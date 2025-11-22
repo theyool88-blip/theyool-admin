@@ -1,0 +1,68 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import CaseEditForm from '@/components/CaseEditForm'
+
+export default async function CaseEditPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  // 사용자 프로필 확인
+  const adminClient = createAdminClient()
+  const { data: profile } = await adminClient
+    .from('users_profiles')
+    .select('*')
+    .eq('auth_user_id', user.id)
+    .single()
+
+  if (!profile) {
+    redirect('/login')
+  }
+
+  // 사건 상세 정보 가져오기
+  const { data: caseData } = await adminClient
+    .from('legal_cases')
+    .select(`
+      *,
+      client:clients(*)
+    `)
+    .eq('id', id)
+    .single()
+
+  if (!caseData) {
+    redirect('/cases')
+  }
+
+  // 모든 사건 목록 (관련 사건 연결용)
+  const { data: allCases } = await adminClient
+    .from('legal_cases')
+    .select('id, case_name, contract_number, status')
+    .neq('id', id)
+    .order('created_at', { ascending: false })
+
+  // 현재 사건의 관련 사건
+  const { data: relatedCases } = await adminClient
+    .from('case_relations')
+    .select(`
+      id,
+      related_case_id,
+      relation_type,
+      notes,
+      related_case:legal_cases!case_relations_related_case_id_fkey(
+        id,
+        case_name,
+        contract_number
+      )
+    `)
+    .eq('case_id', id)
+
+  return <CaseEditForm profile={profile} caseData={caseData} allCases={allCases || []} relatedCases={relatedCases || []} />
+}

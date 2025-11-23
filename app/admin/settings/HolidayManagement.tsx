@@ -11,7 +11,7 @@ interface Holiday {
   created_at: string
 }
 
-export default function HolidaysManagement() {
+export default function HolidayManagement() {
   const [holidays, setHolidays] = useState<Holiday[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
@@ -122,12 +122,11 @@ export default function HolidaysManagement() {
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i)
 
   return (
-    <div className="p-6">
+    <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">공휴일 관리</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            법정 기간 계산에 사용되는 공휴일을 관리합니다
+          <p className="text-sm text-gray-600">
+            법정 기간 계산에 사용되는 공휴일을 관리합니다 (민법 제161조 적용)
           </p>
         </div>
         <button

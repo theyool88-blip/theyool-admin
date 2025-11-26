@@ -64,6 +64,7 @@ interface LegalCase {
   case_type: string | null
   judge_name: string | null
   notes: string | null
+  is_new_case: boolean
   created_at: string
   updated_at: string
   client?: Client
@@ -102,10 +103,33 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [reportModal, setReportModal] = useState<{ title: string; report: string; court?: string | null; caseNumber?: string | null; date?: string | null } | null>(null)
   const [paymentTotal, setPaymentTotal] = useState<number | null>(null)
+  const [isNewCase, setIsNewCase] = useState(caseData.is_new_case ?? false)
+  const [isUpdatingNewCase, setIsUpdatingNewCase] = useState(false)
 
   const router = useRouter()
   const supabase = createClient()
   const clientDisplayName = caseData.client?.name ? `${caseData.client.name}님` : '의뢰인님'
+
+  // 신건여부 토글 함수
+  const handleToggleNewCase = async () => {
+    setIsUpdatingNewCase(true)
+    try {
+      const newValue = !isNewCase
+      const { error } = await supabase
+        .from('legal_cases')
+        .update({ is_new_case: newValue })
+        .eq('id', caseData.id)
+
+      if (error) throw error
+
+      setIsNewCase(newValue)
+    } catch (error) {
+      console.error('신건여부 업데이트 실패:', error)
+      alert('신건여부 변경에 실패했습니다.')
+    } finally {
+      setIsUpdatingNewCase(false)
+    }
+  }
 
   const fetchAllSchedules = useCallback(async () => {
     if (!caseData.court_case_number) return
@@ -312,6 +336,28 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             <span className={`px-2 py-0.5 text-xs font-medium rounded ${getStatusStyle(caseData.status)}`}>
               {caseData.status}
             </span>
+            {/* 신건여부 토글 */}
+            <button
+              onClick={handleToggleNewCase}
+              disabled={isUpdatingNewCase}
+              className={`px-2 py-0.5 text-xs font-medium rounded flex items-center gap-1 transition-colors ${
+                isNewCase
+                  ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              } ${isUpdatingNewCase ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            >
+              {isUpdatingNewCase ? (
+                <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <svg className={`w-3 h-3 ${isNewCase ? 'text-blue-600' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isNewCase ? "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" : "M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"} />
+                </svg>
+              )}
+              신건
+            </button>
           </div>
           <button
             onClick={() => router.push(`/cases/${caseData.id}/edit`)}

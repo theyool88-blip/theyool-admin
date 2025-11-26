@@ -115,12 +115,20 @@ export default function ClientDetail({ clientData }: { clientData: Client }) {
           >
             ← 목록으로
           </Link>
-          <Link
-            href={`/clients/${clientData.id}/edit`}
-            className="px-3 py-1.5 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors"
-          >
-            수정
-          </Link>
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.open(`/admin/client-preview/${clientData.id}?preview=admin`, '_blank')}
+              className="px-3 py-1.5 text-sm font-medium text-sage-700 bg-sage-100 rounded-lg hover:bg-sage-200 transition-colors"
+            >
+              포털 미리보기
+            </button>
+            <Link
+              href={`/clients/${clientData.id}/edit`}
+              className="px-3 py-1.5 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors"
+            >
+              수정
+            </Link>
+          </div>
         </div>
 
         {/* Basic Info Card */}

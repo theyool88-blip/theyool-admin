@@ -18,8 +18,6 @@ import { ko } from 'date-fns/locale'
 import { formatDaysUntil } from '@/types/court-hearing'
 import ScheduleListView from './ScheduleListView'
 import UnifiedScheduleModal, { type EditScheduleData } from './UnifiedScheduleModal'
-import ConsultationScheduleModal from './ConsultationScheduleModal'
-import type { Consultation } from '@/types/consultation'
 
 // 통합 일정 타입
 type ScheduleType = 'trial' | 'consultation' | 'meeting' | 'court_hearing' | 'deadline'
@@ -67,8 +65,9 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
   const [loading, setLoading] = useState(true)
   const [filterType, setFilterType] = useState<'all' | 'court'>('all')
   const [holidays, setHolidays] = useState<Holiday[]>([])
-  const [showConsultationModal, setShowConsultationModal] = useState(false)
-  const [selectedConsultationForSchedule, setSelectedConsultationForSchedule] = useState<Consultation | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [pendingEvents, setPendingEvents] = useState<any[]>([])
+  const [showPendingSection, setShowPendingSection] = useState(false)
 
   const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate])
   const monthEnd = useMemo(() => endOfMonth(currentDate), [currentDate])
@@ -184,6 +183,74 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
   useEffect(() => {
     fetchSchedules()
   }, [fetchSchedules])
+
+  // 캘린더 동기화 함수
+  const handleCalendarSync = async () => {
+    setSyncing(true)
+    try {
+      const response = await fetch('/api/admin/google-calendar/sync', {
+        method: 'POST',
+      })
+      const result = await response.json()
+
+      if (response.ok) {
+        alert(`동기화 완료!\n- 새로 매칭: ${result.matched}건\n- 업데이트: ${result.updated}건\n- 매칭 대기: ${result.pending}건`)
+        fetchSchedules()
+        fetchPendingEvents()
+      } else {
+        alert('동기화 실패: ' + (result.error || '알 수 없는 오류'))
+      }
+    } catch (error) {
+      console.error('Sync error:', error)
+      alert('동기화 중 오류가 발생했습니다.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  // 매칭 안 된 이벤트 조회
+  const fetchPendingEvents = async () => {
+    try {
+      const response = await fetch('/api/admin/google-calendar/sync')
+      const result = await response.json()
+      if (result.pendingEvents) {
+        setPendingEvents(result.pendingEvents)
+        if (result.pendingEvents.length > 0) {
+          setShowPendingSection(true)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching pending events:', error)
+    }
+  }
+
+  // 매칭 재시도
+  const handleRetryPending = async () => {
+    setSyncing(true)
+    try {
+      const response = await fetch('/api/admin/google-calendar/sync?action=retry', {
+        method: 'POST',
+      })
+      const result = await response.json()
+
+      if (response.ok) {
+        alert(`재시도 완료!\n- 새로 매칭: ${result.matched}건\n- 여전히 대기: ${result.stillPending}건`)
+        fetchSchedules()
+        fetchPendingEvents()
+      } else {
+        alert('재시도 실패: ' + (result.error || '알 수 없는 오류'))
+      }
+    } catch (error) {
+      console.error('Retry error:', error)
+      alert('재시도 중 오류가 발생했습니다.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchPendingEvents()
+  }, [])
 
   const applyFilter = useCallback(() => {
     if (filterType === 'all') {
@@ -357,6 +424,34 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   재판
                 </button>
               </div>
+
+              {/* 캘린더 동기화 버튼 */}
+              <button
+                onClick={handleCalendarSync}
+                disabled={syncing}
+                className={`px-2.5 py-1 text-[10px] font-medium rounded-full transition-colors flex items-center gap-1 ${
+                  syncing
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                }`}
+              >
+                {syncing ? (
+                  <>
+                    <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    동기화 중...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    캘린더 동기화
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
@@ -530,7 +625,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                     key={schedule.id}
                     className={`p-3 rounded-lg border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype)} hover:shadow-sm transition-all cursor-pointer border border-gray-100`}
                     onClick={async () => {
-                      // 상담 타입인 경우 ConsultationScheduleModal 오픈
+                      // 상담 타입인 경우 UnifiedScheduleModal로 수정
                       if (schedule.type === 'consultation') {
                         try {
                           // 상담 데이터 가져오기
@@ -538,8 +633,26 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                           const result = await response.json()
 
                           if (response.ok && result.data) {
-                            setSelectedConsultationForSchedule(result.data)
-                            setShowConsultationModal(true)
+                            const consultation = result.data
+                            setEditingSchedule({
+                              id: consultation.id,
+                              event_type: 'CONSULTATION',
+                              event_subtype: consultation.request_type,
+                              reference_id: null,
+                              case_name: consultation.name,
+                              case_id: null,
+                              event_date: consultation.confirmed_date || consultation.preferred_date || schedule.date,
+                              event_time: consultation.confirmed_time || consultation.preferred_time || null,
+                              location: consultation.office_location || null,
+                              description: consultation.message || null,
+                              status: consultation.status,
+                              preferred_date: consultation.preferred_date,
+                              preferred_time: consultation.preferred_time,
+                              confirmed_date: consultation.confirmed_date,
+                              confirmed_time: consultation.confirmed_time
+                            })
+                            setPrefilledDate(consultation.confirmed_date || consultation.preferred_date || schedule.date)
+                            setShowAddModal(true)
                           } else {
                             alert('상담 정보를 불러오는데 실패했습니다.')
                           }
@@ -688,6 +801,96 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
         </div>
       )}
 
+      {/* 매칭 안 된 기일 섹션 */}
+      {pendingEvents.length > 0 && (
+        <div className="bg-amber-50 rounded-lg border border-amber-200 p-4 mt-4">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <h3 className="text-sm font-semibold text-amber-800">
+                매칭 안 된 기일 ({pendingEvents.length}건)
+              </h3>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRetryPending}
+                disabled={syncing}
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                  syncing
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-amber-600 text-white hover:bg-amber-700'
+                }`}
+              >
+                {syncing ? '처리 중...' : '다시 매칭 시도'}
+              </button>
+              <button
+                onClick={() => setShowPendingSection(!showPendingSection)}
+                className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-100 rounded transition-colors"
+              >
+                <svg className={`w-4 h-4 transition-transform ${showPendingSection ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <p className="text-xs text-amber-700 mb-3">
+            아래 기일들은 사건번호와 매칭되지 않았습니다. 해당 사건을 먼저 등록하면 자동으로 연결됩니다.
+          </p>
+
+          {showPendingSection && (
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {pendingEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="bg-white rounded-lg border border-amber-200 p-3"
+                >
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">
+                          {event.parsed_hearing_detail || '기일'}
+                        </span>
+                        <span className="text-[10px] text-gray-500">
+                          {event.start_datetime ? format(new Date(event.start_datetime), 'M/d (E) HH:mm', { locale: ko }) : ''}
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-gray-900 mb-1">
+                        {event.summary}
+                      </p>
+                      <div className="flex flex-wrap gap-2 text-[10px] text-gray-500">
+                        {event.parsed_case_number && (
+                          <span className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            {event.parsed_case_number}
+                          </span>
+                        )}
+                        {event.location && (
+                          <span className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {event.location}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-gray-400">
+                      시도 {event.match_attempts}회
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 일정 추가/수정 모달 */}
       <UnifiedScheduleModal
         isOpen={showAddModal}
@@ -707,41 +910,6 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
         editMode={!!editingSchedule}
         editData={editingSchedule ?? undefined}
       />
-
-      {/* 상담 일정 확정 모달 */}
-      {selectedConsultationForSchedule && (
-        <ConsultationScheduleModal
-          consultation={selectedConsultationForSchedule}
-          isOpen={showConsultationModal}
-          onClose={() => {
-            setShowConsultationModal(false)
-            setSelectedConsultationForSchedule(null)
-          }}
-          onConfirm={async (data) => {
-            try {
-              const response = await fetch(`/api/admin/consultations/${selectedConsultationForSchedule.id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-              })
-
-              if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.error || '일정 확정에 실패했습니다.')
-              }
-
-              // 성공 시 일정 새로고침
-              await fetchSchedules()
-              setShowConsultationModal(false)
-              setSelectedConsultationForSchedule(null)
-              alert('일정이 확정되었습니다.')
-            } catch (error) {
-              console.error('Error confirming schedule:', error)
-              throw error
-            }
-          }}
-        />
-      )}
     </div>
   )
 }

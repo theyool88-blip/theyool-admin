@@ -1,66 +1,137 @@
 /**
  * 관리자용 의뢰인 미리보기 API
- * 관리자가 특정 의뢰인의 포털 화면을 미리볼 수 있게 함
+ * @description 관리자가 특정 의뢰인의 포털 화면을 미리볼 수 있게 함
+ * @endpoint GET /api/admin/client-preview/[clientId]
+ * @returns 의뢰인 기본 정보, 사건 목록, 다가오는 재판기일, 다가오는 기한
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { isAuthenticated } from '@/lib/auth/auth';
+
+// Response Types
+interface ClientInfo {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+}
+
+interface CaseInfo {
+  id: string;
+  case_name: string;
+  contract_number: string;
+  case_type: string;
+  status: string;
+  office: string;
+  contract_date: string;
+  created_at: string;
+  is_new_case: boolean;
+  onedrive_folder_url: string | null;
+}
+
+interface UpcomingHearing {
+  id: string;
+  hearing_date: string;
+  hearing_time: string;
+  court_name: string;
+  case_number: string;
+  case_name: string;
+}
+
+interface UpcomingDeadline {
+  id: string;
+  deadline_date: string;
+  deadline_type: string;
+  description: string;
+  case_name: string;
+}
+
+interface ClientPreviewResponse {
+  success: true;
+  client: ClientInfo;
+  cases: CaseInfo[];
+  upcomingHearings: UpcomingHearing[];
+  upcomingDeadlines: UpcomingDeadline[];
+}
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ clientId: string }> }
 ) {
   try {
-    // 관리자 인증 확인
-    const cookieStore = await cookies();
-    const isAdmin = cookieStore.get('admin_authenticated')?.value === 'true';
-
-    if (!isAdmin) {
-      return NextResponse.json({ error: '관리자 권한이 필요합니다.' }, { status: 401 });
+    // Authentication check
+    const authenticated = await isAuthenticated();
+    if (!authenticated) {
+      return NextResponse.json(
+        { error: '인증이 필요합니다.' },
+        { status: 401 }
+      );
     }
 
+    const supabase = createAdminClient();
     const { clientId } = await params;
-    const supabase = await createClient();
 
-    // 의뢰인 정보 조회
+    // Validate clientId format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(clientId)) {
+      return NextResponse.json(
+        { error: '유효하지 않은 의뢰인 ID입니다.' },
+        { status: 400 }
+      );
+    }
+
+    // 1. 의뢰인 정보 조회
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('id, name, phone')
+      .select('id, name, phone, email')
       .eq('id', clientId)
       .single();
 
-    if (clientError || !client) {
-      return NextResponse.json({ error: '의뢰인을 찾을 수 없습니다.' }, { status: 404 });
+    if (clientError) {
+      console.error('[Client Preview] Client fetch error:', {
+        clientId,
+        error: clientError.message,
+        code: clientError.code
+      });
+      return NextResponse.json(
+        { error: '의뢰인을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
     }
 
-    // 의뢰인의 사건 목록 조회
+    if (!client) {
+      return NextResponse.json(
+        { error: '의뢰인을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
+
+    // 2. 의뢰인의 사건 목록 조회 (is_new_case 필드 포함)
     const { data: cases, error: casesError } = await supabase
       .from('legal_cases')
-      .select('id, case_name, case_number, case_type, status, office_location, created_at, opponent_name')
+      .select('id, case_name, contract_number, case_type, status, office, contract_date, created_at, is_new_case, onedrive_folder_url')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
 
     if (casesError) {
-      console.error('사건 조회 오류:', casesError);
+      console.error('[Client Preview] Cases fetch error:', {
+        clientId,
+        error: casesError.message
+      });
     }
 
-    // 다가오는 재판 조회 (30일 이내)
+    const casesList = cases || [];
+    const caseIds = casesList.map((c) => c.id);
+
+    // Date range for upcoming items (30 days)
     const today = new Date().toISOString().split('T')[0];
     const futureDate = new Date();
     futureDate.setDate(futureDate.getDate() + 30);
     const futureDateStr = futureDate.toISOString().split('T')[0];
 
-    const caseIds = (cases || []).map((c) => c.id);
-
-    let upcomingHearings: Array<{
-      id: string;
-      hearing_date: string;
-      hearing_time: string;
-      court_name: string;
-      case_number: string;
-      case_name: string;
-    }> = [];
+    // 3. 다가오는 재판기일 조회 (30일 이내)
+    let upcomingHearings: UpcomingHearing[] = [];
 
     if (caseIds.length > 0) {
       const { data: hearings, error: hearingsError } = await supabase
@@ -68,10 +139,9 @@ export async function GET(
         .select(`
           id,
           hearing_date,
-          hearing_time,
-          court_name,
+          location,
           case_number,
-          legal_cases (
+          legal_cases!inner (
             case_name
           )
         `)
@@ -79,29 +149,99 @@ export async function GET(
         .gte('hearing_date', today)
         .lte('hearing_date', futureDateStr)
         .order('hearing_date', { ascending: true })
-        .limit(5);
+        .limit(10);
 
-      if (!hearingsError && hearings) {
-        upcomingHearings = hearings.map((h) => ({
-          id: h.id,
-          hearing_date: h.hearing_date,
-          hearing_time: h.hearing_time || '',
-          court_name: h.court_name || '',
-          case_number: h.case_number || '',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          case_name: (h.legal_cases as any)?.case_name || '',
-        }));
+      if (hearingsError) {
+        console.error('[Client Preview] Hearings fetch error:', {
+          clientId,
+          error: hearingsError.message
+        });
+      } else if (hearings) {
+        upcomingHearings = hearings.map((h) => {
+          const legalCase = Array.isArray(h.legal_cases)
+            ? h.legal_cases[0]
+            : h.legal_cases;
+
+          // hearing_date에서 시간 추출 (YYYY-MM-DD HH:MM 형식인 경우)
+          const dateTimeParts = h.hearing_date.split(' ');
+          const date = dateTimeParts[0];
+          const time = dateTimeParts.length > 1 ? dateTimeParts[1] : '';
+
+          return {
+            id: h.id,
+            hearing_date: date,
+            hearing_time: time,
+            court_name: h.location || '',
+            case_number: h.case_number || '',
+            case_name: legalCase?.case_name || '',
+          };
+        });
       }
     }
 
-    return NextResponse.json({
+    // 4. 다가오는 기한 조회 (30일 이내, 미완료만)
+    let upcomingDeadlines: UpcomingDeadline[] = [];
+
+    if (caseIds.length > 0) {
+      const { data: deadlines, error: deadlinesError } = await supabase
+        .from('case_deadlines')
+        .select(`
+          id,
+          deadline_date,
+          deadline_type,
+          notes,
+          status,
+          legal_cases!inner (
+            case_name
+          )
+        `)
+        .in('case_id', caseIds)
+        .neq('status', 'COMPLETED')
+        .gte('deadline_date', today)
+        .lte('deadline_date', futureDateStr)
+        .order('deadline_date', { ascending: true })
+        .limit(10);
+
+      if (deadlinesError) {
+        console.error('[Client Preview] Deadlines fetch error:', {
+          clientId,
+          error: deadlinesError.message
+        });
+      } else if (deadlines) {
+        upcomingDeadlines = deadlines.map((d) => {
+          const legalCase = Array.isArray(d.legal_cases)
+            ? d.legal_cases[0]
+            : d.legal_cases;
+
+          return {
+            id: d.id,
+            deadline_date: d.deadline_date,
+            deadline_type: d.deadline_type || '',
+            description: d.notes || '',
+            case_name: legalCase?.case_name || '',
+          };
+        });
+      }
+    }
+
+    const response: ClientPreviewResponse = {
       success: true,
       client,
-      cases: cases || [],
+      cases: casesList,
       upcomingHearings,
-    });
+      upcomingDeadlines,
+    };
+
+    return NextResponse.json(response);
   } catch (error) {
-    console.error('GET /api/admin/client-preview/[clientId] error:', error);
-    return NextResponse.json({ error: '서버 오류가 발생했습니다.' }, { status: 500 });
+    console.error('[Client Preview] Unexpected error:', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+
+    return NextResponse.json(
+      { error: '서버 오류가 발생했습니다.' },
+      { status: 500 }
+    );
   }
 }

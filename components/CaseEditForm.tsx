@@ -30,6 +30,7 @@ interface LegalCase {
   case_type: string | null
   judge_name: string | null
   notes: string | null
+  onedrive_folder_url: string | null
   client?: Client
 }
 
@@ -87,7 +88,8 @@ export default function CaseEditForm({
     court_name: caseData.court_name || '',
     case_type: caseData.case_type || '',
     judge_name: caseData.judge_name || '',
-    notes: caseData.notes || ''
+    notes: caseData.notes || '',
+    onedrive_folder_url: caseData.onedrive_folder_url || ''
   })
 
   const [allClients, setAllClients] = useState<Client[]>([])
@@ -139,7 +141,8 @@ export default function CaseEditForm({
           court_name: formData.court_name || null,
           case_type: formData.case_type || null,
           judge_name: formData.judge_name || null,
-          notes: formData.notes || null
+          notes: formData.notes || null,
+          onedrive_folder_url: formData.onedrive_folder_url || null
         })
         .eq('id', caseData.id)
 
@@ -410,6 +413,33 @@ export default function CaseEditForm({
               rows={4}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
             />
+          </div>
+
+          {/* OneDrive Folder Link */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-2">소송 서류 폴더 (의뢰인 포털용)</h2>
+            <p className="text-xs text-gray-500 mb-3">
+              원드라이브 공유 폴더 링크를 입력하세요. 의뢰인 포털에서 서류를 확인할 수 있습니다.
+            </p>
+            <input
+              type="url"
+              value={formData.onedrive_folder_url}
+              onChange={(e) => setFormData({...formData, onedrive_folder_url: e.target.value})}
+              placeholder="https://1drv.ms/f/... 또는 https://onedrive.live.com/..."
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
+            />
+            {formData.onedrive_folder_url && (
+              <div className="mt-2">
+                <a
+                  href={formData.onedrive_folder_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-sage-600 hover:text-sage-700 underline"
+                >
+                  링크 열어보기 →
+                </a>
+              </div>
+            )}
           </div>
 
           {/* Related Cases */}

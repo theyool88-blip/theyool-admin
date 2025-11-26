@@ -1,11 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/hearing-reminders",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/consultation-reminders",
+      "path": "/api/cron/daily-reminders",
       "schedule": "0 0 * * *"
     }
   ]

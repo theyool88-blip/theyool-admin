@@ -7,19 +7,38 @@ const CASENOTE_CALENDAR_ID = 'c9c4c72938d6a219203535e47a8c4bbf70aa8b87f88ff16889
 
 // 기일 유형 매핑
 const HEARING_TYPE_MAP: Record<string, string> = {
+  // 변론기일 (HEARING_MAIN)
   '변론': 'HEARING_MAIN',
   '변론준비': 'HEARING_MAIN',
   '증인신문': 'HEARING_MAIN',
+  '당사자신문': 'HEARING_MAIN',
+  '감정': 'HEARING_MAIN',
+  '검증': 'HEARING_MAIN',
+  // 조정기일 (HEARING_MEDIATION)
   '조정': 'HEARING_MEDIATION',
+  '조정조치': 'HEARING_MEDIATION',
+  '화해권고': 'HEARING_MEDIATION',
+  '조정회부': 'HEARING_MEDIATION',
+  // 심문기일 (HEARING_INTERIM)
   '심문': 'HEARING_INTERIM',
   '가처분': 'HEARING_INTERIM',
   '가압류': 'HEARING_INTERIM',
+  '보전처분': 'HEARING_INTERIM',
+  // 조사기일 (HEARING_INVESTIGATION)
   '조사': 'HEARING_INVESTIGATION',
   '면접조사': 'HEARING_INVESTIGATION',
+  '사실조회': 'HEARING_INVESTIGATION',
+  '현장조사': 'HEARING_INVESTIGATION',
+  // 상담·교육 기일 (HEARING_PARENTING)
   '상담': 'HEARING_PARENTING',
   '교육': 'HEARING_PARENTING',
+  '양육상담': 'HEARING_PARENTING',
+  '부모교육': 'HEARING_PARENTING',
+  '면접교섭': 'HEARING_PARENTING',
+  // 선고기일 (HEARING_JUDGMENT)
   '판결선고': 'HEARING_JUDGMENT',
   '선고': 'HEARING_JUDGMENT',
+  '결정선고': 'HEARING_JUDGMENT',
 };
 
 // 이벤트 제목에서 기일 유형 추출
@@ -161,8 +180,8 @@ export async function syncCalendarEvents() {
     });
   }
 
-  // 3. 캘린더 이벤트 가져오기 (1년 전부터 6개월 후까지)
-  const timeMin = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+  // 3. 캘린더 이벤트 가져오기 (오늘부터 6개월)
+  const timeMin = new Date().toISOString();
   const timeMax = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString();
 
   const events = await getCalendarEvents(accessToken, CASENOTE_CALENDAR_ID, {

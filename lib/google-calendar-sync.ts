@@ -161,8 +161,8 @@ export async function syncCalendarEvents() {
     });
   }
 
-  // 3. 캘린더 이벤트 가져오기 (오늘부터 6개월)
-  const timeMin = new Date().toISOString();
+  // 3. 캘린더 이벤트 가져오기 (1년 전부터 6개월 후까지)
+  const timeMin = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
   const timeMax = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString();
 
   const events = await getCalendarEvents(accessToken, CASENOTE_CALENDAR_ID, {

@@ -7,7 +7,7 @@
  * 특징: 5개 고정 마스터 데이터, 생성/수정/삭제 불가
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth/auth';
 import { getDeadlineTypes } from '@/lib/supabase/deadline-types';
 import type {
@@ -30,7 +30,7 @@ import type {
  *   count: 5
  * }
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const authCheck = await isAuthenticated();
     if (!authCheck) {
@@ -50,11 +50,11 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/admin/deadline-types error:', error);
     const response: ApiListResponse<DeadlineTypeMaster> = {
       success: false,
-      error: error.message || '불변기간 타입 조회 실패',
+      error: error instanceof Error ? error.message : '불변기간 타입 조회 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }

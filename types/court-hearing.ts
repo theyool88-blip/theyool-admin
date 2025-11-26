@@ -38,6 +38,16 @@ export const HEARING_STATUS = {
 
 export type HearingStatus = keyof typeof HEARING_STATUS;
 
+// 변론기일 결과 타입
+export const HEARING_RESULT = {
+  CONTINUED: 'CONTINUED',      // 속행
+  CONCLUDED: 'CONCLUDED',      // 종결
+  POSTPONED: 'POSTPONED',      // 연기
+  DISMISSED: 'DISMISSED',      // 추정
+} as const;
+
+export type HearingResult = keyof typeof HEARING_RESULT;
+
 export const DEADLINE_STATUS = {
   PENDING: 'PENDING',
   COMPLETED: 'COMPLETED',
@@ -73,6 +83,13 @@ export const HEARING_STATUS_LABELS: Record<HearingStatus, string> = {
   COMPLETED: '완료',
   POSTPONED: '연기',
   CANCELLED: '취소',
+};
+
+export const HEARING_RESULT_LABELS: Record<HearingResult, string> = {
+  CONTINUED: '속행',
+  CONCLUDED: '종결',
+  POSTPONED: '연기',
+  DISMISSED: '추정',
 };
 
 export const DEADLINE_STATUS_LABELS: Record<DeadlineStatus, string> = {
@@ -155,7 +172,9 @@ export interface CourtHearing {
   hearing_type: HearingType;
   hearing_date: string; // 기일 일시 (ISO 8601 datetime)
   location: string | null; // 법정 (예: "서울가정법원 301호")
-  judge_name: string | null; // 담당 판사
+  judge_name: string | null; // 담당 판사 (deprecated - legal_cases.judge_name 사용 권장)
+  report: string | null; // 재판기일 보고서
+  result: HearingResult | null; // 변론기일 결과 (속행/종결/연기/추정)
   notes: string | null;
   status: HearingStatus;
   created_at: string;

@@ -5,6 +5,12 @@ import CaseDetail from '@/components/CaseDetail'
 
 export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+
+  // "new"는 별도 페이지가 있으므로 리다이렉트
+  if (id === 'new') {
+    redirect('/cases/new')
+  }
+
   const supabase = await createClient()
 
   const {
@@ -66,5 +72,5 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     case_relations: relatedCases || []
   }
 
-  return <CaseDetail profile={profile} caseData={caseDataWithRelations} />
+  return <CaseDetail caseData={caseDataWithRelations} />
 }

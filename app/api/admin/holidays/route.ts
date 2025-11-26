@@ -40,12 +40,13 @@ export async function GET(request: NextRequest) {
       data: data || [],
       count: data?.length || 0
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/admin/holidays error:', error);
+    const message = error instanceof Error ? error.message : '공휴일 조회 실패'
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '공휴일 조회 실패'
+        error: message
       },
       { status: 500 }
     );
@@ -56,6 +57,11 @@ export async function GET(request: NextRequest) {
  * POST /api/admin/holidays
  * 공휴일 추가
  */
+type HolidayPayload = {
+  holiday_date: string
+  holiday_name: string
+}
+
 export async function POST(request: NextRequest) {
   try {
     const authCheck = await isAuthenticated();
@@ -63,7 +69,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 });
     }
 
-    const body = await request.json();
+    const body = (await request.json()) as Partial<HolidayPayload>;
     const { holiday_date, holiday_name } = body;
 
     if (!holiday_date || !holiday_name) {
@@ -98,12 +104,13 @@ export async function POST(request: NextRequest) {
       data,
       message: '공휴일이 추가되었습니다.'
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('POST /api/admin/holidays error:', error);
+    const message = error instanceof Error ? error.message : '공휴일 추가 실패'
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '공휴일 추가 실패'
+        error: message
       },
       { status: 500 }
     );

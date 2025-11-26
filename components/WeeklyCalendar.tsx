@@ -2,8 +2,7 @@
 
 import { startOfWeek, addDays, format, isSameDay } from 'date-fns'
 import { ko } from 'date-fns/locale'
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 
 interface Schedule {
   id: string
@@ -13,38 +12,95 @@ interface Schedule {
   schedule_type: 'trial' | 'consultation' | 'meeting'
   location: string | null
   case_id: string | null
+  event_type?: string
+  reference_id?: string | null
 }
 
-export default function WeeklyCalendar({ initialSchedules }: { initialSchedules: Schedule[] }) {
-  const [currentDate] = useState(new Date())
+interface Holiday {
+  id: string
+  holiday_date: string
+  holiday_name: string
+  year: number
+}
+
+interface WeeklyCalendarProps {
+  initialSchedules: Schedule[]
+  onScheduleClick?: (schedule: Schedule) => void
+  onDateClick?: (date: Date) => void
+  onViewAll?: (date: Date, schedules: Schedule[]) => void
+}
+
+export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDateClick, onViewAll }: WeeklyCalendarProps) {
+  const [currentDate, setCurrentDate] = useState(new Date())
   const [schedules, setSchedules] = useState<Schedule[]>(initialSchedules)
+  const [holidays, setHolidays] = useState<Holiday[]>([])
   const [loading, setLoading] = useState(false)
 
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 }) // 월요일 시작
-  const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
+  const weekStart = useMemo(() => startOfWeek(currentDate, { weekStartsOn: 1 }), [currentDate]) // 월요일 시작
+  const weekEnd = useMemo(() => addDays(weekStart, 6), [weekStart])
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)), [weekStart])
 
-  const supabase = createClient()
-
-  const fetchSchedules = async () => {
+  // currentDate가 변경될 때마다 일정 다시 불러오기
+  const fetchSchedules = useCallback(async () => {
     try {
-      const weekEnd = addDays(weekStart, 6)
+      setLoading(true)
+      const startDate = format(weekStart, 'yyyy-MM-dd')
+      const endDate = format(weekEnd, 'yyyy-MM-dd')
 
-      const { data, error } = await supabase
-        .from('case_schedules')
-        .select('*')
-        .gte('scheduled_date', format(weekStart, 'yyyy-MM-dd'))
-        .lte('scheduled_date', format(weekEnd, 'yyyy-MM-dd'))
-        .eq('status', 'scheduled')
-        .order('scheduled_time', { ascending: true })
+      // 통합 캘린더 API 사용
+      const response = await fetch(`/api/admin/calendar?start_date=${startDate}&end_date=${endDate}`)
+      const result = await response.json()
 
-      if (error) throw error
-      setSchedules(data || [])
+      if (!result.success) {
+        throw new Error(result.error || '일정 조회 실패')
+      }
+
+      // unified_calendar 데이터를 Schedule 형식으로 변환
+      // VIEW에서 이미 한글 제목 형식으로 변환: "(종류) 사건명"
+      const convertedSchedules: Schedule[] = (result.data || []).map((event: {
+        id: string
+        title: string
+        event_date: string
+        event_time?: string | null
+        event_type: string
+        location?: string | null
+        reference_id?: string | null
+      }) => {
+        return {
+          id: event.id,
+          title: event.title, // 이미 "(변론기일) 김OO 이혼사건" 형식으로 저장됨
+          scheduled_date: event.event_date,
+          scheduled_time: event.event_time === '00:00' ? null : event.event_time,
+          schedule_type: event.event_type === 'COURT_HEARING' ? 'trial' :
+                         event.event_type === 'CONSULTATION' ? 'consultation' :
+                         event.event_type === 'DEADLINE' ? 'meeting' : 'meeting',
+          location: event.location,
+          case_id: event.reference_id,
+          event_type: event.event_type,
+          reference_id: event.reference_id
+        }
+      })
+
+      setSchedules(convertedSchedules)
+
+      // 공휴일 조회 (해당 주의 연도)
+      const year = weekStart.getFullYear()
+      const holidayResponse = await fetch(`/api/admin/holidays?year=${year}`)
+      const holidayResult = await holidayResponse.json()
+
+      if (holidayResult.success) {
+        setHolidays(holidayResult.data || [])
+      }
     } catch (error) {
       console.error('일정 로드 실패:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [weekEnd, weekStart])
+
+  useEffect(() => {
+    fetchSchedules()
+  }, [fetchSchedules, currentDate])
 
   const getSchedulesForDay = (day: Date) => {
     return schedules.filter(schedule =>
@@ -52,7 +108,21 @@ export default function WeeklyCalendar({ initialSchedules }: { initialSchedules:
     )
   }
 
-  const getScheduleTypeLabel = (type: string) => {
+  const getHolidayForDay = (day: Date): string | null => {
+    const dateStr = format(day, 'yyyy-MM-dd')
+    const holiday = holidays.find(h => h.holiday_date === dateStr)
+    return holiday ? holiday.holiday_name : null
+  }
+
+  const getScheduleTypeLabel = (type: string, eventType?: string, location?: string | null) => {
+    if (type === 'consultation' && eventType === 'CONSULTATION' && location) {
+      if (location === '천안' || location?.includes('천안')) {
+        return '천안상담'
+      } else if (location === '평택' || location?.includes('평택')) {
+        return '평택상담'
+      }
+    }
+
     switch (type) {
       case 'trial': return '변론'
       case 'consultation': return '상담'
@@ -61,47 +131,123 @@ export default function WeeklyCalendar({ initialSchedules }: { initialSchedules:
     }
   }
 
-  const getScheduleTypeColor = (type: string) => {
+  const getScheduleTypeColor = (type: string, eventType?: string) => {
     switch (type) {
-      case 'trial': return 'bg-purple-50 text-purple-700 border-l-purple-400'
+      case 'trial': return 'bg-sage-50 text-sage-700 border-l-sage-400'
       case 'consultation': return 'bg-blue-50 text-blue-700 border-l-blue-400'
-      case 'meeting': return 'bg-emerald-50 text-emerald-700 border-l-emerald-400'
+      case 'meeting': return 'bg-orange-50 text-orange-700 border-l-orange-400'
       default: return 'bg-gray-50 text-gray-700 border-l-gray-400'
     }
+  }
+
+  const goToPreviousWeek = () => {
+    setCurrentDate(prev => addDays(prev, -7))
+  }
+
+  const goToNextWeek = () => {
+    setCurrentDate(prev => addDays(prev, 7))
+  }
+
+  const goToThisWeek = () => {
+    setCurrentDate(new Date())
   }
 
   if (loading) {
     return (
       <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">이번 주 일정</h2>
+        <h2 className="text-lg font-semibold text-sage-800 mb-4">이번 주 일정</h2>
         <div className="flex justify-center items-center h-64">
-          <p className="text-gray-500">일정을 불러오는 중...</p>
+          <p className="text-sage-500">일정을 불러오는 중...</p>
         </div>
       </div>
     )
   }
 
+  // 날짜 범위 표시 로직 (연도/월이 다른 경우 처리)
+  const getDateRangeText = () => {
+    const startYear = weekStart.getFullYear()
+    const endYear = weekEnd.getFullYear()
+    const startMonth = weekStart.getMonth()
+    const endMonth = weekEnd.getMonth()
+
+    // 연도가 다른 경우
+    if (startYear !== endYear) {
+      return `${format(weekStart, 'yyyy. M월 d일', { locale: ko })} - ${format(weekEnd, 'yyyy. M월 d일', { locale: ko })}`
+    }
+    // 월이 다른 경우
+    if (startMonth !== endMonth) {
+      return `${format(weekStart, 'M월 d일', { locale: ko })} - ${format(weekEnd, 'M월 d일', { locale: ko })}`
+    }
+    // 같은 월인 경우
+    return `${format(weekStart, 'M월 d일', { locale: ko })} - ${format(weekEnd, 'd일', { locale: ko })}`
+  }
+
+  // 현재 주인지 확인
+  const isCurrentWeek = () => {
+    const today = new Date()
+    const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 })
+    return isSameDay(weekStart, currentWeekStart)
+  }
+
+  // 중앙 버튼 텍스트
+  const getCenterButtonText = () => {
+    if (isCurrentWeek()) {
+      return '이번 주'
+    }
+    // 다른 주를 보고 있는 경우 월 정보 표시
+    const startMonth = weekStart.getMonth() + 1
+    const endMonth = weekEnd.getMonth() + 1
+    if (startMonth !== endMonth) {
+      return `${startMonth}월 · ${endMonth}월`
+    }
+    return `${startMonth}월`
+  }
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="card-sage shadow-sage">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-1">
-            이번 주 일정
+          <h2 className="text-xl font-semibold text-sage-800 mb-1">
+            주간 일정
           </h2>
-          <p className="text-sm text-gray-500">
-            {format(weekStart, 'M월 d일', { locale: ko })} - {format(weekDays[6], 'M월 d일', { locale: ko })}
+          <p className="text-sm text-sage-600">
+            {getDateRangeText()}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
+          <button
+            onClick={goToPreviousWeek}
+            className="p-2 text-sage-600 hover:text-sage-800 hover:bg-sage-50 rounded-lg transition-all"
+            title="이전 주"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <button
+            onClick={goToThisWeek}
+            className="px-3 py-2 text-sm font-medium text-sage-700 hover:text-sage-900 hover:bg-sage-50 rounded-lg transition-all"
+          >
+            {getCenterButtonText()}
+          </button>
+          <button
+            onClick={goToNextWeek}
+            className="p-2 text-sage-600 hover:text-sage-800 hover:bg-sage-50 rounded-lg transition-all"
+            title="다음 주"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
           <button
             onClick={fetchSchedules}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-sage-600 hover:text-sage-900 hover:bg-sage-50 rounded-lg transition-all ml-auto"
           >
             새로고침
           </button>
           <a
             href="/schedules"
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+            className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-all shadow-sm hover:shadow-md"
           >
             전체보기
           </a>
@@ -112,40 +258,76 @@ export default function WeeklyCalendar({ initialSchedules }: { initialSchedules:
         {weekDays.map((day, index) => {
           const daySchedules = getSchedulesForDay(day)
           const isToday = isSameDay(day, new Date())
+          const holidayName = getHolidayForDay(day)
+          const isHoliday = holidayName !== null
+          const holidayColor = '#f87171' // tailwind red-400
+          const holidayBg = '#fff1f2' // tailwind red-50
 
           return (
             <div
               key={index}
               className="min-h-[200px] group"
             >
-              <div className="text-center mb-3 pb-2 border-b border-gray-100">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
+              <div className="text-center mb-3 pb-2 border-b border-sage-100">
+                <p className={`text-xs font-medium uppercase tracking-wider mb-1 ${
+                  isHoliday ? 'text-red-500' : 'text-sage-500'
+                }`} style={isHoliday ? { color: holidayColor } : undefined}>
                   {format(day, 'EEE', { locale: ko })}
                 </p>
-                <div className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
-                  isToday
-                    ? 'bg-blue-600 text-white font-semibold'
-                    : 'text-gray-900 font-medium hover:bg-gray-50'
-                }`}>
+                <button
+                  onClick={() => onDateClick && onDateClick(day)}
+                  className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                    isToday
+                      ? isHoliday
+                        ? 'text-red-600 font-semibold'
+                        : 'bg-sage-600 text-white font-semibold hover:bg-sage-700'
+                      : isHoliday
+                      ? 'text-red-500 font-semibold hover:bg-red-50 cursor-pointer'
+                      : 'text-sage-900 font-medium hover:bg-sage-50 cursor-pointer'
+                  }`}
+                  style={
+                    isHoliday
+                      ? {
+                          color: holidayColor,
+                          backgroundColor: isToday ? holidayBg : undefined
+                        }
+                      : undefined
+                  }
+                  title="일정 추가"
+                >
                   {format(day, 'd')}
-                </div>
+                </button>
+                {isHoliday && (
+                  <p
+                    className="text-[10px] text-red-500 font-medium mt-1 truncate px-1"
+                    style={{ color: holidayColor }}
+                    title={holidayName}
+                  >
+                    {holidayName}
+                  </p>
+                )}
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {daySchedules.length === 0 ? (
                   <p className="text-xs text-gray-400 text-center mt-8 opacity-0 group-hover:opacity-100 transition-opacity">
                     일정 없음
                   </p>
                 ) : (
                   <>
-                    {daySchedules.slice(0, 3).map((schedule) => (
+                    {daySchedules.slice(0, 5).map((schedule) => (
                       <div
                         key={schedule.id}
-                        className={`px-2.5 py-2 rounded-md border-l-4 ${getScheduleTypeColor(schedule.schedule_type)} hover:shadow-sm transition-shadow cursor-pointer`}
+                        className={`px-2 pt-1 pb-1.5 rounded-md border-l-4 ${getScheduleTypeColor(schedule.schedule_type, schedule.event_type)} hover:shadow-sm transition-shadow ${onScheduleClick ? 'cursor-pointer' : ''} max-h-[5rem] overflow-hidden`}
+                        onClick={() => {
+                          if (onScheduleClick) {
+                            onScheduleClick(schedule)
+                          }
+                        }}
                       >
-                        <div className="flex items-center gap-1.5 mb-0.5">
+                        <div className="flex items-center gap-1.5">
                           <span className="text-[10px] font-semibold uppercase tracking-wide">
-                            {getScheduleTypeLabel(schedule.schedule_type)}
+                            {getScheduleTypeLabel(schedule.schedule_type, schedule.event_type, schedule.location)}
                           </span>
                           {schedule.scheduled_time && (
                             <>
@@ -156,21 +338,23 @@ export default function WeeklyCalendar({ initialSchedules }: { initialSchedules:
                             </>
                           )}
                         </div>
-                        <p className="text-xs font-medium truncate leading-relaxed" title={schedule.title}>
+                        <p className="text-xs font-medium line-clamp-2 leading-snug" title={schedule.title}>
                           {schedule.title}
                         </p>
                         {schedule.location && (
-                          <p className="text-[10px] opacity-70 mt-1 truncate">
+                          <p className="text-[10px] opacity-70 mt-0.5 truncate">
                             📍 {schedule.location}
                           </p>
                         )}
                       </div>
                     ))}
-                    {daySchedules.length > 3 && (
-                      <div className="text-[11px] text-center text-blue-600 font-medium py-1">
-                        +{daySchedules.length - 3}개
-                      </div>
-                    )}
+                    <button
+                      type="button"
+                      onClick={() => onViewAll && onViewAll(day, daySchedules)}
+                      className="text-[11px] text-center text-sage-600 font-medium py-1 w-full hover:text-sage-800"
+                    >
+                      {daySchedules.length > 5 ? `+${daySchedules.length - 5}` : '+'}
+                    </button>
                   </>
                 )}
               </div>
@@ -182,7 +366,7 @@ export default function WeeklyCalendar({ initialSchedules }: { initialSchedules:
       {schedules.length === 0 && (
         <div className="text-center mt-12 py-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-            <span className="text-2xl">📅</span>
+            
           </div>
           <p className="text-gray-600 font-medium">이번 주에 등록된 일정이 없습니다.</p>
           <p className="text-sm text-gray-500 mt-2">일정 관리 페이지에서 새 일정을 추가하세요.</p>

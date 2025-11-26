@@ -15,6 +15,8 @@ import type {
   ApiListResponse,
   ApiResponse,
   CaseDeadline,
+  DeadlineType,
+  DeadlineStatus,
 } from '@/types/court-hearing';
 
 /**
@@ -43,8 +45,8 @@ export async function GET(request: NextRequest) {
 
     const filters: CaseDeadlineListQuery = {
       case_number: searchParams.get('case_number') || undefined,
-      deadline_type: searchParams.get('deadline_type') as any,
-      status: searchParams.get('status') as any,
+      deadline_type: (searchParams.get('deadline_type') as DeadlineType) || undefined,
+      status: (searchParams.get('status') as DeadlineStatus) || undefined,
       urgent_only: searchParams.get('urgent_only') === 'true',
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50,
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0,
@@ -59,11 +61,11 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/admin/case-deadlines error:', error);
     const response: ApiListResponse<CaseDeadline> = {
       success: false,
-      error: error.message || '데드라인 조회 실패',
+      error: error instanceof Error ? error.message : '데드라인 조회 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }
@@ -113,11 +115,11 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json(response, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error('POST /api/admin/case-deadlines error:', error);
     const response: ApiResponse<CaseDeadline> = {
       success: false,
-      error: error.message || '데드라인 생성 실패',
+      error: error instanceof Error ? error.message : '데드라인 생성 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }

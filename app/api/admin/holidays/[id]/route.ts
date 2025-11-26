@@ -3,7 +3,7 @@
  * @route GET/PATCH/DELETE /api/admin/holidays/[id]
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -13,11 +13,16 @@ interface RouteParams {
   }>;
 }
 
+type HolidayUpdate = {
+  holiday_date?: string;
+  holiday_name?: string;
+}
+
 /**
  * GET /api/admin/holidays/[id]
  * 공휴일 상세 조회
  */
-export async function GET(request: NextRequest, context: RouteParams) {
+export async function GET(_request: unknown, context: RouteParams) {
   try {
     const authCheck = await isAuthenticated();
     if (!authCheck) {
@@ -44,12 +49,13 @@ export async function GET(request: NextRequest, context: RouteParams) {
       success: true,
       data
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/admin/holidays/[id] error:', error);
+    const message = error instanceof Error ? error.message : '공휴일 조회 실패'
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '공휴일 조회 실패'
+        error: message
       },
       { status: 500 }
     );
@@ -60,7 +66,7 @@ export async function GET(request: NextRequest, context: RouteParams) {
  * PATCH /api/admin/holidays/[id]
  * 공휴일 수정
  */
-export async function PATCH(request: NextRequest, context: RouteParams) {
+export async function PATCH(request: Request, context: RouteParams) {
   try {
     const authCheck = await isAuthenticated();
     if (!authCheck) {
@@ -68,10 +74,10 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     }
 
     const params = await context.params;
-    const body = await request.json();
+    const body = (await request.json()) as HolidayUpdate;
     const { holiday_date, holiday_name } = body;
 
-    const updateData: any = {};
+    const updateData: HolidayUpdate = {};
     if (holiday_date !== undefined) updateData.holiday_date = holiday_date;
     if (holiday_name !== undefined) updateData.holiday_name = holiday_name;
 
@@ -90,12 +96,13 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
       data,
       message: '공휴일이 수정되었습니다.'
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('PATCH /api/admin/holidays/[id] error:', error);
+    const message = error instanceof Error ? error.message : '공휴일 수정 실패'
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '공휴일 수정 실패'
+        error: message
       },
       { status: 500 }
     );
@@ -106,7 +113,7 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
  * DELETE /api/admin/holidays/[id]
  * 공휴일 삭제
  */
-export async function DELETE(request: NextRequest, context: RouteParams) {
+export async function DELETE(_request: unknown, context: RouteParams) {
   try {
     const authCheck = await isAuthenticated();
     if (!authCheck) {
@@ -127,12 +134,13 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
       success: true,
       message: '공휴일이 삭제되었습니다.'
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('DELETE /api/admin/holidays/[id] error:', error);
+    const message = error instanceof Error ? error.message : '공휴일 삭제 실패'
     return NextResponse.json(
       {
         success: false,
-        error: error.message || '공휴일 삭제 실패'
+        error: message
       },
       { status: 500 }
     );

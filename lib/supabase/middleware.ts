@@ -15,7 +15,7 @@ export async function updateSession(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) =>
+          cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           )
           supabaseResponse = NextResponse.next({
@@ -33,17 +33,23 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
+  const pathname = request.nextUrl.pathname
+
+  // Admin 경로 보호: /admin/* (단, /admin/login 제외)
+  const isAdminRoute = pathname.startsWith('/admin')
+  const isAdminLoginRoute = pathname === '/admin/login'
+
+  // 로그인하지 않은 경우 admin 페이지 접근 시 로그인 페이지로 리다이렉트
+  if (!user && isAdminRoute && !isAdminLoginRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/login'
+    url.pathname = '/admin/login'
     return NextResponse.redirect(url)
   }
 
   // 로그인한 경우 로그인 페이지 접근 시 대시보드로 리다이렉트
-  if (user && request.nextUrl.pathname === '/login') {
+  if (user && isAdminLoginRoute) {
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = '/admin'
     return NextResponse.redirect(url)
   }
 

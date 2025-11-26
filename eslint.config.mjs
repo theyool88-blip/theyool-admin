@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Project-specific: skip utility scripts (CommonJS, one-off migrations/tests)
+    "scripts/**",
   ]),
 ]);
 

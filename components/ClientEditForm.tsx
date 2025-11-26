@@ -1,8 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import AdminHeader from './AdminHeader'
 
 interface Client {
   id: string
@@ -74,58 +76,28 @@ export default function ClientEditForm({ profile, clientData }: { profile: Profi
     }
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <a href="/" className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center hover:from-blue-600 hover:to-blue-800 transition-colors cursor-pointer">
-              <span className="text-white font-bold text-lg">율</span>
-            </a>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">의뢰인 수정</h1>
-              <p className="text-sm text-gray-600">{clientData.name}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <a
-              href={`/clients/${clientData.id}`}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              취소
-            </a>
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{profile.name}</p>
-              <p className="text-xs text-gray-500">
-                {profile.role === 'admin' ? '관리자' : '직원'}
-              </p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
-      </header>
+      <AdminHeader title="의뢰인 수정" subtitle={clientData.name} />
 
-      {/* 메인 콘텐츠 */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* 기본 정보 */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">기본 정보</h2>
-            <div className="grid grid-cols-2 gap-6">
+      <div className="max-w-3xl mx-auto pt-20 pb-8 px-4">
+        {/* Back Link */}
+        <div className="mb-5">
+          <Link
+            href={`/clients/${clientData.id}`}
+            className="text-sm text-gray-500 hover:text-gray-700"
+          >
+            ← 상세보기로 돌아가기
+          </Link>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          {/* Basic Info */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">기본 정보</h2>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-xs text-gray-500 mb-1">
                   이름 <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -133,64 +105,55 @@ export default function ClientEditForm({ profile, clientData }: { profile: Profi
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  주민등록번호
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">주민등록번호</label>
                 <input
                   type="text"
                   value={formData.resident_number}
                   onChange={(e) => setFormData({ ...formData, resident_number: e.target.value })}
                   placeholder="000000-0000000"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  연락처
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">연락처</label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="010-0000-0000"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  생년월일
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">생년월일</label>
                 <input
                   type="date"
                   value={formData.birth_date}
                   onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500"
+                  style={{ colorScheme: 'light' }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  이메일
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">이메일</label>
                 <input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="example@email.com"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  성별
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">성별</label>
                 <select
                   value={formData.gender}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'M' | 'F' | '' })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500 bg-white"
                 >
                   <option value="">선택</option>
                   <option value="M">남성</option>
@@ -198,61 +161,57 @@ export default function ClientEditForm({ profile, clientData }: { profile: Profi
                 </select>
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  주소
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">주소</label>
                 <input
                   type="text"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500"
                 />
               </div>
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  계좌번호
-                </label>
+                <label className="block text-xs text-gray-500 mb-1">계좌번호</label>
                 <input
                   type="text"
                   value={formData.account_number}
                   onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
                   placeholder="은행명 000-0000-0000"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500"
                 />
               </div>
             </div>
           </div>
 
-          {/* 메모 */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">메모</h2>
+          {/* Memo */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">메모</h2>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={6}
+              rows={4}
               placeholder="의뢰인에 대한 메모를 입력하세요..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-sage-500 focus:border-sage-500 resize-none"
             />
           </div>
 
-          {/* 저장 버튼 */}
-          <div className="flex justify-end gap-4">
-            <a
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-2">
+            <Link
               href={`/clients/${clientData.id}`}
-              className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              className="px-4 py-1.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
             >
               취소
-            </a>
+            </Link>
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-1.5 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {saving ? '저장 중...' : '저장'}
             </button>
           </div>
         </form>
-      </main>
+      </div>
     </div>
   )
 }

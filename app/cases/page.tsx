@@ -35,5 +35,5 @@ export default async function CasesPage() {
     `)
     .order('created_at', { ascending: false })
 
-  return <CasesList profile={profile} initialCases={casesData || []} />
+  return <CasesList initialCases={casesData || []} />
 }

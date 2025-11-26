@@ -75,7 +75,7 @@ export function isNonBusinessDay(date: Date, holidays: string[] = KOREAN_PUBLIC_
  * 토요일 또는 공휴일이면 익일로 이동
  */
 export function getNextBusinessDay(date: Date, holidays: string[] = KOREAN_PUBLIC_HOLIDAYS_2025): Date {
-  let nextDay = new Date(date);
+  const nextDay = new Date(date);
 
   while (isNonBusinessDay(nextDay, holidays)) {
     nextDay.setDate(nextDay.getDate() + 1);
@@ -105,7 +105,7 @@ export function calculateLegalDeadline(
   holidays: string[] = KOREAN_PUBLIC_HOLIDAYS_2025
 ): Date {
   // 1. 기산일 설정
-  let startDate = new Date(triggerDate);
+  const startDate = new Date(triggerDate);
 
   // 2. 초일불산입 처리 (필요시)
   if (excludeInitialDay) {

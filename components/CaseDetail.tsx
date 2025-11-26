@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import type { CourtHearing, CaseDeadline } from '@/types/court-hearing'
 import {
@@ -16,6 +17,9 @@ import {
   DeadlineStatus
 } from '@/types/court-hearing'
 import UnifiedScheduleModal from './UnifiedScheduleModal'
+import AdminHeader from './AdminHeader'
+import HearingDetailModal from './HearingDetailModal'
+import CasePaymentsModal from './CasePaymentsModal'
 
 interface Client {
   id: string
@@ -58,18 +62,12 @@ interface LegalCase {
   court_case_number: string | null
   court_name: string | null
   case_type: string | null
+  judge_name: string | null
   notes: string | null
   created_at: string
   updated_at: string
   client?: Client
   case_relations?: RelatedCase[]
-}
-
-interface Profile {
-  id: string
-  name: string
-  email: string
-  role: string
 }
 
 interface Schedule {
@@ -95,54 +93,50 @@ interface UnifiedScheduleItem {
   source: CourtHearing | CaseDeadline | Schedule
 }
 
-export default function CaseDetail({ profile, caseData }: { profile: Profile, caseData: LegalCase }) {
+export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [unifiedSchedules, setUnifiedSchedules] = useState<UnifiedScheduleItem[]>([])
   const [loading, setLoading] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [selectedHearing, setSelectedHearing] = useState<CourtHearing | null>(null)
+  const [showHearingModal, setShowHearingModal] = useState(false)
+  const [showPaymentModal, setShowPaymentModal] = useState(false)
+  const [reportModal, setReportModal] = useState<{ title: string; report: string; court?: string | null; caseNumber?: string | null; date?: string | null } | null>(null)
+  const [paymentTotal, setPaymentTotal] = useState<number | null>(null)
 
   const router = useRouter()
   const supabase = createClient()
+  const clientDisplayName = caseData.client?.name ? `${caseData.client.name}님` : '의뢰인님'
 
-  useEffect(() => {
-    fetchAllSchedules()
-  }, [])
-
-  const fetchAllSchedules = async () => {
+  const fetchAllSchedules = useCallback(async () => {
     if (!caseData.court_case_number) return
 
     try {
       setLoading(true)
       const unified: UnifiedScheduleItem[] = []
 
-      // Fetch court hearings
       const { data: hearings, error: hearingError } = await supabase
         .from('court_hearings')
         .select('*')
-        .eq('case_number', caseData.court_case_number)
+        .eq('case_id', caseData.id)
         .order('hearing_date', { ascending: true })
 
       if (hearingError) throw hearingError
 
-      // Fetch deadlines
       const { data: deadlines, error: deadlineError } = await supabase
         .from('case_deadlines')
         .select('*')
-        .eq('case_number', caseData.court_case_number)
+        .eq('case_id', caseData.id)
         .order('deadline_date', { ascending: true })
 
       if (deadlineError) throw deadlineError
 
-      // Fetch schedules
-      const { data: schedules, error: scheduleError } = await supabase
-        .from('case_schedules')
+      const { data: schedules } = await supabase
+        .from('general_schedules')
         .select('*')
         .eq('case_id', caseData.id)
-        .order('scheduled_date', { ascending: true })
+        .order('schedule_date', { ascending: true })
 
-      if (scheduleError) throw scheduleError
-
-      // Transform hearings
-      if (hearings) {
+      if (hearings && hearings.length > 0) {
         hearings.forEach(hearing => {
           const date = new Date(hearing.hearing_date)
           const today = new Date()
@@ -165,7 +159,6 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
         })
       }
 
-      // Transform deadlines
       if (deadlines) {
         deadlines.forEach(deadline => {
           const date = new Date(deadline.deadline_date)
@@ -179,7 +172,7 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
             type: 'deadline',
             title: DEADLINE_TYPE_LABELS[deadline.deadline_type as DeadlineType],
             date: deadline.deadline_date,
-            datetime: deadline.deadline_datetime,
+            datetime: `${deadline.deadline_date}T00:00:00`,
             status: deadline.status,
             days_until: daysUntil,
             subtype: deadline.deadline_type,
@@ -188,10 +181,9 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
         })
       }
 
-      // Transform schedules
-      if (schedules) {
+      if (schedules && schedules.length > 0) {
         schedules.forEach(schedule => {
-          const date = new Date(schedule.scheduled_date)
+          const date = new Date(schedule.schedule_date)
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           date.setHours(0, 0, 0, 0)
@@ -201,8 +193,8 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
             id: schedule.id,
             type: 'schedule',
             title: schedule.title,
-            date: schedule.scheduled_date,
-            datetime: schedule.scheduled_time ? `${schedule.scheduled_date}T${schedule.scheduled_time}` : undefined,
+            date: schedule.schedule_date,
+            datetime: schedule.schedule_time ? `${schedule.schedule_date}T${schedule.schedule_time}` : undefined,
             location: schedule.location,
             days_until: daysUntil,
             subtype: schedule.schedule_type,
@@ -211,24 +203,34 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
         })
       }
 
-      // Sort by date
-      unified.sort((a, b) => {
-        return a.date.localeCompare(b.date)
-      })
-
+      unified.sort((a, b) => a.date.localeCompare(b.date))
       setUnifiedSchedules(unified)
     } catch (error) {
       console.error('일정 조회 실패:', error)
+      setUnifiedSchedules([])
     } finally {
       setLoading(false)
     }
-  }
+  }, [caseData.court_case_number, caseData.id, supabase])
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
+  useEffect(() => {
+    fetchAllSchedules()
+  }, [fetchAllSchedules])
+
+  useEffect(() => {
+    const fetchPayments = async () => {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('amount')
+        .eq('case_id', caseData.id)
+
+      if (!error && data) {
+        const total = data.reduce((sum, p) => sum + p.amount, 0)
+        setPaymentTotal(total)
+      }
+    }
+    fetchPayments()
+  }, [caseData.id, supabase])
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-'
@@ -238,7 +240,7 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
   const calculateOutstandingBalance = () => {
     const retainer = caseData.retainer_fee || 0
     const successFee = caseData.calculated_success_fee || 0
-    const received = caseData.total_received || 0
+    const received = (paymentTotal ?? caseData.total_received) || 0
     return retainer + successFee - received
   }
 
@@ -261,520 +263,350 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
     return `${year}.${month}.${day} ${hour}:${minute}`
   }
 
-  const getStatusColor = (status: string) => {
+  const getStatusStyle = (status: string) => {
     return status === '진행중'
-      ? 'bg-emerald-50 text-emerald-700 border-l-emerald-400'
-      : 'bg-gray-50 text-gray-600 border-l-gray-400'
+      ? 'bg-sage-100 text-sage-700'
+      : 'bg-gray-100 text-gray-500'
   }
 
-  const getOfficeColor = (office: string) => {
+  const getOfficeStyle = (office: string | null) => {
     switch (office) {
       case '평택': return 'bg-blue-50 text-blue-700'
       case '천안': return 'bg-purple-50 text-purple-700'
       case '소송구조': return 'bg-amber-50 text-amber-700'
-      default: return 'bg-gray-50 text-gray-700'
+      default: return 'bg-gray-100 text-gray-600'
     }
   }
 
-  const getScheduleTypeColor = (type: 'court_hearing' | 'deadline' | 'schedule', subtype?: string) => {
+  const getScheduleTypeStyle = (type: 'court_hearing' | 'deadline' | 'schedule', subtype?: string) => {
     if (type === 'court_hearing') {
-      // 변호사미팅은 청록색, 일반 법원기일은 파란색
       if (subtype === 'HEARING_LAWYER_MEETING') {
-        return 'bg-teal-50 text-teal-700 border-l-teal-400'
+        return 'border-l-teal-400 bg-teal-50'
       }
-      return 'bg-blue-50 text-blue-700 border-l-blue-400'
+      return 'border-l-blue-400 bg-blue-50'
     } else if (type === 'deadline') {
-      return 'bg-orange-50 text-orange-700 border-l-orange-400'
+      return 'border-l-orange-400 bg-orange-50'
     } else {
-      // Schedule types
       if (subtype === 'trial') {
-        return 'bg-purple-50 text-purple-700 border-l-purple-400'
+        return 'border-l-purple-400 bg-purple-50'
       } else if (subtype === 'consultation') {
-        return 'bg-indigo-50 text-indigo-700 border-l-indigo-400'
+        return 'border-l-indigo-400 bg-indigo-50'
       } else if (subtype === 'meeting') {
-        return 'bg-emerald-50 text-emerald-700 border-l-emerald-400'
+        return 'border-l-emerald-400 bg-emerald-50'
       }
-      return 'bg-gray-50 text-gray-700 border-l-gray-400'
-    }
-  }
-
-  const getHearingStatusColor = (status: HearingStatus) => {
-    switch (status) {
-      case 'SCHEDULED': return 'bg-blue-50 text-blue-700'
-      case 'COMPLETED': return 'bg-green-50 text-green-700'
-      case 'POSTPONED': return 'bg-yellow-50 text-yellow-700'
-      case 'CANCELLED': return 'bg-gray-50 text-gray-600'
-      default: return 'bg-gray-50 text-gray-600'
-    }
-  }
-
-  const getDeadlineStatusColor = (status: DeadlineStatus) => {
-    switch (status) {
-      case 'PENDING': return 'bg-yellow-50 text-yellow-700'
-      case 'COMPLETED': return 'bg-green-50 text-green-700'
-      case 'OVERDUE': return 'bg-red-50 text-red-700'
-      default: return 'bg-gray-50 text-gray-600'
-    }
-  }
-
-  const calculateDaysUntil = (deadlineDate: string): number => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const deadline = new Date(deadlineDate)
-    deadline.setHours(0, 0, 0, 0)
-    const diffTime = deadline.getTime() - today.getTime()
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-  }
-
-  const handleDeleteSchedule = async (item: UnifiedScheduleItem) => {
-    const confirmMsg = item.type === 'court_hearing'
-      ? '이 법원 기일을 삭제하시겠습니까?'
-      : item.type === 'deadline'
-      ? '이 데드라인을 삭제하시겠습니까?'
-      : '이 일정을 삭제하시겠습니까?'
-
-    if (!confirm(confirmMsg)) return
-
-    try {
-      const tableName = item.type === 'court_hearing'
-        ? 'court_hearings'
-        : item.type === 'deadline'
-        ? 'case_deadlines'
-        : 'case_schedules'
-
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq('id', item.id)
-
-      if (error) throw error
-
-      alert('일정이 삭제되었습니다.')
-      fetchAllSchedules()
-    } catch (error: any) {
-      console.error('일정 삭제 실패:', error)
-      alert(`삭제 실패: ${error.message}`)
-    }
-  }
-
-  const handleUpdateHearingStatus = async (hearingId: string, newStatus: HearingStatus) => {
-    try {
-      const { error } = await supabase
-        .from('court_hearings')
-        .update({ status: newStatus })
-        .eq('id', hearingId)
-
-      if (error) throw error
-
-      alert('법원 기일 상태가 변경되었습니다.')
-      fetchAllSchedules()
-    } catch (error: any) {
-      console.error('법원 기일 상태 변경 실패:', error)
-      alert(`상태 변경 실패: ${error.message}`)
-    }
-  }
-
-  const handleCompleteDeadline = async (deadlineId: string) => {
-    try {
-      const { error } = await supabase
-        .from('case_deadlines')
-        .update({
-          status: 'COMPLETED',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', deadlineId)
-
-      if (error) throw error
-
-      alert('데드라인이 완료 처리되었습니다.')
-      fetchAllSchedules()
-    } catch (error: any) {
-      console.error('데드라인 완료 처리 실패:', error)
-      alert(`완료 처리 실패: ${error.message}`)
+      return 'border-l-gray-400 bg-gray-50'
     }
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 헤더 */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <a href="/" className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center hover:from-blue-600 hover:to-blue-800 transition-colors cursor-pointer">
-              <span className="text-white font-bold text-lg">율</span>
-            </a>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">사건 상세</h1>
-              <p className="text-sm text-gray-600">{caseData.case_name}</p>
-            </div>
+      <AdminHeader title="사건 상세" subtitle={caseData.case_name} />
+
+      <div className="max-w-5xl mx-auto pt-20 pb-8 px-4">
+        {/* Header Actions */}
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center gap-2">
+            <span className={`px-2 py-0.5 text-xs font-medium rounded ${getOfficeStyle(caseData.office)}`}>
+              {caseData.office || '-'}
+            </span>
+            <span className={`px-2 py-0.5 text-xs font-medium rounded ${getStatusStyle(caseData.status)}`}>
+              {caseData.status}
+            </span>
           </div>
-          <div className="flex items-center gap-4">
-            <a
-              href="/cases"
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              목록으로
-            </a>
-            <a
-              href={`/cases/${caseData.id}/edit`}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
-            >
-              수정
-            </a>
-            <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{profile.name}</p>
-              <p className="text-xs text-gray-500">
-                {profile.role === 'admin' ? '관리자' : '직원'}
-              </p>
+          <button
+            onClick={() => router.push(`/cases/${caseData.id}/edit`)}
+            className="px-4 py-1.5 text-sm font-medium text-sage-700 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+          >
+            수정
+          </button>
+        </div>
+
+        {/* Case Overview */}
+        <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+          <h2 className="text-sm font-semibold text-gray-900 mb-4">사건 개요</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <label className="text-xs text-gray-500">계약번호</label>
+              <p className="mt-0.5 text-gray-900">{caseData.contract_number || '-'}</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              로그아웃
-            </button>
+            <div>
+              <label className="text-xs text-gray-500">계약일</label>
+              <p className="mt-0.5 text-gray-900">{formatDate(caseData.contract_date)}</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">사건번호</label>
+              <p className="mt-0.5 text-gray-900">{caseData.court_case_number || '-'}</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">법원</label>
+              <p className="mt-0.5 text-gray-900">{caseData.court_name || '-'}</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">담당 판사</label>
+              <p className="mt-0.5 text-gray-900">{caseData.judge_name || '-'}</p>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">사건종류</label>
+              <p className="mt-0.5 text-gray-900">{caseData.case_type || '-'}</p>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-gray-500">사건명</label>
+              <p className="mt-0.5 text-gray-900 font-medium">{caseData.case_name}</p>
+            </div>
           </div>
         </div>
-      </header>
 
-      {/* 메인 콘텐츠 */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-            {/* 사건 개요 */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-900">사건 개요</h2>
-                <div className="flex gap-2">
-                  <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-md ${getOfficeColor(caseData.office)}`}>
-                    {caseData.office}
-                  </span>
-                  <span className={`inline-flex px-3 py-1.5 text-sm font-semibold rounded-md border-l-4 ${getStatusColor(caseData.status)}`}>
-                    {caseData.status}
-                  </span>
-                </div>
+        {/* Fee + Client Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          {/* Fee Info */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4">수임료 정보</h2>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">착수금</span>
+                <span className="font-medium text-gray-900">{formatCurrency(caseData.retainer_fee)}</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-500">계약번호</label>
-                  <p className="mt-1 text-base text-gray-900">{caseData.contract_number || '-'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">계약일</label>
-                  <p className="mt-1 text-base text-gray-900">{formatDate(caseData.contract_date)}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">사건번호</label>
-                  <p className="mt-1 text-base text-gray-900">{caseData.court_case_number || '-'}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">법원</label>
-                  <p className="mt-1 text-base text-gray-900">{caseData.court_name || '-'}</p>
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm font-medium text-gray-500">사건명</label>
-                  <p className="mt-1 text-base text-gray-900 font-semibold">{caseData.case_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-500">사건종류</label>
-                  <p className="mt-1 text-base text-gray-900">{caseData.case_type || '-'}</p>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">발생 성공보수</span>
+                <span className="font-medium text-blue-600">{formatCurrency(caseData.calculated_success_fee)}</span>
               </div>
-            </div>
-
-            {/* 수임료 정보 + 의뢰인 정보 */}
-            <div className="grid grid-cols-2 gap-6">
-              {/* 수임료 정보 */}
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">수임료 정보</h2>
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-500">착수금</label>
-                    <p className="mt-1 text-lg font-semibold text-gray-900">{formatCurrency(caseData.retainer_fee)}</p>
-                  </div>
-                  <div className="border-t border-gray-100 pt-4">
-                    <label className="text-sm font-medium text-gray-500">발생 성공보수</label>
-                    <p className="mt-1 text-lg font-semibold text-blue-600">{formatCurrency(caseData.calculated_success_fee)}</p>
-                  </div>
-                  <div className="border-t border-gray-100 pt-4">
-                    <label className="text-sm font-medium text-gray-500">입금액</label>
-                    <p className="mt-1 text-lg font-semibold text-emerald-600">{formatCurrency(caseData.total_received)}</p>
-                  </div>
-                  <div className="border-t border-gray-100 pt-4">
-                    <label className="text-sm font-medium text-gray-500">미수금</label>
-                    <p className="mt-1 text-xs text-gray-500 mb-1">(착수금 + 발생성보 - 입금액)</p>
-                    <p className="text-lg font-semibold text-red-600">{formatCurrency(calculateOutstandingBalance())}</p>
-                  </div>
-                  {caseData.success_fee_agreement && (
-                    <div className="border-t border-gray-100 pt-4">
-                      <label className="text-sm font-medium text-gray-500">성공보수 약정</label>
-                      <p className="mt-1 text-sm text-gray-700">{caseData.success_fee_agreement}</p>
-                    </div>
-                  )}
-                </div>
+              <div className="flex justify-between border-t border-gray-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="text-gray-500 underline hover:text-sage-600"
+                >
+                  입금액
+                </button>
+                <span className="font-medium text-emerald-600">{formatCurrency(paymentTotal ?? caseData.total_received)}</span>
               </div>
-
-              {/* 의뢰인 정보 */}
-              {caseData.client && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-6">의뢰인 정보</h2>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">이름</label>
-                      <p className="mt-1 text-base text-gray-900 font-semibold">{caseData.client.name}</p>
-                    </div>
-                    {caseData.client.phone && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">연락처</label>
-                        <p className="mt-1 text-base text-gray-900">{caseData.client.phone}</p>
-                      </div>
-                    )}
-                    {caseData.client.email && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">이메일</label>
-                        <p className="mt-1 text-base text-gray-900">{caseData.client.email}</p>
-                      </div>
-                    )}
-                    {caseData.client.birth_date && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">생년월일</label>
-                        <p className="mt-1 text-base text-gray-900">{formatDate(caseData.client.birth_date)}</p>
-                      </div>
-                    )}
-                    {caseData.client.gender && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">성별</label>
-                        <p className="mt-1 text-base text-gray-900">{caseData.client.gender === 'M' ? '남성' : '여성'}</p>
-                      </div>
-                    )}
-                    {caseData.client.address && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">주소</label>
-                        <p className="mt-1 text-base text-gray-900">{caseData.client.address}</p>
-                      </div>
-                    )}
-                    {caseData.client.notes && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-500">메모</label>
-                        <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">{caseData.client.notes}</p>
-                      </div>
-                    )}
-                  </div>
+              <div className="flex justify-between border-t border-gray-100 pt-3">
+                <span className="text-gray-500">미수금</span>
+                <span className="font-bold text-red-600">{formatCurrency(calculateOutstandingBalance())}</span>
+              </div>
+              {caseData.success_fee_agreement && (
+                <div className="border-t border-gray-100 pt-3">
+                  <label className="text-xs text-gray-500">성공보수 약정</label>
+                  <p className="mt-0.5 text-gray-700">{caseData.success_fee_agreement}</p>
                 </div>
               )}
             </div>
+          </div>
 
-            {/* 관련 사건 */}
-            {caseData.case_relations && caseData.case_relations.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">관련 사건</h2>
-                <div className="grid grid-cols-2 gap-3">
-                  {caseData.case_relations.map((relation) => (
-                    <div
-                      key={relation.id}
-                      onClick={() => router.push(`/cases/${relation.related_case_id}`)}
-                      className="p-4 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-all"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          {relation.relation_type && (
-                            <span className="inline-block px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-700 rounded">
-                              {relation.relation_type}
-                            </span>
-                          )}
-                        </div>
-                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {relation.related_case?.case_name || '사건명 없음'}
-                      </p>
-                      {relation.related_case?.contract_number && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {relation.related_case.contract_number}
-                        </p>
-                      )}
-                      {relation.notes && (
-                        <p className="mt-2 text-xs text-gray-600">{relation.notes}</p>
-                      )}
-                    </div>
-                  ))}
+          {/* Client Info */}
+          {caseData.client && (
+            <div
+              className="bg-white rounded-lg border border-gray-200 p-5 cursor-pointer hover:border-sage-300 transition-colors"
+              onClick={() => router.push(`/clients/${caseData.client_id}`)}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-gray-900">의뢰인 정보</h2>
+                <span className="text-xs text-sage-600">상세보기 &rarr;</span>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div>
+                  <label className="text-xs text-gray-500">이름</label>
+                  <p className="mt-0.5 text-gray-900 font-medium">{caseData.client.name}</p>
                 </div>
+                {caseData.client.phone && (
+                  <div>
+                    <label className="text-xs text-gray-500">연락처</label>
+                    <p className="mt-0.5 text-gray-900">{caseData.client.phone}</p>
+                  </div>
+                )}
+                {caseData.client.email && (
+                  <div>
+                    <label className="text-xs text-gray-500">이메일</label>
+                    <p className="mt-0.5 text-gray-900">{caseData.client.email}</p>
+                  </div>
+                )}
+                {caseData.client.birth_date && (
+                  <div>
+                    <label className="text-xs text-gray-500">생년월일</label>
+                    <p className="mt-0.5 text-gray-900">{formatDate(caseData.client.birth_date)}</p>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* 메모 */}
-            {caseData.notes && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">메모</h2>
-                <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{caseData.notes}</p>
-              </div>
-            )}
-
-          {/* 일정 목록 (Unified Schedules) */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">일정 목록</h2>
-              <button
-                onClick={() => setShowScheduleModal(true)}
-                className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                + 일정 추가
-              </button>
             </div>
+          )}
+        </div>
 
-            {!caseData.court_case_number ? (
-              <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                  <span className="text-2xl">⚠️</span>
+        {/* Related Cases */}
+        {caseData.case_relations && caseData.case_relations.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">관련 사건</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {caseData.case_relations.map((relation) => (
+                <div
+                  key={relation.id}
+                  onClick={() => router.push(`/cases/${relation.related_case_id}`)}
+                  className="flex items-center justify-between p-3 border border-gray-200 rounded hover:border-sage-300 hover:bg-gray-50 cursor-pointer transition-colors"
+                >
+                  <div>
+                    {relation.relation_type && (
+                      <span className="inline-block px-1.5 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded mr-2">
+                        {relation.relation_type}
+                      </span>
+                    )}
+                    <span className="text-sm text-gray-900">{relation.related_case?.case_name || '사건명 없음'}</span>
+                    {relation.related_case?.contract_number && (
+                      <span className="text-xs text-gray-400 ml-2">{relation.related_case.contract_number}</span>
+                    )}
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
                 </div>
-                <p className="text-gray-600 font-medium">사건번호가 등록되지 않았습니다.</p>
-                <p className="text-sm text-gray-500 mt-1">사건번호를 먼저 등록해주세요.</p>
-              </div>
-            ) : loading ? (
-              <div className="text-center py-12">
-                <p className="text-gray-500">로딩 중...</p>
-              </div>
-            ) : unifiedSchedules.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-                  <span className="text-2xl">📅</span>
-                </div>
-                <p className="text-gray-600 font-medium">등록된 일정이 없습니다.</p>
-                <p className="text-sm text-gray-500 mt-1">새로운 일정을 추가해보세요.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {unifiedSchedules.map((item) => {
-                  const isHearing = item.type === 'court_hearing'
-                  const isDeadline = item.type === 'deadline'
-                  const isSchedule = item.type === 'schedule'
-                  const source = item.source as any
+              ))}
+            </div>
+          </div>
+        )}
 
-                  return (
-                    <div
-                      key={`${item.type}-${item.id}`}
-                      className={`p-4 border-2 rounded-lg hover:shadow-md transition-all ${getScheduleTypeColor(item.type, item.subtype)}`}
-                    >
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3 flex-wrap">
-                          <span className={`px-3 py-1.5 rounded-md text-sm font-semibold ${getScheduleTypeColor(item.type, item.subtype)}`}>
-                            {item.title}
+        {/* Notes */}
+        {caseData.notes && (
+          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">메모</h2>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{caseData.notes}</p>
+          </div>
+        )}
+
+        {/* Schedules */}
+        <div className="bg-white rounded-lg border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold text-gray-900">일정 목록</h2>
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              className="px-3 py-1 text-xs font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
+            >
+              + 일정 추가
+            </button>
+          </div>
+
+          {!caseData.court_case_number ? (
+            <div className="py-8 text-center text-gray-400 text-sm">
+              사건번호를 먼저 등록해주세요
+            </div>
+          ) : loading ? (
+            <div className="py-8 text-center text-gray-400 text-sm">
+              로딩 중...
+            </div>
+          ) : unifiedSchedules.length === 0 ? (
+            <div className="py-8 text-center text-gray-400 text-sm">
+              등록된 일정이 없습니다
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {unifiedSchedules.map((item) => {
+                const isHearing = item.type === 'court_hearing'
+                const isDeadline = item.type === 'deadline'
+                const source = item.source
+                const itemKey = `${item.type}-${item.id}`
+                const hasReport = isHearing && 'report' in source && source.report
+
+                return (
+                  <div
+                    key={itemKey}
+                    onClick={() => {
+                      if (isHearing) {
+                        setSelectedHearing(item.source as CourtHearing)
+                        setShowHearingModal(true)
+                      }
+                    }}
+                    className={`border-l-4 rounded p-3 cursor-pointer hover:shadow-sm transition-shadow ${getScheduleTypeStyle(item.type, item.subtype)}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium text-gray-700">{item.title}</span>
+                        {item.status && (
+                          <span className={`text-xs ${
+                            isHearing
+                              ? item.status === 'COMPLETED' ? 'text-green-600' :
+                                item.status === 'POSTPONED' ? 'text-yellow-600' :
+                                item.status === 'CANCELLED' ? 'text-gray-500' :
+                                'text-blue-600'
+                              : item.status === 'COMPLETED' ? 'text-green-600' :
+                                item.status === 'OVERDUE' ? 'text-red-600' :
+                                'text-yellow-600'
+                          }`}>
+                            {isHearing
+                              ? item.status === 'COMPLETED'
+                                ? '속행'
+                                : HEARING_STATUS_LABELS[item.status as HearingStatus]
+                              : DEADLINE_STATUS_LABELS[item.status as DeadlineStatus]}
                           </span>
-
-                          {item.status && (
-                            <span className={`px-3 py-1.5 rounded-md text-sm font-semibold ${
-                              isHearing
-                                ? getHearingStatusColor(item.status as HearingStatus)
-                                : getDeadlineStatusColor(item.status as DeadlineStatus)
-                            }`}>
-                              {isHearing
-                                ? HEARING_STATUS_LABELS[item.status as HearingStatus]
-                                : DEADLINE_STATUS_LABELS[item.status as DeadlineStatus]
-                              }
-                            </span>
-                          )}
-
-                          {item.days_until !== undefined && (
-                            <span className={`px-3 py-1.5 rounded-md text-sm font-bold ${
-                              item.days_until <= 1 ? 'bg-red-100 text-red-700' :
-                              item.days_until <= 3 ? 'bg-orange-100 text-orange-700' :
-                              item.days_until <= 7 ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-green-100 text-green-700'
-                            }`}>
-                              {formatDaysUntil(item.days_until)}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          {item.datetime && (
-                            <span className="text-sm font-semibold text-gray-900">
-                              {formatDateTime(item.datetime)}
-                            </span>
-                          )}
-                          {!item.datetime && item.date && (
-                            <span className="text-sm font-semibold text-gray-900">
-                              {formatDate(item.date)}
-                            </span>
-                          )}
-
-                          {/* Action buttons based on type */}
-                          {isHearing && item.status === 'SCHEDULED' && (
-                            <button
-                              onClick={() => handleUpdateHearingStatus(item.id, 'COMPLETED')}
-                              className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100"
-                            >
-                              완료
-                            </button>
-                          )}
-
-                          {isDeadline && item.status === 'PENDING' && (
-                            <button
-                              onClick={() => handleCompleteDeadline(item.id)}
-                              className="px-3 py-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 rounded hover:bg-green-100"
-                            >
-                              완료
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => handleDeleteSchedule(item)}
-                            className="px-3 py-1 text-xs font-semibold text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100"
-                          >
-                            삭제
-                          </button>
-                        </div>
+                        )}
+                        {item.days_until !== undefined && (
+                          <span className={`text-xs font-medium ${
+                            item.days_until <= 1 ? 'text-red-600' :
+                            item.days_until <= 3 ? 'text-orange-600' :
+                            item.days_until <= 7 ? 'text-yellow-600' :
+                            'text-green-600'
+                          }`}>
+                            {formatDaysUntil(item.days_until)}
+                          </span>
+                        )}
                       </div>
+                      <span className="text-xs text-gray-600">
+                        {item.datetime ? formatDateTime(item.datetime) : formatDate(item.date)}
+                      </span>
+                    </div>
 
-                      {/* Additional details */}
-                      <div className="space-y-2">
+                    {(item.location || hasReport) && (
+                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
                         {item.location && (
-                          <p className="text-sm text-gray-600 flex items-center gap-1.5">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <span className="flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                             </svg>
                             {item.location}
-                          </p>
+                          </span>
                         )}
-
-                        {isHearing && source.judge_name && (
-                          <p className="text-sm text-gray-600">
-                            담당 판사: {source.judge_name}
-                          </p>
-                        )}
-
-                        {isDeadline && (
-                          <div className="grid grid-cols-2 gap-4 text-sm pt-2">
-                            <div>
-                              <p className="text-gray-500">기산일</p>
-                              <p className="text-gray-900 font-medium">{formatDate(source.trigger_date)}</p>
-                            </div>
-                            {source.completed_at && (
-                              <div>
-                                <p className="text-gray-500">완료일</p>
-                                <p className="text-green-600 font-medium">{formatDateTime(source.completed_at)}</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {(source.notes || source.description) && (
-                          <p className="text-sm text-gray-600 italic mt-2 pt-2 border-t border-gray-100">
-                            {source.notes || source.description}
-                          </p>
+                        {hasReport && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setReportModal({
+                                title: `${item.title || '재판기일'} 보고서`,
+                                report: source.report || '',
+                                court: caseData.court_name,
+                                caseNumber: caseData.court_case_number,
+                                date: item.date
+                              })
+                            }}
+                            className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            보고서 보기
+                          </button>
                         )}
                       </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
+                    )}
+
+                    {isDeadline && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        기산일: {formatDate((source as CaseDeadline).trigger_date)}
+                        {(source as CaseDeadline).completed_at && (
+                          <span className="ml-3 text-green-600">
+                            완료: {formatDateTime((source as CaseDeadline).completed_at!)}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {(('notes' in source && source.notes) || ('description' in source && source.description)) && (
+                      <p className="mt-2 text-xs text-gray-500 italic">
+                        {('notes' in source && source.notes) || ('description' in source && source.description)}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
-      </main>
+      </div>
 
       {/* Unified Schedule Modal */}
       <UnifiedScheduleModal
@@ -785,6 +617,114 @@ export default function CaseDetail({ profile, caseData }: { profile: Profile, ca
           setShowScheduleModal(false)
         }}
         prefilledCaseNumber={caseData.court_case_number || undefined}
+      />
+
+      <HearingDetailModal
+        isOpen={showHearingModal}
+        onClose={() => {
+          setShowHearingModal(false)
+          setSelectedHearing(null)
+        }}
+        onSuccess={() => {
+          fetchAllSchedules()
+        }}
+        hearing={selectedHearing}
+      />
+
+      {/* Report Modal */}
+      {reportModal && (
+        <div className="fixed inset-0 z-[20050] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white w-full max-w-2xl rounded-lg border border-gray-200 overflow-hidden max-h-[90vh] overflow-y-auto">
+            <div className="relative px-6 pt-4 pb-3 flex items-center justify-center border-b border-gray-100">
+              <Image
+                src="/images/logo-horizontal.png"
+                alt="법무법인 더율 로고"
+                width={110}
+                height={22}
+                className="h-5 w-auto"
+                priority
+              />
+              <button
+                onClick={() => setReportModal(null)}
+                className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="닫기"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="px-8 py-8 text-sm text-gray-900 leading-relaxed space-y-4">
+              <div className="text-center">
+                <p className="text-lg font-bold">변론기일진행보고서</p>
+              </div>
+
+              <div className="space-y-2 text-sm">
+                <div className="flex gap-4">
+                  <span className="w-14 text-gray-500">수신</span>
+                  <span>{clientDisplayName}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="w-14 text-gray-500">발신</span>
+                  <span>법무법인 더율 담당 변호사</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="w-14 text-gray-500">사안</span>
+                  <span>{`${reportModal.court || '해당법원'} ${reportModal.caseNumber || '해당사건번호'}`}</span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="w-14 text-gray-500">변론기일</span>
+                  <span>{reportModal.date ? new Date(reportModal.date).toLocaleDateString('ko-KR') : '-'}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4 space-y-3">
+                <p>
+                  {clientDisplayName.replace('님', '')}님이 의뢰하신 위 사건에 대하여 다음과 같이 변론기일보고를 드립니다.
+                </p>
+
+                <p className="text-center font-semibold">다음</p>
+
+                <div className="whitespace-pre-wrap min-h-[160px]">
+                  {reportModal.report || '등록된 보고서가 없습니다.'}
+                </div>
+
+                <p className="text-center text-gray-500">
+                  {reportModal.date ? new Date(reportModal.date).toLocaleDateString('ko-KR') : ''}
+                </p>
+
+                <div className="text-right mt-6 space-y-1">
+                  <div className="inline-flex items-center justify-end gap-2">
+                    <p className="font-bold">법무법인 더율</p>
+                    <Image
+                      src="/images/stamp-lawfirm.svg"
+                      alt="법무법인 더율 법인인감"
+                      width={48}
+                      height={48}
+                      className="h-12 w-12"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500">담당 변호사</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Case Payments Modal */}
+      <CasePaymentsModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        caseId={caseData.id}
+        caseName={caseData.case_name}
+        clientName={caseData.client?.name}
+        officeLocation={
+          caseData.office === '평택' || caseData.office === '천안'
+            ? caseData.office
+            : undefined
+        }
       />
     </div>
   )

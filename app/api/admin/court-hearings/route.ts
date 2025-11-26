@@ -15,6 +15,8 @@ import type {
   ApiListResponse,
   ApiResponse,
   CourtHearing,
+  HearingType,
+  HearingStatus,
 } from '@/types/court-hearing';
 
 /**
@@ -43,10 +45,13 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
 
+    const hearingType = searchParams.get('hearing_type') as HearingType | null
+    const hearingStatus = searchParams.get('status') as HearingStatus | null
+
     const filters: CourtHearingListQuery = {
       case_number: searchParams.get('case_number') || undefined,
-      hearing_type: searchParams.get('hearing_type') as any,
-      status: searchParams.get('status') as any,
+      hearing_type: hearingType || undefined,
+      status: hearingStatus || undefined,
       from_date: searchParams.get('from_date') || undefined,
       to_date: searchParams.get('to_date') || undefined,
       limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 50,
@@ -62,11 +67,11 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/admin/court-hearings error:', error);
     const response: ApiListResponse<CourtHearing> = {
       success: false,
-      error: error.message || '법원 기일 조회 실패',
+      error: error instanceof Error ? error.message : '법원 기일 조회 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }
@@ -117,11 +122,11 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json(response, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error('POST /api/admin/court-hearings error:', error);
     const response: ApiResponse<CourtHearing> = {
       success: false,
-      error: error.message || '법원 기일 생성 실패',
+      error: error instanceof Error ? error.message : '법원 기일 생성 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }

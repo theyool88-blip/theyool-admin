@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import MonthlyCalendar from '@/components/MonthlyCalendar'
+import AdminHeader from '@/components/AdminHeader'
 
 export default async function SchedulesPage() {
   const supabase = await createClient()
@@ -26,5 +27,10 @@ export default async function SchedulesPage() {
     redirect('/login')
   }
 
-  return <MonthlyCalendar profile={profile} />
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <AdminHeader title="일정 관리" />
+      <MonthlyCalendar profile={profile} />
+    </div>
+  )
 }

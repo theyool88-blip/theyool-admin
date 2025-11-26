@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
@@ -17,6 +18,12 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setError('환경 변수가 설정되지 않았습니다.')
+      setLoading(false)
+      return
+    }
+
     try {
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -24,45 +31,56 @@ export default function LoginPage() {
       })
 
       if (signInError) {
-        console.error('로그인 에러:', signInError)
-        setError(`로그인 실패: ${signInError.message}`)
+        setError('이메일 또는 비밀번호가 올바르지 않습니다.')
         setLoading(false)
         return
       }
 
       if (data.user) {
-        // 로그인 성공 - 대시보드로 이동
         router.push('/')
         router.refresh()
       }
-    } catch (err) {
+    } catch {
       setError('로그인 중 오류가 발생했습니다.')
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-            법무법인 더율
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            관리자 시스템 로그인
-          </p>
-        </div>
-
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
-          {error && (
-            <div className="rounded-md bg-red-50 p-4">
-              <p className="text-sm text-red-800">{error}</p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="w-full max-w-sm">
+        {/* Login Card */}
+        <div className="bg-white border border-gray-200 rounded-lg p-8">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <Image
+                src="/images/logo-horizontal.png"
+                alt="법무법인 더율"
+                width={140}
+                height={36}
+                className="h-6 w-auto"
+                style={{
+                  filter: 'brightness(0) saturate(100%) invert(46%) sepia(13%) saturate(1243%) hue-rotate(118deg) brightness(93%) contrast(87%)'
+                }}
+                priority
+              />
             </div>
-          )}
+            <p className="text-xs text-gray-500">
+              관리자 시스템
+            </p>
+          </div>
 
-          <div className="rounded-md shadow-sm space-y-4">
+          {/* Login Form */}
+          <form className="space-y-4" onSubmit={handleLogin}>
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded px-3 py-2">
+                <p className="text-xs text-red-600">{error}</p>
+              </div>
+            )}
+
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="email" className="block text-xs font-medium text-gray-700 mb-1.5">
                 이메일
               </label>
               <input
@@ -73,14 +91,14 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                className="w-full h-9 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500 transition-colors"
                 placeholder="admin@theyool.com"
                 disabled={loading}
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="password" className="block text-xs font-medium text-gray-700 mb-1.5">
                 비밀번호
               </label>
               <input
@@ -91,27 +109,40 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="비밀번호"
+                className="w-full h-9 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500 transition-colors"
+                placeholder="비밀번호 입력"
                 disabled={loading}
               />
             </div>
-          </div>
 
-          <div>
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-9 mt-2 text-sm font-medium text-white bg-sage-600 rounded hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? '로그인 중...' : '로그인'}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  로그인 중...
+                </span>
+              ) : (
+                '로그인'
+              )}
             </button>
-          </div>
-        </form>
+          </form>
+        </div>
 
-        <div className="text-center text-xs text-gray-500">
-          <p>관리자 및 직원 전용</p>
-          <p className="mt-1">문제가 있으시면 시스템 관리자에게 문의하세요</p>
+        {/* Footer */}
+        <div className="mt-6 text-center">
+          <p className="text-xs text-gray-400">
+            관리자 전용 시스템입니다
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            &copy; 2025 법무법인 더율
+          </p>
         </div>
       </div>
     </div>

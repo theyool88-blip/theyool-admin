@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <rect x="4" y="4" width="192" height="192" fill="none" stroke="#c53030" stroke-width="6" />
+  <rect x="4" y="4" width="192" height="192" fill="rgba(197,48,48,0.12)" />
+  <text x="100" y="88" font-family="Noto Sans KR, Arial, sans-serif" font-weight="800" font-size="28" fill="#c53030" text-anchor="middle" dominant-baseline="middle">
+    법무법인
+  </text>
+  <text x="100" y="136" font-family="Noto Sans KR, Arial, sans-serif" font-weight="800" font-size="32" fill="#c53030" text-anchor="middle" dominant-baseline="middle">
+    더율
+  </text>
+</svg>

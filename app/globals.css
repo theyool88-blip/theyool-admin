@@ -1,8 +1,91 @@
 @import "tailwindcss";
 
+@theme {
+  /* Sage Green - 임신 앱 스타일 메인 컬러 */
+  --color-sage-50: #F0F9F7;
+  --color-sage-100: #E8F5F2;
+  --color-sage-200: #D1EBE5;
+  --color-sage-300: #B3DDD4;
+  --color-sage-400: #8CCABE;
+  --color-sage-500: #6DB5A4;
+  --color-sage-600: #5A9988;
+  --color-sage-700: #487A6C;
+  --color-sage-800: #365B51;
+  --color-sage-900: #243D36;
+
+  /* Coral Pink - 강조 컬러 */
+  --color-coral-50: #FEF7F8;
+  --color-coral-100: #FDEFF1;
+  --color-coral-200: #FBD9DF;
+  --color-coral-300: #F8BECB;
+  --color-coral-400: #F6A4B7;
+  --color-coral-500: #F4A5B0;
+  --color-coral-600: #EF7E90;
+  --color-coral-700: #E85A72;
+  --color-coral-800: #D13C5A;
+  --color-coral-900: #A12E45;
+
+  /* Cream - 배경색 */
+  --color-cream-50: #FEFEFE;
+  --color-cream-100: #FAFAFA;
+  --color-cream-200: #F5F5F5;
+  --color-cream-300: #F0F0F0;
+  --color-cream-400: #EBEBEB;
+  --color-cream-500: #E5E5E5;
+  --color-cream-600: #D9D9D9;
+  --color-cream-700: #BFBFBF;
+  --color-cream-800: #999999;
+  --color-cream-900: #666666;
+
+  /* Neutral - 텍스트 */
+  --color-neutral-50: #FAFAFA;
+  --color-neutral-100: #F5F5F5;
+  --color-neutral-200: #EFEFEF;
+  --color-neutral-300: #DDDDDD;
+  --color-neutral-400: #AAAAAA;
+  --color-neutral-500: #999999;
+  --color-neutral-600: #777777;
+  --color-neutral-700: #666666;
+  --color-neutral-800: #333333;
+  --color-neutral-900: #1A1A1A;
+}
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1d1d1f;
+
+  /* ===== Sage Green CSS Variables - 관리자 시스템 ===== */
+  /* Backgrounds */
+  --sage-bg-light: linear-gradient(to bottom, white, rgba(240, 249, 247, 0.2), white);
+  --sage-bg-medium: linear-gradient(to bottom, rgba(240, 249, 247, 1), white, white);
+  --sage-accent-pattern: radial-gradient(circle at top right, rgba(109, 181, 164, 0.2), rgba(90, 153, 136, 0.1));
+
+  /* Badge Colors */
+  --sage-badge-bg: rgba(232, 245, 242, 1); /* sage-100 */
+  --sage-badge-text: rgba(54, 91, 81, 1); /* sage-800 */
+  --sage-badge-dot: rgba(109, 181, 164, 1); /* sage-500 */
+
+  /* Button Colors */
+  --sage-btn-primary: rgba(90, 153, 136, 1); /* sage-600 */
+  --sage-btn-primary-hover: rgba(72, 122, 108, 1); /* sage-700 */
+  --sage-btn-shadow: rgba(90, 153, 136, 0.35);
+
+  /* Icons */
+  --sage-icon-emphasis: rgba(72, 122, 108, 1); /* sage-700 - 강조용 */
+  --sage-icon-regular: rgba(109, 181, 164, 1); /* sage-500 - 일반용 */
+
+  /* Section Transitions */
+  --sage-gradient-top: linear-gradient(to bottom, white, rgba(240, 249, 247, 0.3), transparent);
+  --sage-gradient-bottom: linear-gradient(to bottom, transparent, rgba(240, 249, 247, 0.2), white);
+
+  /* Form Input Standards */
+  --input-height: 44px; /* h-11 */
+  --input-padding-x: 16px; /* px-4 */
+  --input-padding-y: 10px; /* py-2.5 */
+  --input-border-color: rgba(209, 235, 229, 1); /* sage-200 */
+  --input-border-radius: 0.5rem; /* rounded-lg */
+  --input-focus-border: rgba(109, 181, 164, 1); /* sage-500 */
+  --input-focus-ring: rgba(109, 181, 164, 0.2);
 }
 
 @theme inline {
@@ -21,6 +104,489 @@
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: #333333;
+  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Malgun Gothic', sans-serif;
+  word-break: keep-all;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== GLOBAL TEXT COLOR - 모든 텍스트는 기본적으로 진한 회색 ===== */
+* {
+  color: #333333;
+}
+
+/* Placeholder는 회색으로 유지 */
+input::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* 명시적으로 색상이 지정된 요소들은 유지 */
+.text-white,
+.text-red-500,
+.text-green-600,
+.text-green-700,
+.text-green-800,
+.text-amber-600,
+.text-amber-700,
+.text-amber-800,
+.text-orange-800,
+.text-blue-600,
+.text-blue-800,
+.text-sage-600,
+.text-sage-700,
+.text-sage-800,
+.text-coral-600,
+.text-coral-800 {
+  color: inherit;
+}
+
+/* ===== STANDARDIZED FORM INPUT CLASSES ===== */
+/* CRITICAL: All inputs, selects, and textareas MUST use these identical dimensions */
+
+.form-input-standard {
+  height: var(--input-height);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  font-size: 1rem; /* 16px - text-base */
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--input-border-radius);
+  background-color: white;
+  color: #1d1d1f;
+  transition: all 0.2s ease;
+}
+
+.form-input-standard:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 3px var(--input-focus-ring);
+}
+
+.form-input-standard:disabled {
+  background-color: #f5f5f5;
+  color: #999999;
+  cursor: not-allowed;
+}
+
+.form-textarea-standard {
+  min-height: 88px; /* 2 * input-height */
+  padding: var(--input-padding-y) var(--input-padding-x);
+  font-size: 1rem;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--input-border-radius);
+  background-color: white;
+  color: #1d1d1f;
+  resize: vertical;
+  transition: all 0.2s ease;
+}
+
+.form-textarea-standard:focus {
+  outline: none;
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 3px var(--input-focus-ring);
+}
+
+/* Date and Time Input Visibility Fix - CRITICAL */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  color: #000000 !important;
+  background-color: #ffffff !important;
+  height: var(--input-height);
+  padding: var(--input-padding-y) var(--input-padding-x);
+  font-size: 1rem;
+  border: 1px solid var(--input-border-color);
+  border-radius: var(--input-border-radius);
+}
+
+/* Force all webkit date/time parts to be black */
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-datetime-edit-text,
+input[type="date"]::-webkit-datetime-edit-month-field,
+input[type="date"]::-webkit-datetime-edit-day-field,
+input[type="date"]::-webkit-datetime-edit-year-field,
+input[type="time"]::-webkit-datetime-edit,
+input[type="time"]::-webkit-datetime-edit-text,
+input[type="time"]::-webkit-datetime-edit-hour-field,
+input[type="time"]::-webkit-datetime-edit-minute-field,
+input[type="time"]::-webkit-datetime-edit-ampm-field {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+/* Firefox */
+input[type="date"],
+input[type="time"] {
+  -moz-appearance: textfield;
+}
+
+/* ===== SMOOTH SCROLL SYSTEM ===== */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 80px;
+}
+
+* {
+  scroll-behavior: smooth;
+}
+
+/* Scrollbar Styling (Chrome, Safari) */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f5f7;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c4c4c4;
+  border-radius: 5px;
+  transition: background 0.3s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a0a0a0;
+}
+
+/* Firefox Scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #c4c4c4 #f5f5f7;
+}
+
+/* ===== ANIMATIONS ===== */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.8s ease-out forwards;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.8s ease-out forwards;
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.6s ease-out forwards;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-ping {
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out forwards;
+}
+
+.animate-slide-out-right {
+  animation: slideOutRight 0.3s ease-in forwards;
+}
+
+/* ===== SAGE GREEN SHADOWS ===== */
+.shadow-sage {
+  box-shadow: 0 2px 8px rgba(109, 181, 164, 0.08), 0 1px 2px rgba(109, 181, 164, 0.12);
+}
+
+.shadow-sage-lg {
+  box-shadow: 0 10px 30px rgba(109, 181, 164, 0.12), 0 4px 8px rgba(109, 181, 164, 0.08);
+}
+
+.shadow-sage-xl {
+  box-shadow: 0 20px 50px rgba(109, 181, 164, 0.15), 0 8px 16px rgba(109, 181, 164, 0.10);
+}
+
+.shadow-toss {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.shadow-toss-lg {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 4px 8px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-toss-xl {
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08), 0 8px 16px rgba(0, 0, 0, 0.06);
+}
+
+/* ===== CARDS ===== */
+.card-sage {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(209, 235, 229, 1); /* sage-200 */
+}
+
+.card-sage-hover {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(209, 235, 229, 1);
+}
+
+.card-sage-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 50px rgba(109, 181, 164, 0.15), 0 8px 16px rgba(109, 181, 164, 0.10);
+  border-color: rgba(109, 181, 164, 1); /* sage-500 */
+}
+
+/* ===== GLASSMORPHISM ===== */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-sage {
+  background: rgba(240, 249, 247, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(109, 181, 164, 0.2);
+}
+
+/* ===== TYPOGRAPHY ===== */
+.text-display {
+  font-size: 3.125rem; /* 50px */
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+@media (max-width: 639px) {
+  .text-display {
+    font-size: 1.75rem; /* 28px */
+  }
+}
+
+.text-headline {
+  font-size: 2.5rem; /* 40px */
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+@media (max-width: 639px) {
+  .text-headline {
+    font-size: 1.625rem; /* 26px */
+  }
+}
+
+.text-subheadline {
+  font-size: 1.75rem; /* 28px */
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+@media (max-width: 639px) {
+  .text-subheadline {
+    font-size: 1.125rem; /* 18px */
+  }
+}
+
+/* ===== HOVER EFFECTS ===== */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ===== FOCUS STYLES (ACCESSIBILITY) ===== */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--sage-icon-regular);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* ===== REDUCED MOTION (ACCESSIBILITY) ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ===== TABLE UTILITIES ===== */
+.table-sage thead {
+  background: rgba(232, 245, 242, 1); /* sage-100 */
+  color: rgba(54, 91, 81, 1); /* sage-800 */
+}
+
+.table-sage tbody tr:hover {
+  background: rgba(240, 249, 247, 0.5); /* sage-50 with opacity */
+}
+
+.table-sage th,
+.table-sage td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid rgba(209, 235, 229, 1); /* sage-200 */
+}
+
+/* ===== BADGE UTILITIES ===== */
+.badge-sage {
+  background: var(--sage-badge-bg);
+  color: var(--sage-badge-text);
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.badge-success {
+  background: rgba(209, 250, 229, 1); /* green-100 */
+  color: rgba(21, 128, 61, 1); /* green-700 */
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.badge-warning {
+  background: rgba(254, 243, 199, 1); /* yellow-100 */
+  color: rgba(161, 98, 7, 1); /* yellow-700 */
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.badge-danger {
+  background: rgba(254, 226, 226, 1); /* red-100 */
+  color: rgba(185, 28, 28, 1); /* red-700 */
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
 }

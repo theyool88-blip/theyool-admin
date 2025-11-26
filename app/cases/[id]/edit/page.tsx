@@ -3,6 +3,18 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import CaseEditForm from '@/components/CaseEditForm'
 
+type RelatedCaseRecord = {
+  id: string
+  related_case_id: string
+  relation_type: string | null
+  notes: string | null
+  related_case?: {
+    id: string
+    case_name: string
+    contract_number: string | null
+  }
+}
+
 export default async function CaseEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const supabase = await createClient()
@@ -49,7 +61,7 @@ export default async function CaseEditPage({ params }: { params: Promise<{ id: s
     .order('created_at', { ascending: false })
 
   // 현재 사건의 관련 사건
-  const { data: relatedCases } = await adminClient
+  const { data: relatedCasesData } = await adminClient
     .from('case_relations')
     .select(`
       id,
@@ -64,5 +76,11 @@ export default async function CaseEditPage({ params }: { params: Promise<{ id: s
     `)
     .eq('case_id', id)
 
-  return <CaseEditForm profile={profile} caseData={caseData} allCases={allCases || []} relatedCases={relatedCases || []} />
+  // Transform join result: related_case is returned as array from Supabase
+  const relatedCases: RelatedCaseRecord[] = (relatedCasesData ?? []).map(item => ({
+    ...item,
+    related_case: Array.isArray(item.related_case) ? item.related_case[0] : item.related_case
+  }))
+
+  return <CaseEditForm profile={profile} caseData={caseData} allCases={allCases || []} relatedCases={relatedCases} />
 }

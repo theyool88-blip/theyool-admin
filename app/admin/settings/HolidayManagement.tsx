@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useState, useEffect, useCallback } from 'react'
 
 interface Holiday {
   id: string
@@ -23,13 +22,7 @@ export default function HolidayManagement() {
     holiday_name: ''
   })
 
-  const supabase = createClient()
-
-  useEffect(() => {
-    fetchHolidays()
-  }, [selectedYear])
-
-  const fetchHolidays = async () => {
+  const fetchHolidays = useCallback(async () => {
     try {
       setLoading(true)
       const response = await fetch(`/api/admin/holidays?year=${selectedYear}`)
@@ -44,7 +37,11 @@ export default function HolidayManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [selectedYear])
+
+  useEffect(() => {
+    fetchHolidays()
+  }, [fetchHolidays])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,11 +120,21 @@ export default function HolidayManagement() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600">
-            법정 기간 계산에 사용되는 공휴일을 관리합니다 (민법 제161조 적용)
-          </p>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+            className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+          >
+            {years.map(year => (
+              <option key={year} value={year}>{year}년</option>
+            ))}
+          </select>
+          <span className="text-xs text-gray-500">
+            {holidays.length}개의 공휴일
+          </span>
         </div>
         <button
           onClick={() => {
@@ -135,79 +142,66 @@ export default function HolidayManagement() {
             setFormData({ holiday_date: '', holiday_name: '' })
             setIsAddModalOpen(true)
           }}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+          className="px-3 py-1.5 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
         >
           + 공휴일 추가
         </button>
       </div>
 
-      <div className="mb-6 flex items-center gap-4">
-        <label className="text-sm font-semibold text-gray-700">연도:</label>
-        <select
-          value={selectedYear}
-          onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
-        >
-          {years.map(year => (
-            <option key={year} value={year}>{year}년</option>
-          ))}
-        </select>
-        <span className="text-sm text-gray-600">
-          총 {holidays.length}개의 공휴일
-        </span>
-      </div>
+      {/* Description */}
+      <p className="text-xs text-gray-500 mb-4">
+        법정 기간 계산에 사용되는 공휴일을 관리합니다 (민법 제161조 적용)
+      </p>
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-500">로딩 중...</div>
-      ) : holidays.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          등록된 공휴일이 없습니다.
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+      {/* Table */}
+      <div className="bg-white rounded-lg border border-gray-200">
+        {loading ? (
+          <div className="py-12 text-center">
+            <div className="animate-spin inline-block rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-600"></div>
+          </div>
+        ) : holidays.length === 0 ? (
+          <div className="py-12 text-center text-gray-400 text-sm">
+            등록된 공휴일이 없습니다.
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 text-gray-500 text-xs">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  날짜
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  공휴일명
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  요일
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  작업
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium">날짜</th>
+                <th className="px-4 py-2.5 text-left font-medium">공휴일명</th>
+                <th className="px-4 py-2.5 text-left font-medium">요일</th>
+                <th className="px-4 py-2.5 text-right font-medium">작업</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y divide-gray-100">
               {holidays.map((holiday) => {
                 const date = new Date(holiday.holiday_date)
                 const dayOfWeek = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()]
+                const isWeekend = date.getDay() === 0 || date.getDay() === 6
 
                 return (
                   <tr key={holiday.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <td className="px-4 py-3 font-medium text-gray-900">
                       {holiday.holiday_date}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    <td className="px-4 py-3 text-gray-700">
                       {holiday.holiday_name}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {dayOfWeek}요일
+                    <td className="px-4 py-3">
+                      <span className={`text-xs ${isWeekend ? 'text-red-500' : 'text-gray-500'}`}>
+                        {dayOfWeek}요일
+                      </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleEdit(holiday)}
-                        className="text-blue-600 hover:text-blue-900 mr-4"
+                        className="text-sage-600 hover:text-sage-800 text-xs mr-3"
                       >
                         수정
                       </button>
                       <button
                         onClick={() => handleDelete(holiday.id)}
-                        className="text-red-600 hover:text-red-900"
+                        className="text-red-500 hover:text-red-700 text-xs"
                       >
                         삭제
                       </button>
@@ -217,33 +211,37 @@ export default function HolidayManagement() {
               })}
             </tbody>
           </table>
-        </div>
-      )}
+        )}
+      </div>
 
+      {/* Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">
-              {editingHoliday ? '공휴일 수정' : '공휴일 추가'}
-            </h2>
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-900">
+                {editingHoliday ? '공휴일 수정' : '공휴일 추가'}
+              </h3>
+            </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  날짜 *
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  날짜 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="date"
                   value={formData.holiday_date}
                   onChange={(e) => setFormData({ ...formData, holiday_date: e.target.value })}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 text-sm text-gray-900 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  style={{ colorScheme: 'light' }}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  공휴일명 *
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  공휴일명 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -251,11 +249,11 @@ export default function HolidayManagement() {
                   onChange={(e) => setFormData({ ...formData, holiday_name: e.target.value })}
                   placeholder="예: 설날, 추석, 어린이날"
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
                 />
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -263,13 +261,13 @@ export default function HolidayManagement() {
                     setEditingHoliday(null)
                     setFormData({ holiday_date: '', holiday_name: '' })
                   }}
-                  className="flex-1 px-4 py-2 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                  className="flex-1 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700"
+                  className="flex-1 py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
                 >
                   {editingHoliday ? '수정' : '추가'}
                 </button>

@@ -39,3 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# backup files
+*.backup
+*.backup-*
+*.unused
+
+# temp files
+supabase/.temp/
+
+# local scripts
+proxy.ts
+apply-sage-theme.sh

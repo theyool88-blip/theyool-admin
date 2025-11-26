@@ -51,5 +51,5 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     cases: cases || []
   }
 
-  return <ClientDetail profile={profile} clientData={clientWithCases} />
+  return <ClientDetail clientData={clientWithCases} />
 }

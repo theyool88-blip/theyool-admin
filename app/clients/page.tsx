@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import ClientsList from '@/components/ClientsList'
+import AdminHeader from '@/components/AdminHeader'
 
 export default async function ClientsPage() {
   const supabase = await createClient()
@@ -38,13 +39,23 @@ export default async function ClientsPage() {
     .select('id, case_name, client_id, retainer_fee, calculated_success_fee, total_received, created_at')
     .order('created_at', { ascending: false })
 
+  type ClientCaseSummary = {
+    id: string
+    case_name: string
+    client_id: string
+    retainer_fee: number | null
+    calculated_success_fee: number | null
+    total_received: number | null
+    created_at: string
+  }
+
   // 의뢰인별로 사건 데이터 그룹핑
-  const casesByClient = new Map()
-  allCases?.forEach(c => {
+  const casesByClient = new Map<string, ClientCaseSummary[]>()
+  allCases?.forEach((c) => {
     if (!casesByClient.has(c.client_id)) {
       casesByClient.set(c.client_id, [])
     }
-    casesByClient.get(c.client_id).push(c)
+    casesByClient.get(c.client_id)?.push(c as ClientCaseSummary)
   })
 
   // 각 의뢰인에 대해 최상단 사건과 미수금 계산
@@ -54,8 +65,7 @@ export default async function ClientsPage() {
       id: clientCases[0].id,
       case_name: clientCases[0].case_name
     } : null
-
-    const totalOutstanding = clientCases.reduce((sum, c) => {
+    const totalOutstanding = clientCases.reduce((sum: number, c: ClientCaseSummary) => {
       const retainer = c.retainer_fee || 0
       const successFee = c.calculated_success_fee || 0
       const received = c.total_received || 0
@@ -78,5 +88,10 @@ export default async function ClientsPage() {
     }
   })
 
-  return <ClientsList profile={profile} initialClients={clientsWithCalculations} />
+  return (
+    <>
+      <AdminHeader title="의뢰인 관리" subtitle="법무법인 더율 어드민" />
+      <ClientsList profile={profile} initialClients={clientsWithCalculations} />
+    </>
+  )
 }

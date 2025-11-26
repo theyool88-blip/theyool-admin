@@ -1,23 +1,44 @@
-const { createClient } = require('@supabase/supabase-js');
-const fs = require('fs');
+const { createClient } = require('@supabase/supabase-js')
+const fs = require('fs')
+const path = require('path')
 
-const supabase = createClient(
-  'https://kqqyipnlkmmprfgygauk.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxcXlpcG5sa21tcHJmZ3lnYXVrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2MjMyNDQyOSwiZXhwIjoyMDc3OTAwNDI5fQ.nmE-asCNpDnxix4ZxyNlEyocJdG8kPEunx9MHOTnXS0'
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-async function main() {
-  const sql = fs.readFileSync('/Users/hskim/theyool-admin/supabase/migrations/20251121_add_case_fields.sql', 'utf8');
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('❌ Missing Supabase credentials')
+  process.exit(1)
+}
 
-  console.log('마이그레이션 실행 중...');
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false
+  }
+})
 
-  const { data, error } = await supabase.rpc('exec_sql', { sql_query: sql });
+async function applyMigration() {
+  try {
+    console.log('📖 Reading migration file...')
+    const migrationPath = path.join(__dirname, '..', 'supabase', 'migrations', '20251124_fix_unified_calendar_consultations.sql')
+    const sql = fs.readFileSync(migrationPath, 'utf8')
 
-  if (error) {
-    console.error('오류:', error);
-  } else {
-    console.log('마이그레이션 완료!');
+    console.log('🔄 Executing SQL migration...')
+    console.log('\n' + sql + '\n')
+
+    // Since we can't execute raw SQL directly, we'll use PGPASSWORD and psql
+    console.log('⚠️  Supabase JS client cannot execute raw DDL (CREATE VIEW)')
+    console.log('📋 Please run this migration manually:')
+    console.log('\n1. Using Supabase Dashboard SQL Editor:')
+    console.log('   - Go to: https://supabase.com/dashboard/project/kqqyipnlkmmprfgygauk/sql/new')
+    console.log('   - Paste the SQL from the migration file')
+    console.log('   - Click "Run"\n')
+    console.log('2. Or using psql command:')
+    console.log('   PGPASSWORD=\'Soofm9856!\' psql -h aws-0-ap-northeast-2.pooler.supabase.com -p 6543 -d postgres -U postgres.kqqyipnlkmmprfgygauk -f supabase/migrations/20251124_fix_unified_calendar_consultations.sql')
+
+  } catch (error) {
+    console.error('❌ Error:', error.message)
   }
 }
 
-main().catch(console.error);
+applyMigration()

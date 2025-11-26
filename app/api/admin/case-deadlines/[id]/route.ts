@@ -58,11 +58,11 @@ export async function GET(request: NextRequest, context: RouteParams) {
     };
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error) {
     console.error('GET /api/admin/case-deadlines/[id] error:', error);
     const response: ApiResponse<CaseDeadline> = {
       success: false,
-      error: error.message || '데드라인 조회 실패',
+      error: error instanceof Error ? error.message : '데드라인 조회 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }
@@ -96,11 +96,11 @@ export async function PATCH(request: NextRequest, context: RouteParams) {
     };
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error) {
     console.error('PATCH /api/admin/case-deadlines/[id] error:', error);
     const response: ApiResponse<CaseDeadline> = {
       success: false,
-      error: error.message || '데드라인 수정 실패',
+      error: error instanceof Error ? error.message : '데드라인 수정 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }
@@ -129,11 +129,11 @@ export async function DELETE(request: NextRequest, context: RouteParams) {
     };
 
     return NextResponse.json(response);
-  } catch (error: any) {
+  } catch (error) {
     console.error('DELETE /api/admin/case-deadlines/[id] error:', error);
     const response: ApiResponse<null> = {
       success: false,
-      error: error.message || '데드라인 삭제 실패',
+      error: error instanceof Error ? error.message : '데드라인 삭제 실패',
     };
     return NextResponse.json(response, { status: 500 });
   }

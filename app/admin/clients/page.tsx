@@ -27,9 +27,10 @@ interface ClientDetailModalProps {
   isOpen: boolean
   onClose: () => void
   onEdit: (id: string) => void
+  onPreview: (id: string) => void
 }
 
-function ClientDetailModal({ client, isOpen, onClose, onEdit }: ClientDetailModalProps) {
+function ClientDetailModal({ client, isOpen, onClose, onEdit, onPreview }: ClientDetailModalProps) {
   if (!isOpen || !client) return null
 
   const formatCurrency = (amount: number) => `${amount.toLocaleString('ko-KR')}원`
@@ -139,6 +140,12 @@ function ClientDetailModal({ client, isOpen, onClose, onEdit }: ClientDetailModa
             닫기
           </button>
           <button
+            onClick={() => onPreview(client.id)}
+            className="flex-1 py-2 text-sm bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+          >
+            포털 미리보기
+          </button>
+          <button
             onClick={() => onEdit(client.id)}
             className="flex-1 py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
           >
@@ -229,6 +236,10 @@ export default function AdminClientsPage() {
 
   const handleEdit = (id: string) => {
     router.push(`/clients/${id}/edit`)
+  }
+
+  const handlePreview = (id: string) => {
+    router.push(`/admin/client-preview/${id}`)
   }
 
   const totalOutstanding = useMemo(() => {
@@ -382,6 +393,7 @@ export default function AdminClientsPage() {
         isOpen={isModalOpen}
         onClose={closeModal}
         onEdit={handleEdit}
+        onPreview={handlePreview}
       />
     </div>
   )

@@ -1,23 +1,11 @@
 {
   "crons": [
     {
-      "path": "/api/cron/generate-monthly-expenses",
-      "schedule": "0 0 1 * *"
-    },
-    {
-      "path": "/api/cron/aggregate-monthly-settlement",
-      "schedule": "0 1 1 * *"
-    },
-    {
       "path": "/api/cron/hearing-reminders",
       "schedule": "0 0 * * *"
     },
     {
       "path": "/api/cron/consultation-reminders",
-      "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/deadline-reminders",
       "schedule": "0 0 * * *"
     }
   ]

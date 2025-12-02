@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import CaseDocuments from '@/components/client/CaseDocuments';
 
 interface Client {
   id: string;
@@ -244,15 +245,6 @@ export default function ClientPortalPreview() {
     };
   };
 
-  // OneDrive URL을 임베드 URL로 변환
-  const getOneDriveEmbedUrl = (url: string): string => {
-    if (url.includes('onedrive.live.com')) {
-      // onedrive.live.com/? → onedrive.live.com/embed?
-      return url.replace('onedrive.live.com/?', 'onedrive.live.com/embed?');
-    }
-    // 1drv.ms 단축 링크
-    return url.replace('redir', 'embed');
-  };
 
   if (loading) {
     return (
@@ -480,26 +472,9 @@ export default function ClientPortalPreview() {
             </section>
 
             {/* 소송 서류 */}
-            {primaryCase.onedrive_folder_url && (
-              <section className="bg-white rounded-xl border border-gray-100 p-4">
-                <h3 className="text-sm font-bold text-gray-800 mb-3 flex items-center gap-2">
-                  <span className="w-1 h-4 bg-purple-500 rounded-full"></span>
-                  소송 서류
-                </h3>
-                <div className="rounded-lg overflow-hidden border border-gray-200">
-                  <iframe
-                    src={getOneDriveEmbedUrl(primaryCase.onedrive_folder_url)}
-                    width="100%"
-                    height="400"
-                    frameBorder="0"
-                    className="bg-gray-50"
-                  />
-                </div>
-                <p className="text-xs text-gray-400 mt-2 text-center">
-                  파일을 클릭하여 확인하세요
-                </p>
-              </section>
-            )}
+            <section className="bg-white rounded-xl border border-gray-100 p-4">
+              <CaseDocuments caseId={primaryCase.id} />
+            </section>
 
             {/* 다가오는 기한 */}
             {pendingDeadlines.length > 0 && (
@@ -885,6 +860,7 @@ export default function ClientPortalPreview() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

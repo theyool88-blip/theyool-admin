@@ -1,0 +1,99 @@
+# 문서 인덱스
+
+**Last Updated**: 2025-12-02
+
+법무법인 더율 관리자 시스템 (theyool-admin) 문서 목록입니다.
+
+---
+
+## 시스템 문서 (Systems)
+
+각 시스템의 상세 설명, 데이터 모델, API 구조를 다룹니다.
+
+| 문서 | 설명 |
+|------|------|
+| [PAYMENT_SYSTEM.md](systems/PAYMENT_SYSTEM.md) | 입금/지출 관리, 5:5 파트너십 정산 |
+| [CONSULTATION_SYSTEM.md](systems/CONSULTATION_SYSTEM.md) | 상담 관리 (4유형, 9상태), 리드 스코어링 |
+| [COURT_HEARING_SYSTEM.md](systems/COURT_HEARING_SYSTEM.md) | 법원기일, 불변기간 데드라인 자동 계산 |
+| [CALENDAR_SYSTEM.md](systems/CALENDAR_SYSTEM.md) | 통합 캘린더, Google Calendar 연동 |
+| [CLIENT_PORTAL.md](systems/CLIENT_PORTAL.md) | 의뢰인 포털 미리보기 API |
+
+---
+
+## 개발 가이드 (Guides)
+
+개발 환경 설정, 배포, API 사용법을 다룹니다.
+
+| 문서 | 설명 |
+|------|------|
+| [SETUP_GUIDE.md](guides/SETUP_GUIDE.md) | 초기 설정, 환경 변수, 개발 서버 |
+| [DEPLOYMENT_GUIDE.md](guides/DEPLOYMENT_GUIDE.md) | Vercel 배포, Cron 설정 |
+| [MIGRATION_GUIDE.md](guides/MIGRATION_GUIDE.md) | Supabase 마이그레이션, RLS 정책 |
+| [API_REFERENCE.md](guides/API_REFERENCE.md) | REST API 엔드포인트, 타입 정의 |
+
+---
+
+## 디자인 시스템 (Design)
+
+UI/UX 디자인 가이드라인, 컴포넌트 패턴을 다룹니다.
+
+| 문서 | 설명 |
+|------|------|
+| [SAGE_GREEN_THEME.md](design/SAGE_GREEN_THEME.md) | Sage Green 색상 팔레트, 유틸리티 클래스 |
+
+---
+
+## 과거 문서 (Archived)
+
+완료된 과거 작업의 기록입니다.
+
+```
+archived/
+├── plans/        # 계획 문서
+├── progress/     # 진행 상태 문서
+└── summaries/    # 완료 보고서
+```
+
+---
+
+## 빠른 참조
+
+### 자주 사용하는 문서
+
+1. **새 개발자**: [SETUP_GUIDE.md](guides/SETUP_GUIDE.md) 먼저 읽기
+2. **API 개발**: [API_REFERENCE.md](guides/API_REFERENCE.md) 참조
+3. **UI 작업**: [SAGE_GREEN_THEME.md](design/SAGE_GREEN_THEME.md) 참조
+4. **시스템 이해**: `systems/` 폴더의 해당 시스템 문서 참조
+
+### 코드 레퍼런스
+
+| 위치 | 설명 |
+|------|------|
+| `app/api/admin/` | 관리자 API 엔드포인트 |
+| `lib/supabase/` | Supabase 헬퍼 함수 |
+| `types/` | TypeScript 타입 정의 |
+| `components/` | React 컴포넌트 |
+
+### 데이터베이스
+
+| 테이블 | 설명 |
+|--------|------|
+| `clients` | 의뢰인 |
+| `legal_cases` | 사건 |
+| `payments` | 입금 |
+| `expenses` | 지출 |
+| `consultations` | 상담 |
+| `court_hearings` | 법원기일 |
+| `case_deadlines` | 데드라인 |
+| `drive_file_classifications` | Google Drive 파일 분류 (의뢰인 공개 여부) |
+
+---
+
+## 문서 업데이트
+
+문서 수정 시:
+
+1. 해당 문서의 `Last Updated` 날짜 업데이트
+2. 관련된 다른 문서도 함께 수정
+3. 대규모 변경 시 이 INDEX.md도 업데이트
+

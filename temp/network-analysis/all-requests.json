@@ -1,0 +1,525 @@
+[
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+    "method": "GET",
+    "headers": {
+      "accept-language": "ko-KR,ko;q=0.9",
+      "referer": "https://www.scourt.go.kr/",
+      "upgrade-insecure-requests": "1",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"macOS\""
+    },
+    "resourceType": "document"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/javascript.wq?q=/bootloader",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "script"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/suffix.txt?postfix=1766984089426772.5472011875135",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/config.xml?postfix=17669840894657807.742966015955",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/javascriptPluginAll.wq?w2xType=6&postfix=NS4wXzQuNTI0NUIuMjAyNDA5MjcuMTE0NzMyXw==MS44&compression=true",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0",
+      "accept": "*/*",
+      "accept-encoding": "gzip, deflate, br, zstd",
+      "connection": "keep-alive",
+      "cookie": "WMONID=5uHkiSjVXp4; JSESSIONID=n2podX8UcvxdZdyah5iokmy_COh8p0EIeHg43nLbdok4WZ7gfEvU!-989801892",
+      "host": "ssgo.scourt.go.kr",
+      "sec-fetch-dest": "script",
+      "sec-fetch-mode": "no-cors",
+      "sec-fetch-site": "same-origin"
+    },
+    "resourceType": "script"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/externalJS/jquery/jquery-3.7.1.min.js?postfix=17669840901773128.4409956563086",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/externalJS/es5-sham.mod.js?postfix=17669840902778942.365628069747",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/externalJS/papaparse.js?postfix=17669840903154925.3831155227945",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/message/ko.js?postfix=17669840903574514.144554086309",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0",
+      "accept": "*/*",
+      "accept-encoding": "gzip, deflate, br, zstd",
+      "connection": "keep-alive",
+      "cookie": "WMONID=5uHkiSjVXp4; JSESSIONID=n2podX8UcvxdZdyah5iokmy_COh8p0EIeHg43nLbdok4WZ7gfEvU!-989801892",
+      "host": "ssgo.scourt.go.kr",
+      "sec-fetch-dest": "script",
+      "sec-fetch-mode": "no-cors",
+      "sec-fetch-site": "same-origin"
+    },
+    "resourceType": "script"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/serverTime.wq?pattern=yyyyMMddHHmmssSSS&idx=17669840903583008.0798296124653",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "cache-control": "no-cache",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/websquare/common.js?postfix=1766984090363186.288252103487",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/websquare/javascript.wq?w2xType=6&q=uiplugin/popup&postfix=NS4wXzQuNTI0NUIuMjAyNDA5MjcuMTE0NzMyXw==MS44&compression=true",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/websquare/commonScope.js?postfix=17669840904459880.45204350051",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/websquare/hotfix.js?postfix=17669840905713351.517449749669",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/websquare/blockscript.js?postfix=17669840907232671.2600348079573",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/scpolyfillo.js?postfix=17669840907477439.000460354789",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/scglblo.js?postfix=17669840907724358.335163596801",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/scscrno.js?postfix=1766984090801409.48191559290416",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/sccdo.js?postfix=17669840908187120.280116761206",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/scdateo.js?postfix=17669840908692524.0349736211033",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/scutilo.js?postfix=17669840908913178.6680625292042",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/sccorto.js?postfix=17669840909315522.403059742431",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/sclibo.js?postfix=1766984090960750.8790073269289",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scframeo/scmsgo.js?postfix=1766984090982930.6063571658485",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/js/content.js?postfix=17669840910024127.5189635520455",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/ui/message/ssgomsg.js?postfix=17669840910202397.622147942824",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/js/ssgo.js?postfix=17669840910381655.1900874311466",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/ui/ssgo10l/SSGO10LM08.xml?postfix=17669840910908753.770943906273",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/font/NotoSansKR-Medium.woff2",
+    "method": "GET",
+    "headers": {
+      "origin": "https://ssgo.scourt.go.kr",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/cm/css/font.css?postfix=17669840911125762.331438358163",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "font"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/font/NotoSansKR-Bold.woff2",
+    "method": "GET",
+    "headers": {
+      "origin": "https://ssgo.scourt.go.kr",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/cm/css/font.css?postfix=17669840911125762.331438358163",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "font"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/font/NotoSansKR-Regular.woff2",
+    "method": "GET",
+    "headers": {
+      "origin": "https://ssgo.scourt.go.kr",
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/cm/css/font.css?postfix=17669840911125762.331438358163",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "font"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/ui/ssgo10l/SSGO10LM01.xml?postfix=17669840912433468.194569477311",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/js/biz/ssgocbx.js?postfix=17669840912742313.847767733116",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/ssgo10l/selectHmpgMain.on",
+    "method": "POST",
+    "postData": "{\"dma_search\":{\"cortCd\":\"\",\"cdScope\":\"ALL\",\"csNoHistLst\":\"\",\"csDvsCd\":\"\",\"csYr\":\"\",\"csSerial\":\"\",\"btprNm\":\"\",\"answer\":\"\",\"fullCsNo\":\"\"}}",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "submissionid": "mf_ssgoTopMainTab_contents_content1_body_sbm_search",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "accept": "application/json",
+      "content-type": "application/json;charset=UTF-8",
+      "accept-encoding": "gzip, deflate, br, zstd",
+      "connection": "keep-alive",
+      "content-length": "136",
+      "cookie": "WMONID=5uHkiSjVXp4; JSESSIONID=n2podX8UcvxdZdyah5iokmy_COh8p0EIeHg43nLbdok4WZ7gfEvU!-989801892",
+      "host": "ssgo.scourt.go.kr",
+      "origin": "https://ssgo.scourt.go.kr",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-origin"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/ssgo10l/getCaptchaInf.on",
+    "method": "POST",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "sec-ch-ua-mobile": "?0",
+      "submissionid": "mf_ssgoTopMainTab_contents_content1_body_sbm_captcha",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "accept": "application/json",
+      "content-type": "application/json;charset=UTF-8",
+      "accept-encoding": "gzip, deflate, br, zstd",
+      "connection": "keep-alive",
+      "content-length": "0",
+      "cookie": "WMONID=5uHkiSjVXp4; JSESSIONID=n2podX8UcvxdZdyah5iokmy_COh8p0EIeHg43nLbdok4WZ7gfEvU!-989801892",
+      "host": "ssgo.scourt.go.kr",
+      "origin": "https://ssgo.scourt.go.kr",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-origin"
+    },
+    "resourceType": "xhr"
+  },
+  {
+    "url": "blob:https://ssgo.scourt.go.kr/3633aae4-56c3-49c5-83f6-c1c0ad4e37b8",
+    "method": "GET",
+    "headers": {
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "referer": ""
+    },
+    "resourceType": "image"
+  },
+  {
+    "url": "https://ssgo.scourt.go.kr/ssgo/cm/scui/SCMsgBox.xml?postfix=17669841017032011.3705126083992",
+    "method": "GET",
+    "headers": {
+      "sec-ch-ua-platform": "\"macOS\"",
+      "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+      "accept-language": "ko-KR,ko;q=0.9",
+      "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+      "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+      "sec-ch-ua-mobile": "?0"
+    },
+    "resourceType": "xhr"
+  }
+]

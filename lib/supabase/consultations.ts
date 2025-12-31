@@ -44,15 +44,22 @@ export async function createConsultation(input: CreateConsultationInput): Promis
 
 /**
  * Get all consultations with filters
- * ADMIN ONLY
+ * ADMIN ONLY (테넌트 격리)
+ * @param filters 필터 조건
+ * @param tenantId 테넌트 ID (슈퍼 어드민은 undefined로 전달하여 전체 조회)
  */
-export async function getConsultations(filters?: ConsultationFilters): Promise<Consultation[]> {
+export async function getConsultations(filters?: ConsultationFilters, tenantId?: string): Promise<Consultation[]> {
   const supabase = await createClient();
 
   let query = supabase
     .from('consultations')
     .select('*')
     .order('created_at', { ascending: false });
+
+  // 테넌트 격리 필터
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
 
   // Apply filters
   if (filters?.request_type) {

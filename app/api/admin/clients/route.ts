@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isAuthenticated } from '@/lib/auth/auth'
+import { withTenant, withTenantId } from '@/lib/api/with-tenant'
 
 /**
  * GET /api/admin/clients
- * Fetch all clients with optional filtering and pagination
+ * Fetch all clients with optional filtering and pagination (테넌트 격리)
  */
-export async function GET(request: NextRequest) {
+export const GET = withTenant(async (request, { tenant }) => {
   try {
     const supabase = createAdminClient()
     const searchParams = request.nextUrl.searchParams
@@ -20,6 +20,11 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId)
+    }
 
     // Search by name or phone
     if (search) {
@@ -73,19 +78,14 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
 /**
  * POST /api/admin/clients
- * Create a new client
+ * Create a new client (테넌트 자동 할당)
  */
-export async function POST(request: NextRequest) {
+export const POST = withTenant(async (request, { tenant }) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json() as {
       name?: string
       phone?: string
@@ -106,10 +106,10 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient()
 
-    // Create the client
+    // Create the client (테넌트 ID 포함)
     const { data: newClient, error } = await adminClient
       .from('clients')
-      .insert([{
+      .insert([withTenantId({
         name: body.name,
         phone: body.phone,
         email: body.email || null,
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         address: body.address || null,
         gender: body.gender || null,
         notes: body.notes || null
-      }])
+      }, tenant)])
       .select()
       .single()
 
@@ -141,4 +141,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

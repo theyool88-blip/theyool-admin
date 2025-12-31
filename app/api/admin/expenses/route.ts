@@ -1,7 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant, withTenantId } from '@/lib/api/with-tenant'
 
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/admin/expenses
+ * Fetch expenses with filters (테넌트 격리)
+ */
+export const GET = withTenant(async (request, { tenant }) => {
   try {
     const supabase = createAdminClient()
     const searchParams = request.nextUrl.searchParams
@@ -19,6 +24,11 @@ export async function GET(request: NextRequest) {
       .select('*', { count: 'exact' })
       .order('expense_date', { ascending: false })
       .range(offset, offset + limit - 1)
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId)
+    }
 
     if (category) {
       query = query.eq('expense_category', category)
@@ -61,16 +71,20 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})
 
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/admin/expenses
+ * Create expense (테넌트 자동 할당)
+ */
+export const POST = withTenant(async (request, { tenant }) => {
   try {
     const supabase = createAdminClient()
     const body = await request.json()
 
     const { data, error } = await supabase
       .from('expenses')
-      .insert([body])
+      .insert([withTenantId(body, tenant)])
       .select()
       .single()
 
@@ -90,4 +104,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

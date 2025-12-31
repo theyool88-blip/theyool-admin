@@ -10,13 +10,42 @@ import { createClient } from '@/lib/supabase/client'
 interface AdminHeaderProps {
   title: string
   subtitle?: string
+  tenantLogo?: string | null
+  tenantName?: string
 }
 
-export default function AdminHeader({ title, subtitle }: AdminHeaderProps) {
+export default function AdminHeader({ title, subtitle, tenantLogo, tenantName }: AdminHeaderProps) {
   const router = useRouter()
   const supabase = createClient()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const canPortal = typeof document !== 'undefined'
+
+  // 로고 렌더링 함수
+  const renderLogo = (height: string = 'h-6 md:h-7', showFilter: boolean = true) => {
+    if (tenantLogo) {
+      return (
+        <Image
+          src={tenantLogo}
+          alt={tenantName || '사무소 로고'}
+          width={180}
+          height={45}
+          className={`${height} w-auto object-contain`}
+          priority
+        />
+      )
+    }
+    return (
+      <Image
+        src="/images/logo-horizontal.png"
+        alt="법무법인 더율"
+        width={180}
+        height={45}
+        className={`${height} w-auto`}
+        style={showFilter ? { filter: 'brightness(0) saturate(100%) invert(46%) sepia(13%) saturate(1243%) hue-rotate(118deg) brightness(93%) contrast(87%)' } : undefined}
+        priority
+      />
+    )
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -56,15 +85,7 @@ export default function AdminHeader({ title, subtitle }: AdminHeaderProps) {
 
             {/* 로고 (데스크톱) */}
             <Link href="/" className="hidden lg:flex items-center gap-3">
-              <Image
-                src="/images/logo-horizontal.png"
-                alt="법무법인 더율"
-                width={180}
-                height={45}
-                className="h-6 md:h-7 w-auto"
-                style={{ filter: 'brightness(0) saturate(100%) invert(46%) sepia(13%) saturate(1243%) hue-rotate(118deg) brightness(93%) contrast(87%)' }}
-                priority
-              />
+              {renderLogo('h-6 md:h-7', !tenantLogo)}
               <div className="border-l border-sage-300 pl-3">
                 <div className="text-sm font-semibold text-sage-800">{title}</div>
                 {subtitle && (
@@ -77,15 +98,7 @@ export default function AdminHeader({ title, subtitle }: AdminHeaderProps) {
           {/* 중앙: 로고 (모바일) */}
           <div className="absolute left-1/2 transform -translate-x-1/2 lg:hidden">
             <Link href="/">
-              <Image
-                src="/images/logo-horizontal.png"
-                alt="법무법인 더율"
-                width={180}
-                height={45}
-                className="h-6 w-auto cursor-pointer"
-                style={{ filter: 'brightness(0) saturate(100%) invert(46%) sepia(13%) saturate(1243%) hue-rotate(118deg) brightness(93%) contrast(87%)' }}
-                priority
-              />
+              {renderLogo('h-6', !tenantLogo)}
             </Link>
           </div>
 

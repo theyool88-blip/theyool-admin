@@ -1,10 +1,10 @@
 /**
  * Admin Consultations API
- * ADMIN ONLY - Requires authentication
+ * ADMIN ONLY - Requires authentication (테넌트 격리)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { isAuthenticated } from '@/lib/auth/auth';
+import { NextResponse } from 'next/server';
+import { withTenant } from '@/lib/api/with-tenant';
 import { getConsultations } from '@/lib/supabase/consultations';
 import type {
   ConsultationFilters,
@@ -17,19 +17,10 @@ import type {
 
 /**
  * GET /api/admin/consultations
- * Get all consultations with filters (ADMIN ONLY)
+ * Get all consultations with filters (테넌트 격리)
  */
-export async function GET(request: NextRequest) {
+export const GET = withTenant(async (request, { tenant }) => {
   try {
-    // Check authentication
-    const authenticated = await isAuthenticated();
-    if (!authenticated) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
     const { searchParams } = new URL(request.url);
 
     // Extract filters from query params
@@ -52,8 +43,8 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Get consultations
-    const consultations = await getConsultations(filters);
+    // Get consultations (테넌트 ID 전달)
+    const consultations = await getConsultations(filters, tenant.isSuperAdmin ? undefined : tenant.tenantId);
 
     return NextResponse.json({
       success: true,
@@ -70,4 +61,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+})

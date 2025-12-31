@@ -1,13 +1,13 @@
 /**
- * 사건 데드라인 목록 조회 및 생성 API (관리자 전용)
+ * 사건 데드라인 목록 조회 및 생성 API (관리자 전용, 테넌트 격리)
  * @route GET/POST /api/admin/case-deadlines
  *
  * GET: 목록 조회 (필터링, 페이지네이션)
  * POST: 신규 생성 (deadline_date 자동 계산)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { isAuthenticated } from '@/lib/auth/auth';
+import { NextResponse } from 'next/server';
+import { withTenant } from '@/lib/api/with-tenant';
 import { getCaseDeadlines, createCaseDeadline } from '@/lib/supabase/case-deadlines';
 import type {
   CreateCaseDeadlineRequest,
@@ -30,17 +30,8 @@ import type {
  * - limit: 페이지당 개수 (기본값: 50)
  * - offset: 오프셋 (기본값: 0)
  */
-export async function GET(request: NextRequest) {
+export const GET = withTenant(async (request, { tenant }) => {
   try {
-    const authCheck = await isAuthenticated();
-    if (!authCheck) {
-      const response: ApiListResponse<CaseDeadline> = {
-        success: false,
-        error: '인증이 필요합니다.',
-      };
-      return NextResponse.json(response, { status: 401 });
-    }
-
     const { searchParams } = new URL(request.url);
 
     const filters: CaseDeadlineListQuery = {
@@ -52,7 +43,9 @@ export async function GET(request: NextRequest) {
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0,
     };
 
-    const { data, count } = await getCaseDeadlines(filters);
+    // 테넌트 ID 전달
+    const tenantId = tenant.isSuperAdmin ? undefined : tenant.tenantId;
+    const { data, count } = await getCaseDeadlines(filters, tenantId);
 
     const response: ApiListResponse<CaseDeadline> = {
       success: true,
@@ -69,7 +62,7 @@ export async function GET(request: NextRequest) {
     };
     return NextResponse.json(response, { status: 500 });
   }
-}
+})
 
 /**
  * POST /api/admin/case-deadlines
@@ -85,17 +78,8 @@ export async function GET(request: NextRequest) {
  *
  * 주의: deadline_date와 deadline_datetime은 트리거로 자동 계산됨
  */
-export async function POST(request: NextRequest) {
+export const POST = withTenant(async (request, { tenant }) => {
   try {
-    const authCheck = await isAuthenticated();
-    if (!authCheck) {
-      const response: ApiResponse<CaseDeadline> = {
-        success: false,
-        error: '인증이 필요합니다.',
-      };
-      return NextResponse.json(response, { status: 401 });
-    }
-
     const body: CreateCaseDeadlineRequest = await request.json();
 
     // 필수 필드 검증
@@ -107,7 +91,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(response, { status: 400 });
     }
 
-    const deadline = await createCaseDeadline(body);
+    // 테넌트 ID 전달
+    const deadline = await createCaseDeadline(body, tenant.tenantId);
 
     const response: ApiResponse<CaseDeadline> = {
       success: true,
@@ -123,4 +108,4 @@ export async function POST(request: NextRequest) {
     };
     return NextResponse.json(response, { status: 500 });
   }
-}
+})

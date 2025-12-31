@@ -13,6 +13,7 @@ interface Schedule {
   location: string | null
   case_id: string | null
   event_type?: string
+  event_subtype?: string | null  // HEARING_JUDGMENT, HEARING_PARENTING 등
   reference_id?: string | null
 }
 
@@ -63,6 +64,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
         event_date: string
         event_time?: string | null
         event_type: string
+        event_subtype?: string | null  // hearing_type 정보
         location?: string | null
         reference_id?: string | null
       }) => {
@@ -77,6 +79,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
           location: event.location,
           case_id: event.reference_id,
           event_type: event.event_type,
+          event_subtype: event.event_subtype,  // hearing_type 저장
           reference_id: event.reference_id
         }
       })
@@ -131,7 +134,17 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
     }
   }
 
-  const getScheduleTypeColor = (type: string, eventType?: string) => {
+  const getScheduleTypeColor = (type: string, eventType?: string, eventSubtype?: string | null) => {
+    // 변호사미팅은 청록색(teal)으로 구분
+    if (type === 'trial' && eventSubtype === 'HEARING_LAWYER_MEETING') {
+      return 'bg-teal-50 text-teal-700 border-l-teal-500'
+    }
+
+    // 참석하지 않는 법원기일(선고기일, 부모교육)은 회색으로 표시
+    if (type === 'trial' && (eventSubtype === 'HEARING_JUDGMENT' || eventSubtype === 'HEARING_PARENTING')) {
+      return 'bg-gray-50 text-gray-600 border-l-gray-400'
+    }
+
     switch (type) {
       case 'trial': return 'bg-sage-50 text-sage-700 border-l-sage-400'
       case 'consultation': return 'bg-blue-50 text-blue-700 border-l-blue-400'
@@ -266,24 +279,24 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
           return (
             <div
               key={index}
-              className="min-h-[200px] group"
+              className="min-h-[220px] group"
             >
               <div className="text-center mb-3 pb-2 border-b border-sage-100">
-                <p className={`text-xs font-medium uppercase tracking-wider mb-1 ${
-                  isHoliday ? 'text-red-500' : 'text-sage-500'
+                <p className={`text-sm font-semibold uppercase tracking-wider mb-1 ${
+                  isHoliday ? 'text-red-500' : 'text-sage-600'
                 }`} style={isHoliday ? { color: holidayColor } : undefined}>
                   {format(day, 'EEE', { locale: ko })}
                 </p>
                 <button
                   onClick={() => onDateClick && onDateClick(day)}
-                  className={`inline-flex items-center justify-center w-8 h-8 rounded-full transition-colors ${
+                  className={`inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors text-base ${
                     isToday
                       ? isHoliday
-                        ? 'text-red-600 font-semibold'
-                        : 'bg-sage-600 text-white font-semibold hover:bg-sage-700'
+                        ? 'text-red-600 font-bold'
+                        : 'bg-sage-600 text-white font-bold hover:bg-sage-700'
                       : isHoliday
-                      ? 'text-red-500 font-semibold hover:bg-red-50 cursor-pointer'
-                      : 'text-sage-900 font-medium hover:bg-sage-50 cursor-pointer'
+                      ? 'text-red-500 font-bold hover:bg-red-50 cursor-pointer'
+                      : 'text-sage-900 font-semibold hover:bg-sage-50 cursor-pointer'
                   }`}
                   style={
                     isHoliday
@@ -299,7 +312,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                 </button>
                 {isHoliday && (
                   <p
-                    className="text-[10px] text-red-500 font-medium mt-1 truncate px-1"
+                    className="text-[11px] text-red-500 font-medium mt-1 truncate px-1"
                     style={{ color: holidayColor }}
                     title={holidayName}
                   >
@@ -308,9 +321,9 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                 )}
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1.5">
                 {daySchedules.length === 0 ? (
-                  <p className="text-xs text-gray-400 text-center mt-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-sm text-gray-400 text-center mt-8 opacity-0 group-hover:opacity-100 transition-opacity">
                     일정 없음
                   </p>
                 ) : (
@@ -318,7 +331,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                     {daySchedules.slice(0, 5).map((schedule) => (
                       <div
                         key={schedule.id}
-                        className={`px-2 pt-1 pb-1.5 rounded-md border-l-4 ${getScheduleTypeColor(schedule.schedule_type, schedule.event_type)} hover:shadow-sm transition-shadow ${onScheduleClick ? 'cursor-pointer' : ''} max-h-[5rem] overflow-hidden`}
+                        className={`px-2.5 pt-1.5 pb-2 rounded-md border-l-4 ${getScheduleTypeColor(schedule.schedule_type, schedule.event_type, schedule.event_subtype)} hover:shadow-sm transition-shadow ${onScheduleClick ? 'cursor-pointer' : ''} max-h-[6rem] overflow-hidden`}
                         onClick={() => {
                           if (onScheduleClick) {
                             onScheduleClick(schedule)
@@ -326,23 +339,23 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                         }}
                       >
                         <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide">
+                          <span className="text-[11px] font-bold uppercase tracking-wide">
                             {getScheduleTypeLabel(schedule.schedule_type, schedule.event_type, schedule.location)}
                           </span>
                           {schedule.scheduled_time && (
                             <>
                               <span className="text-gray-400">·</span>
-                              <span className="text-[10px] font-medium">
+                              <span className="text-[11px] font-semibold">
                                 {schedule.scheduled_time.slice(0, 5)}
                               </span>
                             </>
                           )}
                         </div>
-                        <p className="text-xs font-medium line-clamp-2 leading-snug" title={schedule.title}>
+                        <p className="text-[13px] font-medium line-clamp-2 leading-snug" title={schedule.title}>
                           {schedule.title}
                         </p>
                         {schedule.location && (
-                          <p className="text-[10px] opacity-70 mt-0.5 truncate">
+                          <p className="text-[11px] opacity-70 mt-0.5 truncate">
                             📍 {schedule.location}
                           </p>
                         )}

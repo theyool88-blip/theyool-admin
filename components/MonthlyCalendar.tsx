@@ -500,8 +500,8 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
               {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
                 <div
                   key={day}
-                  className={`text-center font-medium text-[10px] py-2 ${
-                    index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-500'
+                  className={`text-center font-semibold text-xs py-2 ${
+                    index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-500' : 'text-gray-600'
                   }`}
                 >
                   {day}
@@ -523,7 +523,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   <div
                     key={index}
                     onClick={() => setSelectedDate(day)}
-                    className={`min-h-[100px] p-2 rounded-lg cursor-pointer transition-all ${
+                    className={`min-h-[130px] p-2.5 rounded-lg cursor-pointer transition-all ${
                       isSelected
                         ? 'bg-sage-50 ring-2 ring-sage-300'
                         : isCurrentDay
@@ -531,10 +531,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         : 'hover:bg-gray-50'
                     } ${!isCurrentMonth ? 'opacity-40' : ''}`}
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className={`text-xs font-medium ${
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className={`text-sm font-semibold ${
                         isCurrentDay
-                          ? 'w-6 h-6 flex items-center justify-center bg-sage-600 text-white rounded-full'
+                          ? 'w-7 h-7 flex items-center justify-center bg-sage-600 text-white rounded-full'
                           : isHoliday || index % 7 === 0
                           ? 'text-red-500'
                           : index % 7 === 6
@@ -544,29 +544,29 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         {format(day, 'd')}
                       </div>
                       {daySchedules.length > 0 && (
-                        <div className="flex gap-0.5">
+                        <div className="flex gap-1">
                           {daySchedules.slice(0, 3).map((schedule) => (
                             <div
                               key={schedule.id}
-                              className={`w-1.5 h-1.5 rounded-full ${getScheduleTypeDot(schedule.type, schedule.hearing_type)}`}
+                              className={`w-2 h-2 rounded-full ${getScheduleTypeDot(schedule.type, schedule.hearing_type)}`}
                             />
                           ))}
                         </div>
                       )}
                     </div>
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {holidayName && (
-                        <p className="text-[9px] text-red-500 font-medium truncate" title={holidayName}>
+                        <p className="text-[10px] text-red-500 font-medium truncate" title={holidayName}>
                           {holidayName}
                         </p>
                       )}
                       {daySchedules.slice(0, 2).map((schedule) => (
                         <div
                           key={schedule.id}
-                          className={`text-[9px] px-1.5 py-1 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype)} leading-tight`}
+                          className={`text-[11px] px-2 py-1.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype)} leading-tight`}
                           title={`${schedule.time?.slice(0, 5) || ''} ${schedule.title} ${schedule.location ? '- ' + schedule.location : ''}`}
                         >
-                          <div className="font-medium truncate">
+                          <div className="font-semibold truncate">
                             {schedule.time?.slice(0, 5)}
                             {schedule.type === 'deadline' && schedule.daysUntil !== undefined && (
                               <span className="ml-1 text-orange-600">{formatDaysUntil(schedule.daysUntil)}</span>
@@ -578,7 +578,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         </div>
                       ))}
                       {daySchedules.length > 2 && (
-                        <div className="text-[9px] text-gray-500 font-medium px-1.5">
+                        <div className="text-[11px] text-gray-500 font-medium px-2">
                           +{daySchedules.length - 2}
                         </div>
                       )}

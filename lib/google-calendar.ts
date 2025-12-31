@@ -1,13 +1,30 @@
 import { google } from 'googleapis';
+import { createAdminClient } from '@/lib/supabase/server';
+import type { IntegrationProvider, TenantIntegrationRecord, OAuthState } from '@/types/integration';
 
-const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+// =====================================================
+// OAuth Scopes
+// =====================================================
+const CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
 
+// 하위 호환성을 위해 기존 SCOPES 유지
+const SCOPES = CALENDAR_SCOPES;
+
+// =====================================================
+// OAuth2 Client (공용)
+// =====================================================
 const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_CALENDAR_CLIENT_ID,
   process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
-  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/callback/google-calendar`
+  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/callback/google`
 );
 
+// =====================================================
+// 기존 함수들 (하위 호환성)
+// =====================================================
+
+/** @deprecated Use getTenantAuthUrl instead */
 export function getAuthUrl() {
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
@@ -64,3 +81,333 @@ export async function getCalendarEvents(
 }
 
 export { oauth2Client };
+
+// =====================================================
+// 테넌트별 OAuth 함수들 (신규)
+// =====================================================
+
+/**
+ * 테넌트별 OAuth 인증 URL 생성
+ */
+export async function getTenantAuthUrl(
+  tenantId: string,
+  provider: IntegrationProvider,
+  userId: string
+): Promise<string> {
+  const supabase = await createAdminClient();
+
+  // State 생성 (CSRF 방지)
+  const stateData: OAuthState = {
+    tenantId,
+    provider,
+    nonce: crypto.randomUUID(),
+    timestamp: Date.now(),
+  };
+  const state = Buffer.from(JSON.stringify(stateData)).toString('base64url');
+
+  // State를 DB에 저장 (10분 만료)
+  await supabase.from('oauth_states').insert({
+    state,
+    tenant_id: tenantId,
+    provider,
+    user_id: userId,
+    expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+  });
+
+  // Scopes 선택
+  const scopes = provider === 'google_calendar' ? CALENDAR_SCOPES : DRIVE_SCOPES;
+
+  return oauth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: scopes,
+    prompt: 'consent',
+    state,
+  });
+}
+
+/**
+ * OAuth State 검증
+ */
+export async function validateOAuthState(state: string): Promise<{
+  valid: boolean;
+  tenantId?: string;
+  provider?: IntegrationProvider;
+  userId?: string;
+  error?: string;
+}> {
+  const supabase = await createAdminClient();
+
+  // State 조회
+  const { data, error } = await supabase
+    .from('oauth_states')
+    .select('*')
+    .eq('state', state)
+    .single();
+
+  if (error || !data) {
+    return { valid: false, error: 'Invalid or expired state' };
+  }
+
+  // 만료 확인
+  if (new Date(data.expires_at) < new Date()) {
+    // 만료된 state 삭제
+    await supabase.from('oauth_states').delete().eq('state', state);
+    return { valid: false, error: 'State expired' };
+  }
+
+  return {
+    valid: true,
+    tenantId: data.tenant_id,
+    provider: data.provider as IntegrationProvider,
+    userId: data.user_id,
+  };
+}
+
+/**
+ * OAuth State 삭제
+ */
+export async function deleteOAuthState(state: string): Promise<void> {
+  const supabase = await createAdminClient();
+  await supabase.from('oauth_states').delete().eq('state', state);
+}
+
+/**
+ * 테넌트 연동 정보 조회
+ */
+export async function getTenantIntegration(
+  tenantId: string,
+  provider: IntegrationProvider
+): Promise<TenantIntegrationRecord | null> {
+  const supabase = await createAdminClient();
+
+  const { data, error } = await supabase
+    .from('tenant_integrations')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('provider', provider)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as TenantIntegrationRecord;
+}
+
+/**
+ * 테넌트 연동 저장/업데이트
+ */
+export async function upsertTenantIntegration(
+  tenantId: string,
+  provider: IntegrationProvider,
+  data: {
+    accessToken: string;
+    refreshToken?: string;
+    tokenExpiry?: Date;
+    connectedBy: string;
+    settings?: Record<string, unknown>;
+  }
+): Promise<TenantIntegrationRecord | null> {
+  const supabase = await createAdminClient();
+
+  const { data: result, error } = await supabase
+    .from('tenant_integrations')
+    .upsert(
+      {
+        tenant_id: tenantId,
+        provider,
+        access_token: data.accessToken,
+        refresh_token: data.refreshToken,
+        token_expiry: data.tokenExpiry?.toISOString(),
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        connected_by: data.connectedBy,
+        settings: data.settings || {},
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tenant_id,provider' }
+    )
+    .select()
+    .single();
+
+  if (error) {
+    console.error('[upsertTenantIntegration] Error:', error);
+    return null;
+  }
+
+  return result as TenantIntegrationRecord;
+}
+
+/**
+ * 테넌트 연동 토큰 갱신
+ */
+export async function refreshTenantToken(
+  tenantId: string,
+  provider: IntegrationProvider
+): Promise<{ accessToken: string; expiryDate?: number } | null> {
+  const integration = await getTenantIntegration(tenantId, provider);
+
+  if (!integration || !integration.refresh_token) {
+    return null;
+  }
+
+  try {
+    const credentials = await refreshAccessToken(integration.refresh_token);
+
+    if (!credentials.access_token) {
+      return null;
+    }
+
+    // 토큰 업데이트
+    const supabase = await createAdminClient();
+    await supabase
+      .from('tenant_integrations')
+      .update({
+        access_token: credentials.access_token,
+        token_expiry: credentials.expiry_date
+          ? new Date(credentials.expiry_date).toISOString()
+          : null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', tenantId)
+      .eq('provider', provider);
+
+    return {
+      accessToken: credentials.access_token,
+      expiryDate: credentials.expiry_date || undefined,
+    };
+  } catch (error) {
+    console.error('[refreshTenantToken] Error:', error);
+
+    // 토큰 갱신 실패 시 상태를 expired로 변경
+    const supabase = await createAdminClient();
+    await supabase
+      .from('tenant_integrations')
+      .update({
+        status: 'expired',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', tenantId)
+      .eq('provider', provider);
+
+    return null;
+  }
+}
+
+/**
+ * 테넌트의 유효한 액세스 토큰 가져오기 (필요시 자동 갱신)
+ */
+export async function getTenantAccessToken(
+  tenantId: string,
+  provider: IntegrationProvider
+): Promise<string | null> {
+  const integration = await getTenantIntegration(tenantId, provider);
+
+  if (!integration || integration.status !== 'connected') {
+    return null;
+  }
+
+  // 토큰 만료 확인
+  const now = Date.now();
+  const expiry = integration.token_expiry ? new Date(integration.token_expiry).getTime() : 0;
+
+  if (expiry && now >= expiry) {
+    // 토큰 갱신
+    const refreshed = await refreshTenantToken(tenantId, provider);
+    return refreshed?.accessToken || null;
+  }
+
+  return integration.access_token;
+}
+
+/**
+ * 테넌트의 캘린더 목록 조회
+ */
+export async function getTenantCalendarList(tenantId: string) {
+  const accessToken = await getTenantAccessToken(tenantId, 'google_calendar');
+
+  if (!accessToken) {
+    throw new Error('Google Calendar not connected or token expired');
+  }
+
+  return getCalendarList(accessToken);
+}
+
+/**
+ * 테넌트 연동 설정 업데이트
+ */
+export async function updateTenantIntegrationSettings(
+  tenantId: string,
+  provider: IntegrationProvider,
+  settings: Record<string, unknown>
+): Promise<boolean> {
+  const supabase = await createAdminClient();
+
+  const { error } = await supabase
+    .from('tenant_integrations')
+    .update({
+      settings,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('provider', provider);
+
+  if (error) {
+    console.error('[updateTenantIntegrationSettings] Error:', error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * 테넌트 연동 해제
+ */
+export async function disconnectTenantIntegration(
+  tenantId: string,
+  provider: IntegrationProvider
+): Promise<boolean> {
+  const supabase = await createAdminClient();
+
+  const { error } = await supabase
+    .from('tenant_integrations')
+    .update({
+      status: 'disconnected',
+      access_token: null,
+      refresh_token: null,
+      token_expiry: null,
+      webhook_channel_id: null,
+      webhook_resource_id: null,
+      webhook_expiry: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('tenant_id', tenantId)
+    .eq('provider', provider);
+
+  if (error) {
+    console.error('[disconnectTenantIntegration] Error:', error);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * 테넌트의 모든 연동 목록 조회
+ */
+export async function getTenantIntegrations(tenantId: string): Promise<TenantIntegrationRecord[]> {
+  const supabase = await createAdminClient();
+
+  const { data, error } = await supabase
+    .from('tenant_integrations')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('provider');
+
+  if (error) {
+    console.error('[getTenantIntegrations] Error:', error);
+    return [];
+  }
+
+  return (data || []) as TenantIntegrationRecord[];
+}

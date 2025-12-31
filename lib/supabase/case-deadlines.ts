@@ -19,13 +19,21 @@ import type {
 } from '@/types/court-hearing';
 
 /**
- * 사건 데드라인 목록 조회 (필터링 및 페이지네이션 지원)
+ * 사건 데드라인 목록 조회 (필터링 및 페이지네이션 지원, 테넌트 격리)
+ * @param filters 필터 조건
+ * @param tenantId 테넌트 ID (슈퍼 어드민은 undefined로 전달하여 전체 조회)
  */
 export async function getCaseDeadlines(
-  filters?: CaseDeadlineListQuery
+  filters?: CaseDeadlineListQuery,
+  tenantId?: string
 ): Promise<{ data: CaseDeadline[]; count: number }> {
   const supabase = createAdminClient();
   let query = supabase.from('case_deadlines').select('*', { count: 'exact' });
+
+  // 테넌트 격리 필터
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
 
   if (filters) {
     if (filters.case_number) {
@@ -136,13 +144,16 @@ export async function getUrgentDeadlines(): Promise<UrgentDeadline[]> {
 }
 
 /**
- * 사건 데드라인 생성
+ * 사건 데드라인 생성 (테넌트 격리)
  *
  * 주의: deadline_date와 deadline_datetime은 자동 계산되므로 제공하지 않음
  *       trigger_date와 deadline_type만 제공
+ * @param request 생성 요청
+ * @param tenantId 테넌트 ID
  */
 export async function createCaseDeadline(
-  request: CreateCaseDeadlineRequest
+  request: CreateCaseDeadlineRequest,
+  tenantId?: string
 ): Promise<CaseDeadline> {
   const supabase = createAdminClient();
 
@@ -152,6 +163,7 @@ export async function createCaseDeadline(
     trigger_date: request.trigger_date,
     notes: request.notes || null,
     status: request.status || 'PENDING',
+    tenant_id: tenantId || null,
   };
 
   const { data, error } = await supabase

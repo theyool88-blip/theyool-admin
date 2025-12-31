@@ -1,24 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant, withTenantId } from '@/lib/api/with-tenant'
 import type { CreatePaymentRequest } from '@/types/payment'
 
-// GET: List payments with filters
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/admin/payments
+ * List payments with filters (테넌트 격리)
+ */
+export const GET = withTenant(async (request, { tenant }) => {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+    const supabase = createAdminClient()
     const searchParams = request.nextUrl.searchParams
 
     // Build query
     let query = supabase
       .from('payments')
       .select('*', { count: 'exact' })
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId)
+    }
 
     // Apply filters
     const officeLocation = searchParams.get('office_location')
@@ -91,18 +93,15 @@ export async function GET(request: NextRequest) {
     console.error('Failed to fetch payments:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})
 
-// POST: Create new payment
-export async function POST(request: NextRequest) {
+/**
+ * POST /api/admin/payments
+ * Create new payment (테넌트 자동 할당)
+ */
+export const POST = withTenant(async (request, { tenant }) => {
   try {
-    const supabase = await createClient()
-
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const supabase = createAdminClient()
 
     const body: CreatePaymentRequest = await request.json()
 
@@ -131,10 +130,10 @@ export async function POST(request: NextRequest) {
     }
 
     const shouldConfirm = !!(body.case_id || body.consultation_id || body.is_confirmed)
-    const confirmedBy = shouldConfirm ? (user.email || user.id || 'admin') : null
+    const confirmedBy = shouldConfirm ? (tenant.memberDisplayName || 'admin') : null
     const { data, error } = await supabase
       .from('payments')
-      .insert({
+      .insert([withTenantId({
         payment_date: body.payment_date,
         depositor_name: body.depositor_name,
         amount: body.amount,
@@ -152,7 +151,7 @@ export async function POST(request: NextRequest) {
         is_confirmed: shouldConfirm,
         confirmed_at: shouldConfirm ? new Date().toISOString() : null,
         confirmed_by: confirmedBy,
-      })
+      }, tenant)])
       .select()
       .single()
 
@@ -197,4 +196,4 @@ export async function POST(request: NextRequest) {
     console.error('Failed to create payment:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})

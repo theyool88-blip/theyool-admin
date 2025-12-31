@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import CaseDocuments from '@/components/client/CaseDocuments';
 
 interface CaseDetail {
   id: string;
@@ -332,6 +333,11 @@ export default function CaseDetailPreview() {
             </div>
           </section>
         )}
+
+        {/* 소송 서류 */}
+        <section className="bg-white rounded-2xl border border-gray-100 p-4">
+          <CaseDocuments caseId={caseId} />
+        </section>
 
         {/* 문의 안내 */}
         <section className="bg-sage-50 rounded-2xl p-4 text-center">

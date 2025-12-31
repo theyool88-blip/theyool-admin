@@ -1,0 +1,53 @@
+{
+  "formFields": [
+    {
+      "tag": "INPUT",
+      "type": "hidden",
+      "name": "searchWord",
+      "id": "",
+      "placeholder": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "hidden",
+      "name": "section",
+      "id": "",
+      "placeholder": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "hidden",
+      "name": "search_kind",
+      "id": "",
+      "placeholder": ""
+    },
+    {
+      "tag": "INPUT",
+      "type": "hidden",
+      "name": "pg",
+      "id": "",
+      "placeholder": ""
+    },
+    {
+      "tag": "SELECT",
+      "type": "select-one",
+      "name": "category",
+      "id": "search_total"
+    },
+    {
+      "tag": "INPUT",
+      "type": "text",
+      "name": "dpWord",
+      "id": "search_word",
+      "placeholder": ""
+    }
+  ],
+  "timestamp": "2025-12-26T06:03:33.357Z",
+  "searchParams": {
+    "courtName": "수원가정법원",
+    "caseYear": "2024",
+    "caseType": "드단",
+    "caseNumber": "26718",
+    "partyName": "김윤한"
+  }
+}

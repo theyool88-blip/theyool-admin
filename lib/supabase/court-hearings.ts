@@ -16,13 +16,21 @@ import type {
 } from '@/types/court-hearing';
 
 /**
- * 법원 기일 목록 조회 (필터링 및 페이지네이션 지원)
+ * 법원 기일 목록 조회 (필터링 및 페이지네이션 지원, 테넌트 격리)
+ * @param filters 필터 조건
+ * @param tenantId 테넌트 ID (슈퍼 어드민은 undefined로 전달하여 전체 조회)
  */
 export async function getCourtHearings(
-  filters?: CourtHearingListQuery
+  filters?: CourtHearingListQuery,
+  tenantId?: string
 ): Promise<{ data: CourtHearing[]; count: number }> {
   const supabase = createAdminClient();
   let query = supabase.from('court_hearings').select('*', { count: 'exact' });
+
+  // 테넌트 격리 필터
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId);
+  }
 
   if (filters) {
     if (filters.case_number) {
@@ -136,10 +144,13 @@ const AUTO_DEADLINE_MAPPING: Record<string, string> = {
 };
 
 /**
- * 법원 기일 생성 (자동 데드라인 생성 옵션 포함)
+ * 법원 기일 생성 (자동 데드라인 생성 옵션 포함, 테넌트 격리)
+ * @param request 생성 요청
+ * @param tenantId 테넌트 ID
  */
 export async function createCourtHearing(
-  request: CreateCourtHearingRequest & { auto_create_deadline?: boolean }
+  request: CreateCourtHearingRequest & { auto_create_deadline?: boolean },
+  tenantId?: string
 ): Promise<CourtHearing> {
   const supabase = createAdminClient();
 
@@ -151,6 +162,7 @@ export async function createCourtHearing(
     judge_name: request.judge_name || null,
     notes: request.notes || null,
     status: request.status || 'SCHEDULED',
+    tenant_id: tenantId || null,
   };
 
   const { data, error } = await supabase
@@ -177,7 +189,8 @@ export async function createCourtHearing(
           deadline_type: deadlineType,
           trigger_date: triggerDate,
           notes: `${data.hearing_type === 'HEARING_JUDGMENT' ? '선고일' : '조정일'}로부터 자동 생성`,
-          status: 'PENDING'
+          status: 'PENDING',
+          tenant_id: tenantId || null,
         });
 
         console.log(`✅ 자동 데드라인 생성: ${deadlineType}`);

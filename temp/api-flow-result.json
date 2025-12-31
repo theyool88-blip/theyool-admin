@@ -1,0 +1,26 @@
+{
+  "searchResult": {
+    "success": true,
+    "data": {
+      "status": 200,
+      "message": " 조회가 완료되었습니다.",
+      "timestamp": 1767004147693,
+      "errors": null,
+      "data": {
+        "dlt_csNoHistLst": [
+          {
+            "csNo": "",
+            "encCsNo": "TwbSPe/xW5Rn9CzTZMLAMeexgmN0rYqEugR3gvtq4O4="
+          }
+        ]
+      },
+      "token": null
+    },
+    "encCsNo": "TwbSPe/xW5Rn9CzTZMLAMeexgmN0rYqEugR3gvtq4O4=",
+    "captchaAttempts": 1
+  },
+  "detailResult": {
+    "success": false,
+    "error": "허용되지 않은 접근방식입니다."
+  }
+}

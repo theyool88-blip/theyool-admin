@@ -1,0 +1,26 @@
+{
+  "searchRequests": [
+    {
+      "url": "https://ssgo.scourt.go.kr/ssgo/cm/scui/SCMsgBox.xml?postfix=17667327294037052.265175073541",
+      "method": "GET",
+      "headers": {
+        "sec-ch-ua-platform": "\"macOS\"",
+        "referer": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+        "accept-language": "ko-KR,ko;q=0.9",
+        "sec-ch-ua": "\"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+        "sec-ch-ua-mobile": "?0",
+        "accept": "*/*",
+        "cookie": "WMONID=5562Eck3CDm; JSESSIONID=vVNZee7RAZp7FYOXdwUhTd4u7TstfpxKBpM6A8xq0DB3ug52IjhZ!147369826; ssgocpk=fHB+l53X8covh+nbRh+r2wUr5bH9mpR/iqy5k4J+U7KCV0UgjzXlVJzS8hsaL8iro4fCwpiLBbCNlH59vDNC/igWBbMOFEifMRYT4/iO674A=AA0A; lastAccess=1766732723412"
+      }
+    }
+  ],
+  "savedResults": {
+    "hasData": false,
+    "rowCount": 0
+  },
+  "urls": {
+    "initial": "https://www.scourt.go.kr/portal/information/events/search/search.jsp",
+    "afterSearch": "https://www.scourt.go.kr/portal/information/events/search/search.jsp"
+  }
+}

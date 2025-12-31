@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant } from '@/lib/api/with-tenant'
 
 type UpcomingHearing = {
   id: string
@@ -13,18 +14,12 @@ type UpcomingDeadline = {
   case_id: string | null
 }
 
-export async function GET() {
-  // Use regular client for auth check
-  const supabase = await createClient()
-
-  // Check authentication
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  // Use admin client for data queries (bypasses RLS)
-  const adminSupabase = await createAdminClient()
+/**
+ * GET /api/admin/dashboard
+ * 대시보드 통계 (테넌트 격리)
+ */
+export const GET = withTenant(async (request, { tenant }) => {
+  const adminSupabase = createAdminClient()
 
   try {
     const now = new Date()
@@ -32,22 +27,36 @@ export async function GET() {
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0)
 
+    // 테넌트 필터 헬퍼
+    const addTenantFilter = <T extends { eq: (col: string, val: string) => T }>(query: T): T => {
+      if (!tenant.isSuperAdmin && tenant.tenantId) {
+        return query.eq('tenant_id', tenant.tenantId)
+      }
+      return query
+    }
+
     // 1. Consultation Stats
-    const { data: allConsultations } = await adminSupabase
+    let allConsultationsQuery = adminSupabase
       .from('consultations')
       .select('id, status, lead_score, created_at, case_id')
       .order('created_at', { ascending: false })
+    allConsultationsQuery = addTenantFilter(allConsultationsQuery)
+    const { data: allConsultations } = await allConsultationsQuery
 
-    const { data: thisMonthConsultations } = await adminSupabase
+    let thisMonthConsultationsQuery = adminSupabase
       .from('consultations')
       .select('id, status, case_id')
       .gte('created_at', thisMonthStart.toISOString())
+    thisMonthConsultationsQuery = addTenantFilter(thisMonthConsultationsQuery)
+    const { data: thisMonthConsultations } = await thisMonthConsultationsQuery
 
-    const { data: lastMonthConsultations } = await adminSupabase
+    let lastMonthConsultationsQuery = adminSupabase
       .from('consultations')
       .select('id, status, case_id')
       .gte('created_at', lastMonthStart.toISOString())
       .lte('created_at', lastMonthEnd.toISOString())
+    lastMonthConsultationsQuery = addTenantFilter(lastMonthConsultationsQuery)
+    const { data: lastMonthConsultations } = await lastMonthConsultationsQuery
 
     // Consultation conversion funnel
     const statusCounts = {
@@ -77,20 +86,26 @@ export async function GET() {
     }
 
     // 2. Payment/Revenue Stats
-    const { data: allPayments } = await adminSupabase
+    let allPaymentsQuery = adminSupabase
       .from('payments')
       .select('amount, payment_date, office_location, payment_category')
+    allPaymentsQuery = addTenantFilter(allPaymentsQuery)
+    const { data: allPayments } = await allPaymentsQuery
 
-    const { data: thisMonthPayments } = await adminSupabase
+    let thisMonthPaymentsQuery = adminSupabase
       .from('payments')
       .select('amount, office_location')
       .gte('payment_date', thisMonthStart.toISOString().split('T')[0])
+    thisMonthPaymentsQuery = addTenantFilter(thisMonthPaymentsQuery)
+    const { data: thisMonthPayments } = await thisMonthPaymentsQuery
 
-    const { data: lastMonthPayments } = await adminSupabase
+    let lastMonthPaymentsQuery = adminSupabase
       .from('payments')
       .select('amount, office_location')
       .gte('payment_date', lastMonthStart.toISOString().split('T')[0])
       .lte('payment_date', lastMonthEnd.toISOString().split('T')[0])
+    lastMonthPaymentsQuery = addTenantFilter(lastMonthPaymentsQuery)
+    const { data: lastMonthPayments } = await lastMonthPaymentsQuery
 
     const totalRevenue = allPayments?.reduce((sum, p) => sum + p.amount, 0) || 0
     const thisMonthRevenue = thisMonthPayments?.reduce((sum, p) => sum + p.amount, 0) || 0
@@ -110,14 +125,18 @@ export async function GET() {
     }
 
     // 3. Cases Stats
-    const { data: allCases } = await adminSupabase
+    let allCasesQuery = adminSupabase
       .from('legal_cases')
       .select('id, status, office, created_at, is_new_case')
+    allCasesQuery = addTenantFilter(allCasesQuery)
+    const { data: allCases } = await allCasesQuery
 
-    const { data: thisMonthCases } = await adminSupabase
+    let thisMonthCasesQuery = adminSupabase
       .from('legal_cases')
       .select('id, status, is_new_case')
       .gte('created_at', thisMonthStart.toISOString())
+    thisMonthCasesQuery = addTenantFilter(thisMonthCasesQuery)
+    const { data: thisMonthCases } = await thisMonthCasesQuery
 
     const activeCases = allCases?.filter(c => c.status === '진행중').length || 0
     const completedCases = allCases?.filter(c => c.status === '완료').length || 0
@@ -138,31 +157,34 @@ export async function GET() {
     }
 
     // 4. Action Items (긴급 알림)
-    // Try to get hearings and deadlines, but don't fail if tables don't exist
     let upcomingHearings: UpcomingHearing[] = []
     let upcomingDeadlines: UpcomingDeadline[] = []
 
     try {
-      const { data: hearings } = await adminSupabase
+      let hearingsQuery = adminSupabase
         .from('court_hearings')
         .select('id, hearing_date, case_id')
         .gte('hearing_date', now.toISOString().split('T')[0])
         .lte('hearing_date', new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('hearing_date', { ascending: true })
         .limit(5)
+      hearingsQuery = addTenantFilter(hearingsQuery)
+      const { data: hearings } = await hearingsQuery
       upcomingHearings = hearings || []
     } catch (error) {
       console.log('Court hearings table not available', error)
     }
 
     try {
-      const { data: deadlines } = await adminSupabase
+      let deadlinesQuery = adminSupabase
         .from('case_deadlines')
         .select('id, deadline_date, case_id')
         .gte('deadline_date', now.toISOString().split('T')[0])
         .lte('deadline_date', new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('deadline_date', { ascending: true })
         .limit(5)
+      deadlinesQuery = addTenantFilter(deadlinesQuery)
+      const { data: deadlines } = await deadlinesQuery
       upcomingDeadlines = deadlines || []
     } catch (error) {
       console.log('Case deadlines table not available', error)
@@ -180,23 +202,28 @@ export async function GET() {
     const thisMonth = now.toISOString().slice(0, 7) // YYYY-MM
     const lastMonth = lastMonthStart.toISOString().slice(0, 7)
 
-    const { data: thisMonthExpenses } = await adminSupabase
+    let thisMonthExpensesQuery = adminSupabase
       .from('expenses')
       .select('amount')
       .eq('month_key', thisMonth)
+    thisMonthExpensesQuery = addTenantFilter(thisMonthExpensesQuery)
+    const { data: thisMonthExpenses } = await thisMonthExpensesQuery
 
-    const { data: lastMonthExpenses } = await adminSupabase
+    let lastMonthExpensesQuery = adminSupabase
       .from('expenses')
       .select('amount')
       .eq('month_key', lastMonth)
+    lastMonthExpensesQuery = addTenantFilter(lastMonthExpensesQuery)
+    const { data: lastMonthExpenses } = await lastMonthExpensesQuery
 
-    // Get partner debt status
-    const { data: debtStatus } = await adminSupabase
+    // Get partner debt status (테넌트별)
+    let debtStatusQuery = adminSupabase
       .from('monthly_settlements')
       .select('kim_accumulated_debt, lim_accumulated_debt')
       .order('settlement_month', { ascending: false })
       .limit(1)
-      .single()
+    debtStatusQuery = addTenantFilter(debtStatusQuery)
+    const { data: debtStatus } = await debtStatusQuery.single()
 
     const expenseStats = {
       thisMonth: thisMonthExpenses?.reduce((sum, e) => sum + (e.amount || 0), 0) || 0,
@@ -222,4 +249,4 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+})

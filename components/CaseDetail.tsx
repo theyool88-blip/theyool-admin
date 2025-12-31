@@ -65,6 +65,7 @@ interface LegalCase {
   judge_name: string | null
   notes: string | null
   is_new_case: boolean
+  onedrive_folder_url: string | null
   created_at: string
   updated_at: string
   client?: Client
@@ -358,6 +359,21 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               )}
               신건
             </button>
+            {/* 문서 폴더 뱃지 */}
+            {caseData.onedrive_folder_url && (
+              <a
+                href={caseData.onedrive_folder_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-2 py-0.5 text-xs font-medium rounded flex items-center gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+                title="소송 서류 폴더 열기"
+              >
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7.71 3.5l1.6 1.5h5.36a1.5 1.5 0 0 1 1.5 1.5v1h2.33a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 17V5a1.5 1.5 0 0 1 1.5-1.5h2.21z"/>
+                </svg>
+                Drive
+              </a>
+            )}
           </div>
           <button
             onClick={() => router.push(`/cases/${caseData.id}/edit`)}

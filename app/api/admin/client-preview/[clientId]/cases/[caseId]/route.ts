@@ -20,6 +20,8 @@ interface CaseDetail {
   contract_date: string;
   created_at: string;
   onedrive_folder_url: string | null;
+  scourt_last_sync: string | null;
+  scourt_unread_updates: number;
 }
 
 interface Hearing {
@@ -42,11 +44,21 @@ interface Deadline {
   is_completed: boolean;
 }
 
+interface ScourtUpdate {
+  id: string;
+  update_type: string;
+  update_summary: string;
+  importance: string;
+  detected_at: string;
+  is_read_by_client: boolean;
+}
+
 interface CaseDetailResponse {
   success: true;
   case: CaseDetail;
   hearings: Hearing[];
   deadlines: Deadline[];
+  scourt_updates: ScourtUpdate[];
 }
 
 export async function GET(
@@ -87,7 +99,9 @@ export async function GET(
         office,
         contract_date,
         created_at,
-        onedrive_folder_url
+        onedrive_folder_url,
+        scourt_last_sync,
+        scourt_unread_updates
       `)
       .eq('id', caseId)
       .eq('client_id', clientId)
@@ -190,11 +204,50 @@ export async function GET(
       return a.is_completed ? 1 : -1;
     });
 
+    // 4. SCOURT 업데이트 조회 (최근 30일, 최대 10건)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const { data: scourtUpdates, error: scourtError } = await supabase
+      .from('scourt_case_updates')
+      .select(`
+        id,
+        update_type,
+        update_summary,
+        importance,
+        detected_at,
+        is_read_by_client
+      `)
+      .eq('legal_case_id', caseId)
+      .gte('detected_at', thirtyDaysAgo.toISOString())
+      .order('detected_at', { ascending: false })
+      .limit(10);
+
+    if (scourtError) {
+      console.error('[Case Detail] SCOURT updates fetch error:', {
+        caseId,
+        error: scourtError.message
+      });
+    }
+
+    const transformedScourtUpdates: ScourtUpdate[] = scourtUpdates?.map((u) => ({
+      id: u.id,
+      update_type: u.update_type,
+      update_summary: u.update_summary,
+      importance: u.importance,
+      detected_at: u.detected_at,
+      is_read_by_client: u.is_read_by_client,
+    })) || [];
+
     const response: CaseDetailResponse = {
       success: true,
-      case: caseDetail,
+      case: {
+        ...caseDetail,
+        scourt_unread_updates: caseDetail.scourt_unread_updates || 0,
+      },
       hearings: transformedHearings,
       deadlines: transformedDeadlines,
+      scourt_updates: transformedScourtUpdates,
     };
 
     return NextResponse.json(response);

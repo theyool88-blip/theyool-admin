@@ -1,0 +1,52 @@
+[
+  {
+    "file": "captcha_01.png",
+    "result": "2",
+    "length": 1
+  },
+  {
+    "file": "captcha_02.png",
+    "result": "4755",
+    "length": 4
+  },
+  {
+    "file": "captcha_03.png",
+    "result": "5",
+    "length": 1
+  },
+  {
+    "file": "captcha_04.png",
+    "result": "(없음)",
+    "length": 0
+  },
+  {
+    "file": "captcha_05.png",
+    "result": "910",
+    "length": 3
+  },
+  {
+    "file": "captcha_06.png",
+    "result": "840",
+    "length": 3
+  },
+  {
+    "file": "captcha_07.png",
+    "result": "562",
+    "length": 3
+  },
+  {
+    "file": "captcha_08.png",
+    "result": "82",
+    "length": 2
+  },
+  {
+    "file": "captcha_09.png",
+    "result": "9",
+    "length": 1
+  },
+  {
+    "file": "captcha_10.png",
+    "result": "6584",
+    "length": 4
+  }
+]

@@ -1,0 +1,249 @@
+{
+  "iframeUrl": "https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www",
+  "inputs": [
+    {
+      "type": "checkbox",
+      "name": "mf_ssgoTopMainTab_contents_content1_body_cbx_saveCsRsltYn_input",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_cbx_saveCsRsltYn_input_0",
+      "className": "w2checkbox_input",
+      "placeholder": "",
+      "value": "on"
+    },
+    {
+      "type": "checkbox",
+      "name": "mf_ssgoTopMainTab_contents_content1_body_cbx_sortHangulCsDvsCd_input",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_cbx_sortHangulCsDvsCd_input_0",
+      "className": "w2checkbox_input",
+      "placeholder": "",
+      "value": "on"
+    },
+    {
+      "type": "checkbox",
+      "name": "mf_ssgoTopMainTab_contents_content1_body_cbx_sortHangulCortCd_input",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_cbx_sortHangulCortCd_input_0",
+      "className": "w2checkbox_input",
+      "placeholder": "",
+      "value": "on"
+    },
+    {
+      "type": "text",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_ibx_csSerial",
+      "className": "w2input inp w100px ml10 mr10",
+      "placeholder": "",
+      "value": ""
+    },
+    {
+      "type": "text",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_ibx_fullCsNo",
+      "className": "w2input inp w260px ml10 mr10",
+      "placeholder": "입력예:17가단10",
+      "value": ""
+    },
+    {
+      "type": "text",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_ibx_btprNm",
+      "className": "w2input inp w130px mr10",
+      "placeholder": "당사자명 필수입력",
+      "value": ""
+    },
+    {
+      "type": "checkbox",
+      "name": "mf_ssgoTopMainTab_contents_content1_body_cbx_chkSanoInputMode_input",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_cbx_chkSanoInputMode_input_0",
+      "className": "w2checkbox_input",
+      "placeholder": "",
+      "value": "on"
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_reloadCaptcha",
+      "className": "w2trigger btn_fcm ty1 ",
+      "placeholder": "",
+      "value": "새로고침"
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_voiceListen",
+      "className": "w2trigger btn_fcm ty1 ",
+      "placeholder": "",
+      "value": "음성듣기"
+    },
+    {
+      "type": "text",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_ibx_answer",
+      "className": "w2input inp w200px mr10",
+      "placeholder": "자동입력 방지문자를 입력하세요",
+      "value": ""
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_srchCs",
+      "className": "w2trigger btn_fcm btn_icT_fcmSearch",
+      "placeholder": "",
+      "value": "검색"
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_txt_inputExample",
+      "className": "w2trigger btn_infcm link",
+      "placeholder": "",
+      "value": "(입력예시)"
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistAllChk",
+      "className": "w2trigger btn_cm lg fl",
+      "placeholder": "",
+      "value": "전체선택"
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistAllUnChk",
+      "className": "w2trigger btn_cm lg fl",
+      "placeholder": "",
+      "value": "선택취소"
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistDel",
+      "className": "w2trigger btn_cm lg tempSave",
+      "placeholder": "",
+      "value": "삭제"
+    },
+    {
+      "type": "button",
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistPrint",
+      "className": "w2trigger btn_cm lg confirm dsN_sm",
+      "placeholder": "",
+      "value": "인쇄하기"
+    }
+  ],
+  "selects": [
+    {
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_sbx_cortCd",
+      "className": "w2selectbox_select sel w180px",
+      "options": [
+        "대법원",
+        "서울고등법원",
+        "서울고등법원(춘천재판부)",
+        "서울고등법원(인천재판부)",
+        "대전고등법원"
+      ]
+    },
+    {
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_sbx_csYr",
+      "className": "w2selectbox_select sel w70px ml10 mr10",
+      "options": [
+        "2025",
+        "2024",
+        "2023",
+        "2022",
+        "2021"
+      ]
+    },
+    {
+      "name": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_sbx_csDvsCd",
+      "className": "w2selectbox_select sel w70px",
+      "options": [
+        "다",
+        "재다",
+        "머",
+        "",
+        "두"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "src": "blob:https://ssgo.scourt.go.kr/e695ad6d-7bb1-4105-a332-ac1ffaf7b659",
+      "alt": "자동 입력 방지 문자",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_img_captcha",
+      "className": "w2image mr10 pb5",
+      "width": 120,
+      "height": 40
+    }
+  ],
+  "buttons": [
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "새로고침",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_reloadCaptcha",
+      "className": "w2trigger btn_fcm ty1 "
+    },
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "음성듣기",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_voiceListen",
+      "className": "w2trigger btn_fcm ty1 "
+    },
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "검색",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_srchCs",
+      "className": "w2trigger btn_fcm btn_icT_fcmSearch"
+    },
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "(입력예시)",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_txt_inputExample",
+      "className": "w2trigger btn_infcm link"
+    },
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "전체선택",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistAllChk",
+      "className": "w2trigger btn_cm lg fl"
+    },
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "선택취소",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistAllUnChk",
+      "className": "w2trigger btn_cm lg fl"
+    },
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "삭제",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistDel",
+      "className": "w2trigger btn_cm lg tempSave"
+    },
+    {
+      "tag": "INPUT",
+      "type": "button",
+      "value": "인쇄하기",
+      "textContent": "",
+      "id": "mf_ssgoTopMainTab_contents_content1_body_btn_csSrchHistPrint",
+      "className": "w2trigger btn_cm lg confirm dsN_sm"
+    }
+  ],
+  "clickables": [],
+  "timestamp": "2025-12-26T06:40:56.377Z"
+}

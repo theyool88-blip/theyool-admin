@@ -1,22 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isAuthenticated } from '@/lib/auth/auth'
+import { withTenant, withTenantId } from '@/lib/api/with-tenant'
 
 /**
  * GET /api/admin/cases
- * Fetch all legal cases with client and payment info
+ * Fetch all legal cases with client and payment info (테넌트 격리)
  */
-export async function GET() {
+export const GET = withTenant(async (request, { tenant }) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const adminClient = createAdminClient()
 
-    // Fetch cases with client info
-    const { data: cases, error } = await adminClient
+    // 테넌트 격리된 사건 조회
+    let query = adminClient
       .from('legal_cases')
       .select(`
         id,
@@ -28,12 +23,20 @@ export async function GET() {
         office,
         contract_date,
         court_case_number,
+        tenant_id,
         client:clients (
           id,
           name
         )
       `)
       .order('created_at', { ascending: false })
+
+    // 슈퍼 어드민이 아니면 테넌트 필터 적용
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: cases, error } = await query
 
     if (error) {
       console.error('Error fetching cases:', error)
@@ -77,19 +80,14 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+})
 
 /**
  * POST /api/admin/cases
- * Create a new legal case
+ * Create a new legal case (테넌트 자동 할당)
  */
-export async function POST(request: NextRequest) {
+export const POST = withTenant(async (request, { tenant }) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const body = await request.json() as {
       case_name?: string
       case_type?: string
@@ -129,7 +127,7 @@ export async function POST(request: NextRequest) {
 
     let clientId = body.client_id
 
-    // 새 의뢰인 생성
+    // 새 의뢰인 생성 (테넌트 ID 포함)
     if (body.new_client) {
       if (!body.new_client.name || !body.new_client.phone) {
         return NextResponse.json(
@@ -140,13 +138,13 @@ export async function POST(request: NextRequest) {
 
       const { data: newClient, error: clientError } = await adminClient
         .from('clients')
-        .insert([{
+        .insert([withTenantId({
           name: body.new_client.name,
           phone: body.new_client.phone,
           email: body.new_client.email || null,
           birth_date: body.new_client.birth_date || null,
           address: body.new_client.address || null
-        }])
+        }, tenant)])
         .select()
         .single()
 
@@ -161,10 +159,10 @@ export async function POST(request: NextRequest) {
       clientId = newClient.id
     }
 
-    // Create the case
+    // Create the case (테넌트 ID 포함)
     const { data: newCase, error } = await adminClient
       .from('legal_cases')
-      .insert([{
+      .insert([withTenantId({
         case_name: body.case_name,
         client_id: clientId,
         case_type: body.case_type,
@@ -174,7 +172,7 @@ export async function POST(request: NextRequest) {
         retainer_fee: body.retainer_fee || null,
         notes: body.notes || null,
         is_new_case: body.is_new_case ?? true
-      }])
+      }, tenant)])
       .select()
       .single()
 
@@ -198,4 +196,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

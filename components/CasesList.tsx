@@ -21,6 +21,7 @@ interface LegalCase {
   office: '평택' | '천안' | '소송구조'
   contract_date: string
   court_case_number: string | null
+  onedrive_folder_url: string | null
   client?: Client
   payment_info?: {
     total_amount: number
@@ -204,8 +205,17 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
                     <td className="px-4 py-3 font-medium text-gray-900">
                       {legalCase.client?.name || '-'}
                     </td>
-                    <td className="px-4 py-3 text-gray-900 max-w-[300px] truncate">
-                      {legalCase.case_name}
+                    <td className="px-4 py-3 text-gray-900 max-w-[300px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">{legalCase.case_name}</span>
+                        {legalCase.onedrive_folder_url && (
+                          <span className="flex-shrink-0 text-sky-500" title="OneDrive 연결됨">
+                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M12.5 3C9.85 3 7.45 4.35 6.15 6.5C3.25 6.7 1 9.1 1 12c0 3 2.5 5.5 5.5 5.5h12c2.5 0 4.5-2 4.5-4.5 0-2.4-1.85-4.35-4.2-4.5C17.85 5.95 15.35 3 12.5 3z"/>
+                            </svg>
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${getOfficeStyle(legalCase.office)}`}>

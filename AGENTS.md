@@ -1,6 +1,43 @@
 # Repository Guidelines
 
+**Last Updated**: 2025-12-02
+
+법무법인 더율 관리자 시스템 (theyool-admin) 개발 가이드라인입니다.
+
+---
+
+## Documentation
+
+문서는 `docs/` 폴더에 체계적으로 정리되어 있습니다:
+
+```
+docs/
+├── systems/           # 시스템 설명서
+│   ├── PAYMENT_SYSTEM.md      # 입금/지출 관리
+│   ├── CONSULTATION_SYSTEM.md # 상담 관리
+│   ├── COURT_HEARING_SYSTEM.md # 법원기일/데드라인
+│   ├── CALENDAR_SYSTEM.md     # 캘린더 시스템
+│   └── CLIENT_PORTAL.md       # 의뢰인 포털
+│
+├── guides/            # 개발 가이드
+│   ├── SETUP_GUIDE.md         # 초기 설정
+│   ├── DEPLOYMENT_GUIDE.md    # 배포 가이드
+│   ├── MIGRATION_GUIDE.md     # DB 마이그레이션
+│   └── API_REFERENCE.md       # API 레퍼런스
+│
+├── design/            # 디자인 시스템
+│   └── SAGE_GREEN_THEME.md    # Sage Green 테마
+│
+└── archived/          # 완료된 과거 문서
+    ├── plans/
+    ├── progress/
+    └── summaries/
+```
+
+---
+
 ## Project Structure & Module Organization
+
 - `app/`: Next.js App Router pages for admin/login/cases/clients/schedules plus API handlers in `app/api`.
 - `components/`: Reusable UI (dashboards, modals, calendars, forms) plus feature subfolders (`components/admin`, `components/consultations`).
 - `hooks/` and `lib/`: Shared state/data utilities, Supabase clients (`lib/supabase`), Excel export helpers, and general helpers.
@@ -8,6 +45,7 @@
 - `scripts/`: Node-based integration checks that call Supabase; use for data-flow validation.
 - `supabase/`: SQL assets for database views/tests (e.g., unified calendar).
 - `public/` and `app/globals.css`: Static assets and Tailwind v4 theme tokens (sage/coral palette).
+- `docs/`: 프로젝트 문서 (시스템, 가이드, 디자인)
 
 ## Build, Test, and Development Commands
 - `npm run dev`: Start the app at `http://localhost:3000`; requires `.env.local` Supabase keys.

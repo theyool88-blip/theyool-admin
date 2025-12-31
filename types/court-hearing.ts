@@ -20,11 +20,14 @@ export const HEARING_TYPES = {
 export type HearingType = keyof typeof HEARING_TYPES;
 
 export const DEADLINE_TYPES = {
-  DL_APPEAL: 'DL_APPEAL',
-  DL_MEDIATION_OBJ: 'DL_MEDIATION_OBJ',
-  DL_IMM_APPEAL: 'DL_IMM_APPEAL',
-  DL_APPEAL_BRIEF: 'DL_APPEAL_BRIEF',
-  DL_RETRIAL: 'DL_RETRIAL',
+  DL_APPEAL: 'DL_APPEAL',                       // 민사/가사소송 상소기간 (14일)
+  DL_MEDIATION_OBJ: 'DL_MEDIATION_OBJ',         // 조정·화해 이의기간 (14일)
+  DL_IMM_APPEAL: 'DL_IMM_APPEAL',               // 민사 즉시항고기간 (7일)
+  DL_APPEAL_BRIEF: 'DL_APPEAL_BRIEF',           // 항소이유서 제출기한 (40일)
+  DL_RETRIAL: 'DL_RETRIAL',                     // 재심의 소 제기기한 (30일)
+  DL_CRIMINAL_APPEAL: 'DL_CRIMINAL_APPEAL',     // 형사 상소기간 (7일) - 형소법 §358
+  DL_FAMILY_NONLIT: 'DL_FAMILY_NONLIT',         // 가사비송 즉시항고 (14일) - 가사소송법
+  DL_PAYMENT_ORDER: 'DL_PAYMENT_ORDER',         // 지급명령 이의신청 (14일) - 민소법 §470
 } as const;
 
 export type DeadlineType = keyof typeof DEADLINE_TYPES;
@@ -76,6 +79,9 @@ export const DEADLINE_TYPE_LABELS: Record<DeadlineType, string> = {
   DL_IMM_APPEAL: '즉시항고기간',
   DL_APPEAL_BRIEF: '항소이유서 제출기한',
   DL_RETRIAL: '재심의 소 제기기한',
+  DL_CRIMINAL_APPEAL: '형사 상소기간',
+  DL_FAMILY_NONLIT: '가사비송 즉시항고',
+  DL_PAYMENT_ORDER: '지급명령 이의신청',
 };
 
 export const HEARING_STATUS_LABELS: Record<HearingStatus, string> = {
@@ -104,36 +110,62 @@ export const DEADLINE_STATUS_LABELS: Record<DeadlineStatus, string> = {
 
 export const HEARING_DETAIL_OPTIONS: Record<HearingType, string[]> = {
   HEARING_MAIN: [
+    '변론',
     '변론기일',
+    '변론준비',
     '변론준비기일',
+    '증인신문',
     '증인신문기일',
+    '당사자신문',
     '당사자신문기일',
+    '감정',
     '감정기일',
+    '검증',
     '검증기일',
   ],
   HEARING_INTERIM: [
+    '심문',
+    '가처분',
     '가처분 심문기일',
+    '가압류',
     '가압류 심문기일',
+    '보전처분',
     '보전처분 심문기일',
   ],
   HEARING_MEDIATION: [
+    '조정',
     '조정기일',
+    '조정조치',
+    '화해권고',
     '화해권고기일',
+    '조정회부',
     '조정회부기일',
   ],
   HEARING_INVESTIGATION: [
+    '조사',
+    '면접조사',
+    '사실조회',
     '사실조회기일',
+    '현장조사',
     '현장조사기일',
     '자료제출기일',
   ],
   HEARING_PARENTING: [
+    '상담',
+    '교육',
+    '양육상담',
     '양육상담기일',
+    '부모교육',
     '부모교육기일',
+    '면접교섭',
     '면접교섭 프로그램 기일',
   ],
   HEARING_JUDGMENT: [
+    '선고',
     '선고기일',
+    '판결선고',
     '판결선고기일',
+    '결정선고',
     '결정선고기일',
   ],
   HEARING_LAWYER_MEETING: [

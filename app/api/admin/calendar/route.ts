@@ -1,13 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { isAuthenticated } from '@/lib/auth/auth'
+import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant } from '@/lib/api/with-tenant'
 
-export async function GET(request: NextRequest) {
-  const authCheck = await isAuthenticated()
-  if (!authCheck) {
-    return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
-  }
-
+/**
+ * GET /api/admin/calendar
+ * 통합 캘린더 조회 (테넌트 격리)
+ */
+export const GET = withTenant(async (request, { tenant }) => {
   try {
     const { searchParams } = new URL(request.url)
     const startDate = searchParams.get('start_date')
@@ -16,13 +15,17 @@ export async function GET(request: NextRequest) {
     const supabase = createAdminClient()
 
     // 통합 캘린더 조회 (정렬 순서: 날짜 → 시간 우선순위 → 시간)
-    // sort_priority: 1 (시간 없음, 00:00) → 2 (시간 있음)
     let query = supabase
       .from('unified_calendar')
       .select('*')
       .order('event_date', { ascending: true })
       .order('sort_priority', { ascending: true })
       .order('event_time', { ascending: true })
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId)
+    }
 
     if (startDate) {
       query = query.gte('event_date', startDate)
@@ -54,4 +57,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

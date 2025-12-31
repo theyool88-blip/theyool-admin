@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { NextResponse } from 'next/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { withTenant, withTenantId } from '@/lib/api/with-tenant';
 import {
   ConsultationWeeklySchedule,
   CreateWeeklyScheduleInput,
@@ -7,21 +8,11 @@ import {
 
 /**
  * GET /api/admin/availability/weekly
- * 주간 상담 일정 조회
+ * 주간 상담 일정 조회 (테넌트 격리)
  */
-export async function GET(request: NextRequest) {
+export const GET = withTenant(async (request, { tenant }) => {
   try {
-    const supabase = await createClient();
-
-    // 인증 확인
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const supabase = createAdminClient();
 
     // 쿼리 파라미터
     const { searchParams } = new URL(request.url);
@@ -35,6 +26,11 @@ export async function GET(request: NextRequest) {
       .select('*')
       .order('day_of_week', { ascending: true })
       .order('start_time', { ascending: true });
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId);
+    }
 
     if (dayOfWeek !== null) {
       query = query.eq('day_of_week', parseInt(dayOfWeek));
@@ -68,25 +64,15 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 /**
  * POST /api/admin/availability/weekly
- * 주간 상담 일정 추가
+ * 주간 상담 일정 추가 (테넌트 자동 할당)
  */
-export async function POST(request: NextRequest) {
+export const POST = withTenant(async (request, { tenant }) => {
   try {
-    const supabase = await createClient();
-
-    // 인증 확인
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const supabase = createAdminClient();
 
     const body: CreateWeeklyScheduleInput = await request.json();
 
@@ -109,10 +95,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 데이터 삽입
+    // 데이터 삽입 (테넌트 ID 포함)
     const { data, error } = await supabase
       .from('consultation_weekly_schedule')
-      .insert({
+      .insert([withTenantId({
         day_of_week: body.day_of_week,
         start_time: body.start_time,
         end_time: body.end_time,
@@ -123,7 +109,7 @@ export async function POST(request: NextRequest) {
         consultation_type: body.consultation_type ?? null,
         max_bookings_per_slot: body.max_bookings_per_slot ?? 1,
         notes: body.notes ?? null,
-      })
+      }, tenant)])
       .select()
       .single();
 
@@ -143,4 +129,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

@@ -1,0 +1,182 @@
+{
+  "inputs": [
+    {
+      "type": "hidden",
+      "name": "searchWord",
+      "id": "",
+      "className": "",
+      "placeholder": "",
+      "value": ""
+    },
+    {
+      "type": "hidden",
+      "name": "section",
+      "id": "",
+      "className": "",
+      "placeholder": "",
+      "value": ""
+    },
+    {
+      "type": "hidden",
+      "name": "search_kind",
+      "id": "",
+      "className": "",
+      "placeholder": "",
+      "value": ""
+    },
+    {
+      "type": "hidden",
+      "name": "pg",
+      "id": "",
+      "className": "",
+      "placeholder": "",
+      "value": ""
+    },
+    {
+      "type": "text",
+      "name": "dpWord",
+      "id": "search_word",
+      "className": "searchInput",
+      "placeholder": "",
+      "value": ""
+    }
+  ],
+  "selects": [
+    {
+      "name": "category",
+      "id": "search_total",
+      "className": "searchSelect",
+      "options": [
+        "",
+        "home_category",
+        "home_web",
+        "home_board",
+        "home_doc"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/logo.png",
+      "alt": "대한민국 법원",
+      "id": "",
+      "className": "",
+      "width": 197,
+      "height": 75
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/logo2.png",
+      "alt": "대국민 서비스",
+      "id": "",
+      "className": "hidlogo",
+      "width": 103,
+      "height": 75
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_search.gif",
+      "alt": "통합검색하기",
+      "id": "",
+      "className": "",
+      "width": 37,
+      "height": 37
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_facebook.png",
+      "alt": "facebook 바로가기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_twitter.png",
+      "alt": "twitter 바로가기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_naverblog.png",
+      "alt": "네이버블로그 바로가기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_daumblog.png",
+      "alt": "다음블로그 바로가기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_youtube.png",
+      "alt": "Youtube 바로가기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_facebook.png",
+      "alt": "facebook 공유하기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_twitter.png",
+      "alt": "x 공유하기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_band.png",
+      "alt": "band 공유하기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/btn_cstory.png",
+      "alt": "카카오스토리 공유하기",
+      "id": "",
+      "className": "",
+      "width": 23,
+      "height": 23
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/footerLogo.png",
+      "alt": "대한민국법원",
+      "id": "",
+      "className": "",
+      "width": 190,
+      "height": 60
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/certi.png",
+      "alt": "WA 인증",
+      "id": "",
+      "className": "",
+      "width": 73,
+      "height": 50
+    },
+    {
+      "src": "https://www.scourt.go.kr/portal/common/images/top_btn.png",
+      "alt": "top",
+      "id": "",
+      "className": "",
+      "width": 40,
+      "height": 35
+    }
+  ],
+  "buttons": [],
+  "timestamp": "2025-12-26T06:34:34.646Z"
+}

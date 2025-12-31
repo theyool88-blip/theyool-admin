@@ -1,12 +1,21 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant, withTenantId } from '@/lib/api/with-tenant'
+import { canAccessModuleWithContext } from '@/lib/auth/permissions'
 
 /**
  * GET /api/admin/expenses
- * Fetch expenses with filters (테넌트 격리)
+ * Fetch expenses with filters (테넌트 격리 + 권한 체크)
  */
 export const GET = withTenant(async (request, { tenant }) => {
+  // 회계 모듈 권한 체크
+  if (!canAccessModuleWithContext(tenant, 'expenses')) {
+    return NextResponse.json(
+      { error: '지출 관리 접근 권한이 없습니다.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const supabase = createAdminClient()
     const searchParams = request.nextUrl.searchParams
@@ -78,6 +87,14 @@ export const GET = withTenant(async (request, { tenant }) => {
  * Create expense (테넌트 자동 할당)
  */
 export const POST = withTenant(async (request, { tenant }) => {
+  // 회계 모듈 권한 체크
+  if (!canAccessModuleWithContext(tenant, 'expenses')) {
+    return NextResponse.json(
+      { error: '지출 관리 접근 권한이 없습니다.' },
+      { status: 403 }
+    )
+  }
+
   try {
     const supabase = createAdminClient()
     const body = await request.json()

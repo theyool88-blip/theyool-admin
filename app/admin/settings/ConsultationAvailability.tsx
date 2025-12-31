@@ -9,7 +9,8 @@ import {
   CreateWeeklyScheduleInput,
   CreateDateExceptionInput,
 } from '@/types/consultation-availability';
-import { LAWYER_NAMES, OFFICE_LOCATIONS, LawyerName, OfficeLocation } from '@/types/consultation';
+import type { LawyerName, OfficeLocation } from '@/types/consultation';
+import { useTenantOptions } from '@/hooks/useTenantOptions';
 
 // 설정 타입 정의
 interface PhoneAvailabilitySettings {
@@ -35,6 +36,9 @@ interface ModalConfigSettings {
 }
 
 export default function ConsultationAvailability() {
+  // 테넌트 옵션 동적 로드
+  const { lawyerNames, officeLocations } = useTenantOptions();
+
   const [activeSubTab, setActiveSubTab] = useState<'weekly' | 'exceptions' | 'modal_settings'>(
     'weekly'
   );
@@ -699,6 +703,8 @@ export default function ConsultationAvailability() {
             setShowAddModal(false);
             loadData();
           }}
+          lawyerNames={lawyerNames}
+          officeLocations={officeLocations}
         />
       )}
 
@@ -720,9 +726,13 @@ export default function ConsultationAvailability() {
 function AddWeeklyScheduleModal({
   onClose,
   onSuccess,
+  lawyerNames,
+  officeLocations,
 }: {
   onClose: () => void;
   onSuccess: () => void;
+  lawyerNames: string[];
+  officeLocations: string[];
 }) {
   const [formData, setFormData] = useState<CreateWeeklyScheduleInput>({
     day_of_week: 1,
@@ -839,7 +849,7 @@ function AddWeeklyScheduleModal({
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
             >
               <option value="">모든 변호사</option>
-              {LAWYER_NAMES.map((name) => (
+              {lawyerNames.map((name) => (
                 <option key={name} value={name}>
                   {name}
                 </option>
@@ -860,7 +870,7 @@ function AddWeeklyScheduleModal({
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
             >
               <option value="">모든 사무소</option>
-              {OFFICE_LOCATIONS.map((location) => (
+              {officeLocations.map((location) => (
                 <option key={location} value={location}>
                   {location}
                 </option>

@@ -21,8 +21,9 @@ export type ConsultationStatus =
   | 'cancelled'         // Cancelled by customer or admin
   | 'no_show';          // Customer didn't show up (visit/video only)
 
-export type OfficeLocation = '천안' | '평택';
-export type LawyerName = '육심원' | '임은지';
+// 동적 타입 - 테넌트 설정에서 가져옴
+export type OfficeLocation = string;
+export type LawyerName = string;
 export type PaymentMethod = 'card' | 'transfer' | 'cash' | 'free';
 export type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'free';
 
@@ -283,7 +284,7 @@ export interface ConsultationStats {
   thisMonth: number;
   byType: Record<RequestType, number>;
   byStatus: Record<ConsultationStatus, number>;
-  byLawyer: Record<LawyerName, number>;
+  byLawyer: Record<string, number>;  // 동적 변호사명
   revenue: number;  // Total revenue from paid consultations
   avgLeadScore: number;
 }
@@ -332,10 +333,12 @@ export const STATUS_COLORS: Record<ConsultationStatus, string> = {
   no_show: 'bg-red-200 text-red-900',
 };
 
-export const OFFICE_LOCATIONS: OfficeLocation[] = ['천안', '평택'];
-export const LAWYER_NAMES: LawyerName[] = ['육심원', '임은지'];
+// 하드코딩된 상수 제거됨 - 테넌트 설정에서 동적으로 가져옴
+// OFFICE_LOCATIONS -> tenant_settings.consultations.officeLocations
+// LAWYER_NAMES -> tenant_members (role='lawyer') 에서 조회
 
-export const CONSULTATION_CATEGORIES = [
+// 기본 카테고리 (테넌트 설정에서 오버라이드 가능)
+export const DEFAULT_CONSULTATION_CATEGORIES = [
   { value: 'alimony', label: '위자료' },
   { value: 'property', label: '재산분할' },
   { value: 'custody', label: '양육권' },

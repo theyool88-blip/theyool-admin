@@ -1,5 +1,12 @@
+/**
+ * GET/PATCH /api/admin/receivables
+ * 미수금 관리 API (테넌트 격리 적용)
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant } from '@/lib/api/with-tenant'
+import { canAccessAccountingWithContext } from '@/lib/auth/permissions'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,8 +57,7 @@ interface WriteOff {
 
 interface ReceivablesSummary {
   total_outstanding: number
-  pyeongtaek_outstanding: number
-  cheonan_outstanding: number
+  by_office: Record<string, number>
   client_count: number
   case_count: number
   watch_count: number
@@ -67,19 +73,38 @@ const gradeOrder: Record<ReceivableGrade, number> = {
   normal: 2,
 }
 
-// 미수금 포기 (Write-off)
-export async function PATCH(request: NextRequest) {
+/**
+ * PATCH /api/admin/receivables
+ * 미수금 등급 변경 또는 포기 처리
+ */
+export const PATCH = withTenant(async (request, { tenant }) => {
   try {
-    const supabase = await createAdminClient()
+    // 회계 모듈 접근 권한 확인
+    if (!canAccessAccountingWithContext(tenant)) {
+      return NextResponse.json(
+        { error: '회계 기능에 접근할 수 없습니다.' },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
     const body = await request.json()
     const { case_id, reason, grade } = body
 
     // 등급 변경 요청인 경우
     if (case_id && grade !== undefined) {
-      const { error: updateError } = await supabase
+      // 테넌트 소속 사건인지 확인
+      let query = supabase
         .from('legal_cases')
         .update({ receivable_grade: grade })
         .eq('id', case_id)
+
+      // 테넌트 필터 (슈퍼어드민 제외)
+      if (!tenant.isSuperAdmin && tenant.tenantId) {
+        query = query.eq('tenant_id', tenant.tenantId)
+      }
+
+      const { error: updateError } = await query
 
       if (updateError) {
         console.error('[PATCH /api/admin/receivables] Grade update error:', updateError)
@@ -94,11 +119,17 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'case_id is required' }, { status: 400 })
     }
 
-    const { data: currentCase, error: fetchError } = await supabase
+    // 테넌트 소속 사건 조회
+    let fetchQuery = supabase
       .from('legal_cases')
       .select('case_name, outstanding_balance, client_id, clients(name)')
       .eq('id', case_id)
-      .single()
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      fetchQuery = fetchQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: currentCase, error: fetchError } = await fetchQuery.single()
 
     if (fetchError || !currentCase) {
       return NextResponse.json({ error: '사건을 찾을 수 없습니다' }, { status: 404 })
@@ -116,16 +147,23 @@ export async function PATCH(request: NextRequest) {
         original_amount: currentCase.outstanding_balance || 0,
         reason: reason || null,
         written_off_at: new Date().toISOString(),
+        tenant_id: tenant.tenantId,
       })
     } catch {
       // 테이블이 없어도 계속 진행
     }
 
     // outstanding_balance를 0으로 설정
-    const { error: updateError } = await supabase
+    let updateQuery = supabase
       .from('legal_cases')
       .update({ outstanding_balance: 0 })
       .eq('id', case_id)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { error: updateError } = await updateQuery
 
     if (updateError) {
       console.error('[PATCH /api/admin/receivables] Update error:', updateError)
@@ -141,11 +179,23 @@ export async function PATCH(request: NextRequest) {
     console.error('[PATCH /api/admin/receivables] Error:', error)
     return NextResponse.json({ error: '처리 실패' }, { status: 500 })
   }
-}
+})
 
-export async function GET(request: NextRequest) {
+/**
+ * GET /api/admin/receivables
+ * 미수금 현황 조회
+ */
+export const GET = withTenant(async (request, { tenant }) => {
   try {
-    const supabase = await createAdminClient()
+    // 회계 모듈 접근 권한 확인
+    if (!canAccessAccountingWithContext(tenant)) {
+      return NextResponse.json(
+        { error: '회계 기능에 접근할 수 없습니다.' },
+        { status: 403 }
+      )
+    }
+
+    const supabase = createAdminClient()
     const { searchParams } = new URL(request.url)
 
     const office = searchParams.get('office')
@@ -173,6 +223,11 @@ export async function GET(request: NextRequest) {
       `)
       .not('client_id', 'is', null)
 
+    // 테넌트 필터 (슈퍼어드민 제외)
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId)
+    }
+
     if (office) {
       query = query.eq('office', office)
     }
@@ -195,11 +250,17 @@ export async function GET(request: NextRequest) {
     let clientMemosMap = new Map<string, Memo[]>()
     try {
       if (clientIds.length > 0) {
-        const { data: memos } = await supabase
+        let memosQuery = supabase
           .from('receivable_memos')
           .select('*')
           .in('client_id', clientIds)
           .order('created_at', { ascending: true })
+
+        if (!tenant.isSuperAdmin && tenant.tenantId) {
+          memosQuery = memosQuery.eq('tenant_id', tenant.tenantId)
+        }
+
+        const { data: memos } = await memosQuery
 
         memos?.forEach(memo => {
           if (!memo.client_id) return
@@ -222,6 +283,7 @@ export async function GET(request: NextRequest) {
     const clientMap = new Map<string, ClientReceivable>()
     let watchCount = 0
     let collectionCount = 0
+    const officeOutstanding: Record<string, number> = {}
 
     cases?.forEach((c: any) => {
       const clientId = c.client_id
@@ -232,17 +294,21 @@ export async function GET(request: NextRequest) {
       const received = c.total_received || 0
       const outstanding = c.outstanding_balance > 0 ? c.outstanding_balance : 0
       const grade: ReceivableGrade = c.receivable_grade || 'normal'
+      const caseOffice = c.office || '미지정'
 
       if (outstanding > 0) {
         if (grade === 'watch') watchCount++
         if (grade === 'collection') collectionCount++
+
+        // 사무소별 집계 (동적)
+        officeOutstanding[caseOffice] = (officeOutstanding[caseOffice] || 0) + outstanding
       }
 
       const caseData: CaseReceivable = {
         id: c.id,
         case_name: c.case_name,
         case_type: c.case_type,
-        office: c.office,
+        office: caseOffice,
         retainer_fee: retainer,
         calculated_success_fee: successFee,
         total_received: received,
@@ -328,28 +394,12 @@ export async function GET(request: NextRequest) {
       return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
     })
 
-    // 사무소별 합계 계산
-    let pyeongtaekOutstanding = 0
-    let cheonanOutstanding = 0
-    let totalOutstanding = 0
-
-    clients.forEach(client => {
-      client.cases.forEach(c => {
-        if (c.outstanding > 0) {
-          totalOutstanding += c.outstanding
-          if (c.office === '평택') {
-            pyeongtaekOutstanding += c.outstanding
-          } else if (c.office === '천안') {
-            cheonanOutstanding += c.outstanding
-          }
-        }
-      })
-    })
+    // 전체 합계 계산
+    const totalOutstanding = Object.values(officeOutstanding).reduce((a, b) => a + b, 0)
 
     const summary: ReceivablesSummary = {
       total_outstanding: totalOutstanding,
-      pyeongtaek_outstanding: pyeongtaekOutstanding,
-      cheonan_outstanding: cheonanOutstanding,
+      by_office: officeOutstanding,
       client_count: clients.length,
       case_count: clients.reduce((sum, c) => sum + c.case_count, 0),
       watch_count: watchCount,
@@ -360,10 +410,16 @@ export async function GET(request: NextRequest) {
     // 포기 이력 조회
     if (includeWriteoffs) {
       try {
-        const { data: writeoffs } = await supabase
+        let writeoffsQuery = supabase
           .from('receivable_writeoffs')
           .select('*')
           .order('written_off_at', { ascending: false })
+
+        if (!tenant.isSuperAdmin && tenant.tenantId) {
+          writeoffsQuery = writeoffsQuery.eq('tenant_id', tenant.tenantId)
+        }
+
+        const { data: writeoffs } = await writeoffsQuery
 
         summary.writeoffs = writeoffs?.map(w => ({
           id: w.id,
@@ -384,4 +440,4 @@ export async function GET(request: NextRequest) {
     console.error('[GET /api/admin/receivables] Error:', error)
     return NextResponse.json({ error: '미수금 조회 실패' }, { status: 500 })
   }
-}
+})

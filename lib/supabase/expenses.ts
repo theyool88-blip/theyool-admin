@@ -1,5 +1,5 @@
 // ============================================================================
-// 법무법인 더율 - 지출 관리 시스템 Supabase 인터페이스
+// 지출 관리 시스템 Supabase 인터페이스 (SaaS 보편화)
 // ============================================================================
 
 import { createAdminClient } from './admin'
@@ -8,14 +8,8 @@ import type {
   ExpenseFormData,
   RecurringTemplate,
   RecurringTemplateFormData,
-  PartnerWithdrawal,
-  PartnerWithdrawalFormData,
-  MonthlySettlement,
-  MonthlySettlementFormData,
-  MonthlyRevenueSummary,
   MonthlyExpenseSummary,
-  ExpenseStatsByCategory,
-  SettlementDashboard
+  ExpenseStatsByCategory
 } from '@/types/expense'
 
 // ============================================================================
@@ -33,6 +27,7 @@ export async function getExpenses(params?: {
   isRecurring?: boolean
   limit?: number
   offset?: number
+  tenantId?: string
 }) {
   const supabase = createAdminClient()
 
@@ -41,6 +36,9 @@ export async function getExpenses(params?: {
     .select('*', { count: 'exact' })
     .order('expense_date', { ascending: false })
 
+  if (params?.tenantId) {
+    query = query.eq('tenant_id', params.tenantId)
+  }
   if (params?.startDate) {
     query = query.gte('expense_date', params.startDate)
   }
@@ -96,7 +94,7 @@ export async function getExpenseById(id: string) {
 /**
  * 지출 생성
  */
-export async function createExpense(expenseData: ExpenseFormData) {
+export async function createExpense(expenseData: ExpenseFormData & { tenant_id?: string }) {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -164,6 +162,7 @@ export async function getRecurringTemplates(params?: {
   isActive?: boolean
   category?: string
   officeLocation?: string
+  tenantId?: string
 }) {
   const supabase = createAdminClient()
 
@@ -172,6 +171,9 @@ export async function getRecurringTemplates(params?: {
     .select('*')
     .order('name', { ascending: true })
 
+  if (params?.tenantId) {
+    query = query.eq('tenant_id', params.tenantId)
+  }
   if (params?.isActive !== undefined) {
     query = query.eq('is_active', params.isActive)
   }
@@ -215,7 +217,7 @@ export async function getRecurringTemplateById(id: string) {
 /**
  * 고정 지출 템플릿 생성
  */
-export async function createRecurringTemplate(templateData: RecurringTemplateFormData) {
+export async function createRecurringTemplate(templateData: RecurringTemplateFormData & { tenant_id?: string }) {
   const supabase = createAdminClient()
 
   const { data, error } = await supabase
@@ -294,339 +296,8 @@ export async function toggleRecurringTemplate(id: string, isActive: boolean) {
 }
 
 // ============================================================================
-// 3. PARTNER_WITHDRAWALS (변호사 인출/지급)
+// 3. STATISTICS (통계)
 // ============================================================================
-
-/**
- * 변호사 인출 목록 조회
- */
-export async function getPartnerWithdrawals(params?: {
-  partnerName?: string
-  monthKey?: string
-  startDate?: string
-  endDate?: string
-  withdrawalType?: string
-  limit?: number
-  offset?: number
-}) {
-  const supabase = createAdminClient()
-
-  let query = supabase
-    .from('partner_withdrawals')
-    .select('*', { count: 'exact' })
-    .order('withdrawal_date', { ascending: false })
-
-  if (params?.partnerName) {
-    query = query.eq('partner_name', params.partnerName)
-  }
-  if (params?.monthKey) {
-    query = query.eq('month_key', params.monthKey)
-  }
-  if (params?.startDate) {
-    query = query.gte('withdrawal_date', params.startDate)
-  }
-  if (params?.endDate) {
-    query = query.lte('withdrawal_date', params.endDate)
-  }
-  if (params?.withdrawalType) {
-    query = query.eq('withdrawal_type', params.withdrawalType)
-  }
-  if (params?.limit) {
-    query = query.limit(params.limit)
-  }
-  if (params?.offset) {
-    query = query.range(params.offset, params.offset + (params.limit || 50) - 1)
-  }
-
-  const { data, error, count } = await query
-
-  if (error) {
-    console.error('Error fetching partner withdrawals:', error)
-    throw error
-  }
-
-  return { data: data as PartnerWithdrawal[], count: count || 0 }
-}
-
-/**
- * 변호사 인출 상세 조회
- */
-export async function getPartnerWithdrawalById(id: string) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('partner_withdrawals')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) {
-    console.error('Error fetching partner withdrawal:', error)
-    throw error
-  }
-
-  return data as PartnerWithdrawal
-}
-
-/**
- * 변호사 인출 생성
- */
-export async function createPartnerWithdrawal(withdrawalData: PartnerWithdrawalFormData) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('partner_withdrawals')
-    .insert([withdrawalData])
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error creating partner withdrawal:', error)
-    throw error
-  }
-
-  return data as PartnerWithdrawal
-}
-
-/**
- * 변호사 인출 수정
- */
-export async function updatePartnerWithdrawal(id: string, withdrawalData: Partial<PartnerWithdrawalFormData>) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('partner_withdrawals')
-    .update(withdrawalData)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error updating partner withdrawal:', error)
-    throw error
-  }
-
-  return data as PartnerWithdrawal
-}
-
-/**
- * 변호사 인출 삭제
- */
-export async function deletePartnerWithdrawal(id: string) {
-  const supabase = createAdminClient()
-
-  const { error } = await supabase
-    .from('partner_withdrawals')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    console.error('Error deleting partner withdrawal:', error)
-    throw error
-  }
-
-  return true
-}
-
-// ============================================================================
-// 4. MONTHLY_SETTLEMENTS (월별 정산)
-// ============================================================================
-
-/**
- * 월별 정산 목록 조회
- */
-export async function getMonthlySettlements(params?: {
-  isSettled?: boolean
-  limit?: number
-}) {
-  const supabase = createAdminClient()
-
-  let query = supabase
-    .from('monthly_settlements')
-    .select('*')
-    .order('settlement_month', { ascending: false })
-
-  if (params?.isSettled !== undefined) {
-    query = query.eq('is_settled', params.isSettled)
-  }
-  if (params?.limit) {
-    query = query.limit(params.limit)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('Error fetching monthly settlements:', error)
-    throw error
-  }
-
-  return data as MonthlySettlement[]
-}
-
-/**
- * 월별 정산 상세 조회
- */
-export async function getMonthlySettlementById(id: string) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('monthly_settlements')
-    .select('*')
-    .eq('id', id)
-    .single()
-
-  if (error) {
-    console.error('Error fetching monthly settlement:', error)
-    throw error
-  }
-
-  return data as MonthlySettlement
-}
-
-/**
- * 월별 정산 조회 (월 키로)
- */
-export async function getMonthlySettlementByMonth(monthKey: string) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('monthly_settlements')
-    .select('*')
-    .eq('settlement_month', monthKey)
-    .maybeSingle()
-
-  if (error) {
-    console.error('Error fetching monthly settlement:', error)
-    throw error
-  }
-
-  return data as MonthlySettlement | null
-}
-
-/**
- * 월별 정산 생성
- */
-export async function createMonthlySettlement(settlementData: MonthlySettlementFormData) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('monthly_settlements')
-    .insert([settlementData])
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error creating monthly settlement:', error)
-    throw error
-  }
-
-  return data as MonthlySettlement
-}
-
-/**
- * 월별 정산 수정
- */
-export async function updateMonthlySettlement(id: string, settlementData: Partial<MonthlySettlementFormData>) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('monthly_settlements')
-    .update(settlementData)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error updating monthly settlement:', error)
-    throw error
-  }
-
-  return data as MonthlySettlement
-}
-
-/**
- * 월별 정산 삭제
- */
-export async function deleteMonthlySettlement(id: string) {
-  const supabase = createAdminClient()
-
-  const { error } = await supabase
-    .from('monthly_settlements')
-    .delete()
-    .eq('id', id)
-
-  if (error) {
-    console.error('Error deleting monthly settlement:', error)
-    throw error
-  }
-
-  return true
-}
-
-/**
- * 월별 정산 확정/취소
- */
-export async function settleMonthlySettlement(id: string, isSettled: boolean, settledBy?: string) {
-  const supabase = createAdminClient()
-
-  const updateData: Partial<MonthlySettlement> = { is_settled: isSettled }
-  if (isSettled) {
-    updateData.settled_at = new Date().toISOString()
-    updateData.settled_by = settledBy
-  } else {
-    updateData.settled_at = null
-    updateData.settled_by = null
-  }
-
-  const { data, error } = await supabase
-    .from('monthly_settlements')
-    .update(updateData)
-    .eq('id', id)
-    .select()
-    .single()
-
-  if (error) {
-    console.error('Error settling monthly settlement:', error)
-    throw error
-  }
-
-  return data as MonthlySettlement
-}
-
-// ============================================================================
-// 5. STATISTICS & VIEWS (통계 뷰)
-// ============================================================================
-
-/**
- * 월별 수입 합계 조회
- */
-export async function getMonthlyRevenueSummary(params?: {
-  startMonth?: string
-  endMonth?: string
-}) {
-  const supabase = createAdminClient()
-
-  let query = supabase
-    .from('monthly_revenue_summary')
-    .select('*')
-    .order('month', { ascending: false })
-
-  if (params?.startMonth) {
-    query = query.gte('month', params.startMonth)
-  }
-  if (params?.endMonth) {
-    query = query.lte('month', params.endMonth)
-  }
-
-  const { data, error } = await query
-
-  if (error) {
-    console.error('Error fetching monthly revenue summary:', error)
-    throw error
-  }
-
-  return data as MonthlyRevenueSummary[]
-}
 
 /**
  * 월별 지출 합계 조회
@@ -634,6 +305,7 @@ export async function getMonthlyRevenueSummary(params?: {
 export async function getMonthlyExpenseSummary(params?: {
   startMonth?: string
   endMonth?: string
+  tenantId?: string
 }) {
   const supabase = createAdminClient()
 
@@ -660,47 +332,17 @@ export async function getMonthlyExpenseSummary(params?: {
 }
 
 /**
- * 변호사별 채권/채무 상태 조회
- */
-export async function getPartnerDebtStatus() {
-  const supabase = createAdminClient()
-
-  // Get the latest settlement to get accumulated debt
-  const { data, error } = await supabase
-    .from('monthly_settlements')
-    .select('settlement_month, kim_accumulated_debt, lim_accumulated_debt')
-    .order('settlement_month', { ascending: false })
-    .limit(1)
-    .single()
-
-  if (error) {
-    console.error('Error fetching partner debt status:', error)
-    return {
-      success: false,
-      error: error.message
-    }
-  }
-
-  return {
-    success: true,
-    data: {
-      kim_accumulated_debt: data.kim_accumulated_debt || 0,
-      lim_accumulated_debt: data.lim_accumulated_debt || 0,
-      last_settlement_month: data.settlement_month
-    }
-  }
-}
-
-/**
  * 카테고리별 지출 통계 조회
  */
-export async function getExpenseStatsByCategory() {
+export async function getExpenseStatsByCategory(tenantId?: string) {
   const supabase = createAdminClient()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('expense_stats_by_category')
     .select('*')
     .order('total_amount', { ascending: false })
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error fetching expense stats by category:', error)
@@ -710,42 +352,30 @@ export async function getExpenseStatsByCategory() {
   return data as ExpenseStatsByCategory[]
 }
 
-/**
- * 정산 대시보드 조회 (최근 12개월)
- */
-export async function getSettlementDashboard() {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('settlement_dashboard')
-    .select('*')
-
-  if (error) {
-    console.error('Error fetching settlement dashboard:', error)
-    throw error
-  }
-
-  return data as SettlementDashboard[]
-}
-
 // ============================================================================
-// 6. AGGREGATION & HELPER FUNCTIONS (집계 및 헬퍼 함수)
+// 4. HELPER FUNCTIONS (헬퍼 함수)
 // ============================================================================
 
 /**
- * 특정 월의 지출 합계 계산
+ * 특정 월의 지출 합계 계산 (동적 사무실별)
  */
-export async function calculateMonthlyExpenses(monthKey: string) {
+export async function calculateMonthlyExpenses(monthKey: string, tenantId?: string) {
   const supabase = createAdminClient()
 
   const startDate = `${monthKey}-01`
-  const endDate = `${monthKey}-31` // 간단히 처리, 실제로는 말일 계산 필요
+  const endDate = `${monthKey}-31`
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('expenses')
     .select('amount, office_location, expense_category')
     .gte('expense_date', startDate)
     .lte('expense_date', endDate)
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data, error } = await query
 
   if (error) {
     console.error('Error calculating monthly expenses:', error)
@@ -753,74 +383,46 @@ export async function calculateMonthlyExpenses(monthKey: string) {
   }
 
   const total = data.reduce((sum, expense) => sum + expense.amount, 0)
-  const pyeongtaek = data
-    .filter(e => e.office_location === '평택')
-    .reduce((sum, e) => sum + e.amount, 0)
-  const cheonan = data
-    .filter(e => e.office_location === '천안')
-    .reduce((sum, e) => sum + e.amount, 0)
-  const fixed = data
-    .filter(e => ['임대료', '인건비', '필수운영비'].includes(e.expense_category))
-    .reduce((sum, e) => sum + e.amount, 0)
-  const marketing = data
-    .filter(e => ['마케팅비', '광고비'].includes(e.expense_category))
-    .reduce((sum, e) => sum + e.amount, 0)
-  const tax = data
-    .filter(e => e.expense_category === '세금')
-    .reduce((sum, e) => sum + e.amount, 0)
+
+  // 동적 사무실별 집계
+  const byOffice: Record<string, number> = {}
+  data.forEach(e => {
+    const office = e.office_location || '미지정'
+    byOffice[office] = (byOffice[office] || 0) + e.amount
+  })
+
+  // 동적 카테고리별 집계
+  const byCategory: Record<string, number> = {}
+  data.forEach(e => {
+    byCategory[e.expense_category] = (byCategory[e.expense_category] || 0) + e.amount
+  })
 
   return {
     total_expenses: total,
-    pyeongtaek_expenses: pyeongtaek,
-    cheonan_expenses: cheonan,
-    fixed_expenses: fixed,
-    marketing_expenses: marketing,
-    tax_expenses: tax
-  }
-}
-
-/**
- * 특정 월의 변호사 인출 합계 계산
- */
-export async function calculateMonthlyWithdrawals(monthKey: string) {
-  const supabase = createAdminClient()
-
-  const { data, error } = await supabase
-    .from('partner_withdrawals')
-    .select('partner_name, amount')
-    .eq('month_key', monthKey)
-
-  if (error) {
-    console.error('Error calculating monthly withdrawals:', error)
-    throw error
-  }
-
-  const kimTotal = data
-    .filter(w => w.partner_name === '김현성')
-    .reduce((sum, w) => sum + w.amount, 0)
-  const limTotal = data
-    .filter(w => w.partner_name === '임은지')
-    .reduce((sum, w) => sum + w.amount, 0)
-
-  return {
-    kim_withdrawals: kimTotal,
-    lim_withdrawals: limTotal
+    by_office: byOffice,
+    by_category: byCategory
   }
 }
 
 /**
  * 고정 지출 자동 생성 (특정 월)
  */
-export async function generateRecurringExpenses(monthKey: string) {
+export async function generateRecurringExpenses(monthKey: string, tenantId?: string) {
   const supabase = createAdminClient()
 
   // 1. 활성 템플릿 조회
-  const { data: templates, error: templateError } = await supabase
+  let query = supabase
     .from('recurring_templates')
     .select('*')
     .eq('is_active', true)
     .lte('start_date', `${monthKey}-31`)
     .or(`end_date.is.null,end_date.gte.${monthKey}-01`)
+
+  if (tenantId) {
+    query = query.eq('tenant_id', tenantId)
+  }
+
+  const { data: templates, error: templateError } = await query
 
   if (templateError) {
     console.error('Error fetching recurring templates:', templateError)
@@ -838,7 +440,8 @@ export async function generateRecurringExpenses(monthKey: string) {
     payment_method: template.payment_method,
     memo: template.memo,
     is_recurring: true,
-    recurring_template_id: template.id
+    recurring_template_id: template.id,
+    tenant_id: tenantId
   }))
 
   if (expensesToCreate.length === 0) {
@@ -857,39 +460,4 @@ export async function generateRecurringExpenses(monthKey: string) {
   }
 
   return createdExpenses as Expense[]
-}
-
-/**
- * 월별 정산 자동 생성/업데이트
- */
-export async function autoGenerateMonthlySettlement(monthKey: string, revenueData: {
-  total_revenue: number
-  pyeongtaek_revenue: number
-  cheonan_revenue: number
-}) {
-  // 1. 지출 합계 계산
-  const expenseData = await calculateMonthlyExpenses(monthKey)
-
-  // 2. 인출 합계 계산
-  const withdrawalData = await calculateMonthlyWithdrawals(monthKey)
-
-  // 3. 기존 정산 레코드 확인
-  const existingSettlement = await getMonthlySettlementByMonth(monthKey)
-
-  const settlementData: MonthlySettlementFormData = {
-    settlement_month: monthKey,
-    total_revenue: revenueData.total_revenue,
-    pyeongtaek_revenue: revenueData.pyeongtaek_revenue,
-    cheonan_revenue: revenueData.cheonan_revenue,
-    ...expenseData,
-    ...withdrawalData,
-    is_settled: false
-  }
-
-  // 4. 생성 또는 업데이트
-  if (existingSettlement) {
-    return await updateMonthlySettlement(existingSettlement.id, settlementData)
-  } else {
-    return await createMonthlySettlement(settlementData)
-  }
 }

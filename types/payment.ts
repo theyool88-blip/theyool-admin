@@ -1,12 +1,54 @@
 /**
  * 입금 관리 시스템 타입 정의
- * @description 법무법인 더율 입금 내역 및 통계 관리
+ * @description 멀티테넌트 SaaS 입금 내역 및 통계 관리
  */
 
 // =====================================================
-// ENUM 타입
+// 기본값 (테넌트 설정에서 오버라이드 가능)
 // =====================================================
 
+/**
+ * 기본 수임료 카테고리
+ * 테넌트 설정에서 추가/수정 가능
+ */
+export const DEFAULT_PAYMENT_CATEGORIES = [
+  { value: '착수금', label: '착수금' },
+  { value: '잔금', label: '잔금' },
+  { value: '성공보수', label: '성공보수' },
+  { value: '모든 상담', label: '모든 상담' },
+  { value: '내용증명', label: '내용증명' },
+  { value: '집행(소송비용)', label: '집행(소송비용)' },
+  { value: '기타', label: '기타' },
+  { value: '환불', label: '환불' },
+] as const;
+
+/**
+ * 기본 영수증 유형
+ * 테넌트 설정에서 추가/수정 가능
+ */
+export const DEFAULT_RECEIPT_TYPES = [
+  { value: '현금영수증', label: '현금영수증' },
+  { value: '카드결제', label: '카드결제' },
+  { value: '세금계산서', label: '세금계산서' },
+  { value: '현금', label: '현금' },
+  { value: '네이버페이', label: '네이버페이' },
+  { value: '자진발급', label: '자진발급' },
+] as const;
+
+// 동적 타입 - 테넌트 설정에서 가져옴
+export type PaymentCategory = string;
+export type ReceiptType = string;
+export type OfficeLocation = string;
+
+// =====================================================
+// 호환성 상수 (레거시 지원)
+// TODO: 프론트엔드를 동적 테넌트 설정으로 마이그레이션 후 삭제
+// =====================================================
+
+/**
+ * @deprecated 테넌트 설정에서 동적으로 가져와야 함
+ * 호환성을 위해 임시 유지
+ */
 export const PAYMENT_CATEGORIES = {
   RETAINER: '착수금',
   BALANCE: '잔금',
@@ -18,16 +60,10 @@ export const PAYMENT_CATEGORIES = {
   REFUND: '환불',
 } as const;
 
-export type PaymentCategory = typeof PAYMENT_CATEGORIES[keyof typeof PAYMENT_CATEGORIES];
-
-export const OFFICE_LOCATIONS = {
-  PYEONGTAEK: '평택',
-  CHEONAN: '천안',
-  LITIGATION_AID: '소송구조',
-} as const;
-
-export type OfficeLocation = typeof OFFICE_LOCATIONS[keyof typeof OFFICE_LOCATIONS];
-
+/**
+ * @deprecated 테넌트 설정에서 동적으로 가져와야 함
+ * 호환성을 위해 임시 유지
+ */
 export const RECEIPT_TYPES = {
   CASH_RECEIPT: '현금영수증',
   CARD: '카드결제',
@@ -37,13 +73,18 @@ export const RECEIPT_TYPES = {
   SELF_ISSUED: '자진발급',
 } as const;
 
-export type ReceiptType = typeof RECEIPT_TYPES[keyof typeof RECEIPT_TYPES];
+/**
+ * @deprecated 테넌트 설정에서 동적으로 가져와야 함
+ * 호환성을 위해 임시 유지
+ */
+export const OFFICE_LOCATIONS = {
+  PYEONGTAEK: '평택',
+  CHEONAN: '천안',
+  LITIGATION_AID: '소송구조',
+} as const;
 
-// =====================================================
-// 한글 라벨 매핑
-// =====================================================
-
-export const PAYMENT_CATEGORY_LABELS: Record<PaymentCategory, string> = {
+// 레거시 라벨 매핑 (호환성)
+export const PAYMENT_CATEGORY_LABELS: Record<string, string> = {
   '착수금': '착수금',
   '잔금': '잔금',
   '성공보수': '성공보수',
@@ -54,13 +95,13 @@ export const PAYMENT_CATEGORY_LABELS: Record<PaymentCategory, string> = {
   '환불': '환불',
 };
 
-export const OFFICE_LOCATION_LABELS: Record<OfficeLocation, string> = {
+export const OFFICE_LOCATION_LABELS: Record<string, string> = {
   '평택': '평택',
   '천안': '천안',
   '소송구조': '소송구조',
 };
 
-export const RECEIPT_TYPE_LABELS: Record<ReceiptType, string> = {
+export const RECEIPT_TYPE_LABELS: Record<string, string> = {
   '현금영수증': '현금영수증',
   '카드결제': '카드결제',
   '세금계산서': '세금계산서',
@@ -69,11 +110,13 @@ export const RECEIPT_TYPE_LABELS: Record<ReceiptType, string> = {
   '자진발급': '자진발급',
 };
 
-// =====================================================
-// 색상 매핑
-// =====================================================
+export const OFFICE_LOCATION_COLORS: Record<string, string> = {
+  '평택': 'bg-emerald-100 text-emerald-800',
+  '천안': 'bg-sky-100 text-sky-800',
+  '소송구조': 'bg-amber-100 text-amber-800',
+};
 
-export const PAYMENT_CATEGORY_COLORS: Record<PaymentCategory, string> = {
+export const PAYMENT_CATEGORY_COLORS: Record<string, string> = {
   '착수금': 'bg-blue-100 text-blue-800',
   '잔금': 'bg-green-100 text-green-800',
   '성공보수': 'bg-purple-100 text-purple-800',
@@ -84,11 +127,20 @@ export const PAYMENT_CATEGORY_COLORS: Record<PaymentCategory, string> = {
   '환불': 'bg-red-100 text-red-800',
 };
 
-export const OFFICE_LOCATION_COLORS: Record<OfficeLocation, string> = {
-  '평택': 'bg-emerald-100 text-emerald-800',
-  '천안': 'bg-sky-100 text-sky-800',
-  '소송구조': 'bg-amber-100 text-amber-800',
-};
+/**
+ * 동적 지점 색상 생성
+ */
+export function getOfficeLocationColor(index: number): string {
+  const colors = [
+    'bg-emerald-100 text-emerald-800',
+    'bg-sky-100 text-sky-800',
+    'bg-amber-100 text-amber-800',
+    'bg-purple-100 text-purple-800',
+    'bg-rose-100 text-rose-800',
+    'bg-teal-100 text-teal-800',
+  ];
+  return colors[index % colors.length];
+}
 
 // =====================================================
 // 데이터베이스 테이블 타입
@@ -134,7 +186,7 @@ export interface Payment {
   admin_notes: string | null;
   imported_from_csv: boolean;
 
-  // 정산 통합 (신규)
+  // 정산 통합
   month_key: string | null;  // YYYY-MM
   is_confirmed: boolean;
   confirmed_at: string | null;  // ISO 8601 datetime
@@ -188,10 +240,10 @@ export interface UpdatePaymentRequest {
 // =====================================================
 
 /**
- * 사무실별 통계 (VIEW: payment_stats_by_office)
+ * 사무실별 통계 (동적 지점)
  */
 export interface PaymentStatsByOffice {
-  office_location: string;  // OfficeLocation | '미지정'
+  office_location: string;  // 동적 지점명 | '미지정'
   payment_category: PaymentCategory;
   payment_count: number;
   total_amount: number;
@@ -201,32 +253,44 @@ export interface PaymentStatsByOffice {
 }
 
 /**
- * 명목별 통계 (VIEW: payment_stats_by_category)
+ * 명목별 통계 (동적 지점별 집계 포함)
  */
 export interface PaymentStatsByCategory {
   payment_category: PaymentCategory;
   payment_count: number;
   total_amount: number;
   avg_amount: number;
+  // 동적 지점별 통계
+  by_office: {
+    [office: string]: {
+      count: number;
+      total: number;
+    };
+  };
+  // 레거시 필드 (호환성) - TODO: 동적 지점으로 마이그레이션 후 삭제
+  /** @deprecated by_office 사용 권장 */
   pyeongtaek_count: number;
+  /** @deprecated by_office 사용 권장 */
   cheonan_count: number;
+  /** @deprecated by_office 사용 권장 */
   pyeongtaek_total: number;
+  /** @deprecated by_office 사용 권장 */
   cheonan_total: number;
 }
 
 /**
- * 월별 통계 (VIEW: payment_stats_by_month)
+ * 월별 통계
  */
 export interface PaymentStatsByMonth {
   month: string;  // ISO date (YYYY-MM-01)
-  office_location: string;  // OfficeLocation | '미지정'
+  office_location: string;  // 동적 지점명 | '미지정'
   payment_category: PaymentCategory;
   payment_count: number;
   total_amount: number;
 }
 
 /**
- * 사건별 입금 합계 (VIEW: case_payment_summary)
+ * 사건별 입금 합계
  */
 export interface CasePaymentSummary {
   case_id: string;
@@ -242,7 +306,7 @@ export interface CasePaymentSummary {
 }
 
 /**
- * 상담별 입금 합계 (VIEW: consultation_payment_summary)
+ * 상담별 입금 합계
  */
 export interface ConsultationPaymentSummary {
   consultation_id: string;
@@ -256,18 +320,27 @@ export interface ConsultationPaymentSummary {
 }
 
 /**
- * 대시보드 전체 통계
+ * 대시보드 전체 통계 (동적 지점 지원)
  */
 export interface PaymentDashboardStats {
   total_amount: number;
-  pyeongtaek_amount: number;
-  cheonan_amount: number;
   this_month_amount: number;
   last_month_amount: number;
   month_growth_rate: number;  // 전월 대비 증감률 (%)
-
   total_count: number;
+
+  // 동적 지점별 통계
+  by_office_amount: Record<string, number>;
+  by_office_count: Record<string, number>;
+
+  // 레거시 필드 (호환성) - TODO: 동적 지점으로 마이그레이션 후 삭제
+  /** @deprecated by_office_amount 사용 권장 */
+  pyeongtaek_amount: number;
+  /** @deprecated by_office_amount 사용 권장 */
+  cheonan_amount: number;
+  /** @deprecated by_office_count 사용 권장 */
   pyeongtaek_count: number;
+  /** @deprecated by_office_count 사용 권장 */
   cheonan_count: number;
 
   by_category: PaymentStatsByCategory[];
@@ -366,4 +439,11 @@ export function formatPhoneNumber(phone: string): string {
     return `${cleaned.slice(0, 3)}-${cleaned.slice(3, 6)}-${cleaned.slice(6)}`;
   }
   return phone;
+}
+
+/**
+ * 카테고리 색상 가져오기 (없으면 기본값)
+ */
+export function getCategoryColor(category: string): string {
+  return PAYMENT_CATEGORY_COLORS[category] || 'bg-gray-100 text-gray-700';
 }

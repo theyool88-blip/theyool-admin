@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx'
-import type { Expense, MonthlySettlement, PartnerWithdrawal } from '@/types/expense'
+import type { Expense } from '@/types/expense'
 import type { Payment } from '@/types/payment'
 
 /**
@@ -34,84 +34,6 @@ export function exportExpensesToExcel(expenses: Expense[], filename: string = 'e
     { wch: 10 }, // 고정지출
     { wch: 10 }, // 정산월
     { wch: 30 }  // 메모
-  ]
-
-  XLSX.writeFile(workbook, filename)
-}
-
-/**
- * 월별 정산 데이터를 Excel로 다운로드
- */
-export function exportSettlementsToExcel(settlements: MonthlySettlement[], filename: string = 'settlements.xlsx') {
-  const data = settlements.map(settlement => ({
-    '정산월': settlement.settlement_month,
-    '총매출': settlement.total_revenue,
-    '천안매출': settlement.cheonan_revenue || 0,
-    '평택매출': settlement.pyeongtaek_revenue || 0,
-    '총지출': settlement.total_expenses,
-    '순수익': settlement.total_revenue - settlement.total_expenses,
-    '김현성_배분': Math.floor((settlement.total_revenue - settlement.total_expenses) / 2),
-    '임은지_배분': Math.floor((settlement.total_revenue - settlement.total_expenses) / 2),
-    '김현성_인출': settlement.kim_withdrawals,
-    '임은지_인출': settlement.lim_withdrawals,
-    '김현성_잔액': Math.floor((settlement.total_revenue - settlement.total_expenses) / 2) - settlement.kim_withdrawals,
-    '임은지_잔액': Math.floor((settlement.total_revenue - settlement.total_expenses) / 2) - settlement.lim_withdrawals,
-    '김현성_누적': settlement.kim_accumulated_debt,
-    '임은지_누적': settlement.lim_accumulated_debt,
-    '정산여부': settlement.is_settled ? '완료' : '대기'
-  }))
-
-  const worksheet = XLSX.utils.json_to_sheet(data)
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, '월별정산')
-
-  // 컬럼 너비 자동 조정
-  worksheet['!cols'] = [
-    { wch: 10 }, // 정산월
-    { wch: 15 }, // 총매출
-    { wch: 15 }, // 천안매출
-    { wch: 15 }, // 평택매출
-    { wch: 15 }, // 총지출
-    { wch: 15 }, // 순수익
-    { wch: 15 }, // 김현성_배분
-    { wch: 15 }, // 임은지_배분
-    { wch: 15 }, // 김현성_인출
-    { wch: 15 }, // 임은지_인출
-    { wch: 15 }, // 김현성_잔액
-    { wch: 15 }, // 임은지_잔액
-    { wch: 15 }, // 김현성_누적
-    { wch: 15 }, // 임은지_누적
-    { wch: 10 }  // 정산여부
-  ]
-
-  XLSX.writeFile(workbook, filename)
-}
-
-/**
- * 변호사 인출 데이터를 Excel로 다운로드
- */
-export function exportWithdrawalsToExcel(withdrawals: PartnerWithdrawal[], filename: string = 'withdrawals.xlsx') {
-  const data = withdrawals.map(withdrawal => ({
-    '인출일': withdrawal.withdrawal_date,
-    '변호사': withdrawal.partner_name,
-    '금액': withdrawal.amount,
-    '유형': withdrawal.withdrawal_type,
-    '정산월': withdrawal.month_key,
-    '설명': withdrawal.description || '-'
-  }))
-
-  const worksheet = XLSX.utils.json_to_sheet(data)
-  const workbook = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(workbook, worksheet, '변호사인출')
-
-  // 컬럼 너비 자동 조정
-  worksheet['!cols'] = [
-    { wch: 12 }, // 인출일
-    { wch: 12 }, // 변호사
-    { wch: 15 }, // 금액
-    { wch: 12 }, // 유형
-    { wch: 10 }, // 정산월
-    { wch: 30 }  // 설명
   ]
 
   XLSX.writeFile(workbook, filename)

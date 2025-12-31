@@ -581,6 +581,15 @@ export async function getPaymentDashboardStats(): Promise<{
       total_count,
       pyeongtaek_count,
       cheonan_count,
+      // 동적 지점별 통계
+      by_office_amount: {
+        '평택': pyeongtaek_amount,
+        '천안': cheonan_amount,
+      },
+      by_office_count: {
+        '평택': pyeongtaek_count,
+        '천안': cheonan_count,
+      },
       by_category: byCategory || [],
       by_office: byOffice || [],
       by_month: byMonth || [],

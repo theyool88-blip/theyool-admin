@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import type { Consultation, LawyerName, OfficeLocation } from '@/types/consultation';
-import { LAWYER_NAMES, OFFICE_LOCATIONS } from '@/types/consultation';
+import { useTenantOptions } from '@/hooks/useTenantOptions';
 
 interface ConsultationScheduleModalProps {
   consultation: Consultation;
@@ -30,6 +30,9 @@ export default function ConsultationScheduleModal({
   onClose,
   onConfirm,
 }: ConsultationScheduleModalProps) {
+  // 테넌트 옵션 동적 로드
+  const { lawyerNames, officeLocations } = useTenantOptions();
+
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
   const [selectedLawyer, setSelectedLawyer] = useState<LawyerName | ''>('');
@@ -328,7 +331,7 @@ export default function ConsultationScheduleModal({
               className="w-full px-3 py-2 text-sm border border-sage-200 rounded-lg bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-sage-500 focus:ring-sage-500"
             >
               <option value="">선택 안 함</option>
-              {LAWYER_NAMES.map((name) => (
+              {lawyerNames.map((name) => (
                 <option key={name} value={name}>{name}</option>
               ))}
             </select>
@@ -341,7 +344,7 @@ export default function ConsultationScheduleModal({
                 사무소 위치 <span className="text-coral-500">*</span>
               </label>
               <div className="flex gap-2">
-                {OFFICE_LOCATIONS.map((location) => (
+                {officeLocations.map((location) => (
                   <button
                     key={location}
                     onClick={() => setSelectedOffice(location)}

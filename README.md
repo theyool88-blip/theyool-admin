@@ -2,6 +2,9 @@
 
 **법무법인 더율**의 사건, 의뢰인, 상담, 재정을 통합 관리하는 관리자 시스템입니다.
 
+> **멀티테넌트 SaaS 지원**: 이 시스템은 멀티테넌트 아키텍처를 지원하여 여러 법무법인/변호사가 독립적으로 사용할 수 있습니다.
+> 자세한 내용: [멀티테넌트 시스템 문서](docs/systems/MULTI_TENANT_SYSTEM.md)
+
 ---
 
 ## 기술 스택
@@ -21,7 +24,7 @@
 | **의뢰인 관리** | 의뢰인 정보, 사건 연결, 포털 미리보기 |
 | **사건 관리** | 이혼/양육권/재산분할 등 사건 CRUD |
 | **상담 관리** | 상담 신청/진행/완료 9단계 워크플로우 |
-| **입금/지출 관리** | 5:5 파트너십 정산, 고정 지출 자동 생성 |
+| **입금/지출 관리** | 수임료 입금 추적, 지출 관리, 고정 지출 자동 생성 |
 | **법원기일 관리** | 기일 등록, 데드라인 자동 계산 |
 | **캘린더** | 통합 일정 조회, Google Calendar 연동 |
 
@@ -53,6 +56,8 @@ npm run dev
 | [DB 마이그레이션](docs/guides/MIGRATION_GUIDE.md) | Supabase 마이그레이션 |
 | [API 레퍼런스](docs/guides/API_REFERENCE.md) | REST API 문서 |
 | [시스템 문서](docs/systems/) | 각 시스템별 상세 설명 |
+| [멀티테넌트 시스템](docs/systems/MULTI_TENANT_SYSTEM.md) | SaaS 아키텍처, 권한 시스템 |
+| [SaaS 검증 보고서](docs/SAAS_VERIFICATION_REPORT.md) | 전환 검증 결과 |
 | [디자인 가이드](docs/design/SAGE_GREEN_THEME.md) | Sage Green 테마 |
 
 전체 문서 목록: [docs/INDEX.md](docs/INDEX.md)

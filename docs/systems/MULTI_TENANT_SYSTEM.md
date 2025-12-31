@@ -1,7 +1,8 @@
 # 멀티테넌트 SaaS 시스템
 
-> **상태**: Phase 5 프론트엔드 완료
+> **상태**: Phase 1-5 완료, Phase 6 (E2E 테스트) 진행 중
 > **마지막 업데이트**: 2025-12-31
+> **검증 보고서**: [SAAS_VERIFICATION_REPORT.md](../SAAS_VERIFICATION_REPORT.md)
 
 ## 개요
 
@@ -42,6 +43,189 @@
 | **Admin** | 3 | 멤버 관리, 설정 변경 (Owner 제외) |
 | **Lawyer** | 2 | 사건 관리, 의뢰인 관리 |
 | **Staff** | 1 | 제한된 조회, 일부 수정 |
+
+## 권한 시스템
+
+### 계정 유형 (단순화)
+
+SaaS 보편화를 위해 권한을 2가지 유형으로 단순화:
+
+| 유형 | 역할 | 접근 가능 모듈 |
+|------|------|----------------|
+| **전체 권한** | owner, admin | 모든 모듈 (회계 포함) |
+| **회계 제외** | lawyer, staff | 사건, 의뢰인, 상담, 캘린더 |
+
+### 모듈별 권한
+
+```typescript
+// lib/auth/permissions.ts
+
+// 회계 모듈 (제한된 계정 접근 불가)
+const ACCOUNTING_MODULES = ['payments', 'expenses', 'receivables'];
+
+// 관리자 전용 모듈
+const ADMIN_ONLY_MODULES = ['settings', 'members'];
+
+// 전체 권한 역할
+const FULL_ACCESS_ROLES = ['owner', 'admin'];
+
+// 회계 제외 역할
+const LIMITED_ROLES = ['lawyer', 'staff'];
+```
+
+### 권한 체크 함수
+
+```typescript
+// 모듈 접근 가능 여부
+canAccessModule(role: MemberRole, module: PermissionModule): boolean
+
+// 회계 모듈 접근 가능 여부
+canAccessAccounting(role: MemberRole): boolean
+
+// 설정/멤버 관리 가능 여부
+canManageSettings(role: MemberRole): boolean
+
+// 접근 가능한 모듈 목록
+getAccessibleModules(role: MemberRole): PermissionModule[]
+```
+
+### API에서 사용
+
+```typescript
+import { withTenant } from '@/lib/api/with-tenant';
+import { canAccessModule } from '@/lib/auth/permissions';
+
+export const GET = withTenant(async (request, { tenant }) => {
+  // 회계 모듈 접근 권한 체크
+  if (!canAccessModule(tenant.memberRole, 'payments')) {
+    return NextResponse.json({ error: '접근 권한 없음' }, { status: 403 });
+  }
+
+  // ... 로직
+});
+```
+
+## 테넌트 설정 시스템
+
+### tenant_settings 테이블
+
+```sql
+CREATE TABLE tenant_settings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  category VARCHAR(50) NOT NULL, -- cases, payments, expenses, consultations
+  settings JSONB NOT NULL DEFAULT '{}',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(tenant_id, category)
+);
+```
+
+### 설정 카테고리별 스키마
+
+```typescript
+// 사건 설정
+interface CaseSettings {
+  branches: { id: string; name: string }[];
+  caseTypes: { value: string; label: string }[];
+  scourtEnabled: boolean;
+}
+
+// 상담 설정
+interface ConsultationSettings {
+  categories: { value: string; label: string }[];
+  defaultFee?: number;
+  autoAssignLawyer: boolean;
+  officeLocations: string[];
+}
+
+// 지출 설정
+interface ExpenseSettings {
+  categories: string[];
+  officeLocations: string[];
+}
+
+// 수임료 설정
+interface PaymentSettings {
+  categories: { value: string; label: string }[];
+  receiptTypes: { value: string; label: string }[];
+  officeLocations: string[];
+}
+```
+
+### 설정 API
+
+```
+GET  /api/admin/tenant/settings?category=consultations
+PUT  /api/admin/tenant/settings
+```
+
+## 클라이언트 훅
+
+### useTenant
+
+현재 로그인한 사용자의 테넌트 정보와 역할을 조회합니다.
+
+```typescript
+// hooks/useTenant.ts
+const {
+  tenantId,
+  tenantName,
+  tenantLogo,
+  memberRole,
+  isSuperAdmin,
+  isLoading
+} = useTenant();
+```
+
+**사용 예시 (AdminHeader)**:
+```typescript
+import { useTenant } from '@/hooks/useTenant';
+import { canAccessModule } from '@/lib/auth/permissions';
+
+function AdminHeader() {
+  const { memberRole } = useTenant();
+
+  // 권한 기반 메뉴 필터링
+  const menuItems = allMenuItems.filter(item =>
+    !item.module || canAccessModule(memberRole, item.module)
+  );
+}
+```
+
+### useTenantOptions
+
+테넌트의 변호사 목록과 사무소 위치를 동적으로 가져옵니다.
+
+```typescript
+// hooks/useTenantOptions.ts
+const {
+  lawyerNames,      // string[] - 활성 멤버 중 변호사 이름 목록
+  officeLocations,  // string[] - 테넌트 설정의 사무소 위치
+  isLoading
+} = useTenantOptions();
+```
+
+**사용 예시 (ConsultationScheduleModal)**:
+```typescript
+import { useTenantOptions } from '@/hooks/useTenantOptions';
+
+function ConsultationScheduleModal() {
+  const { lawyerNames, officeLocations } = useTenantOptions();
+
+  return (
+    <select>
+      {lawyerNames.map(name => (
+        <option key={name} value={name}>{name}</option>
+      ))}
+    </select>
+  );
+}
+```
+
+**데이터 소스**:
+- `lawyerNames`: `/api/admin/tenant` → `members` (role='lawyer'/'owner'/'admin', status='active')
+- `officeLocations`: `/api/admin/tenant/settings` → `consultations.offices` 또는 `cases.branches`
 
 ## 데이터베이스 스키마
 
@@ -216,6 +400,70 @@ export const GET = withTenant(async (request, { tenant }) => {
   return NextResponse.json({ cases });
 });
 ```
+
+## SaaS 보편화 작업
+
+### 개요
+
+더율 전용 하드코딩을 제거하고 보편적인 SaaS로 전환하는 작업입니다.
+
+### 완료된 작업
+
+#### 1. 하드코딩 제거
+
+| 파일 | 변경 내용 |
+|------|----------|
+| `types/consultation.ts` | `LAWYER_NAMES`, `OFFICE_LOCATIONS` 동적화 |
+| `types/expense.ts` | 카테고리/지역 동적화, 파트너 정산 타입 삭제 |
+| `lib/supabase/expenses.ts` | 정산 함수 제거, tenantId 지원 |
+
+#### 2. 파트너 정산 기능 삭제
+
+더율 전용 2인 파트너 정산 기능을 완전히 제거:
+
+**삭제된 파일:**
+- `app/api/admin/expenses/settlements/` (디렉토리)
+- `app/api/admin/expenses/withdrawals/` (디렉토리)
+- `app/admin/expenses/withdrawals/page.tsx`
+- `components/admin/WithdrawalFormModal.tsx`
+
+**삭제된 타입:**
+- `PartnerWithdrawal`
+- `MonthlySettlement`
+- `PartnerDebtStatus`
+- `SettlementDashboard`
+- `kim_*`, `lim_*` 관련 필드
+
+**삭제된 함수:**
+- `getPartnerWithdrawals()`
+- `createPartnerWithdrawal()`
+- `getMonthlySettlements()`
+- `getLatestSettlement()`
+- `calculatePartnerDebt()`
+- `exportSettlementsToExcel()`
+- `exportWithdrawalsToExcel()`
+
+#### 3. 테넌트 격리 보완
+
+- `receivables` API에 withTenant 래퍼 적용
+- `receivables/memos` API에 withTenant 래퍼 적용
+
+#### 4. 권한 체크 적용
+
+**API 라우트:**
+- `payments` API (GET/POST) - `canAccessModuleWithContext(tenant, 'payments')`
+- `expenses` API (GET/POST) - `canAccessModuleWithContext(tenant, 'expenses')`
+- `receivables` API (GET, memos POST/PATCH/DELETE) - `canAccessAccountingWithContext(tenant)`
+
+**프론트엔드:**
+- `AdminHeader.tsx` - memberRole prop 추가, 메뉴별 module 지정 및 필터링
+
+### 남은 작업
+
+- [ ] 프론트엔드 컴포넌트에서 동적 데이터 연동
+  - `ConsultationAvailability.tsx` - LAWYER_NAMES, OFFICE_LOCATIONS API 연동
+  - `ConsultationScheduleModal.tsx` - LAWYER_NAMES, OFFICE_LOCATIONS API 연동
+- [ ] AdminHeader에 memberRole 전달 (각 페이지에서)
 
 ## 완료된 작업
 

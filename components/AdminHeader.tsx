@@ -1,11 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { useTenant } from '@/hooks/useTenant'
+import type { PermissionModule } from '@/lib/auth/permissions'
+import { canAccessModule } from '@/lib/auth/permissions'
+
+interface MenuItem {
+  href: string
+  label: string
+  module?: PermissionModule
+}
 
 interface AdminHeaderProps {
   title: string
@@ -20,13 +29,21 @@ export default function AdminHeader({ title, subtitle, tenantLogo, tenantName }:
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const canPortal = typeof document !== 'undefined'
 
+  // 테넌트 정보 가져오기
+  const { memberRole, tenantLogo: fetchedLogo, tenantName: fetchedName, isLoading } = useTenant()
+
+  // 외부에서 전달된 값 우선, 없으면 훅에서 가져온 값 사용
+  const effectiveLogo = tenantLogo ?? fetchedLogo
+  const effectiveName = tenantName ?? fetchedName
+  const role = memberRole
+
   // 로고 렌더링 함수
   const renderLogo = (height: string = 'h-6 md:h-7', showFilter: boolean = true) => {
-    if (tenantLogo) {
+    if (effectiveLogo) {
       return (
         <Image
-          src={tenantLogo}
-          alt={tenantName || '사무소 로고'}
+          src={effectiveLogo}
+          alt={effectiveName || '사무소 로고'}
           width={180}
           height={45}
           className={`${height} w-auto object-contain`}
@@ -53,17 +70,26 @@ export default function AdminHeader({ title, subtitle, tenantLogo, tenantName }:
     router.refresh()
   }
 
-  const menuItems = [
-    { href: '/admin', label: 'ADMIN' },
-    { href: '/schedules', label: '일정' },
-    { href: '/cases', label: '사건' },
-    { href: '/admin/consultations', label: '상담' },
-    { href: '/admin/expenses', label: '지출 관리' },
-    { href: '/admin/payments', label: '입금 관리' },
-    { href: '/admin/receivables', label: '미수금' },
+  // 전체 메뉴 정의 (module: 해당 메뉴에 필요한 권한)
+  const allMenuItems: MenuItem[] = [
+    { href: '/admin', label: 'ADMIN', module: 'dashboard' },
+    { href: '/schedules', label: '일정', module: 'calendar' },
+    { href: '/cases', label: '사건', module: 'cases' },
+    { href: '/admin/consultations', label: '상담', module: 'consultations' },
+    { href: '/admin/expenses', label: '지출 관리', module: 'expenses' },
+    { href: '/admin/payments', label: '입금 관리', module: 'payments' },
+    { href: '/admin/receivables', label: '미수금', module: 'receivables' },
     { href: '/admin/notifications', label: '알림' },
-    { href: '/admin/settings', label: '설정' }
+    { href: '/admin/settings', label: '설정', module: 'settings' }
   ]
+
+  // 권한에 따라 메뉴 필터링
+  const menuItems = useMemo(() => {
+    return allMenuItems.filter(item => {
+      if (!item.module) return true // module이 없으면 모든 역할 접근 가능
+      return canAccessModule(role, item.module)
+    })
+  }, [role])
 
   return (
     <header className="fixed top-0 left-0 right-0 z-[19998] bg-white/95 backdrop-blur-sm border-b border-sage-200">
@@ -85,7 +111,7 @@ export default function AdminHeader({ title, subtitle, tenantLogo, tenantName }:
 
             {/* 로고 (데스크톱) */}
             <Link href="/" className="hidden lg:flex items-center gap-3">
-              {renderLogo('h-6 md:h-7', !tenantLogo)}
+              {renderLogo('h-6 md:h-7', !effectiveLogo)}
               <div className="border-l border-sage-300 pl-3">
                 <div className="text-sm font-semibold text-sage-800">{title}</div>
                 {subtitle && (
@@ -98,7 +124,7 @@ export default function AdminHeader({ title, subtitle, tenantLogo, tenantName }:
           {/* 중앙: 로고 (모바일) */}
           <div className="absolute left-1/2 transform -translate-x-1/2 lg:hidden">
             <Link href="/">
-              {renderLogo('h-6', !tenantLogo)}
+              {renderLogo('h-6', !effectiveLogo)}
             </Link>
           </div>
 

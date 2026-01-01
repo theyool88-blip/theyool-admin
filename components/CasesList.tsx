@@ -37,6 +37,7 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
   const [currentPage, setCurrentPage] = useState(1)
   const [casesPerPage, setCasesPerPage] = useState(50)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [selectedCaseId, setSelectedCaseId] = useState<string | undefined>(undefined)
   const [selectedCaseNumber, setSelectedCaseNumber] = useState<string | undefined>(undefined)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedCaseForPayment, setSelectedCaseForPayment] = useState<LegalCase | null>(null)
@@ -94,13 +95,10 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     return `${year}.${month}.${day}`
   }
 
-  const handleAddSchedule = (e: React.MouseEvent, caseNumber: string | null) => {
+  const handleAddSchedule = (e: React.MouseEvent, caseId: string, caseNumber: string | null) => {
     e.stopPropagation()
-    if (!caseNumber) {
-      alert('사건번호가 등록되지 않은 사건입니다.')
-      return
-    }
-    setSelectedCaseNumber(caseNumber)
+    setSelectedCaseId(caseId)
+    setSelectedCaseNumber(caseNumber || undefined)
     setShowScheduleModal(true)
   }
 
@@ -236,13 +234,8 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
                           입금
                         </button>
                         <button
-                          onClick={(e) => handleAddSchedule(e, legalCase.court_case_number)}
-                          disabled={!legalCase.court_case_number}
-                          className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                            legalCase.court_case_number
-                              ? 'bg-sage-600 text-white hover:bg-sage-700'
-                              : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                          }`}
+                          onClick={(e) => handleAddSchedule(e, legalCase.id, legalCase.court_case_number)}
+                          className="px-2 py-1 text-xs font-medium rounded transition-colors bg-sage-600 text-white hover:bg-sage-700"
                         >
                           기일
                         </button>
@@ -341,12 +334,15 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
         isOpen={showScheduleModal}
         onClose={() => {
           setShowScheduleModal(false)
+          setSelectedCaseId(undefined)
           setSelectedCaseNumber(undefined)
         }}
         onSuccess={() => {
           setShowScheduleModal(false)
+          setSelectedCaseId(undefined)
           setSelectedCaseNumber(undefined)
         }}
+        prefilledCaseId={selectedCaseId}
         prefilledCaseNumber={selectedCaseNumber}
       />
 

@@ -82,6 +82,41 @@ interface Schedule {
   description: string | null
 }
 
+// 대법원 진행사항 관련 인터페이스
+interface ScourtProgressItem {
+  date: string
+  content: string
+  result?: string | null
+}
+
+interface ScourtHearingItem {
+  date: string
+  time?: string
+  type: string
+  location?: string
+  result?: string
+}
+
+interface ScourtSnapshot {
+  id: string
+  scrapedAt: string
+  caseType: string
+  basicInfo: Record<string, string>
+  hearings: ScourtHearingItem[]
+  progress: ScourtProgressItem[]
+  documents: { date: string; content: string }[]
+  lowerCourt: { court: string; caseNo: string }[]
+  relatedCases: { caseNo: string; caseName?: string; relation?: string }[]
+}
+
+interface ScourtSyncStatus {
+  lastSync: string | null
+  status: string | null
+  caseNumber: string | null
+  isLinked: boolean
+  profileId: string | null
+}
+
 interface UnifiedScheduleItem {
   id: string
   type: 'court_hearing' | 'deadline' | 'schedule'
@@ -106,6 +141,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [paymentTotal, setPaymentTotal] = useState<number | null>(null)
   const [isNewCase, setIsNewCase] = useState(caseData.is_new_case ?? false)
   const [isUpdatingNewCase, setIsUpdatingNewCase] = useState(false)
+
+  // 대법원 진행사항 관련 상태
+  const [scourtSnapshot, setScourtSnapshot] = useState<ScourtSnapshot | null>(null)
+  const [scourtSyncStatus, setScourtSyncStatus] = useState<ScourtSyncStatus | null>(null)
+  const [scourtLoading, setScourtLoading] = useState(false)
+  const [scourtSyncing, setScourtSyncing] = useState(false)
+  const [showProgressDetail, setShowProgressDetail] = useState(false)
+
+  // 탭 상태: 'schedules' | 'progress'
+  const [activeTab, setActiveTab] = useState<'schedules' | 'progress'>('schedules')
 
   const router = useRouter()
   const supabase = createClient()
@@ -132,8 +177,70 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     }
   }
 
-  const fetchAllSchedules = useCallback(async () => {
+  // 대법원 스냅샷 조회
+  const fetchScourtSnapshot = useCallback(async () => {
     if (!caseData.court_case_number) return
+
+    setScourtLoading(true)
+    try {
+      const res = await fetch(`/api/admin/scourt/snapshot?caseId=${caseData.id}`)
+      const data = await res.json()
+
+      if (data.success) {
+        setScourtSnapshot(data.snapshot)
+        setScourtSyncStatus(data.syncStatus)
+      }
+    } catch (error) {
+      console.error('스냅샷 조회 실패:', error)
+    } finally {
+      setScourtLoading(false)
+    }
+  }, [caseData.id, caseData.court_case_number])
+
+  // 대법원 동기화 실행
+  const handleScourtSync = async () => {
+    if (!caseData.court_case_number) {
+      alert('사건번호가 없습니다.')
+      return
+    }
+
+    setScourtSyncing(true)
+    try {
+      const res = await fetch('/api/admin/scourt/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          legalCaseId: caseData.id,
+          caseNumber: caseData.court_case_number,
+          forceRefresh: true,
+        }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        // 동기화 성공 후 스냅샷 새로고침
+        await fetchScourtSnapshot()
+        if (data.updateCount > 0) {
+          alert(`동기화 완료: ${data.updateCount}건의 변경사항이 있습니다.`)
+        } else {
+          alert('동기화 완료: 변경사항이 없습니다.')
+        }
+      } else if (data.skipped) {
+        alert('최근에 동기화되었습니다.')
+      } else {
+        alert(data.error || '동기화 실패')
+      }
+    } catch (error) {
+      console.error('동기화 실패:', error)
+      alert('동기화 중 오류가 발생했습니다.')
+    } finally {
+      setScourtSyncing(false)
+    }
+  }
+
+  const fetchAllSchedules = useCallback(async () => {
+    // case_id로 조회 - 사건번호 없어도 동작
+    if (!caseData.id) return
 
     try {
       setLoading(true)
@@ -236,11 +343,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     } finally {
       setLoading(false)
     }
-  }, [caseData.court_case_number, caseData.id, supabase])
+  }, [caseData.id, supabase])
 
   useEffect(() => {
     fetchAllSchedules()
   }, [fetchAllSchedules])
+
+  // 대법원 스냅샷 조회
+  useEffect(() => {
+    fetchScourtSnapshot()
+  }, [fetchScourtSnapshot])
 
   useEffect(() => {
     const fetchPayments = async () => {
@@ -532,140 +644,336 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           </div>
         )}
 
-        {/* Schedules */}
+        {/* 일정/진행사항 탭 UI */}
         <div className="bg-white rounded-lg border border-gray-200 p-5">
+          {/* 탭 헤더 */}
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">일정 목록</h2>
-            <button
-              onClick={() => setShowScheduleModal(true)}
-              className="px-3 py-1 text-xs font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
-            >
-              + 일정 추가
-            </button>
+            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
+              <button
+                onClick={() => setActiveTab('schedules')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'schedules'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                일정
+              </button>
+              <button
+                onClick={() => setActiveTab('progress')}
+                className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  activeTab === 'progress'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                진행사항
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              {activeTab === 'schedules' && (
+                <button
+                  onClick={() => setShowScheduleModal(true)}
+                  className="px-3 py-1 text-xs font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
+                >
+                  + 일정 추가
+                </button>
+              )}
+              {activeTab === 'progress' && caseData.court_case_number && (
+                <>
+                  {scourtSnapshot && (
+                    <button
+                      onClick={() => setShowProgressDetail(!showProgressDetail)}
+                      className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+                    >
+                      {showProgressDetail ? '접기' : '상세보기'}
+                    </button>
+                  )}
+                  <button
+                    onClick={handleScourtSync}
+                    disabled={scourtSyncing || !scourtSyncStatus?.isLinked}
+                    className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
+                      scourtSyncing
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : scourtSyncStatus?.isLinked
+                        ? 'bg-sage-600 text-white hover:bg-sage-700'
+                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    }`}
+                    title={!scourtSyncStatus?.isLinked ? '대법원 사건 연동이 필요합니다' : ''}
+                  >
+                    {scourtSyncing ? (
+                      <>
+                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        동기화 중...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        동기화
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
 
-          {!caseData.court_case_number ? (
-            <div className="py-8 text-center text-gray-400 text-sm">
-              사건번호를 먼저 등록해주세요
-            </div>
-          ) : loading ? (
-            <div className="py-8 text-center text-gray-400 text-sm">
-              로딩 중...
-            </div>
-          ) : unifiedSchedules.length === 0 ? (
-            <div className="py-8 text-center text-gray-400 text-sm">
-              등록된 일정이 없습니다
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {unifiedSchedules.map((item) => {
-                const isHearing = item.type === 'court_hearing'
-                const isDeadline = item.type === 'deadline'
-                const source = item.source
-                const itemKey = `${item.type}-${item.id}`
-                const hasReport = isHearing && 'report' in source && source.report
+          {/* 일정 탭 내용 */}
+          {activeTab === 'schedules' && (
+            <>
+              {loading ? (
+                <div className="py-8 text-center text-gray-400 text-sm">
+                  로딩 중...
+                </div>
+              ) : unifiedSchedules.length === 0 ? (
+                <div className="py-8 text-center text-gray-400 text-sm">
+                  등록된 일정이 없습니다
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {unifiedSchedules.map((item) => {
+                    const isHearing = item.type === 'court_hearing'
+                    const isDeadline = item.type === 'deadline'
+                    const source = item.source
+                    const itemKey = `${item.type}-${item.id}`
+                    const hasReport = isHearing && 'report' in source && source.report
 
-                return (
-                  <div
-                    key={itemKey}
-                    onClick={() => {
-                      if (isHearing) {
-                        setSelectedHearing(item.source as CourtHearing)
-                        setShowHearingModal(true)
-                      }
-                    }}
-                    className={`border-l-4 rounded p-3 cursor-pointer hover:shadow-sm transition-shadow ${getScheduleTypeStyle(item.type, item.subtype)}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-medium text-gray-700">{item.title}</span>
-                        {item.status && (
-                          <span className={`text-xs ${
-                            isHearing
-                              ? item.status === 'COMPLETED' ? 'text-green-600' :
-                                item.status === 'POSTPONED' ? 'text-yellow-600' :
-                                item.status === 'CANCELLED' ? 'text-gray-500' :
-                                'text-blue-600'
-                              : item.status === 'COMPLETED' ? 'text-green-600' :
-                                item.status === 'OVERDUE' ? 'text-red-600' :
-                                'text-yellow-600'
-                          }`}>
-                            {isHearing
-                              ? item.status === 'COMPLETED'
-                                ? '속행'
-                                : HEARING_STATUS_LABELS[item.status as HearingStatus]
-                              : DEADLINE_STATUS_LABELS[item.status as DeadlineStatus]}
+                    return (
+                      <div
+                        key={itemKey}
+                        onClick={() => {
+                          if (isHearing) {
+                            setSelectedHearing(item.source as CourtHearing)
+                            setShowHearingModal(true)
+                          }
+                        }}
+                        className={`border-l-4 rounded p-3 cursor-pointer hover:shadow-sm transition-shadow ${getScheduleTypeStyle(item.type, item.subtype)}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xs font-medium text-gray-700">{item.title}</span>
+                            {item.status && (
+                              <span className={`text-xs ${
+                                isHearing
+                                  ? item.status === 'COMPLETED' ? 'text-green-600' :
+                                    item.status === 'POSTPONED' ? 'text-yellow-600' :
+                                    item.status === 'CANCELLED' ? 'text-gray-500' :
+                                    'text-blue-600'
+                                  : item.status === 'COMPLETED' ? 'text-green-600' :
+                                    item.status === 'OVERDUE' ? 'text-red-600' :
+                                    'text-yellow-600'
+                              }`}>
+                                {isHearing
+                                  ? item.status === 'COMPLETED'
+                                    ? '속행'
+                                    : HEARING_STATUS_LABELS[item.status as HearingStatus]
+                                  : DEADLINE_STATUS_LABELS[item.status as DeadlineStatus]}
+                              </span>
+                            )}
+                            {item.days_until !== undefined && (
+                              <span className={`text-xs font-medium ${
+                                item.days_until <= 1 ? 'text-red-600' :
+                                item.days_until <= 3 ? 'text-orange-600' :
+                                item.days_until <= 7 ? 'text-yellow-600' :
+                                'text-green-600'
+                              }`}>
+                                {formatDaysUntil(item.days_until)}
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-xs text-gray-600">
+                            {item.datetime ? formatDateTime(item.datetime) : formatDate(item.date)}
                           </span>
+                        </div>
+
+                        {(item.location || hasReport) && (
+                          <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                            {item.location && (
+                              <span className="flex items-center gap-1">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                </svg>
+                                {item.location}
+                              </span>
+                            )}
+                            {hasReport && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setReportModal({
+                                    title: `${item.title || '재판기일'} 보고서`,
+                                    report: source.report || '',
+                                    court: caseData.court_name,
+                                    caseNumber: caseData.court_case_number,
+                                    date: item.date
+                                  })
+                                }}
+                                className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                              >
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                보고서 보기
+                              </button>
+                            )}
+                          </div>
                         )}
-                        {item.days_until !== undefined && (
-                          <span className={`text-xs font-medium ${
-                            item.days_until <= 1 ? 'text-red-600' :
-                            item.days_until <= 3 ? 'text-orange-600' :
-                            item.days_until <= 7 ? 'text-yellow-600' :
-                            'text-green-600'
-                          }`}>
-                            {formatDaysUntil(item.days_until)}
-                          </span>
+
+                        {isDeadline && (
+                          <div className="mt-2 text-xs text-gray-500">
+                            기산일: {formatDate((source as CaseDeadline).trigger_date)}
+                            {(source as CaseDeadline).completed_at && (
+                              <span className="ml-3 text-green-600">
+                                완료: {formatDateTime((source as CaseDeadline).completed_at!)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {(('notes' in source && source.notes) || ('description' in source && source.description)) && (
+                          <p className="mt-2 text-xs text-gray-500 italic">
+                            {('notes' in source && source.notes) || ('description' in source && source.description)}
+                          </p>
                         )}
                       </div>
-                      <span className="text-xs text-gray-600">
-                        {item.datetime ? formatDateTime(item.datetime) : formatDate(item.date)}
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* 진행사항 탭 내용 */}
+          {activeTab === 'progress' && (
+            <>
+              {!caseData.court_case_number ? (
+                <div className="py-8 text-center text-gray-400 text-sm">
+                  사건번호를 먼저 등록해주세요
+                </div>
+              ) : scourtLoading ? (
+                <div className="py-6 text-center text-gray-400 text-sm">
+                  로딩 중...
+                </div>
+              ) : !scourtSyncStatus?.isLinked ? (
+                <div className="py-6 text-center text-gray-400 text-sm">
+                  <p>대법원 사건 연동이 필요합니다.</p>
+                  <p className="mt-1 text-xs">사건번호로 검색하여 사건을 연동해주세요.</p>
+                </div>
+              ) : !scourtSnapshot ? (
+                <div className="py-6 text-center text-gray-400 text-sm">
+                  <p>동기화된 데이터가 없습니다.</p>
+                  <p className="mt-1 text-xs">동기화 버튼을 눌러 대법원에서 정보를 가져오세요.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* 최근 진행내용 요약 (최대 5개) */}
+                  {scourtSnapshot.progress.slice(0, showProgressDetail ? undefined : 5).map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0"
+                    >
+                      <span className="text-xs text-gray-400 whitespace-nowrap pt-0.5">
+                        {item.date}
                       </span>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-700">{item.content}</p>
+                        {item.result && (
+                          <span className="inline-block mt-1 px-1.5 py-0.5 text-xs bg-blue-50 text-blue-600 rounded">
+                            {item.result}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                  ))}
 
-                    {(item.location || hasReport) && (
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                        {item.location && (
-                          <span className="flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            </svg>
-                            {item.location}
-                          </span>
-                        )}
-                        {hasReport && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setReportModal({
-                                title: `${item.title || '재판기일'} 보고서`,
-                                report: source.report || '',
-                                court: caseData.court_name,
-                                caseNumber: caseData.court_case_number,
-                                date: item.date
-                              })
-                            }}
-                            className="text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            보고서 보기
-                          </button>
-                        )}
-                      </div>
-                    )}
+                  {!showProgressDetail && scourtSnapshot.progress.length > 5 && (
+                    <button
+                      onClick={() => setShowProgressDetail(true)}
+                      className="w-full py-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                    >
+                      + {scourtSnapshot.progress.length - 5}건 더보기
+                    </button>
+                  )}
 
-                    {isDeadline && (
-                      <div className="mt-2 text-xs text-gray-500">
-                        기산일: {formatDate((source as CaseDeadline).trigger_date)}
-                        {(source as CaseDeadline).completed_at && (
-                          <span className="ml-3 text-green-600">
-                            완료: {formatDateTime((source as CaseDeadline).completed_at!)}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                  {/* 상세보기 모드에서 추가 정보 표시 */}
+                  {showProgressDetail && (
+                    <>
+                      {/* 심급내용 */}
+                      {scourtSnapshot.lowerCourt && scourtSnapshot.lowerCourt.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <h3 className="text-xs font-semibold text-gray-500 mb-2">심급내용</h3>
+                          <div className="space-y-1">
+                            {scourtSnapshot.lowerCourt.map((item, idx) => (
+                              <div key={idx} className="flex gap-2 text-xs p-2 bg-gray-50 rounded">
+                                <span className="text-gray-500">{item.court}</span>
+                                <span className="text-gray-700 font-medium">{item.caseNo}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
-                    {(('notes' in source && source.notes) || ('description' in source && source.description)) && (
-                      <p className="mt-2 text-xs text-gray-500 italic">
-                        {('notes' in source && source.notes) || ('description' in source && source.description)}
-                      </p>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                      {/* 연계사건 */}
+                      {scourtSnapshot.relatedCases && scourtSnapshot.relatedCases.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <h3 className="text-xs font-semibold text-gray-500 mb-2">연계사건</h3>
+                          <div className="space-y-1">
+                            {scourtSnapshot.relatedCases.map((item, idx) => (
+                              <div key={idx} className="flex items-center gap-2 text-xs p-2 bg-blue-50 rounded">
+                                {item.relation && (
+                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
+                                    {item.relation}
+                                  </span>
+                                )}
+                                <span className="text-gray-700 font-medium">{item.caseNo}</span>
+                                {item.caseName && (
+                                  <span className="text-gray-500">{item.caseName}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 기본정보 */}
+                      {scourtSnapshot.basicInfo && Object.keys(scourtSnapshot.basicInfo).length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <h3 className="text-xs font-semibold text-gray-500 mb-2">기본정보 (대법원)</h3>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {Object.entries(scourtSnapshot.basicInfo).map(([key, value]) => (
+                              <div key={key} className="flex gap-2">
+                                <span className="text-gray-400">{key}</span>
+                                <span className="text-gray-700">{value}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 제출서류 */}
+                      {scourtSnapshot.documents && scourtSnapshot.documents.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <h3 className="text-xs font-semibold text-gray-500 mb-2">제출서류</h3>
+                          <div className="space-y-1">
+                            {scourtSnapshot.documents.map((doc, idx) => (
+                              <div key={idx} className="flex gap-2 text-xs">
+                                <span className="text-gray-400">{doc.date}</span>
+                                <span className="text-gray-700">{doc.content}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -678,6 +986,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           fetchAllSchedules()
           setShowScheduleModal(false)
         }}
+        prefilledCaseId={caseData.id}
         prefilledCaseNumber={caseData.court_case_number || undefined}
       />
 

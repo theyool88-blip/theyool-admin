@@ -23,7 +23,8 @@ import type {
  * GET /api/admin/court-hearings
  *
  * 쿼리 파라미터:
- * - case_number: 사건번호
+ * - case_id: 사건 ID (권장)
+ * - case_number: 사건번호 (하위호환)
  * - hearing_type: 기일 유형
  * - status: 상태
  * - from_date: 시작일 (ISO 8601 date)
@@ -39,6 +40,7 @@ export const GET = withTenant(async (request, { tenant }) => {
     const hearingStatus = searchParams.get('status') as HearingStatus | null
 
     const filters: CourtHearingListQuery = {
+      case_id: searchParams.get('case_id') || undefined,
       case_number: searchParams.get('case_number') || undefined,
       hearing_type: hearingType || undefined,
       status: hearingStatus || undefined,
@@ -74,7 +76,8 @@ export const GET = withTenant(async (request, { tenant }) => {
  *
  * Body:
  * {
- *   case_number: string,
+ *   case_id: string (필수),
+ *   case_number?: string (선택적),
  *   hearing_type: HearingType,
  *   hearing_date: string (ISO 8601 datetime),
  *   location?: string,
@@ -87,11 +90,11 @@ export const POST = withTenant(async (request, { tenant }) => {
   try {
     const body: CreateCourtHearingRequest = await request.json();
 
-    // 필수 필드 검증
-    if (!body.case_number || !body.hearing_type || !body.hearing_date) {
+    // 필수 필드 검증 (case_id 필수, case_number는 선택적)
+    if (!body.case_id || !body.hearing_type || !body.hearing_date) {
       const response: ApiResponse<CourtHearing> = {
         success: false,
-        error: '필수 필드 누락: case_number, hearing_type, hearing_date',
+        error: '필수 필드 누락: case_id, hearing_type, hearing_date',
       };
       return NextResponse.json(response, { status: 400 });
     }

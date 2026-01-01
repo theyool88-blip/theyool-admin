@@ -19,6 +19,7 @@ interface UnifiedScheduleModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  prefilledCaseId?: string
   prefilledCaseNumber?: string
   prefilledDate?: string
   editMode?: boolean
@@ -113,6 +114,7 @@ export default function UnifiedScheduleModal({
   isOpen,
   onClose,
   onSuccess,
+  prefilledCaseId,
   prefilledCaseNumber,
   prefilledDate,
   editMode = false,
@@ -318,12 +320,13 @@ export default function UnifiedScheduleModal({
         setSearchTerm(editData.reference_id || '')
       } else {
         // New schedule
-        if (prefilledCaseNumber) {
+        if (prefilledCaseId || prefilledCaseNumber) {
           setFormData(prev => ({
             ...prev,
-            case_number: prefilledCaseNumber
+            case_id: prefilledCaseId || '',
+            case_number: prefilledCaseNumber || ''
           }))
-          setSearchTerm(prefilledCaseNumber)
+          setSearchTerm(prefilledCaseNumber || '')
         }
         const today = new Date().toISOString().split('T')[0]
         const dateToUse = prefilledDate || today
@@ -376,7 +379,7 @@ export default function UnifiedScheduleModal({
       setCategory('court_hearing')
       setErrors({})
     }
-  }, [isOpen, prefilledCaseNumber, prefilledDate, editMode, editData, initialTab])
+  }, [isOpen, prefilledCaseId, prefilledCaseNumber, prefilledDate, editMode, editData, initialTab])
 
   // Auto-complete case search
   useEffect(() => {
@@ -432,8 +435,9 @@ export default function UnifiedScheduleModal({
         newErrors.subtype = '상담 유형을 선택해주세요'
       }
     } else {
-      if (!formData.case_number) {
-        newErrors.case_number = '사건번호를 입력해주세요'
+      // case_id 또는 case_number 중 하나는 필수
+      if (!formData.case_id && !formData.case_number) {
+        newErrors.case_number = '사건을 선택해주세요'
       }
       if (!formData.subtype) {
         newErrors.subtype = '유형을 선택해주세요'
@@ -687,11 +691,12 @@ export default function UnifiedScheduleModal({
       return  // 중요: 여기서 리턴하여 신규 생성 로직 실행 방지
     }
 
-    // 생성 모드 (기존 로직 유지)
+    // 생성 모드 (case_id 기반)
     const { error } = await supabase
       .from('court_hearings')
       .insert({
-        case_number: formData.case_number,
+        case_id: formData.case_id || null,
+        case_number: formData.case_number || null,
         hearing_type: formData.subtype as HearingType,
         hearing_date: datetime,
         location: formData.location || null,
@@ -720,11 +725,12 @@ export default function UnifiedScheduleModal({
       return  // 중요: 여기서 리턴하여 신규 생성 로직 실행 방지
     }
 
-    // 생성 모드 (기존 로직 유지)
+    // 생성 모드 (case_id 기반)
     const { error } = await supabase
       .from('case_deadlines')
       .insert({
-        case_number: formData.case_number,
+        case_id: formData.case_id || null,
+        case_number: formData.case_number || null,
         deadline_type: formData.subtype as DeadlineType,
         trigger_date: formData.trigger_date,
         notes: formData.notes || null,

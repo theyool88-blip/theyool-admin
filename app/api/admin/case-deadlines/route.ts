@@ -23,7 +23,8 @@ import type {
  * GET /api/admin/case-deadlines
  *
  * 쿼리 파라미터:
- * - case_number: 사건번호
+ * - case_id: 사건 ID (권장)
+ * - case_number: 사건번호 (하위호환)
  * - deadline_type: 데드라인 유형
  * - status: 상태
  * - urgent_only: 긴급(7일 이내)만 조회 (true/false)
@@ -35,6 +36,7 @@ export const GET = withTenant(async (request, { tenant }) => {
     const { searchParams } = new URL(request.url);
 
     const filters: CaseDeadlineListQuery = {
+      case_id: searchParams.get('case_id') || undefined,
       case_number: searchParams.get('case_number') || undefined,
       deadline_type: (searchParams.get('deadline_type') as DeadlineType) || undefined,
       status: (searchParams.get('status') as DeadlineStatus) || undefined,
@@ -69,7 +71,8 @@ export const GET = withTenant(async (request, { tenant }) => {
  *
  * Body:
  * {
- *   case_number: string,
+ *   case_id: string (필수),
+ *   case_number?: string (선택적),
  *   deadline_type: DeadlineType,
  *   trigger_date: string (ISO 8601 date, YYYY-MM-DD),
  *   notes?: string,
@@ -82,11 +85,11 @@ export const POST = withTenant(async (request, { tenant }) => {
   try {
     const body: CreateCaseDeadlineRequest = await request.json();
 
-    // 필수 필드 검증
-    if (!body.case_number || !body.deadline_type || !body.trigger_date) {
+    // 필수 필드 검증 (case_id 필수, case_number는 선택적)
+    if (!body.case_id || !body.deadline_type || !body.trigger_date) {
       const response: ApiResponse<CaseDeadline> = {
         success: false,
-        error: '필수 필드 누락: case_number, deadline_type, trigger_date',
+        error: '필수 필드 누락: case_id, deadline_type, trigger_date',
       };
       return NextResponse.json(response, { status: 400 });
     }

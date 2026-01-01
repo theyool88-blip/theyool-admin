@@ -20,7 +20,7 @@ import type {
 
 /**
  * 사건 데드라인 목록 조회 (필터링 및 페이지네이션 지원, 테넌트 격리)
- * @param filters 필터 조건
+ * @param filters 필터 조건 (case_id 또는 case_number로 필터링)
  * @param tenantId 테넌트 ID (슈퍼 어드민은 undefined로 전달하여 전체 조회)
  */
 export async function getCaseDeadlines(
@@ -36,7 +36,10 @@ export async function getCaseDeadlines(
   }
 
   if (filters) {
-    if (filters.case_number) {
+    // case_id 우선 사용, 없으면 case_number 사용
+    if (filters.case_id) {
+      query = query.eq('case_id', filters.case_id);
+    } else if (filters.case_number) {
       query = query.eq('case_number', filters.case_number);
     }
     if (filters.deadline_type) {
@@ -148,7 +151,7 @@ export async function getUrgentDeadlines(): Promise<UrgentDeadline[]> {
  *
  * 주의: deadline_date와 deadline_datetime은 자동 계산되므로 제공하지 않음
  *       trigger_date와 deadline_type만 제공
- * @param request 생성 요청
+ * @param request 생성 요청 (case_id 필수, case_number 선택적)
  * @param tenantId 테넌트 ID
  */
 export async function createCaseDeadline(
@@ -158,7 +161,8 @@ export async function createCaseDeadline(
   const supabase = createAdminClient();
 
   const insertData = {
-    case_number: request.case_number,
+    case_id: request.case_id,
+    case_number: request.case_number || null,
     deadline_type: request.deadline_type,
     trigger_date: request.trigger_date,
     notes: request.notes || null,

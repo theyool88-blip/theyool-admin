@@ -17,7 +17,7 @@ import type {
 
 /**
  * 법원 기일 목록 조회 (필터링 및 페이지네이션 지원, 테넌트 격리)
- * @param filters 필터 조건
+ * @param filters 필터 조건 (case_id 또는 case_number로 필터링)
  * @param tenantId 테넌트 ID (슈퍼 어드민은 undefined로 전달하여 전체 조회)
  */
 export async function getCourtHearings(
@@ -33,7 +33,10 @@ export async function getCourtHearings(
   }
 
   if (filters) {
-    if (filters.case_number) {
+    // case_id 우선 사용, 없으면 case_number 사용
+    if (filters.case_id) {
+      query = query.eq('case_id', filters.case_id);
+    } else if (filters.case_number) {
       query = query.eq('case_number', filters.case_number);
     }
     if (filters.hearing_type) {
@@ -145,7 +148,7 @@ const AUTO_DEADLINE_MAPPING: Record<string, string> = {
 
 /**
  * 법원 기일 생성 (자동 데드라인 생성 옵션 포함, 테넌트 격리)
- * @param request 생성 요청
+ * @param request 생성 요청 (case_id 필수, case_number 선택적)
  * @param tenantId 테넌트 ID
  */
 export async function createCourtHearing(
@@ -155,7 +158,8 @@ export async function createCourtHearing(
   const supabase = createAdminClient();
 
   const insertData = {
-    case_number: request.case_number,
+    case_id: request.case_id,
+    case_number: request.case_number || null,
     hearing_type: request.hearing_type,
     hearing_date: request.hearing_date,
     location: request.location || null,
@@ -185,7 +189,8 @@ export async function createCourtHearing(
         const triggerDate = new Date(request.hearing_date).toISOString().split('T')[0];
 
         await supabase.from('case_deadlines').insert({
-          case_number: request.case_number,
+          case_id: request.case_id,
+          case_number: request.case_number || null,
           deadline_type: deadlineType,
           trigger_date: triggerDate,
           notes: `${data.hearing_type === 'HEARING_JUDGMENT' ? '선고일' : '조정일'}로부터 자동 생성`,

@@ -405,49 +405,19 @@ export default function CaseEditForm({
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">사건종류</label>
-                <select
+                <input
+                  type="text"
+                  list="case-type-options"
                   value={formData.case_type}
                   onChange={(e) => setFormData({...formData, case_type: e.target.value})}
+                  placeholder="선택 또는 직접 입력"
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                >
-                  <option value="">선택하세요</option>
-                  {/* 카테고리별 그룹 */}
-                  <optgroup label="가사">
-                    {caseTypeOptions.filter(o => o.group === '가사').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="상간자">
-                    {caseTypeOptions.filter(o => o.group === '상간자').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="민사">
-                    {caseTypeOptions.filter(o => o.group === '민사').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="형사">
-                    {caseTypeOptions.filter(o => o.group === '형사').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="집행">
-                    {caseTypeOptions.filter(o => o.group === '집행').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="심급/절차">
-                    {caseTypeOptions.filter(o => o.group === '심급/절차').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="기타">
-                    {caseTypeOptions.filter(o => o.group === '기타').map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </optgroup>
-                </select>
+                />
+                <datalist id="case-type-options">
+                  {caseTypeOptions.map(o => (
+                    <option key={o.value} value={o.value}>{o.group} - {o.label}</option>
+                  ))}
+                </datalist>
               </div>
               {isApplicationCase && (
                 <div>

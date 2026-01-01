@@ -10,12 +10,19 @@ import crypto from 'crypto';
 // 타입 정의
 // ============================================================
 
+export interface RelatedCaseInfo {
+  caseNo: string;
+  caseName?: string;
+  relation?: string;
+}
+
 export interface CaseSnapshot {
   basicInfo: Record<string, string>;
   hearings: HearingInfo[];
   progress: ProgressItem[];
   documents: DocumentItem[];
   lowerCourt: LowerCourtInfo[];
+  relatedCases?: RelatedCaseInfo[];
 }
 
 export interface HearingInfo {

@@ -14,6 +14,7 @@ import {
   ProgressItem,
   DocumentItem,
   LowerCourtInfo,
+  RelatedCaseInfo,
 } from './change-detector';
 import { syncHearingsToCourtHearings } from './hearing-sync';
 import { notifyOnCaseUpdates } from './update-notifier';
@@ -41,8 +42,11 @@ export interface ScrapedCaseData {
   // 제출서류
   documents: DocumentItem[];
 
-  // 심급내용 (형사)
+  // 심급내용 (모든 사건)
   lowerCourt: LowerCourtInfo[];
+
+  // 연계사건
+  relatedCases: RelatedCaseInfo[];
 }
 
 export interface SyncResult {
@@ -119,8 +123,11 @@ export class UnifiedScraper {
     // 제출서류 추출
     const documents = await this.extractDocuments(page);
 
-    // 심급내용 추출 (형사)
-    const lowerCourt = caseType === 'criminal' ? await this.extractLowerCourt(page) : [];
+    // 심급내용 추출 (모든 사건)
+    const lowerCourt = await this.extractLowerCourt(page);
+
+    // 연계사건 추출
+    const relatedCases = await this.extractRelatedCases(page);
 
     // 사건번호, 사건명 추출
     const caseNumber = basicInfo['사건번호'] || '';
@@ -137,6 +144,7 @@ export class UnifiedScraper {
       progress,
       documents,
       lowerCourt,
+      relatedCases,
     };
   }
 
@@ -307,15 +315,15 @@ export class UnifiedScraper {
   }
 
   /**
-   * 심급내용 추출 (형사)
+   * 심급내용 추출 (모든 사건 유형)
    */
   private async extractLowerCourt(page: Page): Promise<LowerCourtInfo[]> {
     return page.evaluate(() => {
       const lowerCourt: LowerCourtInfo[] = [];
 
-      // 심급 테이블 찾기
+      // 심급 테이블 찾기 (다양한 선택자 시도)
       const section = document.querySelector(
-        '.w2group[id*="ssgp"], .w2group[id*="심급"]'
+        '.w2group[id*="ssgp"], .w2group[id*="심급"], .w2group[id*="grp_ssgp"]'
       );
       if (!section) return lowerCourt;
 
@@ -337,6 +345,41 @@ export class UnifiedScraper {
   }
 
   /**
+   * 연계사건 추출
+   */
+  private async extractRelatedCases(page: Page): Promise<RelatedCaseInfo[]> {
+    return page.evaluate(() => {
+      const relatedCases: { caseNo: string; caseName?: string; relation?: string }[] = [];
+
+      // 연계사건 테이블 찾기 (다양한 선택자 시도)
+      const section = document.querySelector(
+        '.w2group[id*="rltn"], .w2group[id*="연계"], .w2group[id*="grp_rltn"], .w2group[id*="관련"]'
+      );
+      if (!section) return relatedCases;
+
+      const rows = section.querySelectorAll('table tbody tr');
+      rows.forEach((row) => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 1) {
+          // 사건번호는 보통 첫 번째 셀 또는 링크 안에 있음
+          const linkEl = row.querySelector('a');
+          const caseNo = linkEl?.textContent?.trim() || cells[0]?.textContent?.trim() || '';
+
+          // 사건명이나 관계 정보가 있으면 추출
+          const caseName = cells.length >= 2 ? cells[1]?.textContent?.trim() : undefined;
+          const relation = cells.length >= 3 ? cells[2]?.textContent?.trim() : undefined;
+
+          if (caseNo && caseNo.match(/\d{4}/)) {  // 연도가 포함된 사건번호인지 확인
+            relatedCases.push({ caseNo, caseName, relation });
+          }
+        }
+      });
+
+      return relatedCases;
+    });
+  }
+
+  /**
    * 스냅샷 저장 및 변경 감지
    */
   async syncCase(
@@ -352,6 +395,7 @@ export class UnifiedScraper {
         progress: scrapedData.progress,
         documents: scrapedData.documents,
         lowerCourt: scrapedData.lowerCourt,
+        relatedCases: scrapedData.relatedCases,
       };
 
       // 2. 해시 생성
@@ -388,6 +432,7 @@ export class UnifiedScraper {
           progress: scrapedData.progress,
           documents: scrapedData.documents,
           lower_court: scrapedData.lowerCourt,
+          related_cases: scrapedData.relatedCases,
           case_type: scrapedData.caseType,
           court_code: scrapedData.court,
           case_number: scrapedData.caseNumber,
@@ -408,6 +453,7 @@ export class UnifiedScraper {
             progress: prevSnapshot.progress,
             documents: prevSnapshot.documents,
             lowerCourt: prevSnapshot.lower_court,
+            relatedCases: prevSnapshot.related_cases,
           }
         : null;
 
@@ -489,6 +535,13 @@ export class UnifiedScraper {
         }
       }
 
+      // 12. 연계사건/심급사건 자동 연결
+      await this.autoLinkRelatedCases(
+        legalCaseId,
+        scrapedData.relatedCases,
+        scrapedData.lowerCourt
+      );
+
       return {
         success: true,
         caseData: scrapedData,
@@ -504,6 +557,121 @@ export class UnifiedScraper {
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * 연계사건/심급사건 자동 연결
+   * 대법원에서 가져온 연계사건/심급정보가 우리 DB에 있으면 case_relations에 등록
+   */
+  private async autoLinkRelatedCases(
+    legalCaseId: string,
+    relatedCases: RelatedCaseInfo[],
+    lowerCourt: LowerCourtInfo[]
+  ): Promise<{ linked: number; skipped: number }> {
+    let linked = 0;
+    let skipped = 0;
+
+    try {
+      // 1. 연계사건 + 심급사건 번호 수집
+      const caseNumbersToMatch: { caseNo: string; relationType: string }[] = [];
+
+      // 연계사건
+      for (const rc of relatedCases) {
+        if (rc.caseNo) {
+          caseNumbersToMatch.push({
+            caseNo: rc.caseNo,
+            relationType: rc.relation || '연계사건',
+          });
+        }
+      }
+
+      // 심급사건 (lowerCourt)
+      for (const lc of lowerCourt) {
+        if (lc.caseNo) {
+          caseNumbersToMatch.push({
+            caseNo: lc.caseNo,
+            relationType: '하급심',
+          });
+        }
+      }
+
+      if (caseNumbersToMatch.length === 0) {
+        return { linked: 0, skipped: 0 };
+      }
+
+      // 2. 우리 DB에서 일치하는 사건 검색
+      const caseNumbers = caseNumbersToMatch.map((c) => c.caseNo);
+      const { data: matchingCases } = await this.supabase
+        .from('legal_cases')
+        .select('id, court_case_number')
+        .in('court_case_number', caseNumbers)
+        .neq('id', legalCaseId); // 자기 자신 제외
+
+      if (!matchingCases || matchingCases.length === 0) {
+        return { linked: 0, skipped: caseNumbersToMatch.length };
+      }
+
+      // 3. 기존 관계 조회 (중복 방지)
+      const { data: existingRelations } = await this.supabase
+        .from('case_relations')
+        .select('related_case_id')
+        .eq('case_id', legalCaseId);
+
+      const existingRelatedIds = new Set(
+        existingRelations?.map((r) => r.related_case_id) || []
+      );
+
+      // 4. 새 관계 생성
+      const newRelations: {
+        case_id: string;
+        related_case_id: string;
+        relation_type: string;
+        notes: string;
+      }[] = [];
+
+      for (const match of matchingCases) {
+        if (existingRelatedIds.has(match.id)) {
+          skipped++;
+          continue;
+        }
+
+        // 관계 유형 찾기
+        const relationInfo = caseNumbersToMatch.find(
+          (c) => c.caseNo === match.court_case_number
+        );
+
+        newRelations.push({
+          case_id: legalCaseId,
+          related_case_id: match.id,
+          relation_type: relationInfo?.relationType || '연계사건',
+          notes: `대법원 나의사건검색에서 자동 연결됨 (${match.court_case_number})`,
+        });
+      }
+
+      if (newRelations.length > 0) {
+        const { error } = await this.supabase
+          .from('case_relations')
+          .upsert(newRelations, {
+            onConflict: 'case_id,related_case_id',
+            ignoreDuplicates: true,
+          });
+
+        if (error) {
+          console.error('[SCOURT] 관계 저장 실패:', error);
+        } else {
+          linked = newRelations.length;
+          console.log(
+            `[SCOURT] 연계사건 자동 연결: ${linked}건 연결됨`
+          );
+        }
+      }
+
+      skipped += caseNumbersToMatch.length - matchingCases.length;
+    } catch (error) {
+      console.error('[SCOURT] 연계사건 자동 연결 실패:', error);
+    }
+
+    return { linked, skipped };
   }
 
   /**

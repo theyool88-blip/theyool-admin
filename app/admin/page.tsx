@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import AdminHeader from '@/components/AdminHeader'
+import { PriorityCasesWidget, UpcomingEventsWidget, RiskAlertsWidget } from '@/components/planning'
 
 interface DashboardStats {
   consultations: {
@@ -249,6 +250,20 @@ export default function AdminDashboardPage() {
             </div>
           </div>
         )}
+
+        {/* AI Planning Section */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-gray-700">SeeD Planning</p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <PriorityCasesWidget limit={5} />
+            <UpcomingEventsWidget limit={7} />
+          </div>
+          <div className="mt-4">
+            <RiskAlertsWidget limit={5} />
+          </div>
+        </div>
 
         {/* Consultation Funnel */}
         {stats && (

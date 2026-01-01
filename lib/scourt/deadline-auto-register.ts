@@ -243,6 +243,21 @@ export async function autoRegisterDeadlines(
     details: [],
   };
 
+  // case_number로 case_id 조회
+  const supabaseForCase = createAdminClient();
+  const { data: caseData } = await supabaseForCase
+    .from('cases')
+    .select('id')
+    .eq('case_number', caseNumber)
+    .single();
+
+  const caseId = caseData?.id;
+
+  if (!caseId) {
+    result.errors.push(`사건을 찾을 수 없음: ${caseNumber}`);
+    return result;
+  }
+
   for (const update of updates) {
     // 해당 업데이트에서 생성할 기한 결정
     const mapping = getDeadlineMappingForUpdate(
@@ -290,6 +305,7 @@ export async function autoRegisterDeadlines(
     // 기한 등록
     try {
       await createCaseDeadline({
+        case_id: caseId,
         case_number: caseNumber,
         deadline_type: mapping.deadlineType,
         trigger_date: triggerDate,

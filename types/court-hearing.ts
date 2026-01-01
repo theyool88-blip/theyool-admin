@@ -200,7 +200,8 @@ export interface DeadlineTypeMaster {
  */
 export interface CourtHearing {
   id: string;
-  case_number: string; // 사건번호 (예: "2024드단12345")
+  case_id: string; // 사건 ID (legal_cases 참조, 필수)
+  case_number: string | null; // 사건번호 (예: "2024드단12345", 선택적)
   hearing_type: HearingType;
   hearing_date: string; // 기일 일시 (ISO 8601 datetime)
   location: string | null; // 법정 (예: "서울가정법원 301호")
@@ -222,7 +223,8 @@ export interface CourtHearing {
  */
 export interface CaseDeadline {
   id: string;
-  case_number: string; // 사건번호
+  case_id: string; // 사건 ID (legal_cases 참조, 필수)
+  case_number: string | null; // 사건번호 (선택적)
   deadline_type: DeadlineType;
   trigger_date: string; // 기산일 (ISO 8601 date, YYYY-MM-DD)
   deadline_date: string; // 만료일 (자동 계산, ISO 8601 date)
@@ -239,7 +241,8 @@ export interface CaseDeadline {
 // =====================================================
 
 export interface CreateCourtHearingRequest {
-  case_number: string;
+  case_id: string; // 사건 ID (필수)
+  case_number?: string; // 사건번호 (선택적)
   hearing_type: HearingType;
   hearing_date: string; // ISO 8601 datetime
   location?: string;
@@ -259,7 +262,8 @@ export interface UpdateCourtHearingRequest {
 }
 
 export interface CreateCaseDeadlineRequest {
-  case_number: string;
+  case_id: string; // 사건 ID (필수)
+  case_number?: string; // 사건번호 (선택적)
   deadline_type: DeadlineType;
   trigger_date: string; // ISO 8601 date (YYYY-MM-DD)
   notes?: string;
@@ -303,7 +307,8 @@ export interface UrgentDeadline extends CaseDeadline {
 // =====================================================
 
 export interface CourtHearingListQuery {
-  case_number?: string;
+  case_id?: string; // 사건 ID로 필터링
+  case_number?: string; // 사건번호로 필터링 (하위호환)
   hearing_type?: HearingType;
   status?: HearingStatus;
   from_date?: string; // ISO 8601 date
@@ -313,7 +318,8 @@ export interface CourtHearingListQuery {
 }
 
 export interface CaseDeadlineListQuery {
-  case_number?: string;
+  case_id?: string; // 사건 ID로 필터링
+  case_number?: string; // 사건번호로 필터링 (하위호환)
   deadline_type?: DeadlineType;
   status?: DeadlineStatus;
   urgent_only?: boolean; // 7일 이내만 조회

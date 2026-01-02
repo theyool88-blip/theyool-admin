@@ -8,6 +8,13 @@ import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import type { HearingInfo } from './change-detector';
 import type { HearingType, HearingResult, HearingStatus } from '@/types/court-hearing';
+import {
+  createTenantCalendarEvent,
+  updateTenantCalendarEvent,
+  deleteTenantCalendarEvent,
+  getTenantIntegration,
+  type CalendarEventData,
+} from '@/lib/google-calendar';
 
 // ============================================================
 // 타입 정의
@@ -157,27 +164,42 @@ export function mapScourtResult(scourtResult: string | undefined): HearingResult
 
 /**
  * SCOURT 날짜/시간 → ISO datetime 변환
- * @param date SCOURT 날짜 형식: "2025.01.15"
- * @param time SCOURT 시간 형식: "10:30" 또는 ""
+ * @param date SCOURT 날짜 형식: "2025.01.15" 또는 "20250115" (YYYYMMDD)
+ * @param time SCOURT 시간 형식: "10:30" 또는 "1030" (HHMM) 또는 ""
  * @returns ISO datetime string: "2025-01-15T10:30:00+09:00"
  */
 export function parseHearingDateTime(date: string, time: string): string {
-  // 날짜 파싱 (YYYY.MM.DD)
-  const dateMatch = date.match(/(\d{4})\.(\d{2})\.(\d{2})/);
-  if (!dateMatch) {
+  let year: string, month: string, day: string;
+
+  // 날짜 파싱 (YYYY.MM.DD 또는 YYYYMMDD)
+  const dotMatch = date.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+  const dashMatch = date.match(/(\d{4})-(\d{2})-(\d{2})/);
+  const compactMatch = date.match(/^(\d{4})(\d{2})(\d{2})$/);
+
+  if (dotMatch) {
+    [, year, month, day] = dotMatch;
+  } else if (dashMatch) {
+    [, year, month, day] = dashMatch;
+  } else if (compactMatch) {
+    [, year, month, day] = compactMatch;
+  } else {
     throw new Error(`Invalid date format: ${date}`);
   }
 
-  const [, year, month, day] = dateMatch;
   const dateStr = `${year}-${month}-${day}`;
 
-  // 시간 파싱 (HH:MM)
+  // 시간 파싱 (HH:MM 또는 HHMM)
   let timeStr = '09:00:00'; // 기본값
   if (time && time.trim()) {
-    const timeMatch = time.match(/(\d{1,2}):(\d{2})/);
-    if (timeMatch) {
-      const [, hour, minute] = timeMatch;
+    const colonMatch = time.match(/(\d{1,2}):(\d{2})/);
+    const compactTimeMatch = time.match(/^(\d{2})(\d{2})$/);
+
+    if (colonMatch) {
+      const [, hour, minute] = colonMatch;
       timeStr = `${hour.padStart(2, '0')}:${minute}:00`;
+    } else if (compactTimeMatch) {
+      const [, hour, minute] = compactTimeMatch;
+      timeStr = `${hour}:${minute}:00`;
     }
   }
 
@@ -231,11 +253,13 @@ function determineHearingStatus(hearing: HearingInfo): HearingStatus {
 /**
  * SCOURT 기일 목록을 court_hearings 테이블에 동기화
  *
+ * @param caseId 사건 UUID (legal_cases.id)
  * @param caseNumber 사건번호 (예: "2024드단26718")
  * @param hearings SCOURT에서 추출한 기일 목록
  * @returns 동기화 결과
  */
 export async function syncHearingsToCourtHearings(
+  caseId: string,
   caseNumber: string,
   hearings: HearingInfo[]
 ): Promise<HearingSyncResult> {
@@ -263,11 +287,11 @@ export async function syncHearingsToCourtHearings(
       const hearingStatus = determineHearingStatus(hearing);
       const hearingDateTime = parseHearingDateTime(hearing.date, hearing.time);
 
-      // 기존 기일 확인 (해시로 검색)
+      // 기존 기일 확인 (case_id + 해시로 검색)
       const { data: existing } = await supabase
         .from('court_hearings')
         .select('id, result, status')
-        .eq('case_number', caseNumber)
+        .eq('case_id', caseId)
         .eq('scourt_hearing_hash', hash)
         .single();
 
@@ -301,7 +325,8 @@ export async function syncHearingsToCourtHearings(
       } else {
         // 새 기일 생성
         const insertData = {
-          case_number: caseNumber,
+          case_id: caseId,              // UUID (필수)
+          case_number: caseNumber,      // 사건번호 (참조용)
           hearing_type: hearingType,
           hearing_date: hearingDateTime,
           location: hearing.location || null,
@@ -335,4 +360,139 @@ export async function syncHearingsToCourtHearings(
   }
 
   return result;
+}
+
+// ============================================================
+// Google Calendar 동기화
+// ============================================================
+
+/**
+ * HearingType → 표시명 변환 (캘린더 이벤트 제목용)
+ */
+const HEARING_TYPE_DISPLAY: Record<HearingType, string> = {
+  'HEARING_MAIN': '변론기일',
+  'HEARING_MEDIATION': '조정기일',
+  'HEARING_INVESTIGATION': '조사기일',
+  'HEARING_JUDGMENT': '선고기일',
+  'HEARING_INTERIM': '심문기일',
+  'HEARING_PARENTING': '양육상담',
+  'HEARING_LAWYER_MEETING': '변호사 면담',
+};
+
+/**
+ * court_hearing → Google Calendar 이벤트 생성
+ */
+export async function syncHearingToGoogleCalendar(
+  tenantId: string,
+  hearingId: string,
+  caseNumber: string,
+  hearingType: HearingType,
+  hearingDate: string,      // ISO datetime
+  location?: string | null
+): Promise<{ eventId: string; htmlLink: string } | null> {
+  // 테넌트 연동 정보 확인
+  const integration = await getTenantIntegration(tenantId, 'google_calendar');
+  if (!integration || integration.status !== 'connected') {
+    console.log('[syncHearingToGoogleCalendar] Google Calendar not connected');
+    return null;
+  }
+
+  // 캘린더 ID 확인 (설정에서)
+  const calendarId = (integration.settings as Record<string, string>)?.calendarId || 'primary';
+
+  // 이벤트 데이터 생성
+  const startDate = new Date(hearingDate);
+  const endDate = new Date(startDate.getTime() + 60 * 60 * 1000); // +1시간
+
+  const eventData: CalendarEventData = {
+    summary: `[${HEARING_TYPE_DISPLAY[hearingType] || hearingType}] ${caseNumber}`,
+    description: `사건번호: ${caseNumber}\n기일 유형: ${HEARING_TYPE_DISPLAY[hearingType] || hearingType}`,
+    location: location || undefined,
+    start: {
+      dateTime: startDate.toISOString(),
+      timeZone: 'Asia/Seoul',
+    },
+    end: {
+      dateTime: endDate.toISOString(),
+      timeZone: 'Asia/Seoul',
+    },
+    colorId: '7',  // 청록색 (법원 기일용)
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'popup', minutes: 60 * 24 },  // 1일 전
+        { method: 'popup', minutes: 60 },        // 1시간 전
+      ],
+    },
+  };
+
+  const result = await createTenantCalendarEvent(tenantId, calendarId, eventData);
+
+  if (result) {
+    // google_event_id 업데이트
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    await supabase
+      .from('court_hearings')
+      .update({ google_event_id: result.id })
+      .eq('id', hearingId);
+
+    console.log('[syncHearingToGoogleCalendar] Created:', result.id);
+    return { eventId: result.id, htmlLink: result.htmlLink };
+  }
+
+  return null;
+}
+
+/**
+ * Google Calendar 이벤트 삭제
+ */
+export async function deleteHearingFromGoogleCalendar(
+  tenantId: string,
+  googleEventId: string
+): Promise<boolean> {
+  const integration = await getTenantIntegration(tenantId, 'google_calendar');
+  if (!integration || integration.status !== 'connected') {
+    return false;
+  }
+
+  const calendarId = (integration.settings as Record<string, string>)?.calendarId || 'primary';
+  return deleteTenantCalendarEvent(tenantId, calendarId, googleEventId);
+}
+
+/**
+ * Google Calendar 이벤트 업데이트
+ */
+export async function updateHearingInGoogleCalendar(
+  tenantId: string,
+  googleEventId: string,
+  hearingType: HearingType,
+  caseNumber: string,
+  hearingDate: string,
+  location?: string | null
+): Promise<boolean> {
+  const integration = await getTenantIntegration(tenantId, 'google_calendar');
+  if (!integration || integration.status !== 'connected') {
+    return false;
+  }
+
+  const calendarId = (integration.settings as Record<string, string>)?.calendarId || 'primary';
+
+  const startDate = new Date(hearingDate);
+  const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+  return updateTenantCalendarEvent(tenantId, calendarId, googleEventId, {
+    summary: `[${HEARING_TYPE_DISPLAY[hearingType] || hearingType}] ${caseNumber}`,
+    location: location || undefined,
+    start: {
+      dateTime: startDate.toISOString(),
+      timeZone: 'Asia/Seoul',
+    },
+    end: {
+      dateTime: endDate.toISOString(),
+      timeZone: 'Asia/Seoul',
+    },
+  });
 }

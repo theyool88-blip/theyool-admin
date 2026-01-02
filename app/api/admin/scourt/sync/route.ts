@@ -2,18 +2,14 @@
  * 대법원 사건 동기화 API
  *
  * POST /api/admin/scourt/sync
- * - 저장된 사건 상세 조회 → 스냅샷 저장 → 변경 감지
+ * - 저장된 encCsNo로 상세 조회 → 스냅샷 저장
+ * - REST API 기반 (Puppeteer 불필요)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { getScourtSessionManager, ProfileConfig } from '@/lib/scourt/session-manager';
-import { getUnifiedScraper } from '@/lib/scourt/unified-scraper';
-import path from 'path';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getScourtApiClient } from '@/lib/scourt/api-client';
+import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync';
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,10 +23,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. 사건 정보 조회
+    const supabase = createAdminClient();
+
+    // 1. 사건 정보 조회 (enc_cs_no, scourt_wmonid 확인)
     const { data: legalCase, error: caseError } = await supabase
       .from('legal_cases')
-      .select('*, scourt_last_sync, scourt_last_snapshot_id')
+      .select('*, scourt_last_sync, enc_cs_no, scourt_wmonid, court_name')
       .eq('id', legalCaseId)
       .single();
 
@@ -57,75 +55,177 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. 프로필에서 저장된 사건 확인
-    const { data: profileCase } = await supabase
-      .from('scourt_profile_cases')
-      .select('*, profile:scourt_profiles(*)')
-      .eq('case_number', caseNumber)
-      .limit(1)
-      .single();
+    // 3. enc_cs_no 확인 (REST API 방식)
+    if (!legalCase.enc_cs_no) {
+      // scourt_profile_cases에서도 확인 (기존 Puppeteer 방식 호환)
+      const { data: profileCase } = await supabase
+        .from('scourt_profile_cases')
+        .select('enc_cs_no, wmonid')
+        .eq('legal_case_id', legalCaseId)
+        .limit(1)
+        .single();
 
-    if (!profileCase || !profileCase.profile) {
+      if (!profileCase?.enc_cs_no) {
+        return NextResponse.json(
+          { error: '저장된 사건을 찾을 수 없습니다. 먼저 사건 검색이 필요합니다.' },
+          { status: 404 }
+        );
+      }
+
+      // enc_cs_no를 legal_cases에 업데이트
+      legalCase.enc_cs_no = profileCase.enc_cs_no;
+    }
+
+    // 4. 사건번호 파싱
+    const caseNumberPattern = /(\d{4})([가-힣]+)(\d+)/;
+    const match = caseNumber.match(caseNumberPattern);
+    if (!match) {
       return NextResponse.json(
-        { error: '저장된 사건을 찾을 수 없습니다. 먼저 사건 검색이 필요합니다.' },
-        { status: 404 }
+        { error: '사건번호 형식이 올바르지 않습니다' },
+        { status: 400 }
+      );
+    }
+    const [, csYear, csDvsNm, csSerial] = match;
+
+    // 5. API 클라이언트로 상세 조회
+    const apiClient = getScourtApiClient();
+
+    // 세션 초기화 (저장된 WMONID 사용)
+    const savedWmonid = legalCase.scourt_wmonid;
+    if (!savedWmonid) {
+      return NextResponse.json(
+        { error: 'WMONID가 저장되어 있지 않습니다. 사건을 다시 검색해주세요.' },
+        { status: 400 }
       );
     }
 
-    // 4. 세션 매니저로 상세 조회
-    const sessionManager = getScourtSessionManager();
-    const profile: ProfileConfig = {
-      id: profileCase.profile.id,
-      lawyerId: profileCase.profile.lawyer_id,
-      profileName: profileCase.profile.profile_name,
-      userDataDir: path.join(process.cwd(), 'data', 'scourt-profiles', profileCase.profile.profile_name),
-      caseCount: profileCase.profile.case_count,
-      maxCases: profileCase.profile.max_cases,
-      status: profileCase.profile.status,
-    };
+    console.log(`🔑 저장된 WMONID 사용: ${savedWmonid}`);
 
-    // 5. 저장된 사건 클릭하여 상세 조회 (페이지 반환 요청)
-    const detailResult = await sessionManager.getCaseDetail(profile, caseNumber, true);
+    // 저장된 encCsNo + wmonid로 상세 조회 (한글 법원명/사건유형 자동 변환)
+    const detailResult = await apiClient.getCaseDetailWithStoredEncCsNo(
+      savedWmonid,
+      legalCase.enc_cs_no,
+      {
+        cortCd: legalCase.court_name || '',  // 한글 법원명 (예: 평택가정)
+        csYear,
+        csDvsCd: csDvsNm,                     // 한글 사건유형 (예: 드단)
+        csSerial,
+      }
+    );
 
-    if (!detailResult.success || !detailResult.page) {
+    if (!detailResult.success || !detailResult.data) {
       return NextResponse.json(
         { error: detailResult.error || '상세 조회 실패' },
         { status: 500 }
       );
     }
 
-    // 6. 통합 스크래퍼로 데이터 추출 및 동기화
-    const scraper = getUnifiedScraper();
-    const scrapedData = await scraper.scrapeDetailPage(detailResult.page);
+    const detailData = detailResult.data;
 
-    const syncResult = await scraper.syncCase(
-      legalCaseId,
-      profile.id,
-      scrapedData
-    );
+    // 6. 스냅샷 저장 (upsert)
+    const { data: existingSnapshot } = await supabase
+      .from('scourt_case_snapshots')
+      .select('id')
+      .eq('legal_case_id', legalCaseId)
+      .order('scraped_at', { ascending: false })
+      .limit(1)
+      .single();
 
-    if (!syncResult.success) {
-      return NextResponse.json(
-        { error: syncResult.error || '동기화 실패' },
-        { status: 500 }
-      );
+    const snapshotData = {
+      legal_case_id: legalCaseId,
+      basic_info: {
+        csNo: detailData.csNo || caseNumber,
+        csNm: detailData.csNm,
+        cortNm: detailData.cortNm || legalCase.court_name,
+        aplNm: detailData.aplNm,
+        rspNm: detailData.rspNm,
+        prcdStsNm: detailData.prcdStsNm,
+      },
+      hearings: detailData.hearings || [],
+      progress: detailData.progress || [],
+      documents: [],
+      lower_court: [],
+      related_cases: [],
+      case_number: caseNumber,
+      court_code: legalCase.court_name,
+      scraped_at: new Date().toISOString(),
+    };
+
+    let snapshotId: string;
+    if (existingSnapshot) {
+      // 기존 스냅샷 업데이트
+      const { error: updateError } = await supabase
+        .from('scourt_case_snapshots')
+        .update(snapshotData)
+        .eq('id', existingSnapshot.id);
+
+      if (updateError) {
+        console.error('스냅샷 업데이트 에러:', updateError);
+      }
+      snapshotId = existingSnapshot.id;
+    } else {
+      // 새 스냅샷 생성
+      const { data: newSnapshot, error: insertError } = await supabase
+        .from('scourt_case_snapshots')
+        .insert(snapshotData)
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('스냅샷 생성 에러:', insertError);
+        return NextResponse.json(
+          { error: '스냅샷 저장 실패' },
+          { status: 500 }
+        );
+      }
+      snapshotId = newSnapshot.id;
     }
 
-    // 7. 응답
+    // 7. 기일 동기화 (court_hearings 테이블)
+    let hearingSyncResult = null;
+    if (detailData.hearings && detailData.hearings.length > 0) {
+      const hearingsForSync = detailData.hearings.map((h: {
+        trmDt?: string;
+        trmHm?: string;
+        trmNm?: string;
+        trmPntNm?: string;
+        rslt?: string;
+      }) => ({
+        date: h.trmDt || '',
+        time: h.trmHm || '',
+        type: h.trmNm || '',
+        location: h.trmPntNm || '',
+        result: h.rslt || '',
+      }));
+
+      hearingSyncResult = await syncHearingsToCourtHearings(
+        legalCaseId,
+        caseNumber,
+        hearingsForSync
+      );
+      console.log('📅 기일 동기화 결과:', hearingSyncResult);
+    }
+
+    // 8. legal_cases 업데이트
+    await supabase
+      .from('legal_cases')
+      .update({
+        scourt_last_sync: new Date().toISOString(),
+        scourt_sync_status: 'synced',
+        scourt_case_name: detailData.csNm,
+      })
+      .eq('id', legalCaseId);
+
+    // 9. 응답
     return NextResponse.json({
       success: true,
-      caseNumber: scrapedData.caseNumber,
-      caseName: scrapedData.caseName,
-      caseType: scrapedData.caseType,
-      isFirstSync: syncResult.isFirstSync,
-      updates: syncResult.updates.map((u) => ({
-        type: u.updateType,
-        summary: u.updateSummary,
-        importance: u.importance,
-      })),
-      updateCount: syncResult.updates.length,
-      snapshotId: syncResult.snapshot?.id,
-      nextHearing: scrapedData.hearings.find((h) => !h.result),
+      caseNumber,
+      caseName: detailData.csNm,
+      snapshotId,
+      hearingsCount: detailData.hearings?.length || 0,
+      progressCount: detailData.progress?.length || 0,
+      basicInfo: snapshotData.basic_info,
+      hearingSync: hearingSyncResult,
     });
 
   } catch (error) {
@@ -152,10 +252,12 @@ export async function PUT(request: NextRequest) {
       );
     }
 
+    const supabase = createAdminClient();
+
     // 사건 목록 조회
     const { data: cases, error } = await supabase
       .from('legal_cases')
-      .select('id, case_number')
+      .select('id, court_case_number')
       .in('id', caseIds);
 
     if (error || !cases) {
@@ -176,7 +278,7 @@ export async function PUT(request: NextRequest) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               legalCaseId: c.id,
-              caseNumber: c.case_number,
+              caseNumber: c.court_case_number,
             }),
           }
         );

@@ -5,7 +5,8 @@ import type { IntegrationProvider, TenantIntegrationRecord, OAuthState } from '@
 // =====================================================
 // OAuth Scopes
 // =====================================================
-const CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+// calendar: 전체 액세스 (캘린더 목록 + 이벤트 읽기/쓰기)
+const CALENDAR_SCOPES = ['https://www.googleapis.com/auth/calendar'];
 const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
 
 // 하위 호환성을 위해 기존 SCOPES 유지
@@ -410,4 +411,201 @@ export async function getTenantIntegrations(tenantId: string): Promise<TenantInt
   }
 
   return (data || []) as TenantIntegrationRecord[];
+}
+
+// =====================================================
+// Google Calendar 쓰기 함수들 (신규)
+// =====================================================
+
+export interface CalendarEventData {
+  summary: string;              // 이벤트 제목
+  description?: string;         // 설명
+  location?: string;            // 장소
+  start: {
+    dateTime: string;           // ISO 8601 형식
+    timeZone?: string;
+  };
+  end: {
+    dateTime: string;
+    timeZone?: string;
+  };
+  colorId?: string;             // 색상 ID (1-11)
+  reminders?: {
+    useDefault: boolean;
+    overrides?: Array<{
+      method: 'email' | 'popup';
+      minutes: number;
+    }>;
+  };
+}
+
+/**
+ * Google Calendar 이벤트 생성
+ */
+export async function createCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  eventData: CalendarEventData
+): Promise<{ id: string; htmlLink: string } | null> {
+  oauth2Client.setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+  try {
+    const response = await calendar.events.insert({
+      calendarId,
+      requestBody: {
+        summary: eventData.summary,
+        description: eventData.description,
+        location: eventData.location,
+        start: {
+          dateTime: eventData.start.dateTime,
+          timeZone: eventData.start.timeZone || 'Asia/Seoul',
+        },
+        end: {
+          dateTime: eventData.end.dateTime,
+          timeZone: eventData.end.timeZone || 'Asia/Seoul',
+        },
+        colorId: eventData.colorId,
+        reminders: eventData.reminders || {
+          useDefault: true,
+        },
+      },
+    });
+
+    console.log('[createCalendarEvent] Created:', response.data.id);
+    return {
+      id: response.data.id!,
+      htmlLink: response.data.htmlLink!,
+    };
+  } catch (error) {
+    console.error('[createCalendarEvent] Error:', error);
+    return null;
+  }
+}
+
+/**
+ * Google Calendar 이벤트 수정
+ */
+export async function updateCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string,
+  eventData: Partial<CalendarEventData>
+): Promise<boolean> {
+  oauth2Client.setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+  try {
+    const updateBody: Record<string, unknown> = {};
+
+    if (eventData.summary) updateBody.summary = eventData.summary;
+    if (eventData.description !== undefined) updateBody.description = eventData.description;
+    if (eventData.location !== undefined) updateBody.location = eventData.location;
+    if (eventData.start) {
+      updateBody.start = {
+        dateTime: eventData.start.dateTime,
+        timeZone: eventData.start.timeZone || 'Asia/Seoul',
+      };
+    }
+    if (eventData.end) {
+      updateBody.end = {
+        dateTime: eventData.end.dateTime,
+        timeZone: eventData.end.timeZone || 'Asia/Seoul',
+      };
+    }
+    if (eventData.colorId) updateBody.colorId = eventData.colorId;
+    if (eventData.reminders) updateBody.reminders = eventData.reminders;
+
+    await calendar.events.patch({
+      calendarId,
+      eventId,
+      requestBody: updateBody,
+    });
+
+    console.log('[updateCalendarEvent] Updated:', eventId);
+    return true;
+  } catch (error) {
+    console.error('[updateCalendarEvent] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * Google Calendar 이벤트 삭제
+ */
+export async function deleteCalendarEvent(
+  accessToken: string,
+  calendarId: string,
+  eventId: string
+): Promise<boolean> {
+  oauth2Client.setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+  try {
+    await calendar.events.delete({
+      calendarId,
+      eventId,
+    });
+
+    console.log('[deleteCalendarEvent] Deleted:', eventId);
+    return true;
+  } catch (error) {
+    console.error('[deleteCalendarEvent] Error:', error);
+    return false;
+  }
+}
+
+/**
+ * 테넌트의 캘린더에 이벤트 생성 (토큰 자동 관리)
+ */
+export async function createTenantCalendarEvent(
+  tenantId: string,
+  calendarId: string,
+  eventData: CalendarEventData
+): Promise<{ id: string; htmlLink: string } | null> {
+  const accessToken = await getTenantAccessToken(tenantId, 'google_calendar');
+
+  if (!accessToken) {
+    console.error('[createTenantCalendarEvent] No valid access token');
+    return null;
+  }
+
+  return createCalendarEvent(accessToken, calendarId, eventData);
+}
+
+/**
+ * 테넌트의 캘린더 이벤트 수정 (토큰 자동 관리)
+ */
+export async function updateTenantCalendarEvent(
+  tenantId: string,
+  calendarId: string,
+  eventId: string,
+  eventData: Partial<CalendarEventData>
+): Promise<boolean> {
+  const accessToken = await getTenantAccessToken(tenantId, 'google_calendar');
+
+  if (!accessToken) {
+    console.error('[updateTenantCalendarEvent] No valid access token');
+    return false;
+  }
+
+  return updateCalendarEvent(accessToken, calendarId, eventId, eventData);
+}
+
+/**
+ * 테넌트의 캘린더 이벤트 삭제 (토큰 자동 관리)
+ */
+export async function deleteTenantCalendarEvent(
+  tenantId: string,
+  calendarId: string,
+  eventId: string
+): Promise<boolean> {
+  const accessToken = await getTenantAccessToken(tenantId, 'google_calendar');
+
+  if (!accessToken) {
+    console.error('[deleteTenantCalendarEvent] No valid access token');
+    return false;
+  }
+
+  return deleteCalendarEvent(accessToken, calendarId, eventId);
 }

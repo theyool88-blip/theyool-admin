@@ -477,18 +477,33 @@ export class UnifiedScraper {
 
       // 8. legal_cases 업데이트
       const nextHearing = CaseChangeDetector.getNextHearing(scrapedData.hearings);
+
+      // 기본정보에서 사건명, 종국결과 추출
+      const basicInfo = scrapedData.basicInfo || {};
+      const scourtCaseName = basicInfo['사건명'] || null;
+      const caseResult = basicInfo['종국결과'] || basicInfo['종국'] || null;
+      const caseResultDateStr = basicInfo['종국일'] || basicInfo['종국일자'] || null;
+      const caseResultDate = caseResultDateStr
+        ? this.parseKoreanDate(caseResultDateStr)
+        : null;
+
       await this.supabase
         .from('legal_cases')
         .update({
           scourt_last_snapshot_id: newSnapshot.id,
           scourt_last_sync: new Date().toISOString(),
           scourt_next_hearing: nextHearing,
+          // 대법원 기본정보 저장
+          scourt_case_name: scourtCaseName,
+          case_result: caseResult,
+          case_result_date: caseResultDate,
         })
         .eq('id', legalCaseId);
 
       // 9. court_hearings 테이블에 기일 동기화
       if (scrapedData.hearings.length > 0) {
         const hearingSyncResult = await syncHearingsToCourtHearings(
+          legalCaseId,
           scrapedData.caseNumber,
           scrapedData.hearings
         );
@@ -762,6 +777,30 @@ export class UnifiedScraper {
     }
 
     return data || [];
+  }
+
+  /**
+   * 한국어 날짜 문자열을 ISO 날짜로 변환
+   * 예: "2024.12.31", "2024-12-31", "2024년 12월 31일"
+   */
+  private parseKoreanDate(dateStr: string): string | null {
+    if (!dateStr) return null;
+
+    // "2024.12.31" 또는 "2024-12-31" 형식
+    const match1 = dateStr.match(/(\d{4})[.\-](\d{1,2})[.\-](\d{1,2})/);
+    if (match1) {
+      const [, year, month, day] = match1;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    // "2024년 12월 31일" 형식
+    const match2 = dateStr.match(/(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/);
+    if (match2) {
+      const [, year, month, day] = match2;
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+    }
+
+    return null;
   }
 }
 

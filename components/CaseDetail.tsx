@@ -70,6 +70,13 @@ interface LegalCase {
   updated_at: string
   client?: Client
   case_relations?: RelatedCase[]
+  // SCOURT 연동 관련
+  enc_cs_no?: string | null
+  scourt_wmonid?: string | null
+  scourt_case_name?: string | null
+  client_role?: 'plaintiff' | 'defendant' | null
+  opponent_name?: string | null
+  case_result?: string | null
 }
 
 interface Schedule {
@@ -147,10 +154,17 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [scourtSyncStatus, setScourtSyncStatus] = useState<ScourtSyncStatus | null>(null)
   const [scourtLoading, setScourtLoading] = useState(false)
   const [scourtSyncing, setScourtSyncing] = useState(false)
+  const [scourtOpening, setScourtOpening] = useState(false)
   const [showProgressDetail, setShowProgressDetail] = useState(false)
 
   // 탭 상태: 'schedules' | 'progress'
   const [activeTab, setActiveTab] = useState<'schedules' | 'progress'>('schedules')
+
+  // 계약 정보 드롭다운 상태
+  const [showContractInfo, setShowContractInfo] = useState(false)
+
+  // 나의사건 연동 상태
+  const isLinked = !!caseData.enc_cs_no || scourtSyncStatus?.isLinked
 
   const router = useRouter()
   const supabase = createClient()
@@ -235,6 +249,37 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       alert('동기화 중 오류가 발생했습니다.')
     } finally {
       setScourtSyncing(false)
+    }
+  }
+
+  // SCOURT 사건 상세 페이지 열기 (Puppeteer)
+  const handleOpenScourtCase = async () => {
+    if (!caseData.court_case_number) {
+      alert('사건번호가 없습니다.')
+      return
+    }
+
+    setScourtOpening(true)
+    try {
+      const res = await fetch('/api/admin/scourt/open-case', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseId: caseData.id,
+          caseNumber: caseData.court_case_number,
+        }),
+      })
+      const data = await res.json()
+
+      if (!data.success) {
+        alert(data.error || '사건 열기 실패')
+      }
+      // 성공 시 Puppeteer 브라우저 창이 자동으로 열림
+    } catch (error) {
+      console.error('사건 열기 실패:', error)
+      alert('사건 열기 중 오류가 발생했습니다.')
+    } finally {
+      setScourtOpening(false)
     }
   }
 
@@ -400,6 +445,77 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     return `${year}.${month}.${day} ${hour}:${minute}`
   }
 
+  // 진행내용 일자 포맷 (YYYYMMDD → YYYY-MM-DD)
+  const formatProgressDate = (dateStr: string | null) => {
+    if (!dateStr) return '-'
+    if (dateStr.includes('-')) return dateStr
+    if (dateStr.length === 8 && /^\d{8}$/.test(dateStr)) {
+      return `${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}`
+    }
+    if (/^\d{4}\.\d{2}\.\d{2}/.test(dateStr)) {
+      return dateStr.replace(/^(\d{4})\.(\d{2})\.(\d{2})/, '$1-$2-$3')
+    }
+    return dateStr
+  }
+
+  // basicInfo 필드 조회 헬퍼 (한글/API 필드명 모두 지원)
+  const getBasicInfo = (koreanKey: string, apiKey?: string): string | number | undefined => {
+    if (!scourtSnapshot?.basicInfo) return undefined
+    const info = scourtSnapshot.basicInfo as Record<string, any>
+    return info[koreanKey] || (apiKey ? info[apiKey] : undefined)
+  }
+
+  // 진행내용 색상 결정 (SCOURT와 동일한 규칙)
+  // - Blue (#003399): 기일 (괄호 포함, 예: "변론기일(제21호 법정)")
+  // - Green (#336633): 명령 (송달 제외, 예: "조정조치명령서", "기일변경명령")
+  // - Orange (#CC6600): 송달 (예: "소장부본 송달", "소환장 송달")
+  // - Dark Red (#660000): 제출 (예: "준비서면 제출", "답변서 제출")
+  // - Black (#000000): 기타 기본
+  const getProgressColor = (content: string): string => {
+    if (!content) return '#000000'
+
+    // 송달: 내용에 "송달" 포함
+    if (content.includes('송달')) {
+      return '#CC6600'
+    }
+
+    // 기일: "기일(" 패턴 (괄호로 시작하는 기일 정보)
+    if (/기일\s*\(/.test(content)) {
+      return '#003399'
+    }
+
+    // 명령: "명령" 포함 (단, 송달 제외 - 위에서 이미 처리됨)
+    if (content.includes('명령')) {
+      return '#336633'
+    }
+
+    // 제출: "제출" 포함
+    if (content.includes('제출')) {
+      return '#660000'
+    }
+
+    // 기본: 검정
+    return '#000000'
+  }
+
+  // 당사자 이름 조회 (의뢰인 여부 포함)
+  const getPartyName = (role: 'plaintiff' | 'defendant', scourtName?: string) => {
+    const isClient = caseData.client_role === role
+    if (isClient && caseData.client?.name) {
+      return { name: caseData.client.name, isClient: true }
+    }
+    if (role === 'plaintiff' && caseData.client_role === 'defendant' && caseData.opponent_name) {
+      return { name: caseData.opponent_name, isClient: false }
+    }
+    if (role === 'defendant' && caseData.client_role === 'plaintiff' && caseData.opponent_name) {
+      return { name: caseData.opponent_name, isClient: false }
+    }
+    if (scourtName) {
+      return { name: scourtName, isClient: false }
+    }
+    return { name: '-', isClient: false }
+  }
+
   const getStatusStyle = (status: string) => {
     return status === '진행중'
       ? 'bg-sage-100 text-sage-700'
@@ -495,114 +611,225 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           </button>
         </div>
 
-        {/* Case Overview */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">사건 개요</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <label className="text-xs text-gray-500">계약번호</label>
-              <p className="mt-0.5 text-gray-900">{caseData.contract_number || '-'}</p>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">계약일</label>
-              <p className="mt-0.5 text-gray-900">{formatDate(caseData.contract_date)}</p>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">사건번호</label>
-              <p className="mt-0.5 text-gray-900">{caseData.court_case_number || '-'}</p>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">법원</label>
-              <p className="mt-0.5 text-gray-900">{caseData.court_name || '-'}</p>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">담당 판사</label>
-              <p className="mt-0.5 text-gray-900">{caseData.judge_name || '-'}</p>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">사건종류</label>
-              <p className="mt-0.5 text-gray-900">{caseData.case_type || '-'}</p>
-            </div>
-            <div className="col-span-2">
-              <label className="text-xs text-gray-500">사건명</label>
-              <p className="mt-0.5 text-gray-900 font-medium">{caseData.case_name}</p>
-            </div>
+        {/* Case Overview - 법원 사건번호 사건명 형식 + 계약정보 드롭다운 */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
+          {/* 제목: 법원 사건번호 사건명 + 나의사건보기 버튼 */}
+          <div className="flex items-start justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-900">
+              {caseData.court_name} {caseData.court_case_number} {getBasicInfo('사건명', 'csNm') || caseData.scourt_case_name || caseData.case_name}
+            </h2>
+            {isLinked && (
+              <button
+                onClick={handleOpenScourtCase}
+                disabled={scourtOpening}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="대법원 나의사건검색에서 원본 보기"
+              >
+                {scourtOpening ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                )}
+                {scourtOpening ? '여는 중...' : '나의사건보기'}
+              </button>
+            )}
           </div>
-        </div>
 
-        {/* Fee + Client Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          {/* Fee Info */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">수임료 정보</h2>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-500">착수금</span>
-                <span className="font-medium text-gray-900">{formatCurrency(caseData.retainer_fee)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">발생 성공보수</span>
-                <span className="font-medium text-blue-600">{formatCurrency(caseData.calculated_success_fee)}</span>
-              </div>
-              <div className="flex justify-between border-t border-gray-100 pt-3">
-                <button
-                  type="button"
-                  onClick={() => setShowPaymentModal(true)}
-                  className="text-gray-500 underline hover:text-sage-600"
-                >
-                  입금액
-                </button>
-                <span className="font-medium text-emerald-600">{formatCurrency(paymentTotal ?? caseData.total_received)}</span>
-              </div>
-              <div className="flex justify-between border-t border-gray-100 pt-3">
-                <span className="text-gray-500">미수금</span>
-                <span className="font-bold text-red-600">{formatCurrency(calculateOutstandingBalance())}</span>
-              </div>
-              {caseData.success_fee_agreement && (
-                <div className="border-t border-gray-100 pt-3">
-                  <label className="text-xs text-gray-500">성공보수 약정</label>
-                  <p className="mt-0.5 text-gray-700">{caseData.success_fee_agreement}</p>
+          {/* 원고/피고 - 의뢰인이 먼저 나오도록 */}
+          <div className="flex flex-wrap gap-6 mb-5">
+            {(() => {
+              const plaintiffInfo = getPartyName('plaintiff', String(getBasicInfo('원고', 'aplNm') || ''))
+              const defendantInfo = getPartyName('defendant', String(getBasicInfo('피고', 'rspNm') || ''))
+
+              // 의뢰인이 먼저 나오도록 순서 결정
+              const parties = [
+                { role: 'plaintiff', label: '원고', info: plaintiffInfo, color: 'blue' },
+                { role: 'defendant', label: '피고', info: defendantInfo, color: 'red' }
+              ]
+
+              // 의뢰인을 먼저 정렬
+              parties.sort((a, b) => {
+                if (a.info.isClient && !b.info.isClient) return -1
+                if (!a.info.isClient && b.info.isClient) return 1
+                return 0
+              })
+
+              return parties.map((party) => (
+                <div key={party.role} className="flex items-center gap-2">
+                  {party.info.isClient ? (
+                    <>
+                      <span className="px-2.5 py-1 bg-sage-100 text-sage-700 rounded-md text-sm">
+                        <span className="font-bold">의뢰인</span> {party.label}
+                      </span>
+                      <span className="text-base font-semibold text-gray-900">
+                        {party.info.name}
+                        {caseData.client?.phone && (
+                          <span className="font-normal text-gray-500 ml-1">({caseData.client.phone})</span>
+                        )}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-sm font-medium">{party.label}</span>
+                      <span className="text-base text-gray-700">{party.info.name}</span>
+                    </>
+                  )}
                 </div>
-              )}
-            </div>
+              ))
+            })()}
           </div>
 
-          {/* Client Info */}
-          {caseData.client && (
-            <div
-              className="bg-white rounded-lg border border-gray-200 p-5 cursor-pointer hover:border-sage-300 transition-colors"
-              onClick={() => router.push(`/clients/${caseData.client_id}`)}
+          {/* 추가 정보 (재판부, 접수일, 인지액 등) */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm mt-1">
+            {getBasicInfo('재판부', 'jdgNm') && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500">재판부</span>
+                <span className="text-gray-800 font-medium">{getBasicInfo('재판부', 'jdgNm')}</span>
+                {getBasicInfo('재판부전화번호', 'jdgTelno') && (
+                  <span className="text-gray-600 text-xs ml-1">({getBasicInfo('재판부전화번호', 'jdgTelno')})</span>
+                )}
+              </div>
+            )}
+            {caseData.judge_name && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500">담당 판사</span>
+                <span className="text-gray-800 font-medium">{caseData.judge_name}</span>
+              </div>
+            )}
+            {getBasicInfo('접수일', 'rcptDt') && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500">접수일</span>
+                <span className="text-gray-800 font-medium">{formatProgressDate(String(getBasicInfo('접수일', 'rcptDt')))}</span>
+              </div>
+            )}
+            {getBasicInfo('인지액', 'stmpAmnt') && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500">인지액</span>
+                <span className="text-gray-800 font-medium">{Number(getBasicInfo('인지액', 'stmpAmnt')).toLocaleString()}원</span>
+              </div>
+            )}
+            {(() => {
+              const mrgrDvs = getBasicInfo('병합구분', 'mrgrDvs')
+              return mrgrDvs && mrgrDvs !== '없음' && (
+                <span className="px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-200 rounded-md text-sm font-medium">
+                  {mrgrDvs}
+                </span>
+              )
+            })()}
+            {(getBasicInfo('종국결과', 'endRslt') || caseData.case_result) && (
+              <span className="px-2.5 py-1 bg-amber-50 text-amber-700 border border-amber-200 rounded-md text-sm font-medium">
+                {getBasicInfo('종국결과', 'endRslt') || caseData.case_result}
+              </span>
+            )}
+            {getBasicInfo('판결도달일', 'jdgArvDt') && (
+              <span className="px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded-md text-sm font-medium">
+                {formatProgressDate(String(getBasicInfo('판결도달일', 'jdgArvDt')))} 도달
+              </span>
+            )}
+            {getBasicInfo('확정일', 'cfrmDt') && (
+              <span className="px-2.5 py-1 bg-green-50 text-green-700 border border-green-200 rounded-md text-sm font-medium">
+                {formatProgressDate(String(getBasicInfo('확정일', 'cfrmDt')))} 확정
+              </span>
+            )}
+            {getBasicInfo('조사관', 'exmnrNm') && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-gray-500">조사관</span>
+                <span className="text-gray-800 font-medium">{getBasicInfo('조사관', 'exmnrNm')}</span>
+                {getBasicInfo('조사관전화번호', 'exmnrTelNo') && (
+                  <span className="text-gray-600 text-xs ml-1">({getBasicInfo('조사관전화번호', 'exmnrTelNo')})</span>
+                )}
+              </div>
+            )}
+            {getBasicInfo('보존여부', 'prsrvYn') === 'Y' && (
+              <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-md text-sm font-medium">
+                {getBasicInfo('보존내용', 'prsrvCtt') || '기록보존'}
+              </span>
+            )}
+          </div>
+
+          {/* 계약 정보 드롭다운 */}
+          <div className="border-t border-gray-100 mt-5 pt-4">
+            <button
+              onClick={() => setShowContractInfo(!showContractInfo)}
+              className="flex items-center justify-between w-full text-left"
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-semibold text-gray-900">의뢰인 정보</h2>
-                <span className="text-xs text-sage-600">상세보기 &rarr;</span>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div>
-                  <label className="text-xs text-gray-500">이름</label>
-                  <p className="mt-0.5 text-gray-900 font-medium">{caseData.client.name}</p>
+              <span className="text-sm font-medium text-gray-700">계약 정보</span>
+              <svg
+                className={`w-5 h-5 text-gray-400 transition-transform ${showContractInfo ? 'rotate-180' : ''}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showContractInfo && (
+              <div className="mt-4 space-y-4">
+                {/* 계약 기본 정보 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <label className="text-xs text-gray-400">계약번호</label>
+                    <p className="mt-0.5 text-gray-900">{caseData.contract_number || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400">계약일</label>
+                    <p className="mt-0.5 text-gray-900">{formatDate(caseData.contract_date)}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400">사건종류</label>
+                    <p className="mt-0.5 text-gray-900">{caseData.case_type || '기타'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400">의뢰인</label>
+                    <p
+                      className="mt-0.5 text-gray-900 cursor-pointer hover:text-sage-600"
+                      onClick={() => caseData.client && router.push(`/clients/${caseData.client_id}`)}
+                    >
+                      {caseData.client?.name || '-'} &rsaquo;
+                    </p>
+                  </div>
                 </div>
-                {caseData.client.phone && (
+
+                {/* 수임료 정보 */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-gray-100 pt-4">
                   <div>
-                    <label className="text-xs text-gray-500">연락처</label>
-                    <p className="mt-0.5 text-gray-900">{caseData.client.phone}</p>
+                    <label className="text-xs text-gray-400">착수금</label>
+                    <p className="mt-0.5 text-gray-900">{formatCurrency(caseData.retainer_fee)}</p>
                   </div>
-                )}
-                {caseData.client.email && (
                   <div>
-                    <label className="text-xs text-gray-500">이메일</label>
-                    <p className="mt-0.5 text-gray-900">{caseData.client.email}</p>
+                    <label className="text-xs text-gray-400">발생 성공보수</label>
+                    <p className="mt-0.5 text-gray-900">{formatCurrency(caseData.calculated_success_fee)}</p>
                   </div>
-                )}
-                {caseData.client.birth_date && (
                   <div>
-                    <label className="text-xs text-gray-500">생년월일</label>
-                    <p className="mt-0.5 text-gray-900">{formatDate(caseData.client.birth_date)}</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowPaymentModal(true)}
+                      className="text-xs text-gray-400 hover:text-sage-600"
+                    >
+                      입금액 &rsaquo;
+                    </button>
+                    <p className="mt-0.5 text-gray-900">{formatCurrency(paymentTotal ?? caseData.total_received)}</p>
                   </div>
-                )}
+                  <div>
+                    <label className="text-xs text-gray-400">미수금</label>
+                    <p className="mt-0.5 text-red-600 font-medium">{formatCurrency(calculateOutstandingBalance())}</p>
+                  </div>
+                </div>
+
+                {/* 성공보수 약정 */}
+                <div className="text-sm border-t border-gray-100 pt-4">
+                  <label className="text-xs text-gray-400">성공보수 약정</label>
+                  <p className="mt-0.5 text-gray-700">{caseData.success_fee_agreement || '-'}</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Related Cases */}
@@ -644,101 +871,32 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           </div>
         )}
 
-        {/* 일정/진행사항 탭 UI */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5">
-          {/* 탭 헤더 */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex gap-1 p-1 bg-gray-100 rounded-lg">
-              <button
-                onClick={() => setActiveTab('schedules')}
-                className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'schedules'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                일정
-              </button>
-              <button
-                onClick={() => setActiveTab('progress')}
-                className={`px-4 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  activeTab === 'progress'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                진행사항
-              </button>
-            </div>
-            <div className="flex items-center gap-2">
-              {activeTab === 'schedules' && (
-                <button
-                  onClick={() => setShowScheduleModal(true)}
-                  className="px-3 py-1 text-xs font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
-                >
-                  + 일정 추가
-                </button>
-              )}
-              {activeTab === 'progress' && caseData.court_case_number && (
-                <>
-                  {scourtSnapshot && (
-                    <button
-                      onClick={() => setShowProgressDetail(!showProgressDetail)}
-                      className="px-3 py-1 text-xs font-medium text-gray-600 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
-                    >
-                      {showProgressDetail ? '접기' : '상세보기'}
-                    </button>
-                  )}
-                  <button
-                    onClick={handleScourtSync}
-                    disabled={scourtSyncing || !scourtSyncStatus?.isLinked}
-                    className={`px-3 py-1 text-xs font-medium rounded transition-colors flex items-center gap-1 ${
-                      scourtSyncing
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : scourtSyncStatus?.isLinked
-                        ? 'bg-sage-600 text-white hover:bg-sage-700'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                    title={!scourtSyncStatus?.isLinked ? '대법원 사건 연동이 필요합니다' : ''}
-                  >
-                    {scourtSyncing ? (
-                      <>
-                        <svg className="animate-spin h-3 w-3" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                        </svg>
-                        동기화 중...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        동기화
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
+        {/* 일정 섹션 */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm relative">
+          {/* 일정 추가 버튼 - 우측 상단 */}
+          <button
+            onClick={() => setShowScheduleModal(true)}
+            className="absolute top-4 right-4 p-2 text-sage-600 hover:bg-sage-50 rounded-lg transition-colors"
+            title="일정 추가"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
 
-          {/* 일정 탭 내용 */}
-          {activeTab === 'schedules' && (
-            <>
-              {loading ? (
-                <div className="py-8 text-center text-gray-400 text-sm">
-                  로딩 중...
-                </div>
-              ) : unifiedSchedules.length === 0 ? (
-                <div className="py-8 text-center text-gray-400 text-sm">
-                  등록된 일정이 없습니다
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {unifiedSchedules.map((item) => {
-                    const isHearing = item.type === 'court_hearing'
-                    const isDeadline = item.type === 'deadline'
+          {loading ? (
+            <div className="py-10 text-center text-gray-400 text-base">
+              로딩 중...
+            </div>
+          ) : unifiedSchedules.length === 0 ? (
+            <div className="py-10 text-center text-gray-400 text-base">
+              등록된 일정이 없습니다
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {unifiedSchedules.map((item) => {
+                const isHearing = item.type === 'court_hearing'
+                const isDeadline = item.type === 'deadline'
                     const source = item.source
                     const itemKey = `${item.type}-${item.id}`
                     const hasReport = isHearing && 'report' in source && source.report
@@ -845,135 +1003,211 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   })}
                 </div>
               )}
-            </>
+        </div>
+
+        {/* 진행내용 섹션 */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm relative">
+          {/* 동기화 버튼 - 우측 상단 */}
+          {caseData.court_case_number && (isLinked || scourtSyncStatus?.isLinked) && (
+            <button
+              onClick={handleScourtSync}
+              disabled={scourtSyncing}
+              className={`absolute top-4 right-4 p-2 rounded-lg transition-colors ${
+                scourtSyncing
+                  ? 'text-gray-400 cursor-not-allowed'
+                  : 'text-sage-600 hover:bg-sage-50'
+              }`}
+              title="대법원 정보 동기화"
+            >
+              {scourtSyncing ? (
+                <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+              ) : (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+            </button>
           )}
 
-          {/* 진행사항 탭 내용 */}
-          {activeTab === 'progress' && (
-            <>
-              {!caseData.court_case_number ? (
-                <div className="py-8 text-center text-gray-400 text-sm">
-                  사건번호를 먼저 등록해주세요
-                </div>
-              ) : scourtLoading ? (
-                <div className="py-6 text-center text-gray-400 text-sm">
-                  로딩 중...
-                </div>
-              ) : !scourtSyncStatus?.isLinked ? (
-                <div className="py-6 text-center text-gray-400 text-sm">
-                  <p>대법원 사건 연동이 필요합니다.</p>
-                  <p className="mt-1 text-xs">사건번호로 검색하여 사건을 연동해주세요.</p>
-                </div>
-              ) : !scourtSnapshot ? (
-                <div className="py-6 text-center text-gray-400 text-sm">
-                  <p>동기화된 데이터가 없습니다.</p>
-                  <p className="mt-1 text-xs">동기화 버튼을 눌러 대법원에서 정보를 가져오세요.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* 최근 진행내용 요약 (최대 5개) */}
-                  {scourtSnapshot.progress.slice(0, showProgressDetail ? undefined : 5).map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-start gap-3 py-2 border-b border-gray-50 last:border-0"
-                    >
-                      <span className="text-xs text-gray-400 whitespace-nowrap pt-0.5">
-                        {item.date}
-                      </span>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-700">{item.content}</p>
-                        {item.result && (
-                          <span className="inline-block mt-1 px-1.5 py-0.5 text-xs bg-blue-50 text-blue-600 rounded">
-                            {item.result}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-
-                  {!showProgressDetail && scourtSnapshot.progress.length > 5 && (
-                    <button
-                      onClick={() => setShowProgressDetail(true)}
-                      className="w-full py-2 text-xs text-gray-500 hover:text-gray-700 transition-colors"
-                    >
-                      + {scourtSnapshot.progress.length - 5}건 더보기
-                    </button>
-                  )}
-
-                  {/* 상세보기 모드에서 추가 정보 표시 */}
-                  {showProgressDetail && (
-                    <>
-                      {/* 심급내용 */}
-                      {scourtSnapshot.lowerCourt && scourtSnapshot.lowerCourt.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <h3 className="text-xs font-semibold text-gray-500 mb-2">심급내용</h3>
-                          <div className="space-y-1">
-                            {scourtSnapshot.lowerCourt.map((item, idx) => (
-                              <div key={idx} className="flex gap-2 text-xs p-2 bg-gray-50 rounded">
-                                <span className="text-gray-500">{item.court}</span>
-                                <span className="text-gray-700 font-medium">{item.caseNo}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 연계사건 */}
-                      {scourtSnapshot.relatedCases && scourtSnapshot.relatedCases.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <h3 className="text-xs font-semibold text-gray-500 mb-2">연계사건</h3>
-                          <div className="space-y-1">
-                            {scourtSnapshot.relatedCases.map((item, idx) => (
-                              <div key={idx} className="flex items-center gap-2 text-xs p-2 bg-blue-50 rounded">
-                                {item.relation && (
-                                  <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">
-                                    {item.relation}
-                                  </span>
-                                )}
-                                <span className="text-gray-700 font-medium">{item.caseNo}</span>
-                                {item.caseName && (
-                                  <span className="text-gray-500">{item.caseName}</span>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 기본정보 */}
-                      {scourtSnapshot.basicInfo && Object.keys(scourtSnapshot.basicInfo).length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <h3 className="text-xs font-semibold text-gray-500 mb-2">기본정보 (대법원)</h3>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            {Object.entries(scourtSnapshot.basicInfo).map(([key, value]) => (
-                              <div key={key} className="flex gap-2">
-                                <span className="text-gray-400">{key}</span>
-                                <span className="text-gray-700">{value}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 제출서류 */}
-                      {scourtSnapshot.documents && scourtSnapshot.documents.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <h3 className="text-xs font-semibold text-gray-500 mb-2">제출서류</h3>
-                          <div className="space-y-1">
-                            {scourtSnapshot.documents.map((doc, idx) => (
-                              <div key={idx} className="flex gap-2 text-xs">
-                                <span className="text-gray-400">{doc.date}</span>
-                                <span className="text-gray-700">{doc.content}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+          {!caseData.court_case_number ? (
+            <div className="py-10 text-center text-gray-400 text-base">
+              사건번호를 먼저 등록해주세요
+            </div>
+          ) : scourtLoading ? (
+            <div className="py-10 text-center text-gray-400 text-base">
+              로딩 중...
+            </div>
+          ) : !(isLinked || scourtSyncStatus?.isLinked) ? (
+            <div className="py-10 text-center text-gray-400">
+              <p className="text-base">대법원 사건 연동이 필요합니다.</p>
+              <p className="mt-2 text-sm">사건번호로 검색하여 사건을 연동해주세요.</p>
+            </div>
+          ) : !scourtSnapshot ? (
+            <div className="py-10 text-center text-gray-400">
+              <p className="text-base">동기화된 데이터가 없습니다.</p>
+              <p className="mt-2 text-sm">동기화 버튼을 눌러 대법원에서 정보를 가져오세요.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {/* 상소심/이송 관련사건 */}
+              {((scourtSnapshot.lowerCourt && scourtSnapshot.lowerCourt.length > 0) ||
+                (scourtSnapshot.relatedCases && scourtSnapshot.relatedCases.length > 0)) && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    상소심/이송 관련사건
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-purple-50 border-b border-purple-200">
+                          <th className="py-3 px-4 text-left text-sm text-purple-700 font-semibold w-32">구분</th>
+                          <th className="py-3 px-4 text-left text-sm text-purple-700 font-semibold">법원</th>
+                          <th className="py-3 px-4 text-left text-sm text-purple-700 font-semibold">사건번호</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scourtSnapshot.lowerCourt?.map((item: any, idx: number) => (
+                          <tr key={`lower-${idx}`} className="border-b border-gray-100 last:border-0 hover:bg-purple-50/50 transition-colors">
+                            <td className="py-3 px-4 text-sm text-purple-600 font-medium">하심사건</td>
+                            <td className="py-3 px-4 text-sm text-gray-700">{item.court || '-'}</td>
+                            <td className="py-3 px-4 text-sm text-gray-900 font-medium">{item.caseNo || '-'}</td>
+                          </tr>
+                        ))}
+                        {scourtSnapshot.relatedCases?.map((item: any, idx: number) => (
+                          <tr key={`related-${idx}`} className="border-b border-gray-100 last:border-0 hover:bg-purple-50/50 transition-colors">
+                            <td className="py-3 px-4 text-sm text-purple-600 font-medium">{item.relation || '관련사건'}</td>
+                            <td className="py-3 px-4 text-sm text-gray-700">{item.caseName || '-'}</td>
+                            <td className="py-3 px-4 text-sm text-gray-900 font-medium">{item.caseNo || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
-            </>
+
+              {/* 최근 기일 */}
+              {scourtSnapshot.hearings && scourtSnapshot.hearings.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    최근 기일
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-blue-50 border-b border-blue-200">
+                          <th className="py-3 px-4 text-left text-sm text-blue-700 font-semibold w-28">일자</th>
+                          <th className="py-3 px-4 text-left text-sm text-blue-700 font-semibold w-20">시각</th>
+                          <th className="py-3 px-4 text-left text-sm text-blue-700 font-semibold">기일구분</th>
+                          <th className="py-3 px-4 text-left text-sm text-blue-700 font-semibold">기일장소</th>
+                          <th className="py-3 px-4 text-left text-sm text-blue-700 font-semibold w-24">결과</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scourtSnapshot.hearings.map((hearing: any, idx: number) => (
+                          <tr key={idx} className="border-b border-gray-100 last:border-0 hover:bg-blue-50/50 transition-colors">
+                            <td className="py-3 px-4 text-sm text-gray-900 font-medium">{formatProgressDate(hearing.trmDt || hearing.date)}</td>
+                            <td className="py-3 px-4 text-sm text-gray-700">
+                              {hearing.trmHm ? `${hearing.trmHm.slice(0,2)}:${hearing.trmHm.slice(2)}` : hearing.time || '-'}
+                            </td>
+                            <td className="py-3 px-4 text-sm text-gray-700">{hearing.trmNm || hearing.type || '-'}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{hearing.trmPntNm || hearing.location || '-'}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{hearing.rslt || hearing.result || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 최근 제출서류 */}
+              {scourtSnapshot.documents && scourtSnapshot.documents.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    최근 제출서류
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-amber-50 border-b border-amber-200">
+                          <th className="py-3 px-4 text-left text-sm text-amber-700 font-semibold w-28">일자</th>
+                          <th className="py-3 px-4 text-left text-sm text-amber-700 font-semibold">내용</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {scourtSnapshot.documents.map((doc: any, idx: number) => (
+                          <tr key={idx} className="border-b border-gray-100 last:border-0 hover:bg-amber-50/50 transition-colors">
+                            <td className="py-3 px-4 text-sm text-gray-900 font-medium">{formatProgressDate(doc.ofdocRcptYmd || doc.date)}</td>
+                            <td className="py-3 px-4 text-sm text-gray-700">{doc.content || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* 진행내용 */}
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-sage-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                  진행내용
+                </h3>
+              {scourtSnapshot.progress && scourtSnapshot.progress.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-sage-50 border-b border-sage-200">
+                        <th className="py-4 px-5 text-left text-sm text-sage-700 font-semibold w-32">일자</th>
+                        <th className="py-4 px-5 text-left text-sm text-sage-700 font-semibold">내용</th>
+                        <th className="py-4 px-5 text-left text-sm text-sage-700 font-semibold w-36">결과</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {scourtSnapshot.progress.slice(0, showProgressDetail ? undefined : 10).map((item, idx) => {
+                        const textColor = getProgressColor(item.content || '')
+                        return (
+                          <tr key={idx} className="border-b border-gray-100 last:border-0 hover:bg-sage-50/50 transition-colors">
+                            <td className="py-4 px-5 text-base font-medium whitespace-nowrap" style={{ color: textColor }}>{formatProgressDate(item.date)}</td>
+                            <td className="py-4 px-5 text-base leading-relaxed" style={{ color: textColor }}>{item.content || '-'}</td>
+                            <td className="py-4 px-5 text-base" style={{ color: textColor }}>{item.result ? formatProgressDate(item.result) : '-'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                  {!showProgressDetail && scourtSnapshot.progress.length > 10 && (
+                    <button
+                      onClick={() => setShowProgressDetail(true)}
+                      className="w-full py-3.5 text-sm text-sage-600 hover:text-sage-700 hover:bg-sage-50 transition-colors mt-2 border-t border-gray-100 font-medium"
+                    >
+                      + {scourtSnapshot.progress.length - 10}건 더보기
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="py-10 text-center text-gray-400">
+                  <p className="text-base">진행내용 데이터가 없습니다.</p>
+                  <p className="mt-2 text-sm">동기화 버튼을 눌러 최신 정보를 가져오세요.</p>
+                </div>
+              )}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1091,11 +1325,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         caseId={caseData.id}
         caseName={caseData.case_name}
         clientName={caseData.client?.name}
-        officeLocation={
-          caseData.office === '평택' || caseData.office === '천안'
-            ? caseData.office
-            : undefined
-        }
       />
     </div>
   )

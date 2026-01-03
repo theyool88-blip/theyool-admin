@@ -129,6 +129,12 @@ export async function POST(request: NextRequest) {
           if (result.detailData.exmnrNm) basicInfoKorean['조사관'] = result.detailData.exmnrNm;
           if (result.detailData.exmnrTelNo) basicInfoKorean['조사관전화번호'] = result.detailData.exmnrTelNo;
 
+          // 당사자 정보 (판결도달일, 확정일 포함)
+          const partiesData = result.detailData.parties || [];
+
+          // 대리인 정보
+          const representativesData = result.detailData.representatives || [];
+
           // 제출서류 추출
           const rawDocs = result.detailData.raw?.data?.dlt_rcntSbmsnDocmtLst || [];
           const documentsData = rawDocs.map((d: { ofdocRcptYmd?: string; content1?: string; content2?: string; content3?: string }) => ({
@@ -139,11 +145,18 @@ export async function POST(request: NextRequest) {
           // 진행내용은 별도 API에서 조회한 데이터 사용 (result.progressData)
           const progressData = result.progressData || [];
 
+          // basic_info에 당사자/대리인 정보 포함
+          const basicInfoWithParties = {
+            ...basicInfoKorean,
+            parties: partiesData,
+            representatives: representativesData,
+          };
+
           const { error: snapshotError } = await supabase
             .from('scourt_case_snapshots')
             .insert({
               legal_case_id: legalCaseId,
-              basic_info: basicInfoKorean,
+              basic_info: basicInfoWithParties,
               hearings: result.detailData.hearings || [],
               progress: progressData,  // 진행내용 (별도 API)
               documents: documentsData,  // 제출서류 원본
@@ -155,7 +168,7 @@ export async function POST(request: NextRequest) {
 
           if (!snapshotError) {
             hasSnapshot = true;
-            console.log(`📸 스냅샷 저장 완료: 기일 ${result.detailData.hearings?.length || 0}건, 진행 ${progressData.length}건, 서류 ${documentsData.length}건`);
+            console.log(`📸 스냅샷 저장 완료: 기일 ${result.detailData.hearings?.length || 0}건, 진행 ${progressData.length}건, 서류 ${documentsData.length}건, 당사자 ${partiesData.length}명, 대리인 ${representativesData.length}명`);
 
             // 공용 함수로 encCsNo 저장
             await saveEncCsNoToCase({

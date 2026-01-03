@@ -1092,6 +1092,76 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 </div>
               )}
 
+              {/* 당사자 내용 */}
+              {(() => {
+                const parties = (scourtSnapshot.basicInfo as any)?.parties || []
+                return parties.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      당사자 내용
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-indigo-50 border-b border-indigo-200">
+                            <th className="py-3 px-4 text-left text-sm text-indigo-700 font-semibold w-28">구분</th>
+                            <th className="py-3 px-4 text-left text-sm text-indigo-700 font-semibold">이름</th>
+                            <th className="py-3 px-4 text-left text-sm text-indigo-700 font-semibold w-32">판결도달일</th>
+                            <th className="py-3 px-4 text-left text-sm text-indigo-700 font-semibold w-32">확정일</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parties.map((party: any, idx: number) => (
+                            <tr key={`party-${idx}`} className="border-b border-gray-100 last:border-0 hover:bg-indigo-50/50 transition-colors">
+                              <td className="py-3 px-4 text-sm text-indigo-600 font-medium">{party.btprDvsNm || '-'}</td>
+                              <td className="py-3 px-4 text-sm text-gray-900">{party.btprNm || '-'}</td>
+                              <td className="py-3 px-4 text-sm text-gray-700">{party.adjdocRchYmd ? formatProgressDate(party.adjdocRchYmd) : '-'}</td>
+                              <td className="py-3 px-4 text-sm text-gray-700">{party.indvdCfmtnYmd ? formatProgressDate(party.indvdCfmtnYmd) : '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {/* 대리인 내용 */}
+              {(() => {
+                const representatives = (scourtSnapshot.basicInfo as any)?.representatives || []
+                return representatives.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                      <svg className="w-4 h-4 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      대리인 내용
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-teal-50 border-b border-teal-200">
+                            <th className="py-3 px-4 text-left text-sm text-teal-700 font-semibold w-40">구분</th>
+                            <th className="py-3 px-4 text-left text-sm text-teal-700 font-semibold">이름</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {representatives.map((rep: any, idx: number) => (
+                            <tr key={`rep-${idx}`} className="border-b border-gray-100 last:border-0 hover:bg-teal-50/50 transition-colors">
+                              <td className="py-3 px-4 text-sm text-teal-600 font-medium">{rep.agntDvsNm || '-'}</td>
+                              <td className="py-3 px-4 text-sm text-gray-900">{rep.agntNm || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })()}
+
               {/* 최근 기일 */}
               {scourtSnapshot.hearings && scourtSnapshot.hearings.length > 0 && (
                 <div>

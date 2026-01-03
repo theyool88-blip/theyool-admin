@@ -69,6 +69,15 @@ export interface CaseDetailData {
   parties?: Array<{
     btprNm: string;        // 당사자명
     btprDvsNm: string;     // 당사자구분 (원고, 피고 등)
+    adjdocRchYmd?: string; // 판결도달일
+    indvdCfmtnYmd?: string; // 확정일
+  }>;
+
+  // 대리인 정보
+  representatives?: Array<{
+    agntDvsNm: string;     // 구분 (원고 소송대리인 등)
+    agntNm: string;        // 대리인명 (법무법인 더율 (담당변호사 : 임은지))
+    jdafrCorpNm?: string;  // 법무법인명
   }>;
 
   // 기일 정보
@@ -532,6 +541,18 @@ export class ScourtApiClient {
         result.parties = partiesList.map((p: any) => ({
           btprNm: p.btprNm || p.btprtNm,
           btprDvsNm: p.btprDvsNm || p.btprtStndngNm,
+          adjdocRchYmd: p.adjdocRchYmd,    // 판결도달일
+          indvdCfmtnYmd: p.indvdCfmtnYmd,  // 확정일
+        }));
+      }
+
+      // 대리인 정보 추출 (dlt_agntCttLst)
+      const agentsList = response?.data?.dlt_agntCttLst || [];
+      if (agentsList.length > 0) {
+        result.representatives = agentsList.map((a: any) => ({
+          agntDvsNm: a.agntDvsNm || '',       // 구분 (원고 소송대리인)
+          agntNm: a.agntNm || '',             // 대리인명
+          jdafrCorpNm: a.jdafrCorpNm || '',   // 법무법인명
         }));
       }
 
@@ -569,7 +590,7 @@ export class ScourtApiClient {
 
       // 응답에 어떤 필드가 있는지 디버그 로깅
       const availableFields = response?.data ? Object.keys(response.data) : [];
-      console.log(`📋 상세 파싱 완료: 기일 ${result.hearings?.length || 0}건, 진행 ${result.progress?.length || 0}건, 당사자 ${result.parties?.length || 0}명`);
+      console.log(`📋 상세 파싱 완료: 기일 ${result.hearings?.length || 0}건, 진행 ${result.progress?.length || 0}건, 당사자 ${result.parties?.length || 0}명, 대리인 ${result.representatives?.length || 0}명`);
       console.log(`📋 응답 필드 목록: ${availableFields.join(', ')}`);
     } catch (e) {
       console.log('상세 정보 파싱 중 에러:', e);

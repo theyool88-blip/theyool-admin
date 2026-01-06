@@ -13,7 +13,7 @@ import {
 } from '@/types/court-hearing'
 import type { ConsultationStatus } from '@/types/consultation'
 import { PAYMENT_CATEGORIES } from '@/types/payment'
-import type { PaymentCategory, OfficeLocation } from '@/types/payment'
+import type { PaymentCategory } from '@/types/payment'
 
 interface UnifiedScheduleModalProps {
   isOpen: boolean
@@ -160,7 +160,6 @@ export default function UnifiedScheduleModal({
     depositor_name: '',
     amount: '',
     payment_category: '',
-    office_location: '',
     linkage: 'none' as 'none' | 'case' | 'consultation',
     case_id: '',
     case_name: '',
@@ -183,7 +182,6 @@ export default function UnifiedScheduleModal({
     amount: '',
     expense_category: '',
     subcategory: '',
-    office_location: '',
     vendor_name: '',
     memo: '',
     payment_method: '카드',
@@ -196,7 +194,6 @@ export default function UnifiedScheduleModal({
     depositor_name: '',
     amount: '',
     payment_category: '',
-    office_location: '',
     linkage: 'none' as 'none' | 'case' | 'consultation',
     case_id: '',
     case_name: '',
@@ -250,7 +247,6 @@ export default function UnifiedScheduleModal({
             depositor_name: editData.depositor_name || '',
             amount: editData.amount?.toString() || '',
             payment_category: editData.payment_category || '',
-            office_location: editData.office_location || '',
             linkage: editData.case_id ? 'case' : editData.consultation_id ? 'consultation' : 'none',
             case_id: editData.case_id || '',
             case_name: editData.case_name || '',
@@ -272,7 +268,6 @@ export default function UnifiedScheduleModal({
             amount: editData.amount?.toString() || '',
             expense_category: editData.expense_category || '',
             subcategory: editData.subcategory || '',
-            office_location: editData.office_location || '',
             vendor_name: editData.vendor_name || '',
             memo: editData.memo || '',
             payment_method: editData.payment_method || '카드',
@@ -320,13 +315,41 @@ export default function UnifiedScheduleModal({
         setSearchTerm(editData.reference_id || '')
       } else {
         // New schedule
-        if (prefilledCaseId || prefilledCaseNumber) {
+        if (prefilledCaseId) {
+          // prefilledCaseId가 있으면 사건 정보 조회
+          const fetchCaseInfo = async () => {
+            try {
+              const res = await fetch(`/api/admin/cases/${prefilledCaseId}`)
+              if (res.ok) {
+                const json = await res.json()
+                const caseInfo = json.data
+                setFormData(prev => ({
+                  ...prev,
+                  case_id: prefilledCaseId,
+                  case_number: caseInfo.court_case_number || '',
+                  case_name: caseInfo.case_name || ''
+                }))
+                // 사건번호가 있으면 사건번호, 없으면 사건명으로 표시
+                setSearchTerm(caseInfo.court_case_number || caseInfo.case_name || '')
+              }
+            } catch (err) {
+              console.error('Failed to fetch case info:', err)
+              // 실패 시 기존 값 사용
+              setFormData(prev => ({
+                ...prev,
+                case_id: prefilledCaseId,
+                case_number: prefilledCaseNumber || ''
+              }))
+              setSearchTerm(prefilledCaseNumber || '')
+            }
+          }
+          fetchCaseInfo()
+        } else if (prefilledCaseNumber) {
           setFormData(prev => ({
             ...prev,
-            case_id: prefilledCaseId || '',
-            case_number: prefilledCaseNumber || ''
+            case_number: prefilledCaseNumber
           }))
-          setSearchTerm(prefilledCaseNumber || '')
+          setSearchTerm(prefilledCaseNumber)
         }
         const today = new Date().toISOString().split('T')[0]
         const dateToUse = prefilledDate || today
@@ -370,7 +393,6 @@ export default function UnifiedScheduleModal({
         amount: '',
         expense_category: '',
         subcategory: '',
-        office_location: '',
         vendor_name: '',
         memo: '',
         payment_method: '카드',
@@ -486,7 +508,6 @@ export default function UnifiedScheduleModal({
         depositor_name: paymentForm.depositor_name,
         amount: finalAmount,
         payment_category: paymentForm.payment_category as PaymentCategory,
-        office_location: paymentForm.office_location || null,
         case_id: paymentForm.linkage === 'case' ? paymentForm.case_id || null : null,
         consultation_id: paymentForm.linkage === 'consultation' ? paymentForm.consultation_id || null : null,
         case_name: paymentForm.linkage === 'case' ? (paymentForm.case_name || paymentSelectedLabel || null) : null,
@@ -787,7 +808,6 @@ export default function UnifiedScheduleModal({
         body: JSON.stringify({
           case_name: formData.case_name || `${formData.name} 상담`,
           case_type: formData.case_type || '상담',
-          office: formData.case_office || '평택',
           status: '진행중',
           new_client: {
             name: formData.name,
@@ -1173,17 +1193,6 @@ export default function UnifiedScheduleModal({
                       placeholder="상담"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-sage-700 mb-1">지점</label>
-                    <select
-                      value={formData.case_office}
-                      onChange={(e) => setFormData(prev => ({ ...prev, case_office: e.target.value }))}
-                      className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
-                    >
-                      <option value="평택">평택</option>
-                      <option value="천안">천안</option>
-                    </select>
-                  </div>
                 </div>
               )}
             </div>
@@ -1195,22 +1204,50 @@ export default function UnifiedScheduleModal({
               {category === 'court_hearing' ? '기일 유형' : category === 'deadline' ? '데드라인 유형' : category === 'consultation' ? '상담 유형' : '일정 유형'}{' '}
               <span className="text-red-500">*</span>
             </label>
-            <select
-              value={formData.subtype}
-              onChange={(e) => setFormData(prev => ({ ...prev, subtype: e.target.value as ScheduleSubtype }))}
-              className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                errors.subtype
-                  ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                  : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-              }`}
-            >
-              <option value="">선택하세요</option>
-              {getSubtypeOptions().map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            {category === 'schedule' ? (
+              // 일반일정: 자유입력 가능 (input + datalist)
+              <>
+                <input
+                  type="text"
+                  list="schedule-type-options"
+                  value={formData.subtype}
+                  onChange={(e) => setFormData(prev => ({ ...prev, subtype: e.target.value as ScheduleSubtype }))}
+                  placeholder="일정 유형 (선택 또는 직접 입력)"
+                  className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
+                    errors.subtype
+                      ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                      : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
+                  }`}
+                />
+                <datalist id="schedule-type-options">
+                  <option value="변론" />
+                  <option value="상담" />
+                  <option value="회의" />
+                  <option value="출장" />
+                  <option value="미팅" />
+                  <option value="접견" />
+                  <option value="기타" />
+                </datalist>
+              </>
+            ) : (
+              // 법원기일, 데드라인, 상담: 기존 select
+              <select
+                value={formData.subtype}
+                onChange={(e) => setFormData(prev => ({ ...prev, subtype: e.target.value as ScheduleSubtype }))}
+                className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
+                  errors.subtype
+                    ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
+                    : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
+                }`}
+              >
+                <option value="">선택하세요</option>
+                {getSubtypeOptions().map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            )}
             {errors.subtype && (
               <p className="mt-1 text-sm text-red-600">{errors.subtype}</p>
             )}
@@ -1288,28 +1325,21 @@ export default function UnifiedScheduleModal({
           {category !== 'deadline' && (
             <div>
               <label className="block text-sm font-medium text-sage-700 mb-2">
-                {category === 'court_hearing' ? '법정' : category === 'consultation' ? '방문 사무소' : '장소'}
+                {category === 'court_hearing' ? '법정' : category === 'consultation' ? '상담 장소' : '장소'}
               </label>
-              {category === 'consultation' ? (
-                <select
-                  value={formData.office_location}
-                  onChange={(e) => setFormData(prev => ({ ...prev, office_location: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
-                >
-                  <option value="">선택하세요</option>
-                  <option value="평택사무소">평택사무소</option>
-                  <option value="천안사무소">천안사무소</option>
-                  <option value="미정">미정</option>
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
-                  placeholder={category === 'court_hearing' ? '예: 서울가정법원 301호' : '예: 사무실 회의실'}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
-                />
-              )}
+              <input
+                type="text"
+                value={category === 'consultation' ? formData.office_location : formData.location}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  [category === 'consultation' ? 'office_location' : 'location']: e.target.value
+                }))}
+                placeholder={
+                  category === 'court_hearing' ? '예: 서울가정법원 301호' :
+                  category === 'consultation' ? '예: 본 사무소' : '예: 사무실 회의실'
+                }
+                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+              />
             </div>
           )}
 
@@ -1485,19 +1515,6 @@ export default function UnifiedScheduleModal({
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">사무실</label>
-                <select
-                  value={paymentForm.office_location}
-                  onChange={(e) => setPaymentForm(prev => ({ ...prev, office_location: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
-                >
-                  <option value="">선택 안 함</option>
-                  <option value="평택">평택</option>
-                  <option value="천안">천안</option>
-                </select>
-                <p className="text-xs text-sage-500 mt-1">사건을 입력하면 해당 사건 사무실로 자동 설정됩니다.</p>
-              </div>
-              <div>
                 <label className="block text-sm font-medium text-sage-700 mb-1">결제/영수증</label>
                 <select
                   value={paymentForm.receipt_type}
@@ -1603,7 +1620,6 @@ export default function UnifiedScheduleModal({
                               case_id: paymentForm.linkage === 'case' ? item.id : '',
                               case_name: paymentForm.linkage === 'case' ? item.name : prev.case_name,
                               consultation_id: paymentForm.linkage === 'consultation' ? item.id : '',
-                              office_location: (item.office === '평택' || item.office === '천안') ? item.office : prev.office_location,
                             }))
                             setPaymentSelectedLabel(item.extra ? `${item.name} (${item.extra})` : item.name)
                             setPaymentSelectedId(item.id)
@@ -1739,19 +1755,6 @@ export default function UnifiedScheduleModal({
                   className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
                   placeholder="예: 사무실 임대료"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">지역</label>
-                <select
-                  value={expenseForm.office_location}
-                  onChange={(e) => setExpenseForm(prev => ({ ...prev, office_location: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
-                >
-                  <option value="">선택 안 함</option>
-                  <option value="평택">평택</option>
-                  <option value="천안">천안</option>
-                  <option value="공통">공통</option>
-                </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-sage-700 mb-1">결제수단</label>

@@ -152,7 +152,10 @@ export default function ConsultationPaymentsModal({
                         <div className="flex items-center gap-3">
                           <span className="text-sm font-medium text-sage-800">{payment.depositor_name}</span>
                           <span className="text-xs text-sage-400">
-                            {new Date(payment.payment_date).toLocaleDateString('ko-KR')}
+                            {(() => {
+                              const d = new Date(payment.payment_date)
+                              return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+                            })()}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 mt-1.5">
@@ -163,9 +166,6 @@ export default function ConsultationPaymentsModal({
                           )}
                           {payment.receipt_type && (
                             <span className="text-xs text-sage-500">{payment.receipt_type}</span>
-                          )}
-                          {payment.office_location && (
-                            <span className="text-xs text-sage-400">{payment.office_location}</span>
                           )}
                         </div>
                       </div>
@@ -218,7 +218,6 @@ function AddPaymentForm({
     amount: '',
     payment_category: '모든 상담' as PaymentCategory,
     receipt_type: '' as ReceiptType | '',
-    office_location: '' as '평택' | '천안' | '',
     memo: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -249,7 +248,6 @@ function AddPaymentForm({
           amount: parsedAmount,
           payment_category: formData.payment_category,
           receipt_type: formData.receipt_type || null,
-          office_location: formData.office_location || null,
           memo: formData.memo || null,
           is_confirmed: true,
         })
@@ -362,19 +360,6 @@ function AddPaymentForm({
             {Object.values(PAYMENT_CATEGORIES).map((category) => (
               <option key={category} value={category}>{category}</option>
             ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">사무소</label>
-          <select
-            value={formData.office_location}
-            onChange={(e) => setFormData({ ...formData, office_location: e.target.value as '평택' | '천안' | '' })}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
-          >
-            <option value="">선택</option>
-            <option value="평택">평택</option>
-            <option value="천안">천안</option>
           </select>
         </div>
 

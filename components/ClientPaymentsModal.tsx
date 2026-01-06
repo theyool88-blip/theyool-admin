@@ -99,7 +99,13 @@ export default function ClientPaymentsModal({
 
   if (!isOpen) return null
 
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+  const fmtDate = (d: string) => {
+    const date = new Date(d)
+    const yy = String(date.getFullYear()).slice(2)
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `${yy}.${mm}.${dd}`
+  }
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
@@ -156,7 +162,6 @@ export default function ClientPaymentsModal({
                   <th className="px-4 py-3 text-right text-xs font-medium text-sage-500 uppercase tracking-wider">금액</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">방법</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">명목</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">사무소</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-sage-100">
@@ -200,9 +205,6 @@ export default function ClientPaymentsModal({
                       }`}>
                         {payment.payment_category}
                       </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-sage-800">
-                      {payment.office_location || '-'}
                     </td>
                   </tr>
                 ))}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { createClient } from '@/lib/supabase/client';
 
 interface UpcomingEvent {
   id: string;
@@ -11,7 +12,10 @@ interface UpcomingEvent {
   title: string;
   caseId: string;
   caseNumber: string;
+  caseName?: string;
   clientName?: string;
+  opponentName?: string;
+  attendingLawyerName?: string;
   daysRemaining: number;
   location?: string;
 }
@@ -24,6 +28,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     fetchEvents();
@@ -32,55 +37,97 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
   async function fetchEvents() {
     try {
       setLoading(true);
-      // 기한과 기일을 함께 조회
-      const [deadlinesRes, hearingsRes] = await Promise.all([
-        fetch(`/api/admin/case-deadlines?upcoming=true&limit=${limit}`),
-        fetch(`/api/admin/court-hearings?upcoming=true&limit=${limit}`),
-      ]);
-
-      const [deadlinesData, hearingsData] = await Promise.all([
-        deadlinesRes.json(),
-        hearingsRes.json(),
-      ]);
-
       const allEvents: UpcomingEvent[] = [];
+      const today = new Date().toISOString().split('T')[0];
 
-      // 기한 데이터 변환
-      if (deadlinesData.success && deadlinesData.data) {
-        for (const d of deadlinesData.data) {
-          const daysRemaining = Math.ceil(
-            (new Date(d.deadline_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
-          );
-          allEvents.push({
-            id: d.id,
-            type: 'deadline',
-            date: d.deadline_date,
-            title: d.deadline_type_name || d.deadline_type || '기한',
-            caseId: d.case_id,
-            caseNumber: d.cases?.case_number || '',
-            clientName: d.cases?.clients?.name,
-            daysRemaining,
-          });
-        }
+      // 기일 조회 (Supabase 직접 사용, 당사자/출석변호사 JOIN)
+      const { data: hearings, error: hearingError } = await supabase
+        .from('court_hearings')
+        .select(`
+          *,
+          attending_lawyer:attending_lawyer_id(id, display_name),
+          legal_cases!inner(
+            id,
+            case_name,
+            court_case_number,
+            client:client_id(id, name),
+            opponent_name
+          )
+        `)
+        .gte('hearing_date', today)
+        .eq('status', 'SCHEDULED')
+        .order('hearing_date', { ascending: true })
+        .limit(limit * 2);
+
+      if (hearingError) {
+        console.error('기일 조회 오류:', hearingError);
+      }
+
+      // 기한 조회
+      const { data: deadlines, error: deadlineError } = await supabase
+        .from('case_deadlines')
+        .select(`
+          *,
+          legal_cases!inner(
+            id,
+            case_name,
+            court_case_number,
+            client:client_id(id, name),
+            opponent_name
+          )
+        `)
+        .gte('deadline_date', today)
+        .in('status', ['PENDING', 'OVERDUE'])
+        .order('deadline_date', { ascending: true })
+        .limit(limit * 2);
+
+      if (deadlineError) {
+        console.error('기한 조회 오류:', deadlineError);
       }
 
       // 기일 데이터 변환
-      if (hearingsData.success && hearingsData.data) {
-        for (const h of hearingsData.data) {
+      if (hearings) {
+        for (const h of hearings) {
           const daysRemaining = Math.ceil(
             (new Date(h.hearing_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
+          const legalCase = h.legal_cases as any;
           allEvents.push({
             id: h.id,
             type: 'hearing',
             date: h.hearing_date,
-            time: h.hearing_time,
-            title: h.hearing_type_name || h.hearing_type || '기일',
+            time: h.hearing_date?.split('T')[1]?.slice(0, 5),
+            title: h.hearing_type || '기일',
             caseId: h.case_id,
-            caseNumber: h.cases?.case_number || '',
-            clientName: h.cases?.clients?.name,
+            caseNumber: legalCase?.court_case_number || '',
+            caseName: legalCase?.case_name,
+            clientName: legalCase?.client?.name,
+            opponentName: legalCase?.opponent_name,
+            attendingLawyerName: (h.attending_lawyer as any)?.display_name,
             daysRemaining,
-            location: h.courtroom,
+            location: h.location,
+          });
+        }
+      }
+
+      // 기한 데이터 변환
+      if (deadlines) {
+        for (const d of deadlines) {
+          const daysRemaining = Math.ceil(
+            (new Date(d.deadline_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+          );
+          const legalCase = d.legal_cases as any;
+          allEvents.push({
+            id: d.id,
+            type: 'deadline',
+            date: d.deadline_date,
+            title: d.deadline_type || '기한',
+            caseId: d.case_id,
+            caseNumber: legalCase?.court_case_number || '',
+            caseName: legalCase?.case_name,
+            clientName: legalCase?.client?.name,
+            opponentName: legalCase?.opponent_name,
+            daysRemaining,
           });
         }
       }
@@ -99,10 +146,10 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
 
   function formatDate(dateStr: string): string {
     const date = new Date(dateStr);
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
-    return `${month}/${day}(${weekday})`;
+    const yy = String(date.getFullYear()).slice(2);
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
+    return `${yy}.${mm}.${dd}`;
   }
 
   function getDaysLabel(days: number): string {
@@ -150,9 +197,10 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
       ) : (
         <div className="divide-y divide-gray-100">
           {events.map((event) => (
-            <div
+            <Link
               key={`${event.type}-${event.id}`}
-              className="px-4 py-3 hover:bg-gray-50 transition-colors"
+              href={`/cases/${event.caseId}`}
+              className="block px-4 py-3 hover:bg-gray-50 transition-colors"
             >
               <div className="flex items-start gap-3">
                 {/* 날짜 */}
@@ -169,12 +217,13 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
                     {formatDate(event.date)}
                   </span>
                   {event.time && (
-                    <p className="text-xs text-gray-400">{event.time.slice(0, 5)}</p>
+                    <p className="text-xs text-gray-400">{event.time}</p>
                   )}
                 </div>
 
                 {/* 내용 */}
                 <div className="flex-1 min-w-0">
+                  {/* 첫 줄: [기일종류] 의뢰인 v 상대방 */}
                   <div className="flex items-center gap-2">
                     <span
                       className={`flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${
@@ -183,20 +232,37 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
                           : 'bg-purple-50 text-purple-600'
                       }`}
                     >
-                      {event.type === 'hearing' ? '기일' : '기한'}
+                      {event.title}
                     </span>
-                    <span className="text-sm text-gray-900 truncate">{event.title}</span>
+                    {event.type === 'hearing' && (event.clientName || event.opponentName) && (
+                      <span className="text-sm text-gray-900 truncate">
+                        {event.clientName || '의뢰인'} v {event.opponentName || '상대방'}
+                      </span>
+                    )}
+                    {event.type === 'deadline' && (
+                      <span className="text-sm text-gray-900 truncate">
+                        {event.caseName || event.caseNumber}
+                      </span>
+                    )}
                   </div>
-                  <Link
-                    href={`/admin/cases?id=${event.caseId}`}
-                    className="text-xs text-gray-500 hover:text-sage-600 block truncate"
-                  >
-                    {event.caseNumber}
-                    {event.clientName && ` · ${event.clientName}`}
-                  </Link>
-                  {event.location && (
-                    <p className="text-xs text-gray-400 truncate">{event.location}</p>
+                  {/* 둘째 줄: 사건번호 */}
+                  {event.caseNumber && (
+                    <p className="text-xs text-gray-500 truncate">
+                      {event.caseNumber}
+                    </p>
                   )}
+                  {/* 셋째 줄: 장소 | 출석변호사 */}
+                  <div className="flex items-center gap-2 text-xs text-gray-400 truncate">
+                    {event.location && (
+                      <span>{event.location}</span>
+                    )}
+                    {event.location && event.attendingLawyerName && (
+                      <span>|</span>
+                    )}
+                    {event.attendingLawyerName && (
+                      <span>출석: {event.attendingLawyerName}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* D-day */}
@@ -214,7 +280,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
                   </span>
                 </div>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

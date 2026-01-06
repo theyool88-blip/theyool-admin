@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Payment, PaymentCategory, ReceiptType, OfficeLocation } from '@/types/payment'
+import type { Payment, PaymentCategory, ReceiptType } from '@/types/payment'
 import { PAYMENT_CATEGORIES, RECEIPT_TYPES, formatCurrency } from '@/types/payment'
 
 interface CasePaymentsModalProps {
@@ -11,7 +11,6 @@ interface CasePaymentsModalProps {
   caseId: string
   caseName: string
   clientName?: string
-  officeLocation?: OfficeLocation
   onPaymentAdded?: () => void
 }
 
@@ -21,7 +20,6 @@ export default function CasePaymentsModal({
   caseId,
   caseName,
   clientName,
-  officeLocation,
   onPaymentAdded,
 }: CasePaymentsModalProps) {
   const [payments, setPayments] = useState<Payment[]>([])
@@ -85,7 +83,10 @@ export default function CasePaymentsModal({
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
-    return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+    const yy = String(date.getFullYear()).slice(2)
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `${yy}.${mm}.${dd}`
   }
 
   if (!isOpen) return null
@@ -127,7 +128,6 @@ export default function CasePaymentsModal({
               caseId={caseId}
               caseName={caseName}
               clientName={clientName}
-              officeLocation={officeLocation}
               onSuccess={handlePaymentAdded}
               onCancel={() => setShowAddForm(false)}
             />
@@ -221,14 +221,12 @@ function AddPaymentForm({
   caseId,
   caseName,
   clientName,
-  officeLocation,
   onSuccess,
   onCancel,
 }: {
   caseId: string
   caseName: string
   clientName?: string
-  officeLocation?: OfficeLocation
   onSuccess: () => void
   onCancel: () => void
 }) {
@@ -238,7 +236,6 @@ function AddPaymentForm({
     amount: '',
     payment_category: '' as PaymentCategory | '',
     receipt_type: '' as ReceiptType | '',
-    office_location: (officeLocation || '') as '평택' | '천안' | '',
     memo: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -274,7 +271,6 @@ function AddPaymentForm({
           amount: finalAmount,
           payment_category: formData.payment_category,
           receipt_type: formData.receipt_type || null,
-          office_location: formData.office_location || null,
           memo: formData.memo || null,
           is_confirmed: true,
         })
@@ -380,21 +376,6 @@ function AddPaymentForm({
                 {type}
               </option>
             ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">
-            사무소
-          </label>
-          <select
-            value={formData.office_location}
-            onChange={(e) => setFormData({ ...formData, office_location: e.target.value as '평택' | '천안' | '' })}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
-          >
-            <option value="">선택</option>
-            <option value="평택">평택</option>
-            <option value="천안">천안</option>
           </select>
         </div>
 

@@ -18,7 +18,12 @@ interface LegalCase {
   case_type: string | null
   client_id: string
   status: '진행중' | '종결'
-  office: '평택' | '천안' | '소송구조'
+  assigned_to?: string
+  assigned_member?: {
+    id: string
+    display_name: string
+    role: string
+  }
   contract_date: string
   court_case_number: string | null
   onedrive_folder_url: string | null
@@ -33,7 +38,6 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
   const cases = initialCases
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | '진행중' | '종결'>('진행중')
-  const [officeFilter, setOfficeFilter] = useState<'all' | '평택' | '천안' | '소송구조'>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const [casesPerPage, setCasesPerPage] = useState(50)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
@@ -50,10 +54,6 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
       filtered = filtered.filter(c => c.status === statusFilter)
     }
 
-    if (officeFilter !== 'all') {
-      filtered = filtered.filter(c => c.office === officeFilter)
-    }
-
     if (searchTerm) {
       const term = searchTerm.toLowerCase()
       filtered = filtered.filter(c =>
@@ -64,7 +64,7 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     }
 
     return filtered
-  }, [cases, officeFilter, searchTerm, statusFilter])
+  }, [cases, searchTerm, statusFilter])
 
   const indexOfLastCase = currentPage * casesPerPage
   const indexOfFirstCase = indexOfLastCase - casesPerPage
@@ -75,15 +75,6 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     return status === '진행중'
       ? 'bg-sage-100 text-sage-700'
       : 'bg-gray-100 text-gray-600'
-  }
-
-  const getOfficeStyle = (office: string) => {
-    switch (office) {
-      case '평택': return 'bg-blue-50 text-blue-700'
-      case '천안': return 'bg-purple-50 text-purple-700'
-      case '소송구조': return 'bg-amber-50 text-amber-700'
-      default: return 'bg-gray-100 text-gray-600'
-    }
   }
 
   const formatDate = (dateStr: string | null) => {
@@ -157,19 +148,6 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
             <option value="종결">종결</option>
           </select>
 
-          <select
-            value={officeFilter}
-            onChange={(e) => {
-              setOfficeFilter(e.target.value as 'all' | '평택' | '천안' | '소송구조')
-              setCurrentPage(1)
-            }}
-            className="px-2 py-1.5 border border-gray-200 rounded bg-white text-sm"
-          >
-            <option value="all">전체 지점</option>
-            <option value="평택">평택</option>
-            <option value="천안">천안</option>
-            <option value="소송구조">소송구조</option>
-          </select>
         </div>
 
         {/* Cases Table */}
@@ -182,7 +160,7 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
                   <th className="px-4 py-2.5 text-left font-medium">유형</th>
                   <th className="px-4 py-2.5 text-left font-medium">의뢰인</th>
                   <th className="px-4 py-2.5 text-left font-medium">사건명</th>
-                  <th className="px-4 py-2.5 text-center font-medium">지점</th>
+                  <th className="px-4 py-2.5 text-center font-medium">담당자</th>
                   <th className="px-4 py-2.5 text-center font-medium">상태</th>
                   <th className="px-4 py-2.5 text-center font-medium">액션</th>
                 </tr>
@@ -216,8 +194,8 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${getOfficeStyle(legalCase.office)}`}>
-                        {legalCase.office || '-'}
+                      <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-indigo-50 text-indigo-700">
+                        {legalCase.assigned_member?.display_name || '-'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -357,7 +335,6 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
           caseId={selectedCaseForPayment.id}
           caseName={selectedCaseForPayment.case_name}
           clientName={selectedCaseForPayment.client?.name}
-          officeLocation={selectedCaseForPayment.office}
           onPaymentAdded={handlePaymentAdded}
         />
       )}

@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AdminHeader from './AdminHeader'
+import { COURTS } from '@/lib/scourt/court-codes'
 
 interface Client {
   id: string
@@ -18,7 +19,7 @@ interface LegalCase {
   case_name: string
   client_id: string
   status: string
-  office: string | null
+  assigned_to: string | null
   contract_date: string | null
   retainer_fee: number | null
   total_received: number | null
@@ -32,7 +33,12 @@ interface LegalCase {
   judge_name: string | null
   notes: string | null
   onedrive_folder_url: string | null
+  client_role: 'plaintiff' | 'defendant' | null
+  opponent_name: string | null
+  enc_cs_no: string | null
+  scourt_case_name: string | null
   client?: Client
+  assigned_member?: { id: string; display_name: string | null; role: string } | null
 }
 
 interface SimpleCase {
@@ -79,7 +85,7 @@ export default function CaseEditForm({
     case_name: caseData.case_name || '',
     client_id: caseData.client_id || '',
     status: caseData.status || '진행중',
-    office: caseData.office || '',
+    assigned_to: caseData.assigned_to || '',
     contract_date: caseData.contract_date || '',
     retainer_fee: caseData.retainer_fee || 0,
     total_received: caseData.total_received || 0,
@@ -91,8 +97,31 @@ export default function CaseEditForm({
     application_type: caseData.application_type || '',
     judge_name: caseData.judge_name || '',
     notes: caseData.notes || '',
-    onedrive_folder_url: caseData.onedrive_folder_url || ''
+    onedrive_folder_url: caseData.onedrive_folder_url || '',
+    client_role: caseData.client_role || '' as 'plaintiff' | 'defendant' | '',
+    opponent_name: caseData.opponent_name || '',
+    enc_cs_no: caseData.enc_cs_no || '',
+    scourt_case_name: caseData.scourt_case_name || ''
   })
+
+  // 담당자 목록 (변호사)
+  const [lawyerMembers, setLawyerMembers] = useState<{id: string, display_name: string | null, role: string}[]>([])
+
+  // 대법원 검색 관련 상태
+  const [scourtSearching, setScourtSearching] = useState(false)
+  const [scourtSearchError, setScourtSearchError] = useState<string | null>(null)
+  const [scourtSearchPartyName, setScourtSearchPartyName] = useState('')  // 당사자이름 검색용
+
+  // 법원 선택 드롭다운
+  const [showCourtDropdown, setShowCourtDropdown] = useState(false)
+  const filteredCourts = COURTS.filter(c =>
+    c.name.includes(formData.court_name)
+  ).slice(0, 15)
+
+  // 대법원 검색 성공 여부
+  const [scourtSearchSuccess, setScourtSearchSuccess] = useState(false)
+  // 법원명 수정 알림
+  const [courtNameCorrected, setCourtNameCorrected] = useState<{original: string, corrected: string} | null>(null)
 
   // 사건종류 옵션 (카테고리별 그룹)
   const caseTypeOptions = [
@@ -163,7 +192,147 @@ export default function CaseEditForm({
       setLoadingClients(false)
     }
     fetchClients()
+
+    // 담당자 목록 불러오기
+    fetch('/api/admin/tenant/members?role=lawyer,admin,owner')
+      .then(res => res.json())
+      .then(data => {
+        if (data.members) {
+          setLawyerMembers(data.members)
+        }
+      })
+      .catch(err => console.error('담당자 목록 조회 실패:', err))
   }, [])
+
+  // 대법원 사건 검색 (사건번호, 법원, 당사자이름 3개 입력 필요)
+  const handleScourtSearch = async () => {
+    const caseNumber = formData.court_case_number.trim()
+    const courtName = formData.court_name.trim()
+    const partyName = scourtSearchPartyName.trim()
+
+    // 3개 필드 모두 입력 필요
+    if (!caseNumber || !courtName || !partyName) {
+      setScourtSearchError('사건번호, 법원, 당사자이름을 모두 입력해주세요.')
+      return
+    }
+
+    // 사건번호 파싱 (법원명 포함 가능: "수원가정법원 2024드단12345" 또는 "2024드단12345")
+    const caseNumberOnly = caseNumber.replace(/^[가-힣\s]+(?=\d)/, '').trim()
+    const caseNumberPattern = /^(\d{4})([가-힣]+)(\d+)$/
+    const match = caseNumberOnly.match(caseNumberPattern)
+
+    if (!match) {
+      setScourtSearchError('사건번호 형식이 올바르지 않습니다. 예: 2024드단12345')
+      return
+    }
+
+    const [, caseYear, caseType, caseSerial] = match
+
+    setScourtSearching(true)
+    setScourtSearchError(null)
+
+    try {
+      const response = await fetch('/api/admin/scourt/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          caseYear,
+          caseType,
+          caseSerial,
+          courtName,
+          partyName,
+          legalCaseId: caseData.id  // 스냅샷 저장용
+        })
+      })
+
+      const result = await response.json()
+
+      // 에러 타입별 처리
+      if (result.errorType === 'COURT_MISMATCH') {
+        // 법원명이 완전히 잘못됨 - 에러 표시
+        setScourtSearchError(`${result.error}`)
+        return
+      }
+
+      if (result.errorType === 'COURT_CORRECTION_NEEDED') {
+        // 법원명 수정 필요 - 사용자 확인 요청
+        const confirmed = window.confirm(
+          `입력한 법원: ${result.enteredCourt}\n` +
+          `실제 법원: ${result.suggestedCourt}\n\n` +
+          `"${result.suggestedCourt}"으로 수정하시겠습니까?`
+        )
+
+        if (confirmed) {
+          // 수정 확인 후 재요청
+          setScourtSearching(true)
+          const retryResponse = await fetch('/api/admin/scourt/search', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              caseYear,
+              caseType,
+              caseSerial,
+              courtName: result.suggestedCourt,  // 수정된 법원명
+              partyName,
+              legalCaseId: caseData.id,
+              confirmCourtCorrection: true  // 수정 확인 플래그
+            })
+          })
+          const retryResult = await retryResponse.json()
+
+          if (retryResult.success) {
+            // 수정된 법원명으로 폼 업데이트
+            setFormData(prev => ({
+              ...prev,
+              court_name: result.suggestedCourt,
+              client_role: retryResult.caseInfo.clientRole || prev.client_role,
+              enc_cs_no: retryResult.caseInfo.encCsNo || prev.enc_cs_no,
+            }))
+            setCourtNameCorrected({
+              original: result.enteredCourt,
+              corrected: result.suggestedCourt
+            })
+            setScourtSearchError(null)
+            setScourtSearchSuccess(true)
+          } else {
+            setScourtSearchError(retryResult.error || '사건 등록에 실패했습니다.')
+          }
+        } else {
+          setScourtSearchError('법원명을 확인 후 다시 검색해주세요.')
+        }
+        return
+      }
+
+      if (result.success && result.caseInfo) {
+        // 검색 성공 - 법원명 자동 수정 알림
+        if (result.courtNameCorrected) {
+          setCourtNameCorrected(result.courtNameCorrected)
+          console.log(`법원명 자동 수정: ${result.courtNameCorrected.original} → ${result.courtNameCorrected.corrected}`)
+        } else {
+          setCourtNameCorrected(null)
+        }
+
+        // 폼 데이터 업데이트
+        setFormData(prev => ({
+          ...prev,
+          court_name: result.caseInfo.courtName || prev.court_name,
+          client_role: result.caseInfo.clientRole || prev.client_role,
+          enc_cs_no: result.caseInfo.encCsNo || prev.enc_cs_no,
+        }))
+
+        setScourtSearchError(null)
+        setScourtSearchSuccess(true)
+        console.log(`✅ 연동 완료: 기일 ${result.detailData?.hearings || 0}건, 진행 ${result.detailData?.progress || 0}건`)
+      } else {
+        setScourtSearchError(result.error || '사건을 찾을 수 없습니다.')
+      }
+    } catch (error) {
+      console.error('대법원 검색 실패:', error)
+      setScourtSearchError('대법원 검색 중 오류가 발생했습니다.')
+    } finally {
+      setScourtSearching(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -185,7 +354,7 @@ export default function CaseEditForm({
           case_name: formData.case_name,
           client_id: formData.client_id,
           status: formData.status,
-          office: formData.office || null,
+          assigned_to: formData.assigned_to || null,
           contract_date: formData.contract_date || null,
           retainer_fee: formData.retainer_fee,
           total_received: formData.total_received,
@@ -197,7 +366,11 @@ export default function CaseEditForm({
           application_type: isApplicationCase ? (formData.application_type || null) : null,
           judge_name: formData.judge_name || null,
           notes: formData.notes || null,
-          onedrive_folder_url: formData.onedrive_folder_url || null
+          onedrive_folder_url: formData.onedrive_folder_url || null,
+          client_role: formData.client_role || null,
+          opponent_name: formData.opponent_name || null,
+          enc_cs_no: formData.enc_cs_no || null,
+          scourt_case_name: formData.scourt_case_name || null
         })
       })
 
@@ -321,7 +494,18 @@ export default function CaseEditForm({
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">의뢰인 *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">
+                  의뢰인 *
+                  {formData.client_role && (
+                    <span className={`ml-2 px-1.5 py-0.5 text-xs font-semibold rounded ${
+                      formData.client_role === 'plaintiff'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}>
+                      {formData.client_role === 'plaintiff' ? '원고' : '피고'}
+                    </span>
+                  )}
+                </label>
                 <select
                   value={formData.client_id}
                   onChange={(e) => setFormData({...formData, client_id: e.target.value})}
@@ -353,6 +537,30 @@ export default function CaseEditForm({
                 />
               </div>
               <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">의뢰인 역할</label>
+                <select
+                  value={formData.client_role}
+                  onChange={(e) => setFormData({...formData, client_role: e.target.value as 'plaintiff' | 'defendant' | ''})}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
+                >
+                  <option value="">선택하세요</option>
+                  <option value="plaintiff">원고</option>
+                  <option value="defendant">피고</option>
+                </select>
+                <p className="text-xs text-gray-400 mt-1">대법원 검색 시 자동 판별됩니다</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">상대방 이름</label>
+                <input
+                  type="text"
+                  value={formData.opponent_name}
+                  onChange={(e) => setFormData({...formData, opponent_name: e.target.value})}
+                  placeholder="예: 김철수"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
+                />
+                <p className="text-xs text-gray-400 mt-1">사건 상세에서 실명으로 표시됩니다</p>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">상태</label>
                 <select
                   value={formData.status}
@@ -364,35 +572,148 @@ export default function CaseEditForm({
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">지점</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1">담당 변호사</label>
                 <select
-                  value={formData.office}
-                  onChange={(e) => setFormData({...formData, office: e.target.value})}
+                  value={formData.assigned_to}
+                  onChange={(e) => setFormData({...formData, assigned_to: e.target.value})}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
                 >
-                  <option value="">선택</option>
-                  <option value="평택">평택</option>
-                  <option value="천안">천안</option>
-                  <option value="소송구조">소송구조</option>
+                  <option value="">선택하세요</option>
+                  {lawyerMembers.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.display_name || '이름 없음'}
+                      {member.role === 'owner' && ' (대표)'}
+                    </option>
+                  ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">사건번호</label>
-                <input
-                  type="text"
-                  value={formData.court_case_number}
-                  onChange={(e) => setFormData({...formData, court_case_number: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">법원</label>
-                <input
-                  type="text"
-                  value={formData.court_name}
-                  onChange={(e) => setFormData({...formData, court_name: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
+              {/* 대법원 검색 섹션 */}
+              <div className={`md:col-span-2 p-4 rounded-lg border ${scourtSearchSuccess ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
+                {scourtSearchSuccess ? (
+                  // 검색 성공 시 결과 표시
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-green-800 flex items-center gap-2">
+                        <span className="text-green-600">✓</span> 대법원 사건 연동 완료
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScourtSearchSuccess(false)
+                          setScourtSearchError(null)
+                          setCourtNameCorrected(null)
+                        }}
+                        className="px-3 py-1 text-xs font-medium text-green-700 border border-green-300 rounded hover:bg-green-100"
+                      >
+                        다시 검색
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+                      <div>
+                        <span className="text-green-700 text-xs">사건번호</span>
+                        <p className="font-medium text-green-900">{formData.court_case_number}</p>
+                      </div>
+                      <div>
+                        <span className="text-green-700 text-xs">법원</span>
+                        <p className="font-medium text-green-900">{formData.court_name}</p>
+                      </div>
+                      {formData.client_role && (
+                        <div>
+                          <span className="text-green-700 text-xs">의뢰인 지위</span>
+                          <p className="font-medium text-green-900">{formData.client_role === 'plaintiff' ? '원고' : '피고'}</p>
+                        </div>
+                      )}
+                    </div>
+                    <p className="mt-2 text-xs text-green-700">
+                      나의사건검색에 등록되어 기일/송달 정보가 자동 동기화됩니다.
+                    </p>
+                    {/* 법원명 수정 알림 */}
+                    {courtNameCorrected && (
+                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                        <span className="text-yellow-700 font-medium">ℹ️ 법원명이 수정되었습니다:</span>
+                        <span className="text-yellow-900 ml-1">
+                          {courtNameCorrected.original} → {courtNameCorrected.corrected}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  // 검색 폼
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-blue-900">대법원 사건 검색</h3>
+                      <button
+                        type="button"
+                        onClick={handleScourtSearch}
+                        disabled={scourtSearching}
+                        className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {scourtSearching ? '검색중...' : '검색'}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-blue-700 mb-1">사건번호 *</label>
+                        <input
+                          type="text"
+                          value={formData.court_case_number}
+                          onChange={(e) => setFormData({...formData, court_case_number: e.target.value})}
+                          placeholder="2024드단12345"
+                          className="w-full px-3 py-2 text-sm border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                      <div className="relative">
+                        <label className="block text-xs font-medium text-blue-700 mb-1">법원 *</label>
+                        <input
+                          type="text"
+                          value={formData.court_name}
+                          onChange={(e) => {
+                            setFormData({...formData, court_name: e.target.value})
+                            setShowCourtDropdown(true)
+                          }}
+                          onFocus={() => setShowCourtDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowCourtDropdown(false), 150)}
+                          placeholder="검색 또는 선택..."
+                          className="w-full px-3 py-2 text-sm border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        />
+                        {showCourtDropdown && filteredCourts.length > 0 && (
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                            {filteredCourts.map(c => (
+                              <div
+                                key={c.code}
+                                className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 text-gray-900"
+                                onMouseDown={() => {
+                                  setFormData({...formData, court_name: c.name})
+                                  setShowCourtDropdown(false)
+                                }}
+                              >
+                                {c.name}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-blue-700 mb-1">당사자이름 *</label>
+                        <input
+                          type="text"
+                          value={scourtSearchPartyName}
+                          onChange={(e) => setScourtSearchPartyName(e.target.value)}
+                          placeholder="의뢰인 또는 상대방 이름"
+                          className="w-full px-3 py-2 text-sm border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        />
+                      </div>
+                    </div>
+                    {scourtSearchError && (
+                      <p className="mt-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
+                        ⚠️ {scourtSearchError}
+                      </p>
+                    )}
+                    <p className="mt-2 text-xs text-blue-600">
+                      검색 성공 시 법원, 판사, 원고/피고 정보가 자동으로 입력됩니다.
+                    </p>
+                  </>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">담당 판사</label>

@@ -20,13 +20,18 @@ export const GET = withTenant(async (request, { tenant }) => {
         case_type,
         client_id,
         status,
-        office,
         contract_date,
         court_case_number,
         tenant_id,
+        assigned_to,
         client:clients (
           id,
           name
+        ),
+        assigned_member:tenant_members!assigned_to (
+          id,
+          display_name,
+          role
         )
       `)
       .order('created_at', { ascending: false })
@@ -99,12 +104,16 @@ export const POST = withTenant(async (request, { tenant }) => {
         birth_date?: string
         address?: string
       }
-      office?: string
+      assigned_to?: string
       status?: string
       contract_date?: string
       retainer_fee?: number
+      success_fee_agreement?: string
       notes?: string
-      is_new_case?: boolean
+      court_case_number?: string
+      court_name?: string
+      judge_name?: string
+      client_role?: 'plaintiff' | 'defendant'
     }
 
     // Validate required fields
@@ -166,12 +175,16 @@ export const POST = withTenant(async (request, { tenant }) => {
         case_name: body.case_name,
         client_id: clientId,
         case_type: body.case_type,
-        office: body.office || '평택',
+        assigned_to: body.assigned_to || null,
         status: body.status || '진행중',
         contract_date: body.contract_date || new Date().toISOString().split('T')[0],
         retainer_fee: body.retainer_fee || null,
+        success_fee_agreement: body.success_fee_agreement || null,
         notes: body.notes || null,
-        is_new_case: body.is_new_case ?? true
+        court_case_number: body.court_case_number || null,
+        court_name: body.court_name || null,
+        judge_name: body.judge_name || null,
+        client_role: body.client_role || null
       }, tenant)])
       .select()
       .single()

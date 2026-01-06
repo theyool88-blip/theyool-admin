@@ -28,7 +28,7 @@ export async function PATCH(
         case_name: body.case_name,
         client_id: body.client_id,
         status: body.status,
-        office: body.office || null,
+        assigned_to: body.assigned_to || null,
         contract_date: body.contract_date || null,
         retainer_fee: body.retainer_fee,
         total_received: body.total_received,
@@ -40,7 +40,11 @@ export async function PATCH(
         application_type: body.application_type || null,
         judge_name: body.judge_name || null,
         notes: body.notes || null,
-        onedrive_folder_url: body.onedrive_folder_url || null
+        onedrive_folder_url: body.onedrive_folder_url || null,
+        client_role: body.client_role || null,
+        opponent_name: body.opponent_name || null,
+        enc_cs_no: body.enc_cs_no || null,
+        scourt_case_name: body.scourt_case_name || null
       })
       .eq('id', id)
       .select()
@@ -93,6 +97,11 @@ export async function GET(
           id,
           name,
           phone
+        ),
+        assigned_member:tenant_members!assigned_to (
+          id,
+          display_name,
+          role
         )
       `)
       .eq('id', id)

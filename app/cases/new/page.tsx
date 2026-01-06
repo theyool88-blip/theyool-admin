@@ -3,7 +3,17 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import NewCaseForm from '@/components/NewCaseForm'
 
-export default async function NewCasePage() {
+interface PageProps {
+  searchParams: Promise<{
+    caseNumber?: string
+    courtName?: string
+    clientId?: string
+    partyName?: string  // 대법원 연동용 당사자명
+  }>
+}
+
+export default async function NewCasePage({ searchParams }: PageProps) {
+  const params = await searchParams
   const supabase = await createClient()
 
   const {
@@ -32,5 +42,13 @@ export default async function NewCasePage() {
     .select('id, name, phone, email')
     .order('created_at', { ascending: false })
 
-  return <NewCaseForm clients={clients || []} />
+  return (
+    <NewCaseForm
+      clients={clients || []}
+      initialCaseNumber={params.caseNumber}
+      initialCourtName={params.courtName}
+      initialClientId={params.clientId}
+      initialPartyName={params.partyName}
+    />
+  )
 }

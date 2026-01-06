@@ -26,7 +26,6 @@ interface CaseInfo {
   office: string;
   contract_date: string;
   created_at: string;
-  is_new_case: boolean;
   onedrive_folder_url: string | null;
 }
 
@@ -107,10 +106,10 @@ export async function GET(
       );
     }
 
-    // 2. 의뢰인의 사건 목록 조회 (is_new_case 필드 포함)
+    // 2. 의뢰인의 사건 목록 조회
     const { data: cases, error: casesError } = await supabase
       .from('legal_cases')
-      .select('id, case_name, contract_number, case_type, status, office, contract_date, created_at, is_new_case, onedrive_folder_url')
+      .select('id, case_name, contract_number, case_type, status, office, contract_date, created_at, onedrive_folder_url')
       .eq('client_id', clientId)
       .order('created_at', { ascending: false });
 

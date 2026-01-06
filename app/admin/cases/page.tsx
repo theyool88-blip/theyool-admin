@@ -19,7 +19,12 @@ interface LegalCase {
   case_type: string | null
   client_id: string
   status: '진행중' | '종결'
-  office: '평택' | '천안' | '소송구조'
+  assigned_to?: string
+  assigned_member?: {
+    id: string
+    display_name: string
+    role: string
+  }
   contract_date: string
   court_case_number: string | null
   client?: Client
@@ -33,9 +38,6 @@ interface CasesSummary {
   total_count: number
   active_count: number
   closed_count: number
-  pyeongtaek_count: number
-  cheonan_count: number
-  sosong_count: number
 }
 
 export default function CasesPage() {
@@ -47,7 +49,6 @@ export default function CasesPage() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | '진행중' | '종결'>('진행중')
-  const [officeFilter, setOfficeFilter] = useState<'all' | '평택' | '천안' | '소송구조'>('all')
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -83,9 +84,6 @@ export default function CasesPage() {
       total_count: cases.length,
       active_count: cases.filter(c => c.status === '진행중').length,
       closed_count: cases.filter(c => c.status === '종결').length,
-      pyeongtaek_count: cases.filter(c => c.office === '평택').length,
-      cheonan_count: cases.filter(c => c.office === '천안').length,
-      sosong_count: cases.filter(c => c.office === '소송구조').length,
     }
   }, [cases])
 
@@ -95,10 +93,6 @@ export default function CasesPage() {
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(c => c.status === statusFilter)
-    }
-
-    if (officeFilter !== 'all') {
-      filtered = filtered.filter(c => c.office === officeFilter)
     }
 
     if (searchTerm) {
@@ -112,7 +106,7 @@ export default function CasesPage() {
     }
 
     return filtered
-  }, [cases, statusFilter, officeFilter, searchTerm])
+  }, [cases, statusFilter, searchTerm])
 
   // Pagination
   const indexOfLastCase = currentPage * casesPerPage
@@ -149,15 +143,6 @@ export default function CasesPage() {
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}.${month}.${day}`
-  }
-
-  const getOfficeStyle = (office: string) => {
-    switch (office) {
-      case '평택': return 'bg-sage-100 text-sage-700'
-      case '천안': return 'bg-blue-50 text-blue-700'
-      case '소송구조': return 'bg-amber-50 text-amber-700'
-      default: return 'bg-gray-100 text-gray-600'
-    }
   }
 
   if (loading) {
@@ -228,20 +213,6 @@ export default function CasesPage() {
             <option value="종결">종결</option>
           </select>
 
-          {/* Office Filter */}
-          <select
-            value={officeFilter}
-            onChange={(e) => {
-              setOfficeFilter(e.target.value as 'all' | '평택' | '천안' | '소송구조')
-              setCurrentPage(1)
-            }}
-            className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-sage-500"
-          >
-            <option value="all">전체 지점</option>
-            <option value="평택">평택</option>
-            <option value="천안">천안</option>
-            <option value="소송구조">소송구조</option>
-          </select>
         </div>
 
         {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
@@ -257,7 +228,7 @@ export default function CasesPage() {
               {/* Table Header */}
               <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium">
                 <div className="col-span-1 text-center">계약일</div>
-                <div className="col-span-1 text-center">지점</div>
+                <div className="col-span-1 text-center">담당자</div>
                 <div className="col-span-1 text-center">의뢰인</div>
                 <div className="col-span-3">사건명</div>
                 <div className="col-span-2">사건번호</div>
@@ -278,8 +249,8 @@ export default function CasesPage() {
                     <div className="md:hidden space-y-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <span className={`px-1.5 py-0.5 text-xs rounded ${getOfficeStyle(legalCase.office)}`}>
-                            {legalCase.office}
+                          <span className="px-1.5 py-0.5 text-xs rounded bg-indigo-50 text-indigo-700">
+                            {legalCase.assigned_member?.display_name || '-'}
                           </span>
                           <span className="text-xs text-gray-500">{formatDate(legalCase.contract_date)}</span>
                         </div>
@@ -327,8 +298,8 @@ export default function CasesPage() {
                       {formatDate(legalCase.contract_date)}
                     </div>
                     <div className="hidden md:block col-span-1 text-center">
-                      <span className={`px-1.5 py-0.5 text-xs rounded ${getOfficeStyle(legalCase.office)}`}>
-                        {legalCase.office}
+                      <span className="px-1.5 py-0.5 text-xs rounded bg-indigo-50 text-indigo-700">
+                        {legalCase.assigned_member?.display_name || '-'}
                       </span>
                     </div>
                     <div className="hidden md:block col-span-1 text-center text-sm font-medium text-gray-900 truncate">
@@ -452,7 +423,6 @@ export default function CasesPage() {
           caseId={selectedCaseForPayment.id}
           caseName={selectedCaseForPayment.case_name}
           clientName={selectedCaseForPayment.client?.name}
-          officeLocation={selectedCaseForPayment.office}
           onPaymentAdded={handlePaymentAdded}
         />
       )}

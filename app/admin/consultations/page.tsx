@@ -569,7 +569,10 @@ export default function AdminConsultationsPage() {
                 <div>
                   <span className="text-gray-500">접수일</span>
                   <p className="font-medium text-gray-900">
-                    {new Date(selectedConsultation.created_at).toLocaleDateString('ko-KR')}
+                    {(() => {
+                      const d = new Date(selectedConsultation.created_at)
+                      return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+                    })()}
                   </p>
                 </div>
                 {selectedConsultation.email && (
@@ -662,7 +665,10 @@ export default function AdminConsultationsPage() {
                             {requestTypeLabels[prevConsultation.request_type] || prevConsultation.request_type}
                           </span>
                           <span className="text-gray-400">
-                            {new Date(prevConsultation.created_at).toLocaleDateString('ko-KR')}
+                            {(() => {
+                              const d = new Date(prevConsultation.created_at)
+                              return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+                            })()}
                           </span>
                         </button>
                       ))}

@@ -56,22 +56,18 @@ export async function PATCH(
 
     const body: UpdatePaymentRequest = await request.json()
 
-    let officeFromCase: string | null | undefined = undefined
     let caseNameFromCase: string | null | undefined = undefined
     if (body.case_id) {
       const { data: caseRow, error: caseError } = await supabase
         .from('legal_cases')
-        .select('office, case_name')
+        .select('case_name')
         .eq('id', body.case_id)
         .single()
       if (caseError) {
-        console.error('Failed to fetch case office:', caseError)
+        console.error('Failed to fetch case name:', caseError)
       } else {
-        officeFromCase = caseRow?.office || null
         caseNameFromCase = caseRow?.case_name || null
       }
-    } else if (body.case_id === null) {
-      officeFromCase = null
     }
 
     const shouldConfirm = !!(body.case_id || body.consultation_id || body.is_confirmed)
@@ -79,9 +75,6 @@ export async function PATCH(
       .from('payments')
       .update({
         ...body,
-        office_location: officeFromCase !== undefined
-          ? officeFromCase
-          : (body.office_location ?? undefined),
         case_name: body.case_name || caseNameFromCase || body.case_name,
         is_confirmed: shouldConfirm,
         confirmed_at: shouldConfirm ? new Date().toISOString() : body.confirmed_at ?? null,

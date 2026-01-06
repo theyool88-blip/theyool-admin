@@ -77,32 +77,6 @@ export default function PaymentStatsPage() {
           </div>
         </div>
 
-        {/* Office Summary */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">평택 사무실</div>
-                <div className="text-xl font-bold text-sage-600">{formatCurrency(stats.pyeongtaek_amount)}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-500">{stats.pyeongtaek_count.toLocaleString()}건</div>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-xs text-gray-500 mb-1">천안 사무실</div>
-                <div className="text-xl font-bold text-indigo-600">{formatCurrency(stats.cheonan_amount)}</div>
-              </div>
-              <div className="text-right">
-                <div className="text-sm text-gray-500">{stats.cheonan_count.toLocaleString()}건</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Category Stats */}
         <div className="bg-white rounded-lg border border-gray-200 mb-4">
           <div className="px-4 py-3 border-b border-gray-100">
@@ -114,28 +88,12 @@ export default function PaymentStatsPage() {
             <div className="divide-y divide-gray-100">
               {stats.by_category.map((cat) => (
                 <div key={cat.payment_category} className="px-4 py-3">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-between">
                     <div>
                       <span className="text-sm font-medium text-gray-900">{cat.payment_category}</span>
                       <span className="ml-2 text-xs text-gray-400">{cat.payment_count}건</span>
                     </div>
                     <span className="text-sm font-bold text-gray-900">{formatCurrency(cat.total_amount)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="bg-sage-50 rounded px-2 py-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-sage-700">평택</span>
-                        <span className="text-xs font-medium text-sage-800">{formatCurrency(cat.pyeongtaek_total)}</span>
-                      </div>
-                      <div className="text-[10px] text-sage-600">{cat.pyeongtaek_count}건</div>
-                    </div>
-                    <div className="bg-indigo-50 rounded px-2 py-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs text-indigo-700">천안</span>
-                        <span className="text-xs font-medium text-indigo-800">{formatCurrency(cat.cheonan_total)}</span>
-                      </div>
-                      <div className="text-[10px] text-indigo-600">{cat.cheonan_count}건</div>
-                    </div>
                   </div>
                 </div>
               ))}
@@ -178,7 +136,10 @@ export default function PaymentStatsPage() {
                     return (
                       <div key={month} className="flex items-center gap-3">
                         <div className="w-20 text-xs text-gray-500">
-                          {new Date(month).toLocaleDateString('ko-KR', { year: '2-digit', month: 'short' })}
+                          {(() => {
+                            const d = new Date(month)
+                            return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}`
+                          })()}
                         </div>
                         <div className="flex-1">
                           <div className="w-full bg-gray-100 rounded-full h-4">
@@ -196,57 +157,6 @@ export default function PaymentStatsPage() {
                     )
                   })}
               </div>
-            </div>
-          )}
-        </div>
-
-        {/* Office Detail Table */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-900">사무실별 상세 통계</h2>
-          </div>
-          {!stats.by_office?.length ? (
-            <div className="py-8 text-center text-gray-400 text-sm">데이터 없음</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium">사무실</th>
-                    <th className="px-4 py-2 text-left font-medium">명목</th>
-                    <th className="px-4 py-2 text-right font-medium">건수</th>
-                    <th className="px-4 py-2 text-right font-medium">총액</th>
-                    <th className="px-4 py-2 text-right font-medium">평균</th>
-                    <th className="px-4 py-2 text-left font-medium">기간</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {stats.by_office.map((office, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-4 py-2">
-                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
-                          office.office_location === '평택'
-                            ? 'bg-sage-100 text-sage-700'
-                            : 'bg-indigo-100 text-indigo-700'
-                        }`}>
-                          {office.office_location}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2 text-gray-700">{office.payment_category}</td>
-                      <td className="px-4 py-2 text-right text-gray-600">{office.payment_count}건</td>
-                      <td className="px-4 py-2 text-right font-medium text-gray-900">
-                        {formatCurrency(parseInt(office.total_amount.toString()))}
-                      </td>
-                      <td className="px-4 py-2 text-right text-gray-500">
-                        {formatCurrency(Math.round(office.avg_amount))}
-                      </td>
-                      <td className="px-4 py-2 text-xs text-gray-400">
-                        {office.first_payment} ~ {office.last_payment}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>

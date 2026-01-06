@@ -23,6 +23,7 @@ export const GET = withTenant(async (request, { tenant }) => {
       .order('event_time', { ascending: true })
 
     // 테넌트 격리 필터
+    console.log('캘린더 API - tenant:', { isSuperAdmin: tenant.isSuperAdmin, tenantId: tenant.tenantId })
     if (!tenant.isSuperAdmin && tenant.tenantId) {
       query = query.eq('tenant_id', tenant.tenantId)
     }

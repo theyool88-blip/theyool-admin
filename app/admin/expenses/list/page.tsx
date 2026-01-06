@@ -13,7 +13,6 @@ export default function ExpenseListPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
-  const [locationFilter, setLocationFilter] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -24,7 +23,6 @@ export default function ExpenseListPage() {
     try {
       const params = new URLSearchParams()
       if (categoryFilter) params.append('category', categoryFilter)
-      if (locationFilter) params.append('location', locationFilter)
       if (startDate) params.append('startDate', startDate)
       if (endDate) params.append('endDate', endDate)
 
@@ -38,7 +36,7 @@ export default function ExpenseListPage() {
     } finally {
       setLoading(false)
     }
-  }, [categoryFilter, endDate, locationFilter, startDate])
+  }, [categoryFilter, endDate, startDate])
 
   useEffect(() => {
     fetchExpenses()
@@ -80,7 +78,6 @@ export default function ExpenseListPage() {
   })
 
   const categories = ['임대료', '인건비', '필수운영비', '마케팅비', '광고비', '세금', '식대', '구독료', '기타']
-  const locations = ['천안', '평택', '공통']
 
   const handleExport = () => {
     const filename = `지출내역_${startDate || new Date().toISOString().slice(0, 7)}.xlsx`
@@ -89,12 +86,11 @@ export default function ExpenseListPage() {
 
   const clearFilters = () => {
     setCategoryFilter('')
-    setLocationFilter('')
     setStartDate('')
     setEndDate('')
   }
 
-  const hasActiveFilters = categoryFilter || locationFilter || startDate || endDate
+  const hasActiveFilters = categoryFilter || startDate || endDate
 
   return (
     <div className="min-h-screen bg-sage-50 pt-16">
@@ -164,7 +160,7 @@ export default function ExpenseListPage() {
               <span className="hidden sm:inline font-medium">필터</span>
               {hasActiveFilters && (
                 <span className="w-5 h-5 bg-sage-600 text-white text-xs rounded-full flex items-center justify-center font-medium">
-                  {[categoryFilter, locationFilter, startDate, endDate].filter(Boolean).length}
+                  {[categoryFilter, startDate, endDate].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -197,21 +193,6 @@ export default function ExpenseListPage() {
                     <option value="">전체 카테고리</option>
                     {categories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Location Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-sage-600 mb-1.5">지역</label>
-                  <select
-                    value={locationFilter}
-                    onChange={(e) => setLocationFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 text-base border border-sage-300 rounded-xl focus:ring-2 focus:ring-sage-500 focus:border-transparent bg-white min-h-[44px] text-sage-800"
-                  >
-                    <option value="">전체 지역</option>
-                    {locations.map(loc => (
-                      <option key={loc} value={loc}>{loc}</option>
                     ))}
                   </select>
                 </div>
@@ -301,13 +282,10 @@ export default function ExpenseListPage() {
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-sage-100">
                     <div className="flex items-center gap-3 text-sm text-sage-500">
-                      <span>{new Date(expense.expense_date).toLocaleDateString('ko-KR')}</span>
-                      {expense.office_location && (
-                        <>
-                          <span className="text-sage-300">|</span>
-                          <span>{expense.office_location}</span>
-                        </>
-                      )}
+                      <span>{(() => {
+                        const d = new Date(expense.expense_date)
+                        return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+                      })()}</span>
                     </div>
                     <div className="flex gap-1">
                       <button
@@ -349,9 +327,6 @@ export default function ExpenseListPage() {
                         금액
                       </th>
                       <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
-                        지역
-                      </th>
-                      <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
                         유형
                       </th>
                       <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
@@ -364,7 +339,10 @@ export default function ExpenseListPage() {
                       <tr key={expense.id} className="hover:bg-sage-50 transition-colors">
                         <td className="px-5 py-4 whitespace-nowrap">
                           <span className="text-base text-sage-800">
-                            {new Date(expense.expense_date).toLocaleDateString('ko-KR')}
+                            {(() => {
+                              const d = new Date(expense.expense_date)
+                              return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
+                            })()}
                           </span>
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap">
@@ -385,11 +363,6 @@ export default function ExpenseListPage() {
                             {expense.amount.toLocaleString()}
                           </span>
                           <span className="text-sm text-sage-500 ml-0.5">원</span>
-                        </td>
-                        <td className="px-5 py-4 whitespace-nowrap text-center">
-                          <span className="text-base text-sage-600">
-                            {expense.office_location || '-'}
-                          </span>
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap text-center">
                           {expense.is_recurring ? (

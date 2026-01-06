@@ -127,29 +127,25 @@ export const GET = withTenant(async (request, { tenant }) => {
     // 3. Cases Stats
     let allCasesQuery = adminSupabase
       .from('legal_cases')
-      .select('id, status, office, created_at, is_new_case')
+      .select('id, status, office, created_at')
     allCasesQuery = addTenantFilter(allCasesQuery)
     const { data: allCases } = await allCasesQuery
 
     let thisMonthCasesQuery = adminSupabase
       .from('legal_cases')
-      .select('id, status, is_new_case')
+      .select('id, status')
       .gte('created_at', thisMonthStart.toISOString())
     thisMonthCasesQuery = addTenantFilter(thisMonthCasesQuery)
     const { data: thisMonthCases } = await thisMonthCasesQuery
 
     const activeCases = allCases?.filter(c => c.status === '진행중').length || 0
     const completedCases = allCases?.filter(c => c.status === '완료').length || 0
-    const newCases = allCases?.filter(c => c.is_new_case).length || 0
-    const existingCases = (allCases?.length || 0) - newCases
 
     const casesStats = {
       total: allCases?.length || 0,
       active: activeCases,
       completed: completedCases,
       thisMonth: thisMonthCases?.length || 0,
-      newCases,
-      existingCases,
       byOffice: {
         pyeongtaek: allCases?.filter(c => c.office === '평택').length || 0,
         cheonan: allCases?.filter(c => c.office === '천안').length || 0,

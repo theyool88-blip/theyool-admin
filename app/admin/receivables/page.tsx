@@ -197,7 +197,13 @@ export default function ReceivablesPage() {
     } catch {}
   }
 
-  const fmtDate = (d: string) => new Date(d).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+  const fmtDate = (d: string) => {
+    const date = new Date(d)
+    const yy = String(date.getFullYear()).slice(2)
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    return `${yy}.${mm}.${dd}`
+  }
 
   if (loading) {
     return (

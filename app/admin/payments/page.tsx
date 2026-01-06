@@ -29,7 +29,6 @@ export default function PaymentsPage() {
   const [totalCount, setTotalCount] = useState(0)
 
   // Filters
-  const [officeFilter, setOfficeFilter] = useState<string>('')
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [depositorSearch, setDepositorSearch] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -48,7 +47,6 @@ export default function PaymentsPage() {
     setLoading(true)
     try {
       const params = new URLSearchParams()
-      if (officeFilter) params.append('office_location', officeFilter)
       if (categoryFilter) params.append('payment_category', categoryFilter)
       if (depositorSearch) params.append('depositor_name', depositorSearch)
       if (fromDate) params.append('from_date', fromDate)
@@ -71,7 +69,7 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [officeFilter, categoryFilter, depositorSearch, fromDate, toDate, confirmationFilter, currentPage, limit])
+  }, [categoryFilter, depositorSearch, fromDate, toDate, confirmationFilter, currentPage, limit])
 
   useEffect(() => {
     fetchPayments()
@@ -102,7 +100,6 @@ export default function PaymentsPage() {
   }
 
   function resetFilters() {
-    setOfficeFilter('')
     setCategoryFilter('')
     setDepositorSearch('')
     setFromDate('')
@@ -189,16 +186,6 @@ export default function PaymentsPage() {
             </div>
 
             <select
-              value={officeFilter}
-              onChange={(e) => { setOfficeFilter(e.target.value); setCurrentPage(1) }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[40px]"
-            >
-              <option value="">전체 사무소</option>
-              <option value="평택">평택</option>
-              <option value="천안">천안</option>
-            </select>
-
-            <select
               value={categoryFilter}
               onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1) }}
               className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[40px]"
@@ -269,7 +256,6 @@ export default function PaymentsPage() {
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">입금일</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">입금인</th>
                       <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">입금액</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">사무실</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">명목</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 min-w-[150px]">사건명</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 min-w-[100px]">메모</th>
@@ -294,7 +280,6 @@ export default function PaymentsPage() {
                         <td className="px-4 py-3 text-sm text-gray-700">{p.payment_date}</td>
                         <td className="px-4 py-3 text-sm text-gray-900">{p.depositor_name}</td>
                         <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(p.amount)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{p.office_location || '-'}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{p.payment_category}</td>
                         <td className="px-4 py-3">
                           {p.case_id ? (
@@ -346,7 +331,6 @@ export default function PaymentsPage() {
                     </div>
                     <div className="text-sm text-gray-900 mb-1">{p.depositor_name}</div>
                     <div className="text-xs text-gray-500 mb-2">
-                      {p.office_location && <span>{p.office_location} · </span>}
                       {p.payment_category}
                       {p.case_name && <span> · {p.case_name}</span>}
                     </div>
@@ -426,7 +410,6 @@ function PaymentFormModal({
     payment_date: payment?.payment_date || new Date().toISOString().split('T')[0],
     depositor_name: payment?.depositor_name || '',
     amount: payment ? payment.amount.toLocaleString('ko-KR') : '',
-    office_location: payment?.office_location || '',
     payment_category: payment?.payment_category || '',
     case_id: payment?.case_id || '',
     case_name: payment?.case_name || '',
@@ -475,7 +458,6 @@ function PaymentFormModal({
           body: JSON.stringify({
             ...formData,
             amount: parsedAmount,
-            office_location: formData.office_location || null,
             case_id: linkageType === 'case' ? (formData.case_id || null) : null,
             consultation_id: linkageType === 'consultation' ? (formData.consultation_id || null) : null,
             receipt_type: formData.receipt_type || null,
@@ -537,18 +519,6 @@ function PaymentFormModal({
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
                   placeholder="1,000,000"
                 />
-              </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">사무실</label>
-                <select
-                  value={formData.office_location}
-                  onChange={(e) => setFormData({ ...formData, office_location: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
-                >
-                  <option value="">미지정</option>
-                  <option value="평택">평택</option>
-                  <option value="천안">천안</option>
-                </select>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">명목 *</label>
@@ -656,7 +626,6 @@ function PaymentFormModal({
                                   ...prev,
                                   case_id: caseItem.id,
                                   case_name: caseItem.case_name,
-                                  office_location: caseItem.office === '평택' || caseItem.office === '천안' ? caseItem.office : prev.office_location,
                                 }))
                                 setSelectedLabel(caseItem.case_name)
                               } else {

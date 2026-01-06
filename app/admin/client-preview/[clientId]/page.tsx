@@ -21,7 +21,6 @@ interface Case {
   office: string;
   contract_date: string;
   created_at: string;
-  is_new_case: boolean;
   onedrive_folder_url: string | null;
 }
 
@@ -95,15 +94,7 @@ export default function ClientPortalPreview() {
       )[0];
     }
 
-    const newCases = activeCases.filter(c => c.is_new_case === true);
-
-    if (newCases.length > 0) {
-      return newCases.sort((a, b) =>
-        new Date(a.contract_date || a.created_at).getTime() -
-        new Date(b.contract_date || b.created_at).getTime()
-      )[0];
-    }
-
+    // 가장 최근 사건 반환
     return activeCases.sort((a, b) =>
       new Date(a.contract_date || a.created_at).getTime() -
       new Date(b.contract_date || b.created_at).getTime()
@@ -236,12 +227,15 @@ export default function ClientPortalPreview() {
     const day = date.getDate();
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
     const weekday = weekdays[date.getDay()];
+    const yy = String(year).slice(2);
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
     return {
       month,
       day,
       weekday,
-      full: `${year}년 ${month}월 ${day}일 (${weekday})`,
-      simple: `${String(year).slice(2)}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')}`
+      full: `${yy}.${mm}.${dd}(${weekday})`,
+      simple: `${yy}.${mm}.${dd}`
     };
   };
 

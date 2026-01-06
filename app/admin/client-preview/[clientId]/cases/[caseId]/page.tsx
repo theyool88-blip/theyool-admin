@@ -102,12 +102,15 @@ export default function CaseDetailPreview() {
     const day = date.getDate();
     const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
     const weekday = weekdays[date.getDay()];
+    const yy = String(year).slice(2);
+    const mm = String(month).padStart(2, '0');
+    const dd = String(day).padStart(2, '0');
     return {
       month,
       day,
       weekday,
-      full: `${year}년 ${month}월 ${day}일 (${weekday})`,
-      simple: `${String(year).slice(2)}.${String(month).padStart(2, '0')}.${String(day).padStart(2, '0')}`
+      full: `${yy}.${mm}.${dd}(${weekday})`,
+      simple: `${yy}.${mm}.${dd}`
     };
   };
 

@@ -241,8 +241,7 @@ export default function RecurringExpensesPage() {
                           {template.amount.toLocaleString()}<span className="text-sm font-medium">원</span>
                         </p>
                       </div>
-                      <div className="flex items-center justify-between pt-3 border-t border-sage-100">
-                        <span className="text-sm text-sage-500">{template.office_location || '공통'}</span>
+                      <div className="flex items-center justify-end pt-3 border-t border-sage-100">
                         <div className="flex gap-1">
                           <button
                             onClick={() => toggleActive(template.id, template.is_active)}
@@ -285,9 +284,6 @@ export default function RecurringExpensesPage() {
                           금액
                         </th>
                         <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
-                          지역
-                        </th>
-                        <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
                           발생일
                         </th>
                         <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
@@ -313,11 +309,6 @@ export default function RecurringExpensesPage() {
                               {template.amount.toLocaleString()}
                             </span>
                             <span className="text-sm text-sage-500 ml-0.5">원</span>
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            <span className="text-base text-sage-600">
-                              {template.office_location || '-'}
-                            </span>
                           </td>
                           <td className="px-5 py-4 text-center">
                             <span className="text-base text-sage-600">
@@ -386,8 +377,7 @@ export default function RecurringExpensesPage() {
                           {template.amount.toLocaleString()}<span className="text-sm font-medium">원</span>
                         </p>
                       </div>
-                      <div className="flex items-center justify-between pt-3 border-t border-sage-100">
-                        <span className="text-sm text-sage-400">{template.office_location || '공통'}</span>
+                      <div className="flex items-center justify-end pt-3 border-t border-sage-100">
                         <div className="flex gap-1">
                           <button
                             onClick={() => toggleActive(template.id, template.is_active)}
@@ -424,9 +414,6 @@ export default function RecurringExpensesPage() {
                           금액
                         </th>
                         <th className="px-5 py-4 text-center text-sm font-semibold text-sage-600">
-                          지역
-                        </th>
-                        <th className="px-5 py-4 text-center text-sm font-semibold text-sage-600">
                           작업
                         </th>
                       </tr>
@@ -449,11 +436,6 @@ export default function RecurringExpensesPage() {
                               {template.amount.toLocaleString()}
                             </span>
                             <span className="text-sm text-sage-400 ml-0.5">원</span>
-                          </td>
-                          <td className="px-5 py-4 text-center">
-                            <span className="text-base text-sage-500">
-                              {template.office_location || '-'}
-                            </span>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap">
                             <div className="flex justify-center gap-1">

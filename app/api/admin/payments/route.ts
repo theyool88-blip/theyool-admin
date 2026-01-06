@@ -32,11 +32,6 @@ export const GET = withTenant(async (request, { tenant }) => {
     }
 
     // Apply filters
-    const officeLocation = searchParams.get('office_location')
-    if (officeLocation) {
-      query = query.eq('office_location', officeLocation)
-    }
-
     const paymentCategory = searchParams.get('payment_category')
     if (paymentCategory) {
       query = query.eq('payment_category', paymentCategory)
@@ -130,18 +125,16 @@ export const POST = withTenant(async (request, { tenant }) => {
       )
     }
 
-    let officeFromCase: string | null = null
     let caseNameFromCase: string | null = null
     if (body.case_id) {
       const { data: caseRow, error: caseError } = await supabase
         .from('legal_cases')
-        .select('office, case_name')
+        .select('case_name')
         .eq('id', body.case_id)
         .single()
       if (caseError) {
-        console.error('Failed to fetch case office:', caseError)
+        console.error('Failed to fetch case name:', caseError)
       } else {
-        officeFromCase = caseRow?.office || null
         caseNameFromCase = caseRow?.case_name || null
       }
     }
@@ -154,7 +147,6 @@ export const POST = withTenant(async (request, { tenant }) => {
         payment_date: body.payment_date,
         depositor_name: body.depositor_name,
         amount: body.amount,
-        office_location: officeFromCase || body.office_location || null,
         payment_category: body.payment_category,
         case_id: body.case_id || null,
         case_name: body.case_name || caseNameFromCase || null,

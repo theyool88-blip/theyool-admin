@@ -1,6 +1,6 @@
 # 문서 인덱스
 
-**Last Updated**: 2025-12-31
+**Last Updated**: 2026-01-06
 
 법무법인 더율 관리자 시스템 (theyool-admin) 문서 목록입니다.
 
@@ -20,6 +20,7 @@
 | [CALENDAR_SYSTEM.md](systems/CALENDAR_SYSTEM.md) | 통합 캘린더, Google Calendar 연동 |
 | [CLIENT_PORTAL.md](systems/CLIENT_PORTAL.md) | 의뢰인 포털 미리보기 API |
 | [SCOURT_API_ANALYSIS.md](systems/SCOURT_API_ANALYSIS.md) | 대법원 나의사건검색 API 분석 |
+| [SCOURT_INTEGRATION.md](systems/SCOURT_INTEGRATION.md) | SCOURT 통합 시스템 (동기화, 필드매핑) |
 | [CAPTCHA_MODEL.md](systems/CAPTCHA_MODEL.md) | 캡차 인식 ML 모델 |
 
 ---

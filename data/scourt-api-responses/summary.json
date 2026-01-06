@@ -1,0 +1,199 @@
+{
+  "timestamp": "2026-01-05T01:24:39.530Z",
+  "totalCases": 14,
+  "successCount": 8,
+  "failCount": 6,
+  "withRelatedCases": 7,
+  "results": [
+    {
+      "caseNumber": "평택가정 2024드단25547",
+      "category": "가사",
+      "success": true,
+      "fields": [
+        "dlt_rcntDxdyLst",
+        "dma_csBasCtt",
+        "dlt_inscrtDtsLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_gurdnCttLst",
+        "dlt_reltCsLst"
+      ],
+      "hasRelatedCases": true,
+      "relatedCasesCount": 1
+    },
+    {
+      "caseNumber": "천안가정 2025느단3513",
+      "category": "가사",
+      "success": true,
+      "fields": [
+        "dlt_rcntDxdyLst",
+        "dma_csBasCtt",
+        "dlt_inscrtDtsLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_gurdnCttLst",
+        "dlt_reltCsLst"
+      ],
+      "hasRelatedCases": true,
+      "relatedCasesCount": 1
+    },
+    {
+      "caseNumber": "평택가정 2025너2110",
+      "category": "가사",
+      "success": true,
+      "fields": [
+        "dlt_rcntDxdyLst",
+        "dma_csBasCtt",
+        "dlt_inscrtDtsLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_gurdnCttLst",
+        "dlt_reltCsLst"
+      ],
+      "hasRelatedCases": false,
+      "relatedCasesCount": 0
+    },
+    {
+      "caseNumber": "평택지원 2025가단55158",
+      "category": "민사",
+      "success": true,
+      "fields": [
+        "dlt_rcntDxdyLst",
+        "dma_csBasCtt",
+        "dlt_inscrtDtsLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_lwstRltnrCttLst",
+        "dlt_aplntCttLst",
+        "dlt_reltCsLst"
+      ],
+      "hasRelatedCases": true,
+      "relatedCasesCount": 1
+    },
+    {
+      "caseNumber": "안성시법원 2025가소6582",
+      "category": "민사",
+      "success": true,
+      "fields": [
+        "dlt_rcntDxdyLst",
+        "dma_csBasCtt",
+        "dlt_inscrtDtsLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_lwstRltnrCttLst",
+        "dlt_aplntCttLst",
+        "dlt_reltCsLst"
+      ],
+      "hasRelatedCases": true,
+      "relatedCasesCount": 1
+    },
+    {
+      "caseNumber": "평택지원 2025카기10680",
+      "category": "보전",
+      "success": true,
+      "fields": [
+        "dma_csBasCtt",
+        "dlt_rcntDxdyLst",
+        "dlt_reltCsLst",
+        "dlt_scrtyCttLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_crctnOrdLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_gurdnCttLst",
+        "dlt_aplntCttLst"
+      ],
+      "hasRelatedCases": true,
+      "relatedCasesCount": 1
+    },
+    {
+      "caseNumber": "평택가정 2025즈단10057",
+      "category": "보전",
+      "success": false,
+      "fields": [],
+      "hasRelatedCases": false,
+      "relatedCasesCount": 0
+    },
+    {
+      "caseNumber": "천안지원 2025카불6034",
+      "category": "집행",
+      "success": true,
+      "fields": [
+        "dma_csBasCtt",
+        "dlt_rcntDxdyLst",
+        "dlt_reltCsLst",
+        "dlt_scrtyCttLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_crctnOrdLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_gurdnCttLst",
+        "dlt_aplntCttLst"
+      ],
+      "hasRelatedCases": true,
+      "relatedCasesCount": 1
+    },
+    {
+      "caseNumber": "수원고법 2025르10717",
+      "category": "항소",
+      "success": true,
+      "fields": [
+        "dlt_rcntDxdyLst",
+        "dma_csBasCtt",
+        "dlt_inscrtDtsLst",
+        "dlt_rcntSbmsnDocmtLst",
+        "dlt_btprtCttLst",
+        "dlt_agntCttLst",
+        "dlt_gurdnCttLst",
+        "dlt_reltCsLst"
+      ],
+      "hasRelatedCases": true,
+      "relatedCasesCount": 1
+    },
+    {
+      "caseNumber": "안성시법원 2025차전2850",
+      "category": "지급명령",
+      "success": false,
+      "fields": [],
+      "hasRelatedCases": false,
+      "relatedCasesCount": 0
+    },
+    {
+      "caseNumber": "서울회생법원 2024개회53142",
+      "category": "회생",
+      "success": false,
+      "fields": [],
+      "hasRelatedCases": false,
+      "relatedCasesCount": 0
+    },
+    {
+      "caseNumber": "서울회생법원 2023개회125248",
+      "category": "회생",
+      "success": false,
+      "fields": [],
+      "hasRelatedCases": false,
+      "relatedCasesCount": 0
+    },
+    {
+      "caseNumber": "서울회생법원 2022하단11477",
+      "category": "파산",
+      "success": false,
+      "fields": [],
+      "hasRelatedCases": false,
+      "relatedCasesCount": 0
+    },
+    {
+      "caseNumber": "서울회생법원 2022하면10353",
+      "category": "파산",
+      "success": false,
+      "fields": [],
+      "hasRelatedCases": false,
+      "relatedCasesCount": 0
+    }
+  ]
+}

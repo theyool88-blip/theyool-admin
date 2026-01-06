@@ -1,0 +1,222 @@
+{
+  "caseInfo": {
+    "court": "천안지원",
+    "caseNumber": "2025카불6034",
+    "party": "강호현",
+    "category": "집행"
+  },
+  "encCsNo": "UY2ExIMY9Exz4SqZwBkpd1flCRtiGgv+esWoOvH1YQ5/q8bLxmmLXKyrvSHoTEYR",
+  "wmonid": "P-Vpwbl3_GZ",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576251716,
+      "errors": null,
+      "data": {
+        "dma_csBasCtt": {
+          "cortCd": "000283",
+          "csNo": "20252360006034",
+          "csNm": "채무불이행자명부등재",
+          "rprsPtnrNm": "강OO",
+          "rprsPtnrNmOrg": "",
+          "ptnrCnt": 1,
+          "rprsRqstrNm": "허OO",
+          "rprsRqstrNmOrg": "",
+          "rqstrCnt": 1,
+          "grnshCnt": 0,
+          "csClmAmt": 24691494,
+          "clmAmtCrnyCd": "001",
+          "jdbnCd": "1020",
+          "cfupMarkNm": "가",
+          "scrtyKndCd": "04",
+          "csRcptYmd": "20250626",
+          "csUltmtYmd": "20251208",
+          "csUltmtDvsCd": "101",
+          "csTkpDvsCd": "0",
+          "csMrgTypCd": "0",
+          "lastDcsnstDlvrYmd": "20251210",
+          "csPrsrvYn": "N",
+          "today": "20260105",
+          "aplyCsNmCd": "317",
+          "lwstDvsCd": "2",
+          "csUltmtDvsCdOrg": "101",
+          "csUltmtYmdOrg": "20251208",
+          "prwlCnt": 2,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "ultmtJdbnNm": "신청5단독",
+          "rprsGrnshNmOrg": "",
+          "dlvrblFlag": 0,
+          "prwcCsYn": "N",
+          "jdbnTelno": "041-620-3099(카불)",
+          "jdbnNm": "신청5단독",
+          "prsvCtt": "",
+          "cortNm": "대전지방법원 천안지원",
+          "userCsNo": "2025카불6034",
+          "clmAmtCrnyNm": "원",
+          "csUltmtDvsNm": "인용",
+          "csTkpDvsNm": "제소",
+          "csMrgTypNm": "없음",
+          "apalPrpndRsltNm": "",
+          "entrsRsltTypNm": "",
+          "encCsNo": "FtapOzfQW0zDLdR2mE9UBuUJI35/c+/35v2lPOX0tTGsDd04X1uVNxgH7dhVEHLU",
+          "titRprsPtnr": "채권자",
+          "titRprsRqstr": "채무자"
+        },
+        "dlt_rcntDxdyLst": [],
+        "dlt_reltCsLst": [
+          {
+            "reltCsCortCd": "000253",
+            "reltCsNo": "20230010050743",
+            "reltCsDvsCd": "A0",
+            "reltCsCortNm": "수원지방법원 평택지원",
+            "comTaskTypCd": "CV",
+            "userCsNo": "2023가단50743",
+            "reltCsDvsNm": "판결정본",
+            "encCsNo": "FtapOzfQW0zDLdR2mE9UBmi7SnElpffAQ+ro1cloEIi5aHyF8wtyUQLOK/YG+PJt",
+            "isLink": "Y"
+          }
+        ],
+        "dlt_scrtyCttLst": [],
+        "dlt_rcntSbmsnDocmtLst": [
+          {
+            "ofdocRcptYmd": "20250915",
+            "content1": "채권자 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 주소보정서(특별송달,공시송달,일반송달신청) 제출"
+          },
+          {
+            "ofdocRcptYmd": "20250721",
+            "content1": "채권자 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 주소보정서(특별송달,공시송달,일반송달신청) 제출"
+          },
+          {
+            "ofdocRcptYmd": "20250704",
+            "content1": "채권자 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 보정서 제출"
+          },
+          {
+            "ofdocRcptYmd": "20250626",
+            "content1": "채권자 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 접수증명서"
+          }
+        ],
+        "dlt_crctnOrdLst": [
+          {
+            "crctnOrdYmd": "20250909",
+            "crctnRsnCd": "10",
+            "crctnRsnNm": "참여관용 주소보정"
+          },
+          {
+            "crctnOrdYmd": "20250718",
+            "crctnRsnCd": "10",
+            "crctnRsnNm": "참여관용 주소보정"
+          },
+          {
+            "crctnOrdYmd": "20250702",
+            "crctnRsnCd": "99",
+            "crctnRsnNm": "기타"
+          }
+        ],
+        "dlt_btprtCttLst": [
+          {
+            "btprtSeq": 1,
+            "btprtRnk": 1,
+            "btprtDvsCd": "27",
+            "btprtNm": "1. 강OO ",
+            "dcsnstDlvrYmd": "20251209",
+            "csUltmtYmd": "20251208",
+            "csUltmtDvsCd": "101",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "csUltmtDvsNm": "인용",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "채권자"
+          },
+          {
+            "btprtSeq": 2,
+            "btprtRnk": 1,
+            "btprtDvsCd": "28",
+            "btprtNm": "1. 허OO ",
+            "dcsnstDlvrYmd": "20251210",
+            "csUltmtYmd": "20251208",
+            "csUltmtDvsCd": "101",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "csUltmtDvsNm": "인용",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "채무자"
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "27",
+            "allBtprtAgntSeniYn": "N",
+            "agntSeq": 1,
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+            "chargLwyrNm": "임은지",
+            "seniKndCd": "0",
+            "agntEmlAddr": "",
+            "agntTelno": "",
+            "agntFaxno": "",
+            "jdcpcAtnTypCd": "1",
+            "cdNm": "채권자",
+            "agntDvsNm": "채권자1"
+          }
+        ],
+        "dlt_gurdnCttLst": [],
+        "dlt_aplntCttLst": []
+      },
+      "token": null
+    },
+    "caseCategory": "application",
+    "csNo": "2025카불6034",
+    "cortNm": "대전지방법원 천안지원",
+    "csNm": "채무불이행자명부등재",
+    "jdgNm": "신청5단독",
+    "rcptDt": "20250626",
+    "endDt": "20251208",
+    "mrgrDvs": "없음",
+    "jdgTelno": "041-620-3099(카불)",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 강OO "
+      },
+      {
+        "btprNm": "1. 허OO "
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "채권자1",
+        "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+        "jdafrCorpNm": ""
+      }
+    ]
+  },
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576251601,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20252360006034",
+          "encCsNo": "UY2ExIMY9Exz4SqZwBkpd1flCRtiGgv+esWoOvH1YQ5/q8bLxmmLXKyrvSHoTEYR"
+        }
+      ]
+    },
+    "token": null
+  }
+}

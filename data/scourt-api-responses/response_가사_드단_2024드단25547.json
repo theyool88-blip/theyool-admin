@@ -1,0 +1,1052 @@
+{
+  "caseInfo": {
+    "court": "평택가정",
+    "caseNumber": "2024드단25547",
+    "party": "엄현식",
+    "category": "가사"
+  },
+  "encCsNo": "qZGGq2GJ8sQTlEUuAMdkmGO9FPkkeNHR/XpHs1yoqWjjBdP8iMljLCKBoEBqVrKM",
+  "wmonid": "gQTv17MO_8o",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576220142,
+      "errors": null,
+      "data": {
+        "dlt_rcntDxdyLst": [
+          {
+            "dxdyYmd": "20251224",
+            "dxdyHm": "1400",
+            "dxdyKndCd": "01",
+            "dxdyRsltCd": "기일변경(추후지정)",
+            "dxdyPlcNm": "제21호 법정",
+            "vdeoJdcpcMeansCd": "0",
+            "dxdyKndNm": "판결선고기일",
+            "dxdyRsltNm": "기일변경(추후지정)"
+          },
+          {
+            "dxdyYmd": "20251210",
+            "dxdyHm": "1400",
+            "dxdyKndCd": "01",
+            "dxdyRsltCd": "기일변경",
+            "dxdyPlcNm": "제21호 법정",
+            "vdeoJdcpcMeansCd": "0",
+            "dxdyKndNm": "판결선고기일",
+            "dxdyRsltNm": "기일변경"
+          },
+          {
+            "dxdyYmd": "20251029",
+            "dxdyHm": "1000",
+            "dxdyKndCd": "03",
+            "dxdyRsltCd": "변론종결",
+            "dxdyPlcNm": "제21호 법정",
+            "vdeoJdcpcMeansCd": "0",
+            "dxdyKndNm": "변론기일",
+            "dxdyRsltNm": "변론종결"
+          },
+          {
+            "dxdyYmd": "20250827",
+            "dxdyHm": "1000",
+            "dxdyKndCd": "03",
+            "dxdyRsltCd": "속행",
+            "dxdyPlcNm": "제21호 법정",
+            "vdeoJdcpcMeansCd": "0",
+            "dxdyKndNm": "변론기일",
+            "dxdyRsltNm": "속행"
+          }
+        ],
+        "dma_csBasCtt": {
+          "cortCd": "000305",
+          "csNo": "20241500025547",
+          "csNm": "이혼 등 청구",
+          "rprsClmntNm": "심OO",
+          "clmntCnt": 1,
+          "rprsAcsdNm": "엄OO",
+          "acsdCnt": 1,
+          "csDstrtYn": "Y",
+          "jdbnCd": "1001",
+          "csRcptYmd": "20241122",
+          "csMrgTypCd": "1",
+          "intgInscrtMtjrCd": "1",
+          "csPrsrvYn": "N",
+          "lwstDvsCd": "2",
+          "stmpAtchAmt": 51700,
+          "stmpRfndAmt": 0,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "clmntVsml": 20000000,
+          "acsdVsml": 0,
+          "csTkpDvsCd": "0",
+          "jdbnTelno": "031-650-3126(재판일:수, 법원은 중립기관으로 법률상담이 불가합니다.)",
+          "jdbnNm": "가사1단독",
+          "csTkpDvsCdNm": "제소",
+          "prsvCtt": "",
+          "isHrngProgCurst": "N",
+          "cortNm": "수원가정법원 평택지원",
+          "userCsNo": "2024드단25547",
+          "csMrgTypNm": "본소",
+          "encCsNo": "7RucZHnXOs7LScBbCVywftCv1COuqhrGnj45Se4bcgmOn4SXxnjGLJCeDzdxfqB3",
+          "titRprsPtnr": "원고",
+          "titRprsRqstr": "피고"
+        },
+        "dlt_inscrtDtsLst": [],
+        "dlt_rcntSbmsnDocmtLst": [
+          {
+            "ofdocRcptYmd": "20260102",
+            "content1": "원고 소송대리인 ",
+            "content2": "이OO",
+            "content3": " 화해권고결정에 대한 이의신청서 제출"
+          },
+          {
+            "ofdocRcptYmd": "20251027",
+            "content1": "피고 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 보정서 제출"
+          },
+          {
+            "ofdocRcptYmd": "20251024",
+            "content1": "원고 소송대리인 ",
+            "content2": "이OO",
+            "content3": " 준비서면 제출"
+          },
+          {
+            "ofdocRcptYmd": "20251022",
+            "content1": "피고 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 반소 청구취지 및 청구원인 변경신청서 제출"
+          }
+        ],
+        "dlt_btprtCttLst": [
+          {
+            "btprtStndngNm": "원고(반소피고)",
+            "btprtRnk": 1,
+            "btprtNm": "1. 심OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "01",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "원고(반소피고)"
+          },
+          {
+            "btprtStndngNm": "피고(반소원고)",
+            "btprtRnk": 1,
+            "btprtNm": "1. 엄OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "02",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "피고(반소원고)"
+          },
+          {
+            "btprtStndngNm": "사건본인1",
+            "btprtRnk": 1,
+            "btprtNm": "1. 엄OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "38",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "사건본인1"
+          },
+          {
+            "btprtStndngNm": "사건본인2",
+            "btprtRnk": 2,
+            "btprtNm": "2. 엄OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "38",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "사건본인2"
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "01",
+            "btprtRltnCtt": "  소송대리인",
+            "agntDvsCd": "001",
+            "agntNm": "변호사 이다민",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntFaxno": "",
+            "agntIdxNm": "",
+            "agntDvsNm": "원고   소송대리인"
+          },
+          {
+            "btprtDvsCd": "02",
+            "btprtRltnCtt": "  소송대리인",
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+            "jdafrCorpNm": "법무법인 더율",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntFaxno": "",
+            "agntIdxNm": "",
+            "agntDvsNm": "피고   소송대리인"
+          }
+        ],
+        "dlt_gurdnCttLst": [],
+        "dlt_reltCsLst": [
+          {
+            "reltCsCortCd": "000305",
+            "reltCsNo": "20251500020475",
+            "reltCsDvsCd": "02",
+            "reltCsCortNm": "수원가정법원 평택지원",
+            "comTaskTypCd": "KS",
+            "userCsNo": "2025드단20475",
+            "reltCsDvsNm": "반소",
+            "encCsNo": "7RucZHnXOs7LScBbCVywfjvm13yzRYmOIcfI8rd5jNpMb6s3C2bYKrymhnenkY1d",
+            "isLink": "Y"
+          }
+        ]
+      },
+      "token": null
+    },
+    "caseCategory": "family",
+    "csNo": "2024드단25547",
+    "cortNm": "수원가정법원 평택지원",
+    "csNm": "이혼 등 청구",
+    "aplNm": "심OO",
+    "rspNm": "엄OO",
+    "jdgNm": "가사1단독",
+    "rcptDt": "20241122",
+    "stmpAmnt": 51700,
+    "mrgrDvs": "본소",
+    "jdgTelno": "031-650-3126(재판일:수, 법원은 중립기관으로 법률상담이 불가합니다.)",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 심OO ",
+        "btprDvsNm": "원고(반소피고)"
+      },
+      {
+        "btprNm": "1. 엄OO ",
+        "btprDvsNm": "피고(반소원고)"
+      },
+      {
+        "btprNm": "1. 엄OO ",
+        "btprDvsNm": "사건본인1"
+      },
+      {
+        "btprNm": "2. 엄OO ",
+        "btprDvsNm": "사건본인2"
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "원고   소송대리인",
+        "agntNm": "변호사 이다민",
+        "jdafrCorpNm": ""
+      },
+      {
+        "agntDvsNm": "피고   소송대리인",
+        "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+        "jdafrCorpNm": "법무법인 더율"
+      }
+    ],
+    "hearings": [
+      {
+        "trmDt": "20251224",
+        "trmNm": "판결선고기일",
+        "trmPntNm": "제21호 법정",
+        "trmHm": "1400",
+        "rslt": "기일변경(추후지정)"
+      },
+      {
+        "trmDt": "20251210",
+        "trmNm": "판결선고기일",
+        "trmPntNm": "제21호 법정",
+        "trmHm": "1400",
+        "rslt": "기일변경"
+      },
+      {
+        "trmDt": "20251029",
+        "trmNm": "변론기일",
+        "trmPntNm": "제21호 법정",
+        "trmHm": "1000",
+        "rslt": "변론종결"
+      },
+      {
+        "trmDt": "20250827",
+        "trmNm": "변론기일",
+        "trmPntNm": "제21호 법정",
+        "trmHm": "1000",
+        "rslt": "속행"
+      }
+    ]
+  },
+  "progressData": [
+    {
+      "prcdDt": "20241122",
+      "prcdNm": "소장접수",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20241211",
+      "prcdNm": "원고 소송대리인 이OO 참고자료 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20241212",
+      "prcdNm": "피고 엄OO에게 소장부본/소송절차안내서/답변서요약표/자녀양육안내문 송달",
+      "prcdRslt": "2024.12.16 도달"
+    },
+    {
+      "prcdDt": "20250116",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 답변서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250116",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 소송위임장 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250116",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 답변서부본(25.01.16.자) 송달",
+      "prcdRslt": "2025.01.17 도달"
+    },
+    {
+      "prcdDt": "20250116",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 변론기일소환장 송달",
+      "prcdRslt": "2025.01.17 도달"
+    },
+    {
+      "prcdDt": "20250116",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 변론기일소환장 송달",
+      "prcdRslt": "2025.01.16 도달"
+    },
+    {
+      "prcdDt": "20250117",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 재판기록열람신청서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250310",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 반소장부본 송달",
+      "prcdRslt": "2025.03.11 도달"
+    },
+    {
+      "prcdDt": "20250312",
+      "prcdNm": "변론기일(제21호 법정 14:40)",
+      "prcdRslt": "속행"
+    },
+    {
+      "prcdDt": "20250312",
+      "prcdNm": "재산명시명령(일반)",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20250313",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 재산명시결정등본 송달",
+      "prcdRslt": "2025.03.20 도달"
+    },
+    {
+      "prcdDt": "20250313",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 재산명시결정등본 송달",
+      "prcdRslt": "2025.03.13 도달"
+    },
+    {
+      "prcdDt": "20250401",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 재산명시목록 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250401",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 재산명시목록부본(25.04.01.자) 송달",
+      "prcdRslt": "2025.04.02 도달"
+    },
+    {
+      "prcdDt": "20250421",
+      "prcdNm": "원고 소송대리인 이OO 재산명시목록 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250421",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 준비서면 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250421",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 재산명시목록부본(25.04.21.자) 송달",
+      "prcdRslt": "2025.04.21 도달"
+    },
+    {
+      "prcdDt": "20250421",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 준비서면부본(25.04.21.자) 송달",
+      "prcdRslt": "2025.04.21 도달"
+    },
+    {
+      "prcdDt": "20250422",
+      "prcdNm": "원고 소송대리인 이OO 재산명시목록 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250422",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 재산명시목록부본(25.04.22.자) 송달",
+      "prcdRslt": "2025.04.22 도달"
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250429",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "NOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "토OOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "국OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "광OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "신OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "우OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "카OOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "토OOOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.02 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "농OOOOOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "현OOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250501",
+      "prcdNm": "DOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250507",
+      "prcdNm": "토스뱅크 토OOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250508",
+      "prcdNm": "원고 소송대리인 이OO 준비서면 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250508",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 준비서면부본(25.05.08.자) 송달",
+      "prcdRslt": "2025.05.08 도달"
+    },
+    {
+      "prcdDt": "20250509",
+      "prcdNm": "작성자 디OOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "기일변경명령",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 기일변경신청서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "작성자 주OOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "작성자 주OOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "토OOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "농OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.05.14 도달"
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 변경기일소환장 송달",
+      "prcdRslt": "2025.05.14 도달"
+    },
+    {
+      "prcdDt": "20250512",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 변경기일소환장 송달",
+      "prcdRslt": "2025.05.13 도달"
+    },
+    {
+      "prcdDt": "20250513",
+      "prcdNm": "주OOOOOOOO 금융거래정보제공요구서회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250513",
+      "prcdNm": "현OOOOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250514",
+      "prcdNm": "변론기일(제21호 법정 14:40)",
+      "prcdRslt": "기일변경"
+    },
+    {
+      "prcdDt": "20250514",
+      "prcdNm": "주OOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250515",
+      "prcdNm": "국OOO 금융거래정보제공요구서회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250515",
+      "prcdNm": "농협은행 최OO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250516",
+      "prcdNm": "작성자 엔OOOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250516",
+      "prcdNm": "농OOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250522",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "현OOOOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "NOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.09 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "카OOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.09 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "NOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.05 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "기OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.05 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "부OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.09 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "신OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.05 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "우OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.05 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "안OOOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.09 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "케OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.05 도달"
+    },
+    {
+      "prcdDt": "20250530",
+      "prcdNm": "한OOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.09 도달"
+    },
+    {
+      "prcdDt": "20250602",
+      "prcdNm": "현OOOOOOO 제출명령에 대한 회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250602",
+      "prcdNm": "신OOOOOOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.09 도달"
+    },
+    {
+      "prcdDt": "20250604",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250604",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250604",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 사실조회회신도착통지(25.06.02.자) 송달",
+      "prcdRslt": "2025.06.04 도달"
+    },
+    {
+      "prcdDt": "20250604",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 사실조회회신 도착 통지서(25.06.02.자) 송달",
+      "prcdRslt": "2025.06.04 도달"
+    },
+    {
+      "prcdDt": "20250605",
+      "prcdNm": "농협은행 최OO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250609",
+      "prcdNm": "새OOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.12 도달"
+    },
+    {
+      "prcdDt": "20250609",
+      "prcdNm": "우OOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.06.11 도달"
+    },
+    {
+      "prcdDt": "20250610",
+      "prcdNm": "작성자 엔OOOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250610",
+      "prcdNm": "작성자 안OOOOOOOO 사실조회 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250611",
+      "prcdNm": "부OOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250611",
+      "prcdNm": "기OOO 금융거래정보제공요구서회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250611",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 준비서면 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250611",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 준비서면부본(25.06.11.자) 송달",
+      "prcdRslt": "2025.06.12 도달"
+    },
+    {
+      "prcdDt": "20250612",
+      "prcdNm": "주OOOOOOOO 금융거래정보제공요구서회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "한OOOOOOOOO 사실조회회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 기일변경신청서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "주OOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250616",
+      "prcdNm": "기일변경명령",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20250616",
+      "prcdNm": "우OOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250616",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 기일변경명령등본 송달",
+      "prcdRslt": "2025.06.17 도달"
+    },
+    {
+      "prcdDt": "20250616",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 기일변경명령등본 송달",
+      "prcdRslt": "2025.06.16 도달"
+    },
+    {
+      "prcdDt": "20250617",
+      "prcdNm": "한OOOOOOOOO 금융거래정보제공요구서회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250618",
+      "prcdNm": "변론기일(제21호 법정 14:40)",
+      "prcdRslt": "기일변경"
+    },
+    {
+      "prcdDt": "20250618",
+      "prcdNm": "주OOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250619",
+      "prcdNm": "새OOOOOOO 금융거래정보제공요구서회신 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250619",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 사실조회회신 도착 통지서(25.06.17.자) 송달",
+      "prcdRslt": "2025.06.19 도달"
+    },
+    {
+      "prcdDt": "20250627",
+      "prcdNm": "원고 소송대리인 이OO 보정서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250724",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보회신 독촉 신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250725",
+      "prcdNm": "주OOOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250728",
+      "prcdNm": "신OOOOOOOOOOO에게 제출명령에 따른 독촉 송달",
+      "prcdRslt": "2025.07.29 도달"
+    },
+    {
+      "prcdDt": "20250807",
+      "prcdNm": "피고 소송대리인 임OO 소계속증명서",
+      "prcdRslt": "2025.08.07 발급 "
+    },
+    {
+      "prcdDt": "20250819",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 기일연기신청서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250819",
+      "prcdNm": "원고 소송대리인 이OO 피고의 기일변경신청에 대한 의견서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250827",
+      "prcdNm": "변론기일(제21호 법정 10:00)",
+      "prcdRslt": "속행"
+    },
+    {
+      "prcdDt": "20250903",
+      "prcdNm": "신OOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250903",
+      "prcdNm": "신OOOOOOOOOO 사실조회 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250905",
+      "prcdNm": "원고 소송대리인 이OO 금융거래정보제출명령신청 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250916",
+      "prcdNm": "신OOOOOOOOOOO에게 제출명령(금융기관) 송달",
+      "prcdRslt": "2025.09.17 도달"
+    },
+    {
+      "prcdDt": "20250923",
+      "prcdNm": "신OOOOOOOOOO 금융거래정보 제공요구에 대한 회신서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251022",
+      "prcdNm": "참여관용 보정명령(인지대/송달료)",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251022",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 준비서면 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251022",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 반소 청구취지 및 청구원인 변경신청서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251022",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 준비서면부본(25.10.22.자) 송달",
+      "prcdRslt": "2025.10.22 도달"
+    },
+    {
+      "prcdDt": "20251024",
+      "prcdNm": "원고 소송대리인 이OO 준비서면 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251024",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 보정명령(인지대,송달료)등본 송달",
+      "prcdRslt": "2025.10.24 도달"
+    },
+    {
+      "prcdDt": "20251024",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 청구취지 및 청구원인변경신청부본(25.10.22.자) 송달",
+      "prcdRslt": "2025.10.24 도달"
+    },
+    {
+      "prcdDt": "20251024",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 준비서면부본(25.10.24.자) 송달",
+      "prcdRslt": "2025.10.24 도달"
+    },
+    {
+      "prcdDt": "20251027",
+      "prcdNm": "피고 소송대리인 법OOOOOOOOOO 보정서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251029",
+      "prcdNm": "변론기일(제21호 법정 10:00)",
+      "prcdRslt": "변론종결"
+    },
+    {
+      "prcdDt": "20251210",
+      "prcdNm": "판결선고기일(제21호 법정 14:00)",
+      "prcdRslt": "기일변경"
+    },
+    {
+      "prcdDt": "20251210",
+      "prcdNm": "기일변경명령",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251210",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 변경기일소환장 송달",
+      "prcdRslt": "2025.12.10 도달"
+    },
+    {
+      "prcdDt": "20251210",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 변경기일소환장 송달",
+      "prcdRslt": "2025.12.10 도달"
+    },
+    {
+      "prcdDt": "20251224",
+      "prcdNm": "판결선고기일(제21호 법정 14:00)",
+      "prcdRslt": "기일변경(추후지정)"
+    },
+    {
+      "prcdDt": "20251224",
+      "prcdNm": "기일변경명령",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251224",
+      "prcdNm": "화해권고결정",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251224",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 화해권고결정정본 송달",
+      "prcdRslt": "2025.12.24 도달"
+    },
+    {
+      "prcdDt": "20251224",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 화해권고결정정본 송달",
+      "prcdRslt": "2025.12.24 도달"
+    },
+    {
+      "prcdDt": "20251224",
+      "prcdNm": "원고 소송대리인 변호사 이OO에게 기일변경명령등본 송달",
+      "prcdRslt": "2025.12.24 도달"
+    },
+    {
+      "prcdDt": "20251224",
+      "prcdNm": "피고 소송대리인 법무법인 더율 담당변호사 임OO에게 기일변경명령등본 송달",
+      "prcdRslt": "2025.12.24 도달"
+    },
+    {
+      "prcdDt": "20260102",
+      "prcdNm": "원고 소송대리인 이OO 화해권고결정에 대한 이의신청서 제출",
+      "prcdRslt": " "
+    }
+  ],
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576220013,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20241500025547",
+          "encCsNo": "qZGGq2GJ8sQTlEUuAMdkmGO9FPkkeNHR/XpHs1yoqWjjBdP8iMljLCKBoEBqVrKM"
+        }
+      ]
+    },
+    "token": null
+  }
+}

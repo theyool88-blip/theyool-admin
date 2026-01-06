@@ -1,0 +1,217 @@
+{
+  "caseInfo": {
+    "court": "평택지원",
+    "caseNumber": "2025가단55158",
+    "party": "이명규",
+    "category": "민사"
+  },
+  "encCsNo": "ZSblOZ08xh7h14ZNVt/UBCbT1S9+WqdQMwWIqHUccqjhTW5pOBEi2mNmYZh7ECSn",
+  "wmonid": "zh189vPACwL",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576233689,
+      "errors": null,
+      "data": {
+        "dlt_rcntDxdyLst": [],
+        "dma_csBasCtt": {
+          "cortCd": "000253",
+          "csNo": "20250010055158",
+          "csNm": "손해배상(기)",
+          "rprsClmntNm": "이OO",
+          "clmntCnt": 1,
+          "rprsAcsdNm": "이OO",
+          "acsdCnt": 1,
+          "jdbnCd": "1004",
+          "csRcptYmd": "20251229",
+          "clmntVsml": 30010000,
+          "acsdVsml": 0,
+          "csTkpDvsCd": "0",
+          "csMrgTypCd": "0",
+          "intgInscrtMtjrCd": "1",
+          "csPrsrvYn": "N",
+          "lwstDvsCd": "2",
+          "stmpAtchAmt": 126000,
+          "stmpRfndAmt": 0,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "jdbnTelno": "031-650-3145",
+          "jdbnNm": "민사4단독",
+          "dlvrCrtYmd": "",
+          "prsvCtt": "",
+          "isHrngProgCurst": "N",
+          "cortNm": "수원지방법원 평택지원",
+          "userCsNo": "2025가단55158",
+          "csUltmtDvsNm": "",
+          "csTkpDvsNm": "제소",
+          "csMrgTypNm": "없음",
+          "encCsNo": "Qad+xB8CUj/Aw5EI3I5d2xRC5N8f0iW8D2zNwJ6Hrn5rO+qEnzmrn01/9wMf6kGb"
+        },
+        "dlt_inscrtDtsLst": [],
+        "dlt_rcntSbmsnDocmtLst": [
+          {
+            "ofdocRcptYmd": "20251229",
+            "content1": "원고대리인 ",
+            "content2": "임OO",
+            "content3": " 소제기증명서"
+          },
+          {
+            "ofdocRcptYmd": "20251229",
+            "content1": "원고 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 사실조회 촉탁신청서(주식회사 케이티) 제출"
+          },
+          {
+            "ofdocRcptYmd": "20251229",
+            "content1": "원고 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 사실조회 촉탁신청서(에스케이텔레콤 주식회사) 제출"
+          },
+          {
+            "ofdocRcptYmd": "20251229",
+            "content1": "원고 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 사실조회 촉탁신청서(주식회사 엘지유플러스) 제출"
+          }
+        ],
+        "dlt_btprtCttLst": [
+          {
+            "btprtStndngNm": "원고",
+            "btprtSeq": 1,
+            "btprtNm": "1. 이OO ",
+            "dlvrMthdCd": "01",
+            "btprtRnk": 1,
+            "btprtDvsCd": "01",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "원고",
+            "ultmtDvsNm": "  "
+          },
+          {
+            "btprtStndngNm": "피고",
+            "btprtSeq": 2,
+            "btprtNm": "1. 이OO ",
+            "dlvrMthdCd": "02",
+            "btprtRnk": 1,
+            "btprtDvsCd": "02",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "피고",
+            "ultmtDvsNm": "  "
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "01",
+            "btprtRltnCtt": "원고 소송대리인",
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+            "jdafrCorpNm": "법무법인 더율",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntTelno": "",
+            "agntEmlAddr": "",
+            "agntFaxno": "",
+            "agntDvsNm": "원고 소송대리인"
+          }
+        ],
+        "dlt_lwstRltnrCttLst": [],
+        "dlt_aplntCttLst": [],
+        "dlt_reltCsLst": [
+          {
+            "reltCsCortCd": "000253",
+            "reltCsNo": "20250740010680",
+            "reltCsDvsCd": "18",
+            "reltCsCortNm": "수원지방법원 평택지원",
+            "comTaskTypCd": "KA",
+            "userCsNo": "2025카기10680",
+            "reltCsDvsNm": "신청사건",
+            "encCsNo": "Qad+xB8CUj/Aw5EI3I5d2yLncmpLPF6aZyVFxlH00/KIoO1/lig35hY9bvN7asVw",
+            "isLink": "Y"
+          }
+        ]
+      },
+      "token": null
+    },
+    "caseCategory": "civil",
+    "csNo": "2025가단55158",
+    "cortNm": "수원지방법원 평택지원",
+    "csNm": "손해배상(기)",
+    "aplNm": "이OO",
+    "rspNm": "이OO",
+    "jdgNm": "민사4단독",
+    "rcptDt": "20251229",
+    "stmpAmnt": 126000,
+    "mrgrDvs": "없음",
+    "jdgTelno": "031-650-3145",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 이OO ",
+        "btprDvsNm": "원고"
+      },
+      {
+        "btprNm": "1. 이OO ",
+        "btprDvsNm": "피고"
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "원고 소송대리인",
+        "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+        "jdafrCorpNm": "법무법인 더율"
+      }
+    ]
+  },
+  "progressData": [
+    {
+      "prcdDt": "20251229",
+      "prcdNm": "소장접수",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251229",
+      "prcdNm": "원고 소송대리인 법OOOOOOOOOO 사실조회 촉탁신청서(주식회사 엘지유플러스) 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251229",
+      "prcdNm": "원고 소송대리인 법OOOOOOOOOO 사실조회 촉탁신청서(에스케이텔레콤 주식회사) 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251229",
+      "prcdNm": "원고 소송대리인 법OOOOOOOOOO 사실조회 촉탁신청서(주식회사 케이티) 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251229",
+      "prcdNm": "원고대리인 임OO 소제기증명서",
+      "prcdRslt": " "
+    }
+  ],
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576233646,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20250010055158",
+          "encCsNo": "ZSblOZ08xh7h14ZNVt/UBCbT1S9+WqdQMwWIqHUccqjhTW5pOBEi2mNmYZh7ECSn"
+        }
+      ]
+    },
+    "token": null
+  }
+}

@@ -1,0 +1,316 @@
+{
+  "caseInfo": {
+    "court": "천안가정",
+    "caseNumber": "2025느단3513",
+    "party": "김지영",
+    "category": "가사"
+  },
+  "encCsNo": "oHFI5i7r+aQkIzOn6tvnfV7ordZmqZRubrUGbrKnreSoKPy6AKWjTeL9lDDRKLYY",
+  "wmonid": "NI9ysYXgdq5",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576224594,
+      "errors": null,
+      "data": {
+        "dlt_rcntDxdyLst": [],
+        "dma_csBasCtt": {
+          "cortCd": "000294",
+          "csNo": "20251620003513",
+          "csNm": "재산분할",
+          "rprsClmntNm": "김OO",
+          "clmntCnt": 1,
+          "rprsAcsdNm": "윤OO",
+          "acsdCnt": 1,
+          "csDstrtYn": "Y",
+          "jdbnCd": "3002",
+          "csRcptYmd": "20250611",
+          "csMrgTypCd": "0",
+          "intgInscrtMtjrCd": "3",
+          "csPrsrvYn": "N",
+          "lwstDvsCd": "2",
+          "stmpAtchAmt": 221500,
+          "stmpRfndAmt": 0,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "clmntVsml": 109350000,
+          "acsdVsml": 0,
+          "csTkpDvsCd": "0",
+          "jdbnTelno": "041-620-2999",
+          "jdbnNm": "가사비송2단독",
+          "csTkpDvsCdNm": "제소",
+          "prsvCtt": "",
+          "isHrngProgCurst": "N",
+          "cortNm": "대전가정법원 천안지원",
+          "userCsNo": "2025느단3513",
+          "csMrgTypNm": "없음",
+          "encCsNo": "fNY7U6c+uNBbsrf4DqdesFYvpdb6qdo70Ihxa+TxBXE31CvmUChoFZQ60B2BuFbs",
+          "titRprsPtnr": "청구인",
+          "titRprsRqstr": "상대방"
+        },
+        "dlt_inscrtDtsLst": [],
+        "dlt_rcntSbmsnDocmtLst": [
+          {
+            "ofdocRcptYmd": "20251231",
+            "content1": "상대방 소송대리인 ",
+            "content2": "법OOOOOOOOOOOO",
+            "content3": " 재산명시목록 제출"
+          },
+          {
+            "ofdocRcptYmd": "20251128",
+            "content1": "청구인 소송대리인 ",
+            "content2": "법OOOOOOOOOO",
+            "content3": " 재산명시신청서 제출"
+          },
+          {
+            "ofdocRcptYmd": "20251111",
+            "content1": "상대방 소송대리인 ",
+            "content2": "법OOOOOOOOOOOO",
+            "content3": " 준비서면 제출"
+          },
+          {
+            "ofdocRcptYmd": "20250627",
+            "content1": "상대방 소송대리인 ",
+            "content2": "법OOOOOOOOOOOO",
+            "content3": " 답변서(청구취지/원인) 제출"
+          }
+        ],
+        "dlt_btprtCttLst": [
+          {
+            "btprtStndngNm": "청구인",
+            "btprtRnk": 1,
+            "btprtNm": "1. 김OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "10",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "청구인"
+          },
+          {
+            "btprtStndngNm": "상대방",
+            "btprtRnk": 1,
+            "btprtNm": "1. 윤OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "36",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "상대방"
+          },
+          {
+            "btprtStndngNm": "사건본인",
+            "btprtRnk": 1,
+            "btprtNm": "1. 윤OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "38",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "사건본인"
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "10",
+            "btprtRltnCtt": "  소송대리인",
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+            "jdafrCorpNm": "법무법인 더율",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntFaxno": "",
+            "agntIdxNm": "",
+            "agntDvsNm": "청구인   소송대리인"
+          },
+          {
+            "btprtDvsCd": "36",
+            "btprtRltnCtt": "  소송대리인",
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 와이케이 (담당변호사 : 김규민,안경배,조아라,나길호,이레.이솔,유진,지중후)",
+            "jdafrCorpNm": "법무법인 와이케이",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntIdxNm": "",
+            "agntFaxno": "",
+            "agntDvsNm": "상대방   소송대리인"
+          }
+        ],
+        "dlt_gurdnCttLst": [],
+        "dlt_reltCsLst": [
+          {
+            "reltCsCortCd": "000294",
+            "reltCsNo": "20251620003520",
+            "reltCsDvsCd": "99",
+            "reltCsCortNm": "대전가정법원 천안지원",
+            "comTaskTypCd": "KS",
+            "userCsNo": "2025느단3520",
+            "reltCsDvsNm": "기타",
+            "encCsNo": "fNY7U6c+uNBbsrf4DqdesIFcIdyRrbK2A94Bl/vPswUIv69olAy4goeOjlk9545T",
+            "isLink": "Y"
+          }
+        ]
+      },
+      "token": null
+    },
+    "caseCategory": "family",
+    "csNo": "2025느단3513",
+    "cortNm": "대전가정법원 천안지원",
+    "csNm": "재산분할",
+    "aplNm": "김OO",
+    "rspNm": "윤OO",
+    "jdgNm": "가사비송2단독",
+    "rcptDt": "20250611",
+    "stmpAmnt": 221500,
+    "mrgrDvs": "없음",
+    "jdgTelno": "041-620-2999",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 김OO ",
+        "btprDvsNm": "청구인"
+      },
+      {
+        "btprNm": "1. 윤OO ",
+        "btprDvsNm": "상대방"
+      },
+      {
+        "btprNm": "1. 윤OO ",
+        "btprDvsNm": "사건본인"
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "청구인   소송대리인",
+        "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+        "jdafrCorpNm": "법무법인 더율"
+      },
+      {
+        "agntDvsNm": "상대방   소송대리인",
+        "agntNm": "법무법인 와이케이 (담당변호사 : 김규민,안경배,조아라,나길호,이레.이솔,유진,지중후)",
+        "jdafrCorpNm": "법무법인 와이케이"
+      }
+    ]
+  },
+  "progressData": [
+    {
+      "prcdDt": "20250611",
+      "prcdNm": "소장접수",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20250612",
+      "prcdNm": "청구인 소송대리인 법OOOOOOOOOO 사실조회 촉탁신청서(신창면 행정복지센터) 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "참여관용 보정명령",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "청구인 소송대리인 법OOOOOOOOOO 사실조회신청 철회서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "청구인 소송대리인 법OOOOOOOOOO 당사자표시 정정신청서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "청구인 소송대리인 법OOOOOOOOOO 보정서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250613",
+      "prcdNm": "청구인 소송대리인 법무법인 더율 담당변호사 임OO에게 보정명령등본 송달",
+      "prcdRslt": "2025.06.13 도달"
+    },
+    {
+      "prcdDt": "20250616",
+      "prcdNm": "상대방 윤OO에게 소장부본/소송안내서 송달",
+      "prcdRslt": "2025.06.20 도달"
+    },
+    {
+      "prcdDt": "20250627",
+      "prcdNm": "상대방 소송대리인 법OOOOOOOOOOOO 소송위임장 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250627",
+      "prcdNm": "상대방 소송대리인 법OOOOOOOOOOOO 답변서(청구취지/원인) 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20250630",
+      "prcdNm": "청구인 소송대리인 법무법인 더율 담당변호사 임OO에게 답변서부본(25.06.27.자) 송달",
+      "prcdRslt": "2025.06.30 도달"
+    },
+    {
+      "prcdDt": "20251111",
+      "prcdNm": "상대방 소송대리인 법OOOOOOOOOOOO 준비서면 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251111",
+      "prcdNm": "청구인 소송대리인 법무법인 더율 담당변호사 임OO에게 준비서면부본(25.11.11.자) 송달",
+      "prcdRslt": "2025.11.11 도달"
+    },
+    {
+      "prcdDt": "20251128",
+      "prcdNm": "청구인 소송대리인 법OOOOOOOOOO 재산명시신청서 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251129",
+      "prcdNm": "상대방 소송대리인 법무법인 와이케이 담당변호사 김OOOOOOOOOOOOOOOOOOOOOOOOOOO에게 재산명시신청서부본(25.11.28.자) 송달",
+      "prcdRslt": "2025.12.01 도달"
+    },
+    {
+      "prcdDt": "20251201",
+      "prcdNm": "재산명시명령(일반)",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251201",
+      "prcdNm": "청구인 소송대리인 법무법인 더율 담당변호사 임OO에게 재산명시결정등본 송달",
+      "prcdRslt": "2025.12.01 도달"
+    },
+    {
+      "prcdDt": "20251201",
+      "prcdNm": "상대방 소송대리인 법무법인 와이케이 담당변호사 김OOOOOOOOOOOOOOOOOOOOOOOOOOO에게 재산명시결정등본 송달",
+      "prcdRslt": "2025.12.01 도달"
+    },
+    {
+      "prcdDt": "20251231",
+      "prcdNm": "상대방 소송대리인 법OOOOOOOOOOOO 재산명시목록 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20260102",
+      "prcdNm": "청구인 소송대리인 법무법인 더율 담당변호사 임OO에게 재산명시목록부본(25.12.31.자) 송달",
+      "prcdRslt": ""
+    }
+  ],
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576224547,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20251620003513",
+          "encCsNo": "oHFI5i7r+aQkIzOn6tvnfV7ordZmqZRubrUGbrKnreSoKPy6AKWjTeL9lDDRKLYY"
+        }
+      ]
+    },
+    "token": null
+  }
+}

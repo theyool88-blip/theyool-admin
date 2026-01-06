@@ -1,0 +1,193 @@
+{
+  "caseInfo": {
+    "court": "평택지원",
+    "caseNumber": "2025카기10680",
+    "party": "이명규",
+    "category": "보전"
+  },
+  "encCsNo": "iKbHYbIoVgAIb77+0ADAPsFSarNfBmFzIj37QnPSkorTnJA4U7yg09OVgYDOg/ev",
+  "wmonid": "Z4PI1MbKNDo",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576242909,
+      "errors": null,
+      "data": {
+        "dma_csBasCtt": {
+          "cortCd": "000253",
+          "csNo": "20250740010680",
+          "csNm": "증거보전",
+          "rprsPtnrNm": "이OO",
+          "rprsPtnrNmOrg": "",
+          "ptnrCnt": 1,
+          "rprsRqstrNm": "이OO",
+          "rprsRqstrNmOrg": "",
+          "rqstrCnt": 1,
+          "grnshCnt": 0,
+          "jdbnCd": "1004",
+          "scrtyKndCd": "01",
+          "csRcptYmd": "20251229",
+          "csUltmtYmd": "20251230",
+          "csUltmtDvsCd": "101",
+          "csTkpDvsCd": "0",
+          "csMrgTypCd": "0",
+          "csPrsrvYn": "N",
+          "today": "20260105",
+          "aplyCsNmCd": "315",
+          "lwstDvsCd": "2",
+          "csUltmtDvsCdOrg": "101",
+          "csUltmtYmdOrg": "20251230",
+          "prwlCnt": 3,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "ultmtJdbnNm": "2단독(신청)",
+          "rprsGrnshNmOrg": "",
+          "dlvrblFlag": 0,
+          "prwcCsYn": "N",
+          "jdbnTelno": "3165(기타신청), 3170(강제집행정지)",
+          "jdbnNm": "2단독(신청)",
+          "prsvCtt": "",
+          "cortNm": "수원지방법원 평택지원",
+          "userCsNo": "2025카기10680",
+          "clmAmtCrnyNm": "",
+          "csUltmtDvsNm": "인용",
+          "csTkpDvsNm": "제소",
+          "csMrgTypNm": "없음",
+          "apalPrpndRsltNm": "",
+          "entrsRsltTypNm": "",
+          "encCsNo": "iq7CTQGfL7dZnRItA1bXNw6La4pDZeJPMmHnT2Fk9iWtxLGpT0ZYrHWnuAPxj9rG",
+          "titRprsPtnr": "신청인",
+          "titRprsRqstr": "피신청인"
+        },
+        "dlt_rcntDxdyLst": [],
+        "dlt_reltCsLst": [
+          {
+            "reltCsCortCd": "000253",
+            "reltCsNo": "20250010055158",
+            "reltCsDvsCd": "54",
+            "reltCsCortNm": "수원지방법원 평택지원",
+            "comTaskTypCd": "CV",
+            "userCsNo": "2025가단55158",
+            "reltCsDvsNm": "본사건",
+            "encCsNo": "iq7CTQGfL7dZnRItA1bXNx58mlptzuGk6dGmwTDA1UaS5gs1SwPzt0BWCbZn7/K8",
+            "isLink": "Y"
+          }
+        ],
+        "dlt_scrtyCttLst": [],
+        "dlt_rcntSbmsnDocmtLst": [],
+        "dlt_crctnOrdLst": [],
+        "dlt_btprtCttLst": [
+          {
+            "btprtSeq": 1,
+            "btprtRnk": 1,
+            "btprtDvsCd": "05",
+            "btprtNm": "1. 이OO ",
+            "csUltmtYmd": "20251230",
+            "csUltmtDvsCd": "101",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "csUltmtDvsNm": "인용",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "신청인"
+          },
+          {
+            "btprtSeq": 2,
+            "btprtRnk": 1,
+            "btprtDvsCd": "06",
+            "btprtNm": "1. 이OO ",
+            "csUltmtYmd": "20251230",
+            "csUltmtDvsCd": "101",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "csUltmtDvsNm": "인용",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "피신청인"
+          },
+          {
+            "btprtSeq": 3,
+            "btprtRnk": 1,
+            "btprtDvsCd": "99",
+            "btprtNm": "1. 호OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO ",
+            "csUltmtYmd": "20251230",
+            "csUltmtDvsCd": "101",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "csUltmtDvsNm": "인용",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "기타"
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "05",
+            "allBtprtAgntSeniYn": "N",
+            "agntSeq": 1,
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+            "chargLwyrNm": "임은지",
+            "seniKndCd": "0",
+            "agntEmlAddr": "",
+            "agntTelno": "",
+            "agntFaxno": "",
+            "jdcpcAtnTypCd": "1",
+            "cdNm": "신청인",
+            "agntDvsNm": "신청인1"
+          }
+        ],
+        "dlt_gurdnCttLst": [],
+        "dlt_aplntCttLst": []
+      },
+      "token": null
+    },
+    "caseCategory": "application",
+    "csNo": "2025카기10680",
+    "cortNm": "수원지방법원 평택지원",
+    "csNm": "증거보전",
+    "jdgNm": "2단독(신청)",
+    "rcptDt": "20251229",
+    "endDt": "20251230",
+    "mrgrDvs": "없음",
+    "jdgTelno": "3165(기타신청), 3170(강제집행정지)",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 이OO "
+      },
+      {
+        "btprNm": "1. 이OO "
+      },
+      {
+        "btprNm": "1. 호OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO "
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "신청인1",
+        "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+        "jdafrCorpNm": ""
+      }
+    ]
+  },
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576242843,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20250740010680",
+          "encCsNo": "iKbHYbIoVgAIb77+0ADAPsFSarNfBmFzIj37QnPSkorTnJA4U7yg09OVgYDOg/ev"
+        }
+      ]
+    },
+    "token": null
+  }
+}

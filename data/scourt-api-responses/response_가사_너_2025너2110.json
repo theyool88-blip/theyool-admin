@@ -1,0 +1,208 @@
+{
+  "caseInfo": {
+    "court": "평택가정",
+    "caseNumber": "2025너2110",
+    "party": "권순영",
+    "category": "가사"
+  },
+  "encCsNo": "yM3nW38YgTnVy9geBmOrR5OuE2kb5BW7hosbcRhH/Nu6WI9E5Z0uN8jmgPI2rBgF",
+  "wmonid": "zbulyPbJEoC",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576229187,
+      "errors": null,
+      "data": {
+        "dlt_rcntDxdyLst": [
+          {
+            "dxdyYmd": "20260202",
+            "dxdyHm": "1530",
+            "dxdyKndCd": "10",
+            "dxdyPlcNm": "제310호 조정실",
+            "vdeoJdcpcMeansCd": "0",
+            "dxdyKndNm": "조정기일",
+            "dxdyRsltNm": ""
+          }
+        ],
+        "dma_csBasCtt": {
+          "cortCd": "000305",
+          "csNo": "20250290002110",
+          "csNm": "이혼 등",
+          "rprsClmntNm": "권OO",
+          "clmntCnt": 1,
+          "rprsAcsdNm": "황OO",
+          "acsdCnt": 1,
+          "csDstrtYn": "Y",
+          "jdbnCd": "5001",
+          "cfupMarkNm": "가",
+          "csRcptYmd": "20251105",
+          "csMrgTypCd": "0",
+          "intgInscrtMtjrCd": "5",
+          "csPrsrvYn": "N",
+          "lwstDvsCd": "2",
+          "stmpAtchAmt": 4500,
+          "stmpRfndAmt": 0,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "clmntVsml": 26000000,
+          "acsdVsml": 0,
+          "csTkpDvsCd": "9",
+          "jdbnTelno": "031-650-3126(재판일:수, 법원은 중립기관으로 법률상담 불가.)",
+          "jdbnNm": "가사조정1단독",
+          "csTkpDvsCdNm": "조정신청",
+          "prsvCtt": "",
+          "isHrngProgCurst": "N",
+          "cortNm": "수원가정법원 평택지원",
+          "userCsNo": "2025너2110",
+          "csMrgTypNm": "없음",
+          "encCsNo": "7KlYh8VlRRhQnJ0O/uUMDqcSzQXqovV/x/Jg8bfTL5fAi9TP1NZ04yMqf7TlFiRc",
+          "titRprsPtnr": "신청인",
+          "titRprsRqstr": "피신청인"
+        },
+        "dlt_inscrtDtsLst": [],
+        "dlt_rcntSbmsnDocmtLst": [
+          {
+            "ofdocRcptYmd": "20251209",
+            "content1": "피신청인 ",
+            "content2": "황OO",
+            "content3": " 답변서(조정용) 제출"
+          }
+        ],
+        "dlt_btprtCttLst": [
+          {
+            "btprtStndngNm": "신청인",
+            "btprtRnk": 1,
+            "btprtNm": "1. 권OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "05",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "신청인"
+          },
+          {
+            "btprtStndngNm": "피신청인",
+            "btprtRnk": 1,
+            "btprtNm": "1. 황OO ",
+            "dlvrMthdCd": "02",
+            "btprtDvsCd": "06",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "피신청인"
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "05",
+            "btprtRltnCtt": "  소송대리인",
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+            "jdafrCorpNm": "법무법인 더율",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntFaxno": "",
+            "agntIdxNm": "",
+            "agntDvsNm": "신청인   소송대리인"
+          }
+        ],
+        "dlt_gurdnCttLst": [],
+        "dlt_reltCsLst": []
+      },
+      "token": null
+    },
+    "caseCategory": "family",
+    "csNo": "2025너2110",
+    "cortNm": "수원가정법원 평택지원",
+    "csNm": "이혼 등",
+    "aplNm": "권OO",
+    "rspNm": "황OO",
+    "jdgNm": "가사조정1단독",
+    "rcptDt": "20251105",
+    "stmpAmnt": 4500,
+    "mrgrDvs": "없음",
+    "jdgTelno": "031-650-3126(재판일:수, 법원은 중립기관으로 법률상담 불가.)",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 권OO ",
+        "btprDvsNm": "신청인"
+      },
+      {
+        "btprNm": "1. 황OO ",
+        "btprDvsNm": "피신청인"
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "신청인   소송대리인",
+        "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+        "jdafrCorpNm": "법무법인 더율"
+      }
+    ],
+    "hearings": [
+      {
+        "trmDt": "20260202",
+        "trmNm": "조정기일",
+        "trmPntNm": "제310호 조정실",
+        "trmHm": "1530",
+        "rslt": ""
+      }
+    ]
+  },
+  "progressData": [
+    {
+      "prcdDt": "20251105",
+      "prcdNm": "소장접수",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251124",
+      "prcdNm": "피신청인 황OO에게 조정신청서부본/조정절차안내 송달",
+      "prcdRslt": "2025.11.26 도달"
+    },
+    {
+      "prcdDt": "20251209",
+      "prcdNm": "피신청인 황OO 답변서(조정용) 제출",
+      "prcdRslt": " "
+    },
+    {
+      "prcdDt": "20251212",
+      "prcdNm": "신청인 소송대리인 법무법인 더율 담당변호사 임OO에게 답변서부본(25.12.09.자) 송달",
+      "prcdRslt": "2025.12.15 도달"
+    },
+    {
+      "prcdDt": "20251222",
+      "prcdNm": "신청인 소송대리인 법무법인 더율 담당변호사 임OO에게 조정기일소환장 송달",
+      "prcdRslt": "2025.12.22 도달"
+    },
+    {
+      "prcdDt": "20251222",
+      "prcdNm": "피신청인 황OO에게 조정기일소환장 송달",
+      "prcdRslt": "2025.12.24 도달"
+    },
+    {
+      "prcdDt": "20260202",
+      "prcdNm": "조정기일(제310호 조정실 15:30)",
+      "prcdRslt": ""
+    }
+  ],
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576229143,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20250290002110",
+          "encCsNo": "yM3nW38YgTnVy9geBmOrR5OuE2kb5BW7hosbcRhH/Nu6WI9E5Z0uN8jmgPI2rBgF"
+        }
+      ]
+    },
+    "token": null
+  }
+}

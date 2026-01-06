@@ -1,0 +1,192 @@
+{
+  "caseInfo": {
+    "court": "안성시법원",
+    "caseNumber": "2025가소6582",
+    "party": "임승태",
+    "category": "민사"
+  },
+  "encCsNo": "8MUj0SSHhJkJnkjX09rNX81hBI0AXCYcCyOhKLRX2p4zFzpGZGK532FE5PK/VqJc",
+  "wmonid": "jL4lnCv4cp8",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576238279,
+      "errors": null,
+      "data": {
+        "dlt_rcntDxdyLst": [],
+        "dma_csBasCtt": {
+          "cortCd": "250821",
+          "csNo": "20250030006582",
+          "csNm": "약정금",
+          "rprsClmntNm": "임OO",
+          "clmntCnt": 1,
+          "rprsAcsdNm": "안OO",
+          "acsdCnt": 1,
+          "jdbnCd": "3001",
+          "csRcptYmd": "20251120",
+          "clmntVsml": 12000000,
+          "acsdVsml": 0,
+          "csTkpDvsCd": "1",
+          "csMrgTypCd": "0",
+          "intgInscrtMtjrCd": "3",
+          "csPrsrvYn": "N",
+          "lwstDvsCd": "2",
+          "stmpAtchAmt": 53100,
+          "stmpRfndAmt": 0,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "jdbnTelno": "031)673-8596",
+          "jdbnNm": "민사소액단독",
+          "dlvrCrtYmd": "",
+          "prsvCtt": "",
+          "isHrngProgCurst": "N",
+          "cortNm": "수원지방법원 평택지원 안성시법원",
+          "userCsNo": "2025가소6582",
+          "csUltmtDvsNm": "",
+          "csTkpDvsNm": "지급명령에 대한 이의",
+          "csMrgTypNm": "없음",
+          "encCsNo": "UX7DjUQM9EmmpAqqYLWcq5yaouJvmTMTwb4llwPVlJgzIiFL5UalOgUvGxzy0at9"
+        },
+        "dlt_inscrtDtsLst": [],
+        "dlt_rcntSbmsnDocmtLst": [],
+        "dlt_btprtCttLst": [
+          {
+            "btprtStndngNm": "원고",
+            "btprtSeq": 1,
+            "btprtNm": "1. 임OO ",
+            "dlvrMthdCd": "01",
+            "btprtRnk": 1,
+            "btprtDvsCd": "01",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtEmlAddr": "",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "원고",
+            "ultmtDvsNm": "  "
+          },
+          {
+            "btprtStndngNm": "피고",
+            "btprtSeq": 2,
+            "btprtNm": "1. 안OO ",
+            "dlvrMthdCd": "19",
+            "btprtRnk": 1,
+            "btprtDvsCd": "02",
+            "prtcpnDvsCd": "00",
+            "btprtPrsnlDvsCd": "01",
+            "btprtEmlAddr": "",
+            "jdcpcAtnTypCd": "1",
+            "btprtTelno": "",
+            "btprtFaxno": "",
+            "btprtDvsNm": "피고",
+            "ultmtDvsNm": "  "
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "01",
+            "btprtRltnCtt": "원고 소송대리인",
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+            "jdafrCorpNm": "법무법인 더율",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntTelno": "",
+            "agntEmlAddr": "",
+            "agntFaxno": "",
+            "agntDvsNm": "원고 소송대리인"
+          }
+        ],
+        "dlt_lwstRltnrCttLst": [],
+        "dlt_aplntCttLst": [],
+        "dlt_reltCsLst": [
+          {
+            "reltCsCortCd": "250821",
+            "reltCsNo": "20254000002850",
+            "reltCsDvsCd": "11",
+            "reltCsCortNm": "수원지방법원 평택지원 안성시법원",
+            "comTaskTypCd": "DC",
+            "userCsNo": "2025차전2850",
+            "reltCsDvsNm": "독촉사건",
+            "encCsNo": "UX7DjUQM9EmmpAqqYLWcq+VFhYn3x6ZeED2d15pkPKzgTJXdyndzJpQUV8Kl4H7m",
+            "isLink": "Y"
+          }
+        ]
+      },
+      "token": null
+    },
+    "caseCategory": "civil",
+    "csNo": "2025가소6582",
+    "cortNm": "수원지방법원 평택지원 안성시법원",
+    "csNm": "약정금",
+    "aplNm": "임OO",
+    "rspNm": "안OO",
+    "jdgNm": "민사소액단독",
+    "rcptDt": "20251120",
+    "stmpAmnt": 53100,
+    "mrgrDvs": "없음",
+    "jdgTelno": "031)673-8596",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 임OO ",
+        "btprDvsNm": "원고"
+      },
+      {
+        "btprNm": "1. 안OO ",
+        "btprDvsNm": "피고"
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "원고 소송대리인",
+        "agntNm": "법무법인 더율 (담당변호사 : 임은지)",
+        "jdafrCorpNm": "법무법인 더율"
+      }
+    ]
+  },
+  "progressData": [
+    {
+      "prcdDt": "20251120",
+      "prcdNm": "접수",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251121",
+      "prcdNm": "피고 안OO에게 기타송달문서(서증 등) 송달",
+      "prcdRslt": "2025.11.21 도달"
+    },
+    {
+      "prcdDt": "20251230",
+      "prcdNm": "석명준비명령(도과기간확인)",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251230",
+      "prcdNm": "원고 소송대리인 법무법인 더율 담당변호사 임OO에게 석명준비명령등본 송달",
+      "prcdRslt": "2025.12.31 도달"
+    },
+    {
+      "prcdDt": "20251230",
+      "prcdNm": "피고 안OO에게 석명준비명령등본 송달",
+      "prcdRslt": "2025.12.30 도달"
+    }
+  ],
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576238237,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20250030006582",
+          "encCsNo": "8MUj0SSHhJkJnkjX09rNX81hBI0AXCYcCyOhKLRX2p4zFzpGZGK532FE5PK/VqJc"
+        }
+      ]
+    },
+    "token": null
+  }
+}

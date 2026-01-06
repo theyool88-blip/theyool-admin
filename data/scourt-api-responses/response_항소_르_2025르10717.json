@@ -1,0 +1,190 @@
+{
+  "caseInfo": {
+    "court": "수원고법",
+    "caseNumber": "2025르10717",
+    "party": "장원석",
+    "category": "항소"
+  },
+  "encCsNo": "SPkewxuZWZF67dfW/E2L5mjYqDkxJgN26B/wA7jJNe7W/JzY6teYQJSQ9jcNAgxq",
+  "wmonid": "ZO9fOyxT38J",
+  "detailData": {
+    "raw": {
+      "status": 200,
+      "message": "{} 조회가 완료되었습니다.",
+      "timestamp": 1767576256173,
+      "errors": null,
+      "data": {
+        "dlt_rcntDxdyLst": [],
+        "dma_csBasCtt": {
+          "cortCd": "000800",
+          "csNo": "20250240010717",
+          "csNm": "이혼 등",
+          "rprsClmntNm": "장OO",
+          "clmntCnt": 1,
+          "rprsAcsdNm": "고OO",
+          "acsdCnt": 1,
+          "csDstrtYn": "Y",
+          "jdbnCd": "6661",
+          "cfupMarkNm": "나",
+          "csRcptYmd": "20251229",
+          "csMrgTypCd": "1",
+          "intgInscrtMtjrCd": "6",
+          "csPrsrvYn": "N",
+          "lwstDvsCd": "2",
+          "stmpAtchAmt": 0,
+          "dxdyRqrdSchdTimeRlsYn": "N",
+          "vdeoJdcpcProgYn": "N",
+          "clmntVsml": 475000000,
+          "acsdVsml": 0,
+          "csTkpDvsCd": "0",
+          "jdbnTelno": "031-639-1662",
+          "jdbnNm": "제1-1가사부",
+          "csTkpDvsCdNm": "제소",
+          "prsvCtt": "",
+          "isHrngProgCurst": "N",
+          "cortNm": "수원고등법원",
+          "userCsNo": "2025르10717",
+          "csMrgTypNm": "본소",
+          "encCsNo": "5P43k3oPmJvi8bStWIY44WwJYo+8gawknNlGRcQycEb9H0/EkZhtcKuHD/BU2JX2",
+          "titRprsPtnr": "원고",
+          "titRprsRqstr": "피고"
+        },
+        "dlt_inscrtDtsLst": [
+          {
+            "inscrtReltCortCd": "000305",
+            "inscrtReltCsNo": "20251510002016",
+            "inscrtReltCsUltmtYmd": "20251128",
+            "inscrtCsUltmtDvsCd": "062",
+            "cortCd": "000305",
+            "cortNm": "수원가정법원 평택지원",
+            "csNo": "20251510002016",
+            "comTaskTypCd": "KS",
+            "encCsNo": "5P43k3oPmJvi8bStWIY44aPo44j3AabikJcDgxYKydVAzPZHB7H9X1FDgX09YN/a",
+            "userCsNo": "2025드합2016",
+            "ultmtDvsNm": "원고일부승",
+            "ultmtYmd": "20251128",
+            "isLink": "Y"
+          }
+        ],
+        "dlt_rcntSbmsnDocmtLst": [],
+        "dlt_btprtCttLst": [
+          {
+            "btprtStndngNm": "원고(반소피고,항소인)",
+            "btprtRnk": 1,
+            "btprtNm": "1. 장OO ",
+            "dlvrMthdCd": "01",
+            "btprtDvsCd": "01",
+            "prtcpnDvsCd": "00",
+            "aplntStndngCd": "01",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "원고(반소피고,항소인)"
+          },
+          {
+            "btprtStndngNm": "피고(반소원고,피항소인)",
+            "btprtRnk": 1,
+            "btprtNm": "1. 고OO ",
+            "dlvrMthdCd": "02",
+            "btprtDvsCd": "02",
+            "prtcpnDvsCd": "00",
+            "aplntStndngCd": "02",
+            "btprtPrsnlDvsCd": "01",
+            "jdcpcAtnTypCd": "1",
+            "btprtFaxno": "",
+            "btprtDvsNm": "피고(반소원고,피항소인)"
+          }
+        ],
+        "dlt_agntCttLst": [
+          {
+            "btprtDvsCd": "01",
+            "btprtRltnCtt": " (항소인) 소송대리인",
+            "agntDvsCd": "007",
+            "agntNm": "법무법인 리앤파트너스 (담당변호사 : 김건우,박근화,이승재,장호진)",
+            "jdafrCorpNm": "법무법인 리앤파트너스",
+            "seniKndCd": "0",
+            "jdcpcAtnTypCd": "1",
+            "agntIdxNm": "",
+            "agntFaxno": "",
+            "agntDvsNm": "원고  (항소인) 소송대리인"
+          }
+        ],
+        "dlt_gurdnCttLst": [],
+        "dlt_reltCsLst": [
+          {
+            "reltCsCortCd": "000800",
+            "reltCsNo": "20250240010718",
+            "reltCsDvsCd": "02",
+            "reltCsCortNm": "수원고등법원",
+            "comTaskTypCd": "KS",
+            "userCsNo": "2025르10718",
+            "reltCsDvsNm": "반소",
+            "encCsNo": "5P43k3oPmJvi8bStWIY44bn+sN3o8q/WXh/jV50rfLIcJo8rom2SozwQ2cHQ7Mqm",
+            "isLink": "Y"
+          }
+        ]
+      },
+      "token": null
+    },
+    "caseCategory": "family",
+    "csNo": "2025르10717",
+    "cortNm": "수원고등법원",
+    "csNm": "이혼 등",
+    "aplNm": "장OO",
+    "rspNm": "고OO",
+    "jdgNm": "제1-1가사부",
+    "rcptDt": "20251229",
+    "mrgrDvs": "본소",
+    "jdgTelno": "031-639-1662",
+    "prsrvYn": "N",
+    "parties": [
+      {
+        "btprNm": "1. 장OO ",
+        "btprDvsNm": "원고(반소피고,항소인)"
+      },
+      {
+        "btprNm": "1. 고OO ",
+        "btprDvsNm": "피고(반소원고,피항소인)"
+      }
+    ],
+    "representatives": [
+      {
+        "agntDvsNm": "원고  (항소인) 소송대리인",
+        "agntNm": "법무법인 리앤파트너스 (담당변호사 : 김건우,박근화,이승재,장호진)",
+        "jdafrCorpNm": "법무법인 리앤파트너스"
+      }
+    ]
+  },
+  "progressData": [
+    {
+      "prcdDt": "20251229",
+      "prcdNm": "소장접수",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20251231",
+      "prcdNm": "참여관용 보정명령(항소 인지대/송달료)",
+      "prcdRslt": ""
+    },
+    {
+      "prcdDt": "20260102",
+      "prcdNm": "원고(항소인) 소송대리인 법무법인 리앤파트너스 담당변호사 김OOOOOOOOOOOOOO에게 보정명령(인지대,송달료)등본 송달",
+      "prcdRslt": "2026.01.05 도달"
+    }
+  ],
+  "raw": {
+    "status": 200,
+    "message": " 조회가 완료되었습니다.",
+    "timestamp": 1767576256126,
+    "errors": null,
+    "data": {
+      "dlt_csNoHistLst": [
+        {
+          "csNo": "20250240010717",
+          "encCsNo": "SPkewxuZWZF67dfW/E2L5mjYqDkxJgN26B/wA7jJNe7W/JzY6teYQJSQ9jcNAgxq"
+        }
+      ]
+    },
+    "token": null
+  }
+}

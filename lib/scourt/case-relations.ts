@@ -604,3 +604,202 @@ export const CASE_RELATION_STATS = {
   complaintChainCount: Object.keys(COMPLAINT_CHAIN).length,
   relatedTypesCount: Object.keys(RELATED_CASE_TYPES).length,
 };
+
+// ============================================================
+// SCOURT 연관사건 매핑 (SCOURT API → 시스템 relation_type_code)
+// ============================================================
+
+/**
+ * SCOURT에서 반환하는 연관사건 유형(reltCsDvsNm) → 시스템 relation_type_code 매핑
+ */
+export const SCOURT_RELATION_MAP: Record<string, CaseRelationType> = {
+  // 심급 관계
+  '항소심': 'appeal',
+  '상고심': 'appeal',
+  '하심사건': 'appeal',      // 하심 = 원심
+  '1심': 'appeal',
+  '2심': 'appeal',
+  '3심': 'appeal',
+
+  // 본안/보전 관계
+  '본안사건': 'provisional', // 보전→본안
+  '신청사건': 'provisional', // 본안→보전
+
+  // 관련사건
+  '반소': 'related',
+  '이의신청': 'related',
+  '병합': 'related',
+  '분리': 'related',
+  '관련사건': 'related',
+
+  // 재심
+  '재심': 'retrial',
+  '준재심': 'retrial',
+};
+
+/**
+ * SCOURT 연관사건 유형에서 방향(direction) 결정
+ * @param relationType SCOURT에서 반환한 연관사건 유형 (reltCsDvsNm)
+ * @param sourceCaseType 현재 사건의 사건유형
+ * @returns 'parent' | 'child' | 'sibling'
+ */
+export function determineRelationDirection(
+  relationType: string,
+  sourceCaseType?: string
+): 'parent' | 'child' | 'sibling' {
+  // 상위 심급을 가리키는 경우 (현재 사건이 하위)
+  if (['항소심', '상고심', '재심', '준재심'].includes(relationType)) {
+    return 'child';  // 연관사건이 상위, 현재가 하위
+  }
+
+  // 하위 심급을 가리키는 경우 (현재 사건이 상위)
+  if (['하심사건', '1심', '원심'].includes(relationType)) {
+    return 'parent';  // 연관사건이 하위, 현재가 상위
+  }
+
+  // 본안 → 보전 관계
+  if (relationType === '본안사건') {
+    return 'child';  // 연관사건(본안)이 상위, 현재(보전)가 하위
+  }
+  if (relationType === '신청사건') {
+    return 'parent';  // 연관사건(보전)이 하위, 현재(본안)가 상위
+  }
+
+  // 나머지는 대등 관계
+  return 'sibling';
+}
+
+// ============================================================
+// 주사건(Main Case) 결정 로직
+// ============================================================
+
+/**
+ * 심급 우선순위 (높을수록 주사건 우선)
+ */
+const LEVEL_PRIORITY: Record<string, number> = {
+  '상고심': 3,
+  '항소심': 2,
+  '2심': 2,    // 별칭
+  '3심': 3,    // 별칭
+  '1심': 1,
+  '신청': 0,   // 보전/신청사건
+  '비송': 0,
+};
+
+/**
+ * 본안 사건유형 판별
+ * 본안만 주사건이 될 수 있음 (보전/신청은 주사건이 될 수 없음)
+ */
+export function isMainProceeding(caseType: string): boolean {
+  // 본안 사건유형 목록
+  const mainTypes = [
+    // 민사 본안
+    '가단', '가합', '가소',
+    // 민사 항소/상고
+    '나', '다',
+    // 가사 본안
+    '드단', '드합', '드',
+    // 가사 항소
+    '르', '느단', '느합',
+    // 가사 상고
+    '므',
+    // 형사 본안
+    '고단', '고합', '고약', '고정',
+    // 형사 항소/상고
+    '노', '도',
+    // 행정
+    '구단', '구합', '구', '누', '두',
+  ];
+
+  return mainTypes.includes(caseType);
+}
+
+/**
+ * 사건 목록에서 주사건 결정
+ * 규칙: 현재 최상위 심급이 주사건 (상고심 > 항소심 > 1심)
+ *
+ * @param cases 관련된 사건 목록 (id, case_level, case_type_code 필요)
+ * @returns 주사건 ID 또는 null
+ */
+export function determineMainCase(cases: Array<{
+  id: string;
+  case_level?: string;
+  case_type_code?: string;
+  court_case_number?: string;
+}>): string | null {
+  if (cases.length === 0) return null;
+  if (cases.length === 1) return cases[0].id;
+
+  // 본안 사건만 필터링
+  const mainCases = cases.filter(c => {
+    // case_type_code가 있으면 사용
+    if (c.case_type_code) {
+      return isMainProceeding(c.case_type_code);
+    }
+    // 없으면 court_case_number에서 추출 시도
+    if (c.court_case_number) {
+      const parsed = parseCaseNumber(c.court_case_number);
+      if (parsed) {
+        return isMainProceeding(parsed.caseType);
+      }
+    }
+    return true; // 판별 불가시 포함
+  });
+
+  // 본안이 없으면 첫 번째 사건 반환
+  if (mainCases.length === 0) {
+    return cases[0].id;
+  }
+
+  // 심급 우선순위로 정렬 (높은 순)
+  const sorted = mainCases.sort((a, b) => {
+    const priorityA = LEVEL_PRIORITY[a.case_level || '1심'] ?? 1;
+    const priorityB = LEVEL_PRIORITY[b.case_level || '1심'] ?? 1;
+    return priorityB - priorityA;  // 높은 순
+  });
+
+  return sorted[0].id;
+}
+
+/**
+ * 새 심급사건이 연결되었을 때 주사건 재결정 여부 판단
+ *
+ * @param newCase 새로 연결된 사건
+ * @param currentMainCase 현재 주사건
+ * @returns true면 새 사건이 주사건이 되어야 함
+ */
+export function shouldUpdateMainCase(
+  newCase: { case_level?: string; case_type_code?: string },
+  currentMainCase: { case_level?: string; case_type_code?: string }
+): boolean {
+  // 새 사건이 본안이 아니면 주사건 변경 안함
+  if (newCase.case_type_code && !isMainProceeding(newCase.case_type_code)) {
+    return false;
+  }
+
+  const newPriority = LEVEL_PRIORITY[newCase.case_level || '1심'] ?? 1;
+  const currentPriority = LEVEL_PRIORITY[currentMainCase.case_level || '1심'] ?? 1;
+
+  // 새 사건의 심급이 더 높으면 주사건 변경
+  return newPriority > currentPriority;
+}
+
+/**
+ * 사건 유형에서 심급 추출 (case_level이 없을 때 대체)
+ */
+export function inferCaseLevelFromType(caseType: string): string {
+  // 상고심 코드
+  if (['다', '므', '도', '두', '스'].includes(caseType)) {
+    return '상고심';
+  }
+  // 항소심 코드
+  if (['나', '르', '느단', '느합', '노', '누', '즈단', '즈합'].includes(caseType)) {
+    return '항소심';
+  }
+  // 신청/비송/보전
+  if (['카단', '카합', '타채', '카경', '차', '차전', '머', '루', '브', '바', '조'].includes(caseType)) {
+    return '신청';
+  }
+  // 기본 1심
+  return '1심';
+}

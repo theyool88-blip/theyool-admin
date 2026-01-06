@@ -278,11 +278,11 @@ export const CASE_TYPES: CaseTypeInfo[] = [
   {
     code: '르',
     name: '르',
-    fullName: '가사비송',
+    fullName: '가사항소',
     category: 'family',
-    level: '신청',
-    description: '가사 비송 사건 (후견, 상속 등)',
-    partyLabels: { plaintiff: '신청인', defendant: '상대방' }
+    level: '항소심',
+    description: '가사 항소 사건 (드단/드합의 항소심)',
+    partyLabels: { plaintiff: '항소인', defendant: '피항소인' }
   },
   {
     code: '므',

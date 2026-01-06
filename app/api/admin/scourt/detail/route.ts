@@ -3,12 +3,11 @@
  *
  * POST /api/admin/scourt/detail
  *
- * 핵심: 저장된 사건은 캡챠 없이 상세 조회 가능!
+ * 핵심: 저장된 encCsNo가 있으면 캡챠 없이 상세 조회 가능!
  *
  * 요청:
  * - caseNumber: 사건번호 (필수, 예: 2024드단26718)
- * - profileId: 프로필 ID (선택, 없으면 활성 프로필 사용)
- * - legalCaseId: DB의 legal_cases ID (선택, 결과 연동용)
+ * - legalCaseId: DB의 legal_cases ID (필수, encCsNo 조회용)
  *
  * 응답:
  * - success: 성공 여부
@@ -16,14 +15,34 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getScourtSessionManager } from '@/lib/scourt/session-manager';
-import { createClient } from '@/lib/supabase';
+import { getScourtApiClient } from '@/lib/scourt/api-client';
+import { getStoredEncCsNo, updateSyncStatus } from '@/lib/scourt/case-storage';
+import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync';
+import { transformHearings, transformProgress } from '@/lib/scourt/field-transformer';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+// 사건번호 파싱 (예: 2024드단26718 → { year: 2024, type: 드단, serial: 26718 })
+function parseCaseNumber(caseNumber: string): {
+  year: string;
+  type: string;
+  serial: string;
+} | null {
+  // 패턴: 4자리 연도 + 한글 사건유형 + 숫자 일련번호
+  const match = caseNumber.match(/^(\d{4})([가-힣]+)(\d+)$/);
+  if (!match) {
+    return null;
+  }
+  return {
+    year: match[1],
+    type: match[2],
+    serial: match[3],
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-
-    const { caseNumber, profileId, legalCaseId } = body;
+    const { caseNumber, legalCaseId } = body;
 
     // 필수 파라미터 검증
     if (!caseNumber) {
@@ -33,75 +52,123 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const sessionManager = getScourtSessionManager();
-    const supabase = createClient();
-
-    // 프로필 조회
-    let profile;
-    if (profileId) {
-      profile = await sessionManager.getProfileStatus(profileId);
-      if (!profile) {
-        return NextResponse.json(
-          { error: '프로필을 찾을 수 없습니다' },
-          { status: 404 }
-        );
-      }
-    } else {
-      // 해당 사건이 저장된 프로필 찾기
-      const { data: profileCase } = await supabase
-        .from('scourt_profile_cases')
-        .select('profile_id')
-        .eq('case_number', caseNumber)
-        .limit(1)
-        .single();
-
-      if (profileCase) {
-        profile = await sessionManager.getProfileStatus(profileCase.profile_id);
-      }
-
-      if (!profile) {
-        return NextResponse.json(
-          { error: '해당 사건이 저장된 프로필이 없습니다. 먼저 검색을 실행해주세요.' },
-          { status: 404 }
-        );
-      }
+    if (!legalCaseId) {
+      return NextResponse.json(
+        { error: 'legalCaseId가 필요합니다' },
+        { status: 400 }
+      );
     }
 
-    // 상세 조회 실행 (캡챠 불필요!)
-    console.log(`📍 상세 조회 시작: ${caseNumber} (캡챠 불필요)`);
-    const result = await sessionManager.getCaseDetail(profile, caseNumber);
-
-    if (result.success && result.detail) {
-      // legal_cases 업데이트 (선택적)
-      if (legalCaseId) {
-        await supabase
-          .from('legal_cases')
-          .update({
-            scourt_last_sync: new Date().toISOString(),
-            scourt_raw_data: result.detail.rawData,
-            scourt_sync_status: 'synced',
-            // 기본 정보 업데이트
-            judge_name: result.detail.judge || undefined,
-          })
-          .eq('id', legalCaseId);
-
-        // 기일 정보가 있으면 court_hearings 업데이트
-        if (result.detail.hearings && result.detail.hearings.length > 0) {
-          console.log(`📅 기일 정보 ${result.detail.hearings.length}건 발견`);
-          // TODO: court_hearings 테이블 업데이트 로직
-        }
-      }
-
-      return NextResponse.json({
-        success: true,
-        detail: result.detail,
-        profileId: profile.id,
-      });
-    } else {
+    // 저장된 encCsNo 조회
+    const stored = await getStoredEncCsNo(legalCaseId);
+    if (!stored || !stored.encCsNo || !stored.wmonid) {
       return NextResponse.json(
         {
           success: false,
-          error: result.error,
+          error: '저장된 encCsNo가 없습니다. 먼저 사건 검색을 실행해주세요.',
+        },
+        { status: 404 }
+      );
+    }
+
+    // 사건번호 파싱
+    const parsed = parseCaseNumber(caseNumber);
+    if (!parsed) {
+      return NextResponse.json(
+        { error: '사건번호 형식이 올바르지 않습니다 (예: 2024드단26718)' },
+        { status: 400 }
+      );
+    }
+
+    // 법원명 조회
+    const supabase = createAdminClient();
+    const { data: caseData } = await supabase
+      .from('legal_cases')
+      .select('court_name')
+      .eq('id', legalCaseId)
+      .single();
+
+    const courtName = caseData?.court_name || '서울가정법원';
+
+    console.log(`📍 상세 조회 시작: ${caseNumber} (캡챠 불필요)`);
+    console.log(`  encCsNo: ${stored.encCsNo.substring(0, 20)}...`);
+
+    // 동기화 상태 업데이트
+    await updateSyncStatus(legalCaseId, 'syncing');
+
+    // API 클라이언트로 상세 조회 (캡챠 불필요!)
+    const apiClient = getScourtApiClient();
+    const result = await apiClient.getCaseDetailWithStoredEncCsNo(
+      stored.wmonid,
+      stored.encCsNo,
+      {
+        cortCd: courtName,
+        csYear: parsed.year,
+        csDvsCd: parsed.type,
+        csSerial: parsed.serial,
+      }
+    );
+
+    if (result.success && result.data) {
+      // 동기화 상태 업데이트
+      await updateSyncStatus(legalCaseId, 'synced');
+
+      // legal_cases 메타데이터 업데이트
+      const rawData = result.data.raw || {};
+      await supabase
+        .from('legal_cases')
+        .update({
+          scourt_last_sync: new Date().toISOString(),
+          scourt_sync_status: 'synced',
+          judge_name: rawData.jdgNm || undefined,
+        })
+        .eq('id', legalCaseId);
+
+      // 기일 정보가 있으면 court_hearings 테이블 동기화
+      const hearings = result.data.hearings || [];
+      let hearingSyncResult = null;
+
+      if (hearings.length > 0) {
+        console.log(`📅 기일 정보 ${hearings.length}건 → court_hearings 동기화`);
+
+        // SCOURT 필드를 표준 필드로 변환
+        const transformedHearings = hearings.map((h: any) => ({
+          date: h.trmDt || h.date || '',
+          time: h.trmHm || h.time || '',
+          type: h.trmNm || h.type || '',
+          location: h.trmPntNm || h.location || '',
+          result: h.rslt || h.result || '',
+        }));
+
+        hearingSyncResult = await syncHearingsToCourtHearings(
+          legalCaseId,
+          caseNumber,
+          transformedHearings
+        );
+
+        console.log(`✅ 기일 동기화 완료: 생성 ${hearingSyncResult.created}, 업데이트 ${hearingSyncResult.updated}, 스킵 ${hearingSyncResult.skipped}`);
+      }
+
+      // 응답 데이터 변환
+      const transformedDetail = {
+        ...result.data,
+        hearings: transformHearings(hearings),
+        progress: transformProgress(result.data.progress || []),
+      };
+
+      return NextResponse.json({
+        success: true,
+        detail: transformedDetail,
+        hearingSync: hearingSyncResult,
+      });
+    } else {
+      // 실패 시 상태 업데이트
+      await updateSyncStatus(legalCaseId, 'failed', result.error);
+
+      return NextResponse.json(
+        {
+          success: false,
+          error: result.error || '상세 조회 실패',
         },
         { status: 422 }
       );

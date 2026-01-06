@@ -11,20 +11,35 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase';
-import { getScourtSessionManager } from '@/lib/scourt/session-manager';
+import { createAdminClient } from '@/lib/supabase/admin';
+
+// 기본 설정값
+const DEFAULT_MAX_PROFILES = 5;
+const DEFAULT_MAX_CASES_PER_PROFILE = 50;
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('userId') || undefined;
 
-    const supabase = createClient();
-    const sessionManager = getScourtSessionManager();
+    const supabase = createAdminClient();
 
-    // 사용자 설정 및 사용량 조회
-    const settings = await sessionManager.getUserSettings(userId);
-    const usage = await sessionManager.getProfileUsage(userId);
+    // 사용자 설정 조회 (있으면)
+    let maxProfiles = DEFAULT_MAX_PROFILES;
+    let maxCasesPerProfile = DEFAULT_MAX_CASES_PER_PROFILE;
+
+    if (userId) {
+      const { data: userSettings } = await supabase
+        .from('scourt_user_settings')
+        .select('max_profiles, max_cases_per_profile')
+        .eq('lawyer_id', userId)
+        .single();
+
+      if (userSettings) {
+        maxProfiles = userSettings.max_profiles || DEFAULT_MAX_PROFILES;
+        maxCasesPerProfile = userSettings.max_cases_per_profile || DEFAULT_MAX_CASES_PER_PROFILE;
+      }
+    }
 
     // 프로필 목록 조회
     let profileQuery = supabase
@@ -38,17 +53,16 @@ export async function GET(request: NextRequest) {
 
     const { data: profiles } = await profileQuery;
 
-    // 총 저장된 사건 수
-    let casesQuery = supabase
-      .from('scourt_profile_cases')
-      .select('*', { count: 'exact', head: true });
-
-    if (userId && profiles?.length) {
+    // 총 저장된 사건 수 조회
+    let totalCases = 0;
+    if (profiles && profiles.length > 0) {
       const profileIds = profiles.map((p) => p.id);
-      casesQuery = casesQuery.in('profile_id', profileIds);
+      const { count } = await supabase
+        .from('scourt_profile_cases')
+        .select('*', { count: 'exact', head: true })
+        .in('profile_id', profileIds);
+      totalCases = count || 0;
     }
-
-    const { count: totalCases } = await casesQuery;
 
     // 최근 동기화 로그 (최근 10개)
     let logsQuery = supabase
@@ -65,23 +79,34 @@ export async function GET(request: NextRequest) {
     const { data: recentSyncs } = await logsQuery;
 
     // 통계 계산
+    const totalProfiles = profiles?.length || 0;
+    const activeProfiles = profiles?.filter((p) => p.status === 'active').length || 0;
+    const fullProfiles = profiles?.filter((p) => p.status === 'full').length || 0;
+    const totalSlots = (profiles || []).reduce((sum, p) => sum + (p.max_cases || DEFAULT_MAX_CASES_PER_PROFILE), 0);
+    const usedSlots = totalCases;
+
     const stats = {
-      totalProfiles: profiles?.length || 0,
-      activeProfiles: profiles?.filter((p) => p.status === 'active').length || 0,
-      fullProfiles: profiles?.filter((p) => p.status === 'full').length || 0,
-      totalCases: totalCases || 0,
-      totalSlots: (profiles || []).reduce((sum, p) => sum + p.max_cases, 0),
-      usedSlots: (profiles || []).reduce((sum, p) => sum + p.case_count, 0),
+      totalProfiles,
+      activeProfiles,
+      fullProfiles,
+      totalCases,
+      totalSlots,
+      usedSlots,
     };
 
     // 제한 정보
+    const maxTotalCases = maxProfiles * maxCasesPerProfile;
+    const remainingProfiles = maxProfiles - totalProfiles;
+    const remainingCases = maxTotalCases - totalCases;
+    const usagePercent = maxTotalCases > 0 ? Math.round((totalCases / maxTotalCases) * 100) : 0;
+
     const limits = {
-      maxProfiles: settings.maxProfiles,
-      maxCasesPerProfile: settings.maxCasesPerProfile,
-      maxTotalCases: usage.maxTotalCases,
-      remainingProfiles: usage.remainingProfiles,
-      remainingCases: usage.maxTotalCases - usage.totalCases,
-      usagePercent: Math.round((usage.totalCases / usage.maxTotalCases) * 100),
+      maxProfiles,
+      maxCasesPerProfile,
+      maxTotalCases,
+      remainingProfiles,
+      remainingCases,
+      usagePercent,
     };
 
     return NextResponse.json({

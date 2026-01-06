@@ -9,53 +9,76 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getScourtSessionManager } from '@/lib/scourt/session-manager';
-import { createClient } from '@/lib/supabase';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const profileId = searchParams.get('profileId');
 
-    const sessionManager = getScourtSessionManager();
-    const supabase = createClient();
+    const supabase = createAdminClient();
 
     // 프로필 조회
-    let profile;
+    let profileQuery = supabase
+      .from('scourt_profiles')
+      .select('*');
+
     if (profileId) {
-      profile = await sessionManager.getProfileStatus(profileId);
+      profileQuery = profileQuery.eq('id', profileId);
     } else {
-      // 기본 프로필 사용
-      profile = await sessionManager.getOrCreateProfile();
+      // 기본 활성 프로필
+      profileQuery = profileQuery.eq('status', 'active').limit(1);
     }
 
-    if (!profile) {
+    const { data: profiles, error: profileError } = await profileQuery;
+
+    if (profileError || !profiles || profiles.length === 0) {
       return NextResponse.json(
         { error: '프로필을 찾을 수 없습니다' },
         { status: 404 }
       );
     }
 
+    const profile = profiles[0];
+
     // DB에서 저장된 사건 목록 조회
-    const { data: dbCases } = await supabase
+    const { data: dbCases, error: casesError } = await supabase
       .from('scourt_profile_cases')
-      .select('*')
+      .select(`
+        *,
+        legal_case:legal_case_id (
+          id,
+          case_name,
+          case_type,
+          court_name,
+          client:client_id (
+            name
+          )
+        )
+      `)
       .eq('profile_id', profile.id)
       .order('last_accessed_at', { ascending: false });
 
-    // 브라우저에서 실제 저장된 사건 목록 조회 (선택적)
-    // const browserCases = await sessionManager.getSavedCases(profile);
+    if (casesError) {
+      console.error('사건 목록 조회 에러:', casesError);
+    }
+
+    // 프로필의 저장된 사건 수 계산
+    const caseCount = dbCases?.length || 0;
+    const maxCases = profile.max_cases || 50;
 
     return NextResponse.json({
       success: true,
       cases: dbCases || [],
       profileInfo: {
         id: profile.id,
-        profileName: profile.profileName,
-        caseCount: profile.caseCount,
-        maxCases: profile.maxCases,
+        profileName: profile.profile_name,
+        caseCount,
+        maxCases,
         status: profile.status,
-        remainingSlots: profile.maxCases - profile.caseCount,
+        remainingSlots: maxCases - caseCount,
+        createdAt: profile.created_at,
+        lastUsedAt: profile.last_used_at,
       },
     });
   } catch (error) {

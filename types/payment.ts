@@ -38,7 +38,6 @@ export const DEFAULT_RECEIPT_TYPES = [
 // 동적 타입 - 테넌트 설정에서 가져옴
 export type PaymentCategory = string;
 export type ReceiptType = string;
-export type OfficeLocation = string;
 
 // =====================================================
 // 호환성 상수 (레거시 지원)
@@ -73,16 +72,6 @@ export const RECEIPT_TYPES = {
   SELF_ISSUED: '자진발급',
 } as const;
 
-/**
- * @deprecated 테넌트 설정에서 동적으로 가져와야 함
- * 호환성을 위해 임시 유지
- */
-export const OFFICE_LOCATIONS = {
-  PYEONGTAEK: '평택',
-  CHEONAN: '천안',
-  LITIGATION_AID: '소송구조',
-} as const;
-
 // 레거시 라벨 매핑 (호환성)
 export const PAYMENT_CATEGORY_LABELS: Record<string, string> = {
   '착수금': '착수금',
@@ -95,12 +84,6 @@ export const PAYMENT_CATEGORY_LABELS: Record<string, string> = {
   '환불': '환불',
 };
 
-export const OFFICE_LOCATION_LABELS: Record<string, string> = {
-  '평택': '평택',
-  '천안': '천안',
-  '소송구조': '소송구조',
-};
-
 export const RECEIPT_TYPE_LABELS: Record<string, string> = {
   '현금영수증': '현금영수증',
   '카드결제': '카드결제',
@@ -108,12 +91,6 @@ export const RECEIPT_TYPE_LABELS: Record<string, string> = {
   '현금': '현금',
   '네이버페이': '네이버페이',
   '자진발급': '자진발급',
-};
-
-export const OFFICE_LOCATION_COLORS: Record<string, string> = {
-  '평택': 'bg-emerald-100 text-emerald-800',
-  '천안': 'bg-sky-100 text-sky-800',
-  '소송구조': 'bg-amber-100 text-amber-800',
 };
 
 export const PAYMENT_CATEGORY_COLORS: Record<string, string> = {
@@ -126,21 +103,6 @@ export const PAYMENT_CATEGORY_COLORS: Record<string, string> = {
   '기타': 'bg-gray-100 text-gray-700',
   '환불': 'bg-red-100 text-red-800',
 };
-
-/**
- * 동적 지점 색상 생성
- */
-export function getOfficeLocationColor(index: number): string {
-  const colors = [
-    'bg-emerald-100 text-emerald-800',
-    'bg-sky-100 text-sky-800',
-    'bg-amber-100 text-amber-800',
-    'bg-purple-100 text-purple-800',
-    'bg-rose-100 text-rose-800',
-    'bg-teal-100 text-teal-800',
-  ];
-  return colors[index % colors.length];
-}
 
 // =====================================================
 // 데이터베이스 테이블 타입
@@ -161,7 +123,6 @@ export interface Payment {
   amount: number;  // 원 단위 정수
 
   // 분류 정보
-  office_location: OfficeLocation | null;
   payment_category: PaymentCategory;
 
   // 사건 연결
@@ -201,7 +162,6 @@ export interface CreatePaymentRequest {
   payment_date: string;  // YYYY-MM-DD
   depositor_name: string;
   amount: number;
-  office_location?: OfficeLocation;
   payment_category: PaymentCategory;
   case_id?: string;
   case_name?: string;
@@ -219,7 +179,6 @@ export interface UpdatePaymentRequest {
   payment_date?: string;
   depositor_name?: string;
   amount?: number;
-  office_location?: OfficeLocation | null;
   payment_category?: PaymentCategory;
   case_id?: string | null;
   case_name?: string | null;
@@ -240,42 +199,13 @@ export interface UpdatePaymentRequest {
 // =====================================================
 
 /**
- * 사무실별 통계 (동적 지점)
- */
-export interface PaymentStatsByOffice {
-  office_location: string;  // 동적 지점명 | '미지정'
-  payment_category: PaymentCategory;
-  payment_count: number;
-  total_amount: number;
-  avg_amount: number;
-  first_payment: string;  // ISO date
-  last_payment: string;   // ISO date
-}
-
-/**
- * 명목별 통계 (동적 지점별 집계 포함)
+ * 명목별 통계
  */
 export interface PaymentStatsByCategory {
   payment_category: PaymentCategory;
   payment_count: number;
   total_amount: number;
   avg_amount: number;
-  // 동적 지점별 통계
-  by_office: {
-    [office: string]: {
-      count: number;
-      total: number;
-    };
-  };
-  // 레거시 필드 (호환성) - TODO: 동적 지점으로 마이그레이션 후 삭제
-  /** @deprecated by_office 사용 권장 */
-  pyeongtaek_count: number;
-  /** @deprecated by_office 사용 권장 */
-  cheonan_count: number;
-  /** @deprecated by_office 사용 권장 */
-  pyeongtaek_total: number;
-  /** @deprecated by_office 사용 권장 */
-  cheonan_total: number;
 }
 
 /**
@@ -283,7 +213,6 @@ export interface PaymentStatsByCategory {
  */
 export interface PaymentStatsByMonth {
   month: string;  // ISO date (YYYY-MM-01)
-  office_location: string;  // 동적 지점명 | '미지정'
   payment_category: PaymentCategory;
   payment_count: number;
   total_amount: number;
@@ -320,7 +249,7 @@ export interface ConsultationPaymentSummary {
 }
 
 /**
- * 대시보드 전체 통계 (동적 지점 지원)
+ * 대시보드 전체 통계
  */
 export interface PaymentDashboardStats {
   total_amount: number;
@@ -329,22 +258,7 @@ export interface PaymentDashboardStats {
   month_growth_rate: number;  // 전월 대비 증감률 (%)
   total_count: number;
 
-  // 동적 지점별 통계
-  by_office_amount: Record<string, number>;
-  by_office_count: Record<string, number>;
-
-  // 레거시 필드 (호환성) - TODO: 동적 지점으로 마이그레이션 후 삭제
-  /** @deprecated by_office_amount 사용 권장 */
-  pyeongtaek_amount: number;
-  /** @deprecated by_office_amount 사용 권장 */
-  cheonan_amount: number;
-  /** @deprecated by_office_count 사용 권장 */
-  pyeongtaek_count: number;
-  /** @deprecated by_office_count 사용 권장 */
-  cheonan_count: number;
-
   by_category: PaymentStatsByCategory[];
-  by_office: PaymentStatsByOffice[];
   by_month: PaymentStatsByMonth[];
 }
 
@@ -353,7 +267,6 @@ export interface PaymentDashboardStats {
 // =====================================================
 
 export interface PaymentListQuery {
-  office_location?: OfficeLocation;
   payment_category?: PaymentCategory;
   case_id?: string;
   consultation_id?: string;

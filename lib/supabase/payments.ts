@@ -9,7 +9,6 @@ import type {
   CreatePaymentRequest,
   UpdatePaymentRequest,
   PaymentListQuery,
-  PaymentStatsByOffice,
   PaymentStatsByCategory,
   PaymentStatsByMonth,
   CasePaymentSummary,
@@ -32,17 +31,15 @@ export async function createPayment(
     const { data: userData } = await supabase.auth.getUser();
     const confirmedBy = userData?.user?.email || userData?.user?.id || null;
 
-    let officeFromCase: string | null = null;
     let caseNameFromCase: string | null = null;
     let clientIdFromCase: string | null = null;
     if (data.case_id) {
       const { data: caseRow, error: caseError } = await supabase
         .from('legal_cases')
-        .select('office, case_name, client_id')
+        .select('case_name, client_id')
         .eq('id', data.case_id)
         .single();
       if (!caseError) {
-        officeFromCase = caseRow?.office || null;
         caseNameFromCase = caseRow?.case_name || null;
         clientIdFromCase = caseRow?.client_id || null;
       }
@@ -56,7 +53,6 @@ export async function createPayment(
         payment_date: data.payment_date,
         depositor_name: data.depositor_name,
         amount: data.amount,
-        office_location: officeFromCase ?? data.office_location ?? null,
         payment_category: data.payment_category,
         case_id: data.case_id || null,
         case_name: data.case_name || caseNameFromCase || null,
@@ -112,9 +108,6 @@ export async function listPayments(
     let queryBuilder = supabase.from('payments').select('*', { count: 'exact' });
 
     // 필터 적용
-    if (query?.office_location) {
-      queryBuilder = queryBuilder.eq('office_location', query.office_location);
-    }
     if (query?.payment_category) {
       queryBuilder = queryBuilder.eq('payment_category', query.payment_category);
     }
@@ -271,20 +264,17 @@ export async function updatePayment(
     const { data: userData } = await supabase.auth.getUser();
     const confirmedBy = userData?.user?.email || userData?.user?.id || null;
 
-    let officeFromCase: string | null | undefined = undefined;
     let caseNameFromCase: string | null | undefined = undefined;
     let clientIdFromCase: string | null | undefined = undefined;
     if (data.case_id) {
       const { data: caseRow } = await supabase
         .from('legal_cases')
-        .select('office, case_name, client_id')
+        .select('case_name, client_id')
         .eq('id', data.case_id)
         .single();
-      officeFromCase = caseRow?.office || null;
       caseNameFromCase = caseRow?.case_name || null;
       clientIdFromCase = caseRow?.client_id || null;
     } else if (data.case_id === null) {
-      officeFromCase = null;
       caseNameFromCase = null;
       // client_id는 case_id가 null이 되어도 유지 (직접 연결 유지)
     }
@@ -295,7 +285,6 @@ export async function updatePayment(
       .from('payments')
       .update({
         ...data,
-        office_location: officeFromCase !== undefined ? officeFromCase : (data.office_location ?? undefined),
         case_name: data.case_name || caseNameFromCase || data.case_name,
         client_id: data.client_id !== undefined ? data.client_id : (clientIdFromCase ?? undefined),
         is_confirmed: shouldConfirm,
@@ -358,30 +347,6 @@ export async function deletePayment(
 // =====================================================
 // 통계 조회
 // =====================================================
-
-/**
- * 사무실별 통계 조회
- */
-export async function getPaymentStatsByOffice(): Promise<{
-  data: PaymentStatsByOffice[];
-  error: Error | null;
-}> {
-  try {
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from('payment_stats_by_office')
-      .select('*')
-      .order('office_location')
-      .order('payment_category');
-
-    if (error) throw error;
-    return { data: data || [], error: null };
-  } catch (error) {
-    console.error('[getPaymentStatsByOffice] Error:', error);
-    return { data: [], error: error as Error };
-  }
-}
 
 /**
  * 명목별 통계 조회
@@ -499,7 +464,7 @@ export async function getPaymentDashboardStats(): Promise<{
     // 전체 통계
     const { data: totalStats } = await supabase
       .from('payments')
-      .select('amount, office_location');
+      .select('amount');
 
     // 이번 달 통계
     const now = new Date();
@@ -532,10 +497,6 @@ export async function getPaymentDashboardStats(): Promise<{
       .select('*')
       .order('total_amount', { ascending: false });
 
-    const { data: byOffice } = await supabase
-      .from('payment_stats_by_office')
-      .select('*');
-
     const { data: byMonth } = await supabase
       .from('payment_stats_by_month')
       .select('*')
@@ -544,20 +505,7 @@ export async function getPaymentDashboardStats(): Promise<{
 
     // 집계
     const total_amount = totalStats?.reduce((sum, p) => sum + p.amount, 0) || 0;
-    const pyeongtaek_amount =
-      totalStats
-        ?.filter((p) => p.office_location === '평택')
-        .reduce((sum, p) => sum + p.amount, 0) || 0;
-    const cheonan_amount =
-      totalStats
-        ?.filter((p) => p.office_location === '천안')
-        .reduce((sum, p) => sum + p.amount, 0) || 0;
-
     const total_count = totalStats?.length || 0;
-    const pyeongtaek_count =
-      totalStats?.filter((p) => p.office_location === '평택').length || 0;
-    const cheonan_count =
-      totalStats?.filter((p) => p.office_location === '천안').length || 0;
 
     const this_month_amount =
       thisMonthStats?.reduce((sum, p) => sum + p.amount, 0) || 0;
@@ -573,25 +521,11 @@ export async function getPaymentDashboardStats(): Promise<{
 
     const stats: PaymentDashboardStats = {
       total_amount,
-      pyeongtaek_amount,
-      cheonan_amount,
       this_month_amount,
       last_month_amount,
       month_growth_rate,
       total_count,
-      pyeongtaek_count,
-      cheonan_count,
-      // 동적 지점별 통계
-      by_office_amount: {
-        '평택': pyeongtaek_amount,
-        '천안': cheonan_amount,
-      },
-      by_office_count: {
-        '평택': pyeongtaek_count,
-        '천안': cheonan_count,
-      },
       by_category: byCategory || [],
-      by_office: byOffice || [],
       by_month: byMonth || [],
     };
 

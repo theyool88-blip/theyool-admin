@@ -42,6 +42,7 @@ const DEFAULT_FEATURES: TenantFeatures = {
   maxCases: 100,
   maxClients: 200,
   maxMembers: 1,
+  maxLawyers: -1, // -1 = 무제한
   scourtSync: false,
   clientPortal: false,
   homepage: false,

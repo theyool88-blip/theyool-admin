@@ -24,9 +24,6 @@ export const DEFAULT_EXPENSE_CATEGORIES = [
 // 동적 타입 - 테넌트 설정에서 가져옴
 export type ExpenseCategory = string
 
-// 동적 사무실 위치 - 테넌트 설정에서 가져옴
-export type OfficeLocation = string
-
 /**
  * 결제 수단
  */
@@ -60,7 +57,6 @@ export interface Expense {
   // 분류 정보
   expense_category: ExpenseCategory
   subcategory: string | null
-  office_location: OfficeLocation | null
 
   // 고정 지출 관련
   is_recurring: boolean
@@ -100,7 +96,6 @@ export interface RecurringTemplate {
   // 분류 정보
   expense_category: ExpenseCategory
   subcategory: string | null
-  office_location: OfficeLocation | null
 
   // 상세 정보
   vendor_name: string | null
@@ -133,7 +128,6 @@ export interface ExpenseFormData {
   amount: number
   expense_category: ExpenseCategory | ''
   subcategory?: string
-  office_location?: OfficeLocation | ''
   vendor_name?: string
   memo?: string
   payment_method?: PaymentMethod | ''
@@ -149,7 +143,6 @@ export interface RecurringTemplateFormData {
   amount: number
   expense_category: ExpenseCategory | ''
   subcategory?: string
-  office_location?: OfficeLocation | ''
   vendor_name?: string
   payment_method?: PaymentMethod | ''
   memo?: string
@@ -169,7 +162,6 @@ export interface RecurringTemplateFormData {
  */
 export interface MonthlyExpenseSummary {
   month: string // DATE
-  office_location: string
   expense_category: ExpenseCategory
   expense_count: number
   total_amount: number
@@ -182,7 +174,6 @@ export interface MonthlyExpenseSummary {
  */
 export interface ExpenseStatsByCategory {
   expense_category: ExpenseCategory
-  office_location: string
   expense_count: number
   total_amount: number
   avg_amount: number
@@ -228,7 +219,6 @@ export interface ExpenseImportRow {
   amount: number
   expense_category: string
   subcategory?: string
-  office_location?: string
   vendor_name?: string
   memo?: string
   payment_method?: string
@@ -241,6 +231,5 @@ export interface RecurringTemplateImportRow {
   name: string
   amount: number
   expense_category: string
-  office_location?: string
   start_date: string
 }

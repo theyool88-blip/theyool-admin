@@ -22,6 +22,7 @@ export interface TenantFeatures {
   maxCases: number;      // -1 = 무제한
   maxClients: number;    // -1 = 무제한
   maxMembers: number;    // -1 = 무제한
+  maxLawyers: number;    // -1 = 무제한, 테넌트에서 등록 가능한 변호사 수
   scourtSync: boolean;   // 대법원 연동
   clientPortal: boolean; // 의뢰인 포털
   homepage: boolean;     // 홈페이지 서비스

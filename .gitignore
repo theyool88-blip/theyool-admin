@@ -51,3 +51,4 @@ supabase/.temp/
 # local scripts
 proxy.ts
 apply-sage-theme.sh
+data/scourt-profiles/

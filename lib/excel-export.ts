@@ -11,7 +11,6 @@ export function exportExpensesToExcel(expenses: Expense[], filename: string = 'e
     '카테고리': expense.expense_category,
     '세부카테고리': expense.subcategory || '-',
     '금액': expense.amount,
-    '지역': expense.office_location || '-',
     '공급업체': expense.vendor_name || '-',
     '결제방법': expense.payment_method || '-',
     '고정지출': expense.is_recurring ? 'Y' : 'N',
@@ -28,7 +27,6 @@ export function exportExpensesToExcel(expenses: Expense[], filename: string = 'e
     { wch: 15 }, // 카테고리
     { wch: 15 }, // 세부카테고리
     { wch: 15 }, // 금액
-    { wch: 10 }, // 지역
     { wch: 20 }, // 공급업체
     { wch: 12 }, // 결제방법
     { wch: 10 }, // 고정지출
@@ -75,7 +73,6 @@ export function exportPaymentsToExcel(payments: Payment[], filename: string = 'p
     '입금일': payment.payment_date,
     '입금자명': payment.depositor_name,
     '금액': payment.amount,
-    '지역': payment.office_location || '-',
     '카테고리': payment.payment_category,
     '사건명': payment.case_name || '-',
     '영수증유형': payment.receipt_type || '-',
@@ -96,7 +93,6 @@ export function exportPaymentsToExcel(payments: Payment[], filename: string = 'p
     { wch: 12 }, // 입금일
     { wch: 15 }, // 입금자명
     { wch: 15 }, // 금액
-    { wch: 10 }, // 지역
     { wch: 15 }, // 카테고리
     { wch: 25 }, // 사건명
     { wch: 12 }, // 영수증유형
@@ -127,13 +123,12 @@ export function exportFinancialReportToExcel(
     '입금일': payment.payment_date,
     '입금자명': payment.depositor_name,
     '금액': payment.amount,
-    '지역': payment.office_location || '-',
     '카테고리': payment.payment_category,
     '확인상태': payment.is_confirmed ? '확인' : '미확인'
   }))
   const paymentSheet = XLSX.utils.json_to_sheet(paymentData)
   paymentSheet['!cols'] = [
-    { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 15 }, { wch: 10 }
+    { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }
   ]
   XLSX.utils.book_append_sheet(workbook, paymentSheet, '입금내역')
 
@@ -142,13 +137,12 @@ export function exportFinancialReportToExcel(
     '지출일': expense.expense_date,
     '카테고리': expense.expense_category,
     '금액': expense.amount,
-    '지역': expense.office_location || '-',
     '공급업체': expense.vendor_name || '-',
     '고정지출': expense.is_recurring ? 'Y' : 'N'
   }))
   const expenseSheet = XLSX.utils.json_to_sheet(expenseData)
   expenseSheet['!cols'] = [
-    { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 10 }
+    { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 10 }
   ]
   XLSX.utils.book_append_sheet(workbook, expenseSheet, '지출내역')
 

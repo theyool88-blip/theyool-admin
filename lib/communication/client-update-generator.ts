@@ -496,11 +496,11 @@ JSON으로 출력: { "subject": "제목 (이메일만)", "body": "본문" }
 
   private formatDate(dateStr: string): string {
     const date = new Date(dateStr);
-    const year = date.getFullYear();
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
+    const yy = String(date.getFullYear()).slice(2);
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    const dd = String(date.getDate()).padStart(2, '0');
     const weekday = ['일', '월', '화', '수', '목', '금', '토'][date.getDay()];
-    return `${year}년 ${month}월 ${day}일 (${weekday})`;
+    return `${yy}.${mm}.${dd}(${weekday})`;
   }
 
   private formatTime(dateStr: string): string {

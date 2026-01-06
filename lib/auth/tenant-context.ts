@@ -71,6 +71,7 @@ export async function getCurrentTenantContext(): Promise<TenantContext | null> {
           maxCases: -1,
           maxClients: -1,
           maxMembers: -1,
+          maxLawyers: -1,
           scourtSync: true,
           clientPortal: true,
           homepage: true,

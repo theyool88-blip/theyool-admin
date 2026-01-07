@@ -353,6 +353,14 @@
       "caseNo": "2018정명602",
       "party": "최향옥",
       "verified": true
+    },
+    {
+      "type": "즈기",
+      "desc": "가사신청 기타",
+      "court": "수원가정법원 평택지원",
+      "caseNo": "2026즈기1014",
+      "party": "김은성",
+      "verified": false
     }
   ]
 }

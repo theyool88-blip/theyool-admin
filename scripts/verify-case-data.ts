@@ -55,8 +55,10 @@ interface VerificationResult {
 }
 
 const testCases: TestCase[] = [
-  // 15차 검증: 스
-  { court: '대법원', year: '2023', type: '스', serial: '794', party: '공준권', category: 'family', desc: '특별항고' },
+  // 16차 검증: 스, 브, 아 (브라우저로 확인한 엔드포인트)
+  { court: '대법원', year: '2023', type: '스', serial: '794', party: '공준권', category: 'appeal', desc: '특별항고 (ssgo108)' },
+  { court: '대구가정법원', year: '2025', type: '브', serial: '1002', party: '박정준', category: 'appeal', desc: '가사후견항고 (ssgo108)' },
+  { court: '서울행정법원', year: '2022', type: '아', serial: '12622', party: '이준식', category: 'application', desc: '행정신청 (ssgo105)' },
 ];
 
 async function verifyCase(client: any, tc: TestCase): Promise<VerificationResult> {

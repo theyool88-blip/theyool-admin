@@ -2,20 +2,24 @@
  * 대법원 나의사건검색 API 클라이언트
  * 브라우저 없이 직접 API 호출로 사건 검색
  *
- * 지원 범위 (2025.01 기준):
+ * 지원 범위 (2026.01 기준) - 참고: docs/scourt-api-endpoint-discovery.md
  *
- * ┌─────────────────┬──────────────┬──────────────┬────────────────┐
- * │ 사건 유형       │ 검색(encCsNo)│ 상세 조회    │ 비고           │
- * ├─────────────────┼──────────────┼──────────────┼────────────────┤
- * │ 가사(드단,느단) │ ✅ 지원      │ ✅ 지원      │ 완전 지원      │
- * │ 형사(고단,고합) │ ✅ 지원      │ ❌ 미지원    │ 상세API 불가   │
- * │ 민사(가단,가합) │ ❌ 차단      │ ❌ 차단      │ WebSquare5 차단│
- * │ 신청(즈단,즈기) │ ❌ 차단      │ ❌ 차단      │ WebSquare5 차단│
- * │ 집행(카불,카확) │ ❌ 차단      │ ❌ 차단      │ WebSquare5 차단│
- * └─────────────────┴──────────────┴──────────────┴────────────────┘
+ * ┌─────────────────────┬───────────┬─────────────────────────────────────────┐
+ * │ 사건 유형           │ 모듈      │ 엔드포인트                              │
+ * ├─────────────────────┼───────────┼─────────────────────────────────────────┤
+ * │ 민사(가단,가합,머)  │ ssgo101   │ selectHmpgCvlcsCsGnrlCtt.on     ✅      │
+ * │ 가사(드단,느단,르)  │ ssgo102   │ selectHmpgFmlyCsGnrlCtt.on      ✅      │
+ * │ 형사(고단,노,도)    │ ssgo10g   │ selectHmpgCrmcsPbtrlCsGnrlCtt.on ✅     │
+ * │ 신청(카기,카불,즈단)│ ssgo105   │ selectHmpgAplyCsGnrlCtt.on      ✅      │
+ * │ 집행(타채,타기,타배)│ ssgo10a   │ selectHmpgEtexecCsGnrlCtt.on    ✅      │
+ * │ 전자독촉(차전)      │ ssgo10c   │ selectHmpgElctnUrgngCsGnrlCtt.on ✅     │
+ * │ 회생/파산(개회,하단)│ ssgo107   │ selectHmpgRhblBnkpCsGnrlCtt.on  ✅      │
+ * │ 보호(동버,푸)       │ ssgo10i   │ selectHmpgFamlyPrtctCsGnrlCtt.on ✅     │
+ * │ 항고/재항고(스,브)  │ ssgo108   │ selectHmpgApalRaplCsGnrlCtt.on  ✅      │
+ * │ 감치(정명)          │ ssgo106   │ selectHmpgEtcCsGnrlCtt.on       ✅      │
+ * └─────────────────────┴───────────┴─────────────────────────────────────────┘
  *
- * 미지원 사건 유형은 Puppeteer 기반 스크래퍼 필요:
- * - lib/scourt/scraper-v2.ts
+ * 행정 사건(구합, 루 등)은 민사 엔드포인트(ssgo101) 사용
  */
 
 import { getVisionCaptchaSolver } from '../google/vision-captcha-solver';
@@ -75,9 +79,10 @@ export interface CaseDetailData {
   exmnrNm?: string;        // 조사관명
   exmnrTelNo?: string;     // 조사관 전화번호
 
-  // 소가 정보 (민사 사건)
+  // 소가 정보 (민사/가사 사건)
   aplSovAmt?: string;      // 원고 소가
   rspSovAmt?: string;      // 피고 소가
+  csClmAmt?: string;       // 청구금액 (집행 사건)
 
   // 수리구분
   rcptDvsNm?: string;      // 수리구분 (제소, 신청 등)
@@ -87,8 +92,27 @@ export interface CaseDetailData {
   crmcsNo?: string;        // 형제번호 (형사)
   aplCtt?: string;         // 상소제기내용 (형사)
 
+  // 추가 기본 필드 (제공필드.csv 기반)
+  aplRslt?: string;        // 항고신청결과
+  aplyDt?: string;         // 신청일
+  sendDt?: string;         // 발송일
+  dcsnDt?: string;         // 결정일
+  trnsfDt?: string;        // 인계일
+  dspsYn?: string;         // 폐기여부
+  thrdDbtr?: string;       // 제3채무자
+  note?: string;           // 비고
+
+  // 회생/파산 전용 필드
+  strtDcsnDt?: string;     // 개시결정일
+  crtrObjDdln?: string;    // 채권이의마감일
+  dschgDcsnDt?: string;    // 면책결정일
+  prcdAbndDcsnDt?: string; // 절차폐지결정일
+
+  // 보호 사건 전용 필드 (동버, 푸 등)
+  siblingCsNo?: string;    // 형제번호 (보호 사건)
+
   // 사건 분류 정보
-  caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'order' | 'other';  // 사건 카테고리
+  caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other';  // 사건 카테고리
 
   // 당사자 정보
   parties?: Array<{
@@ -142,6 +166,45 @@ export interface CaseDetailData {
     encCsNo?: string;        // 암호화된 사건번호 (상세조회용)
   }>;
 
+  // 추가 LIST 타입 (제공필드.csv 기반)
+  correctionOrders?: Array<{  // 보정명령LIST
+    orderDt: string;         // 명령일
+    orderCtt: string;        // 명령내용
+    dueDate?: string;        // 보정기한
+    compDt?: string;         // 보정일
+  }>;
+
+  crimeNames?: Array<{        // 죄명내용LIST (형사)
+    crmNm: string;           // 죄명
+  }>;
+
+  creditors?: Array<{         // 채권자LIST (회생/파산)
+    crtrNm: string;          // 채권자명
+    clmAmt?: string;         // 채권액
+  }>;
+
+  repayments?: Array<{        // 변제LIST (개인회생)
+    rpmtDt: string;          // 변제일
+    rpmtAmt: string;         // 변제액
+    rpmtCtt?: string;        // 변제내용
+  }>;
+
+  custodians?: Array<{        // 후견인내용LIST (가사후견)
+    cstdnNm: string;         // 후견인명
+    cstdnTyp?: string;       // 후견유형
+  }>;
+
+  defendantsList?: Array<{    // 피고인내용LIST (형사)
+    dfndtNm: string;         // 피고인명
+    dfndtSts?: string;       // 상태
+  }>;
+
+  collaterals?: Array<{       // 담보내용LIST
+    colType: string;         // 담보유형
+    colAmt?: string;         // 담보금액
+    colCtt?: string;         // 담보내용
+  }>;
+
   // 심급 정보
   caseLevel?: 1 | 2 | 3 | 'special';  // 심급 (1심, 2심, 3심, 특별)
   caseLevelDesc?: string;              // 심급 설명
@@ -155,6 +218,90 @@ interface SessionInfo {
   wmonid: string;      // WMONID - encCsNo 바인딩에 필수
   cookies: string;
   createdAt: Date;
+}
+
+/**
+ * 사건유형 지원 상태
+ */
+export type CaseSupportStatus = 'verified' | 'supported' | 'unknown';
+
+/**
+ * 검증 완료된 사건유형 (42개 테스트 통과)
+ * 이 목록의 사건유형은 API 엔드포인트가 확인되었음
+ */
+const VERIFIED_CASE_TYPES = new Set([
+  // 민사 (ssgo101)
+  '가단', '가소', '가합', '나', '다', '머',
+  // 가사 (ssgo102)
+  '드단', '드합', '느단', '느합', '르', '므', '너', '즈기',
+  // 형사 (ssgo10g)
+  '고단', '고합', '노', '도',
+  // 신청/보전 (ssgo105)
+  '카기', '카불', '카확', '카정', '카소', '카단', '카합', '카담', '카명', '즈단', '즈합', '아',
+  // 집행 (ssgo10a)
+  '타채', '타배',
+  // 전자독촉 (ssgo10c)
+  '차전',
+  // 회생/파산 (ssgo107)
+  '개회', '하단', '하면',
+  // 항고 (ssgo108)
+  '스', '브',
+  // 행정 (ssgo101 via civil)
+  '구단', '구합', '누', '두',
+]);
+
+/**
+ * API 엔드포인트 매핑이 있지만 아직 테스트되지 않은 사건유형
+ * 작동할 가능성이 높음
+ */
+const SUPPORTED_CASE_TYPES = new Set([
+  // 민사 추가
+  '라', '마', '바', '자', '그', '재가단', '재가합', '재가소', '재나', '재다', '재머',
+  // 가사 추가
+  '드', '후기', '후개', '재드', '재르', '재므',
+  // 형사 추가
+  '고약', '고정', '로', '모', '보', '오', '조', '초', '초재',
+  // 신청/보전 추가
+  '카공', '카조', '카임', '카기전', '카열', '카구',
+  // 집행 추가
+  '타기',
+  // 회생/파산 추가
+  '개확', '개기', '하합', '하확', '하기', '회단', '회합', '회확', '비단', '비합', '과', '간회단', '간회합',
+  // 행정 추가
+  '구', '루', '무', '부', '사', '재구', '재누', '재두',
+]);
+
+/**
+ * 지원 불가능한 것으로 알려진 카테고리
+ * 나의사건검색에서 다른 시스템으로 안내될 수 있음
+ */
+const UNSUPPORTED_CATEGORIES = new Set([
+  '보호',      // 보호관찰 시스템
+  '특허',      // 특허법원 시스템
+  '선거특별',  // 선거관리위원회
+  '감치',      // 별도 시스템
+]);
+
+/**
+ * 사건유형 지원 상태 확인
+ */
+export function getCaseSupportStatus(caseType: string): CaseSupportStatus {
+  if (VERIFIED_CASE_TYPES.has(caseType)) {
+    return 'verified';
+  }
+  if (SUPPORTED_CASE_TYPES.has(caseType)) {
+    return 'supported';
+  }
+  return 'unknown';
+}
+
+/**
+ * 사건유형이 지원 불가 카테고리인지 확인
+ */
+export function isUnsupportedCategory(caseType: string): boolean {
+  const { getCaseCategoryByTypeName } = require('./case-type-codes');
+  const category = getCaseCategoryByTypeName(caseType);
+  return category ? UNSUPPORTED_CATEGORIES.has(category) : false;
 }
 
 export class ScourtApiClient {
@@ -380,7 +527,7 @@ export class ScourtApiClient {
     encCsNo: string;      // 암호화된 사건번호 (검색 결과에서)
     captchaAnswer: string; // 캡챠 답
     csNo?: string;        // 14자리 사건번호 (검색 결과에서)
-    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'order' | 'other';  // 사건 카테고리
+    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other';  // 사건 카테고리
   }): Promise<CaseDetailResult> {
     if (!this.session) {
       return { success: false, error: '세션이 초기화되지 않았습니다.' };
@@ -398,12 +545,13 @@ export class ScourtApiClient {
     const csDvsCdNum = this.getCaseTypeCode(params.csDvsCd);
 
     // 사건 카테고리별 파라미터 분기 (브라우저 캡처 결과 반영)
-    const isCriminal = caseCategory === 'criminal';
-    const csSerialValue = isCriminal ? params.csSerial.padStart(7, '0') : params.csSerial;
-    const csNoValue = isCriminal
+    // 형사, 항고, 보호, 감치 사건은 csNo와 srchDvs: '06' 필요
+    const needsFullParams = caseCategory === 'criminal' || caseCategory === 'appeal' || caseCategory === 'protection' || caseCategory === 'contempt';
+    const csSerialValue = needsFullParams ? params.csSerial.padStart(7, '0') : params.csSerial;
+    const csNoValue = needsFullParams
       ? (params.csNo || `${params.csYear}${csDvsCdNum}${params.csSerial.padStart(7, '0')}`)
       : '';
-    const srchDvsValue = isCriminal ? '06' : '';
+    const srchDvsValue = needsFullParams ? '06' : '';
 
     const requestBody = {
       dma_search: {
@@ -509,7 +657,18 @@ export class ScourtApiClient {
       }
     }
 
-    return { success: false, error: lastError || '모든 엔드포인트 실패' };
+    // 지원 상태에 따른 에러 메시지 개선
+    const supportStatus = getCaseSupportStatus(params.csDvsCd);
+    const isUnsupported = isUnsupportedCategory(params.csDvsCd);
+
+    let errorMessage = lastError || '모든 엔드포인트 실패';
+    if (isUnsupported) {
+      errorMessage = `'${params.csDvsCd}' 사건유형은 나의사건검색에서 지원되지 않습니다. 해당 사건은 별도의 시스템(보호관찰, 특허법원 등)을 이용해야 합니다.`;
+    } else if (supportStatus === 'unknown') {
+      errorMessage = `'${params.csDvsCd}' 사건유형은 아직 시스템에서 지원 확인이 되지 않았습니다. 사건 정보가 맞는지 확인해주세요. (${lastError || '엔드포인트 실패'})`;
+    }
+
+    return { success: false, error: errorMessage };
   }
 
   /**
@@ -532,7 +691,7 @@ export class ScourtApiClient {
     csDvsCd: string;
     csSerial: string;
     encCsNo: string;
-    caseCategory?: 'family' | 'civil' | 'criminal' | 'application' | 'execution' | 'electronicOrder' | 'insolvency';
+    caseCategory?: 'family' | 'civil' | 'criminal' | 'application' | 'execution' | 'electronicOrder' | 'appeal' | 'insolvency' | 'protection' | 'contempt';
   }): Promise<{ success: boolean; progress?: Array<{ prcdDt: string; prcdNm: string; prcdRslt?: string; progCttDvs?: string }>; error?: string }> {
     if (!this.session) {
       return { success: false, error: '세션이 초기화되지 않았습니다.' };
@@ -569,6 +728,9 @@ export class ScourtApiClient {
         execution: '/ssgo/ssgo10a/selectHmpgEtexecCsProgCtt.on',        // 집행(타채) ✅ 브라우저 확인
         electronicOrder: '/ssgo/ssgo10c/selectHmpgElctnUrgngCsProgCtt.on',  // 전자독촉 (차전) ✅ 브라우저 확인
         insolvency: '/ssgo/ssgo107/selectHmpgRhblBnkpCsProgCtt.on',    // 회생/파산 (개회,하단,하면)
+        appeal: '/ssgo/ssgo108/selectHmpgApalRaplCsProgCtt.on',        // 항고/재항고 (스,브,그,너) - 2026.01.07 추가
+        protection: '/ssgo/ssgo10i/selectHmpgFamlyPrtctCsProgCtt.on', // 보호 (동버,푸) - 2026.01.07 추가
+        contempt: '/ssgo/ssgo106/selectHmpgEtcCsProgCtt.on',          // 감치 (정명) - 2026.01.07 추가
       };
       const endpoint = progressEndpoints[params.caseCategory || 'family'] || progressEndpoints.civil;
       console.log(`  엔드포인트: ${endpoint} (${params.caseCategory || 'family'})`);
@@ -652,7 +814,7 @@ export class ScourtApiClient {
    */
   private parseDetailResponse(
     response: any,
-    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'order' | 'other'
+    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'
   ): CaseDetailData {
     const result: CaseDetailData = {
       raw: response,
@@ -719,9 +881,10 @@ export class ScourtApiClient {
           result.rspNm = result.dfndtNm;  // UI 호환성을 위해 rspNm에도 설정
           console.log(`  형사사건: 피고인=${result.dfndtNm}, 형제번호=${result.crmcsNo}`);
         } else {
-          // 원고/피고명 (여러 필드명 대응) - 가사, 민사, 신청 등
-          result.aplNm = caseInfo.aplNm || caseInfo.rprsClmntNm || caseInfo.clmntNm;  // 원고/신청인/채권자
-          result.rspNm = caseInfo.rspNm || caseInfo.rprsAcsdNm || caseInfo.acsdNm;    // 피고/피신청인/채무자
+          // 원고/피고명 (여러 필드명 대응) - 민사, 가사, 보전, 집행 등
+          // 민사/가사: rprsClmntNm/rprsAcsdNm, 보전/집행: rprsPtnrNm/rprsRqstrNm
+          result.aplNm = caseInfo.aplNm || caseInfo.rprsClmntNm || caseInfo.rprsPtnrNm || caseInfo.clmntNm;  // 원고/신청인/채권자
+          result.rspNm = caseInfo.rspNm || caseInfo.rprsAcsdNm || caseInfo.rprsRqstrNm || caseInfo.acsdNm;    // 피고/피신청인/채무자
         }
 
         // 추가 기본 정보 추출 (일반내용 탭)
@@ -729,7 +892,7 @@ export class ScourtApiClient {
         result.jdgNm = caseInfo.jdbnNm || caseInfo.ultmtJdbnNm || caseInfo.jdgNm || caseInfo.jdgpNm;  // 재판부
         result.rcptDt = caseInfo.csRcptYmd || caseInfo.rcptDt || caseInfo.rcptYmd;                    // 접수일
         result.endDt = caseInfo.csUltmtYmd || caseInfo.endDt;                                         // 종국일
-        result.endRslt = caseInfo.csUltmtDtlCtt || caseInfo.endRslt || caseInfo.endRsltNm;            // 종국결과
+        result.endRslt = caseInfo.csUltmtDvsNm || caseInfo.csUltmtDtlCtt || caseInfo.endRslt || caseInfo.endRsltNm;  // 종국결과
         result.cfrmDt = caseInfo.csCfmtnYmd || caseInfo.cfrmDt || caseInfo.cfrmYmd;                   // 확정일
         result.stmpAmnt = caseInfo.stmpAtchAmt || caseInfo.stmpAmnt || caseInfo.injiAek;              // 인지액
         result.mrgrDvs = caseInfo.csMrgTypNm || caseInfo.mrgrDvs || caseInfo.mrgrDvsNm;               // 병합구분
@@ -744,12 +907,62 @@ export class ScourtApiClient {
         result.exmnrNm = caseInfo.exmnrNm || caseInfo.csExmnrNm;                                     // 조사관명
         result.exmnrTelNo = caseInfo.exmnrTelNo || caseInfo.csExmnrTelNo;                            // 조사관 전화번호
 
-        // 소가 정보 (민사 사건)
-        result.aplSovAmt = caseInfo.clmntSovAmt || caseInfo.aplSovAmt || caseInfo.aplClmAmt;         // 원고 소가
-        result.rspSovAmt = caseInfo.acsdSovAmt || caseInfo.rspSovAmt || caseInfo.rspClmAmt;          // 피고 소가
+        // 소가 정보 (민사/가사 사건) - clmntVsml/acsdVsml이 실제 API 필드명
+        result.aplSovAmt = caseInfo.clmntVsml || caseInfo.clmntSovAmt || caseInfo.aplSovAmt || caseInfo.aplClmAmt;  // 원고 소가
+        result.rspSovAmt = caseInfo.acsdVsml || caseInfo.acsdSovAmt || caseInfo.rspSovAmt || caseInfo.rspClmAmt;    // 피고 소가
+        result.csClmAmt = caseInfo.csClmAmt || caseInfo.clmAmt;  // 청구금액 (집행 사건)
 
-        // 수리구분
-        result.rcptDvsNm = caseInfo.rcptDvsNm || caseInfo.rcptDvs || caseInfo.csRcptDvsNm;           // 수리구분 (제소, 신청 등)
+        // 수리구분 - csTkpDvsNm(민사/보전/집행), csTkpDvsCdNm(가사/항소)이 실제 API 필드명
+        result.rcptDvsNm = caseInfo.csTkpDvsNm || caseInfo.csTkpDvsCdNm || caseInfo.rcptDvsNm || caseInfo.rcptDvs || caseInfo.csRcptDvsNm;  // 수리구분
+
+        // 추가 기본 필드 추출 (제공필드.csv 기반)
+        result.aplRslt = caseInfo.aplRslt || caseInfo.aplPrcsRslt || caseInfo.atcAplRslt;                   // 항고신청결과
+        result.aplyDt = caseInfo.aplyYmd || caseInfo.aplyDt || caseInfo.aplctnYmd;                         // 신청일
+        result.sendDt = caseInfo.sendYmd || caseInfo.dlvrYmd || caseInfo.sendDt;                           // 발송일
+        result.dcsnDt = caseInfo.dcsnYmd || caseInfo.dcsnDt || caseInfo.dcsrYmd;                           // 결정일
+        result.trnsfDt = caseInfo.trnsfYmd || caseInfo.hndvrYmd || caseInfo.trnsfDt;                       // 인계일
+        result.dspsYn = caseInfo.dspsYn || caseInfo.rcrdDspsYn || caseInfo.rcrdDspsYnNm;                   // 폐기여부
+        result.thrdDbtr = caseInfo.thrdDbtrNm || caseInfo.thrdDbtr || caseInfo.trhdDtrNm;                  // 제3채무자
+        result.note = caseInfo.rmrk || caseInfo.note || caseInfo.ntesCtt;                                   // 비고
+
+        // 회생/파산 전용 필드 추출 (실제 API 필드명: csCmdcYmd, crdtrDdlnYmd, repayKjDay, rhblCmsnrNm)
+        if (caseCategory === 'insolvency') {
+          result.strtDcsnDt = caseInfo.csCmdcYmd || caseInfo.strtDcsnYmd || caseInfo.cmncdtDcsnYmd;        // 개시결정일 (실제: csCmdcYmd)
+          result.crtrObjDdln = caseInfo.crdtrDdlnYmd || caseInfo.crtrObjDdlnYmd;                           // 채권이의마감일 (실제: crdtrDdlnYmd)
+          result.dschgDcsnDt = caseInfo.repayKjDay || caseInfo.dschgDcsnYmd || caseInfo.frmbrDcsnYmd;     // 변제계획안인가일 (실제: repayKjDay)
+          result.prcdAbndDcsnDt = caseInfo.prcdAbndDcsnYmd || caseInfo.abolDcsnYmd;                        // 절차폐지결정일
+          // 회생위원 정보 (실제: rhblCmsnrNm, rhblCmsnrTelno)
+          result.exmnrNm = caseInfo.rhblCmsnrNm || result.exmnrNm;                                         // 회생위원명
+          result.exmnrTelNo = caseInfo.rhblCmsnrTelno || result.exmnrTelNo;                                // 회생위원 전화번호
+        }
+
+        // 집행 전용 필드 추출 (실제 API 필드명: dcsnstDlvrYmd, telNo, thrdDbtrNm)
+        if (caseCategory === 'execution') {
+          result.sendDt = caseInfo.dcsnstDlvrYmd || result.sendDt;                                         // 결정송달일 (실제: dcsnstDlvrYmd)
+          result.jdgTelno = caseInfo.telNo || result.jdgTelno;                                             // 담당계 전화번호 (실제: telNo)
+          result.thrdDbtr = caseInfo.thrdDbtrNm || result.thrdDbtr;                                        // 제3채무자 (실제: thrdDbtrNm)
+        }
+
+        // 보호 사건 전용 필드 추출 (ssgo10i - 동버, 푸 등) - 2026.01.07 추가
+        if (caseCategory === 'protection') {
+          // 보호 사건 특수 당사자명 (행위자/피해아동)
+          result.aplNm = caseInfo.actorNm || caseInfo.hngwzNm || result.aplNm;                            // 행위자명
+          result.rspNm = caseInfo.victimNm || caseInfo.phaDongNm || result.rspNm;                         // 피해아동명
+          // 보호 사건 특수 필드
+          result.exmnrNm = caseInfo.invstgtrNm || caseInfo.jsgrNm || result.exmnrNm;                      // 조사관명
+          result.siblingCsNo = caseInfo.siblingCsNo || caseInfo.hyjeNo || caseInfo.crmcsNo;               // 형제번호
+          result.trnsfDt = caseInfo.hndvrYmd || caseInfo.ingyeIl || result.trnsfDt;                       // 인계일
+          // 종국결과 (날짜+결과 포맷: "2023.07.17 불처분결정")
+          result.endRslt = caseInfo.csUltmtDtlCtt || caseInfo.jgRsltCtt || result.endRslt;
+        }
+
+        // 감치 사건 전용 필드 추출 (ssgo106 - 정명 등) - 2026.01.07 추가
+        if (caseCategory === 'contempt') {
+          // 감치 사건 특수 필드
+          result.rspNm = caseInfo.debtorNm || caseInfo.cmwzNm || result.rspNm;                            // 채무자(피고)명
+          // 종국결과 (날짜+결과 포맷: "2018.04.18 감치결정")
+          result.endRslt = caseInfo.csUltmtDtlCtt || caseInfo.jgRsltCtt || result.endRslt;
+        }
 
         // 디버그: 추출된 추가 필드 로깅
         if (result.jdgNm || result.rcptDt || result.endRslt || result.cfrmDt || result.stmpAmnt) {
@@ -877,6 +1090,73 @@ export class ScourtApiClient {
           encCsNo: lc.encCsNo || '',        // 암호화된 사건번호 (상세조회용)
         }));
         console.log(`📋 심급내용 (원심): ${lowerCourtList.length}건`);
+      }
+
+      // 추가 LIST 타입 추출 (제공필드.csv 기반)
+      // 보정명령LIST (dlt_crtnOrdLst)
+      const correctionList = response?.data?.dlt_crtnOrdLst || response?.data?.dlt_crctOrdLst || [];
+      if (correctionList.length > 0) {
+        result.correctionOrders = correctionList.map((co: any) => ({
+          orderDt: co.ordYmd || co.orderDt || '',
+          orderCtt: co.ordCtt || co.orderCtt || '',
+          dueDate: co.crtnDdln || co.dueDate || '',
+          compDt: co.crtnYmd || co.compDt || '',
+        }));
+      }
+
+      // 죄명내용LIST (dlt_crmNmLst) - 형사사건
+      const crimeNamesList = response?.data?.dlt_crmNmLst || response?.data?.dlt_crmLst || [];
+      if (crimeNamesList.length > 0) {
+        result.crimeNames = crimeNamesList.map((cn: any) => ({
+          crmNm: cn.crmNm || cn.crimeNm || '',
+        }));
+      }
+
+      // 채권자LIST (dlt_crtrLst) - 회생/파산
+      const creditorsList = response?.data?.dlt_crtrLst || response?.data?.dlt_creditorLst || [];
+      if (creditorsList.length > 0) {
+        result.creditors = creditorsList.map((cr: any) => ({
+          crtrNm: cr.crtrNm || cr.creditorNm || '',
+          clmAmt: cr.clmAmt || cr.claimAmt || '',
+        }));
+      }
+
+      // 변제LIST (dlt_rpmtLst) - 개인회생
+      const repaymentsList = response?.data?.dlt_rpmtLst || response?.data?.dlt_repayLst || [];
+      if (repaymentsList.length > 0) {
+        result.repayments = repaymentsList.map((rp: any) => ({
+          rpmtDt: rp.rpmtYmd || rp.rpmtDt || '',
+          rpmtAmt: rp.rpmtAmt || '',
+          rpmtCtt: rp.rpmtCtt || '',
+        }));
+      }
+
+      // 후견인내용LIST (dlt_cstdnLst) - 가사후견
+      const custodiansList = response?.data?.dlt_cstdnLst || response?.data?.dlt_grdnLst || [];
+      if (custodiansList.length > 0) {
+        result.custodians = custodiansList.map((cs: any) => ({
+          cstdnNm: cs.cstdnNm || cs.grdnNm || '',
+          cstdnTyp: cs.cstdnTypNm || cs.grdnTyp || '',
+        }));
+      }
+
+      // 피고인내용LIST (dlt_dfndtLst) - 형사
+      const defendantsList = response?.data?.dlt_dfndtLst || response?.data?.dlt_acsdLst || [];
+      if (defendantsList.length > 0) {
+        result.defendantsList = defendantsList.map((df: any) => ({
+          dfndtNm: df.dfndtNm || df.acsdNm || '',
+          dfndtSts: df.dfndtStsNm || df.acsdSts || '',
+        }));
+      }
+
+      // 담보내용LIST (dlt_colLst)
+      const collateralsList = response?.data?.dlt_colLst || response?.data?.dlt_sctLst || [];
+      if (collateralsList.length > 0) {
+        result.collaterals = collateralsList.map((col: any) => ({
+          colType: col.colTypNm || col.sctTypNm || '',
+          colAmt: col.colAmt || col.sctAmt || '',
+          colCtt: col.colCtt || col.sctCtt || '',
+        }));
       }
 
       // 심급 정보 결정 (사건유형 한글명 기반)
@@ -1041,7 +1321,7 @@ export class ScourtApiClient {
    * - 대전지방법원 천안지원: 000283 (민사/형사)
    * - 대전가정법원 천안지원: 000294 (가사)
    */
-  private getCourtCode(cortNm: string, _caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'order' | 'other'): string {
+  private getCourtCode(cortNm: string, _caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
     // 숫자 코드면 그대로 반환
     if (/^\d+$/.test(cortNm)) {
       return cortNm;
@@ -1101,44 +1381,162 @@ export class ScourtApiClient {
    * - 전자독촉(차전): ssgo10c 엔드포인트 사용 (브라우저 분석으로 확인)
    * - 회생/파산(개회, 하단, 하면): ssgo107 엔드포인트 사용 (브라우저 분석으로 확인)
    */
-  private getCaseCategory(csDvsCd: string): 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'order' | 'other' {
+  private getCaseCategory(csDvsCd: string): 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other' {
     // 1. 특수 사건 유형 우선 처리 (API 엔드포인트 기준)
+    // 참고: docs/scourt-api-endpoint-discovery.md
+
+    // 항고/재항고/특별항고 → ssgo108 (appeal)
+    // 브라우저 분석 결과: /ssgo/ssgo108/selectHmpgApalRaplCsGnrlCtt.on
+    // 스(특별항고), 브(가사후견항고), 그(민사항고) 등
+    // 주의: 너(가사비송항고)는 ssgo102(family)로 처리됨
+    const appealTypes = [
+      '스', '브', '그',  // 항고 사건 (너 제외 - family로 처리)
+      '재스', '재브', '재그',  // 재심
+      '준재스', '준재브', '준재그',  // 준재심
+    ];
+    if (appealTypes.includes(csDvsCd)) {
+      return 'appeal';
+    }
+
+    // 행정 신청 사건 → ssgo105 (application)
+    // 브라우저 분석 결과: 아(행정신청)는 ssgo105 사용
+    const adminApplicationTypes = ['아', '재아', '준재아'];
+    if (adminApplicationTypes.includes(csDvsCd)) {
+      return 'application';
+    }
 
     // 가사 보전/신청 사건 → ssgo105 (application)
-    // 즈단(177), 즈기(178), 재즈단(225), 재즈기(226) 등
-    const familyApplicationTypes = ['즈단', '즈기', '재즈단', '재즈기', '177', '178', '225', '226'];
+    // 즈단(177), 즈기(178), 즈합 등
+    const familyApplicationTypes = ['즈단', '즈합', '즈기', '재즈단', '재즈합', '재즈기', '준재즈기', '177', '178', '211', '225', '226', '251', '252'];
     if (familyApplicationTypes.includes(csDvsCd)) {
       return 'application';
     }
 
     // 전자독촉/지급명령 → ssgo10c (electronicOrder)
     // 브라우저 분석 결과: /ssgo/ssgo10c/selectHmpgElctnUrgngCsGnrlCtt.on
-    // 차전(400), 차(012) 등
     const electronicOrderTypes = ['차전', '차', '400', '012'];
     if (electronicOrderTypes.includes(csDvsCd)) {
       return 'electronicOrder';
     }
 
+    // 신청/보전 사건 → ssgo105 (application)
+    // 카공, 카기, 카단, 카합, 카담, 카명, 카불, 카조, 카확, 카정, 카소, 카임, 카기전 등
+    // 미지원(X): 재카구(217), 준재카합(219), 준재카단(220), 준재카담(221), 준재카기(222)
+    const applicationTypes = [
+      '카', '카공', '카기', '카기전', '카단', '카합', '카담', '카명', '카불', '카조', '카확', '카정', '카소', '카임', '카열',
+      '카구', '재카합', '재카단', '재카담', '재카기',
+      '008', '069', '071', '072', '073', '074', '201', '212', '213', '236', '411', '421',
+    ];
+    if (applicationTypes.includes(csDvsCd)) {
+      return 'application';
+    }
+
+    // 집행 사건 → ssgo10a (execution)
+    // 타기, 타배, 타채 등
+    // 미지원(X): 타(120), 타경(013), 카경, 재타경(122), 재타기(224), 준재타경, 본(601)
+    const executionTypes = [
+      '타기', '타배', '타채',
+      '014', '200', '185', '300', '301',
+    ];
+    if (executionTypes.includes(csDvsCd)) {
+      return 'execution';
+    }
+
     // 비송도산 (회생/파산) → ssgo107 (insolvency)
     // 브라우저 분석 결과: /ssgo/ssgo107/selectHmpgRhblBnkpCsGnrlCtt.on
-    // 개회(253), 하단(210), 하면(214,245), 파산(017), 회생 등
+    // 미지원(X): 하(017), 회(180), 화/거(018), 파(015), 재하(175), 준재하(176), 재과(218), 준재과(223), 선(181), 유(182)
     const insolvencyTypes = [
-      '개회', '개확', '개보', '개기',  // 개인회생
-      '하단', '하합', '하면', '하확', '하기', '하보',  // 파산
-      '회단', '회합', '회확', '회기', '회보', '회',  // 회생
-      '화', '화보',  // 도산화의
-      '파', '파단', '파합',  // 비송
-      '비단', '비합',  // 비송
+      '개회', '개확', '개보', '개기',  // 개인회생 ○
+      '하단', '하합', '하면', '하확', '하기', '하보',  // 파산 ○ (하 제외)
+      '회단', '회합', '회확', '회기', '회보',  // 회생 ○ (회 제외)
+      '비단', '비합',  // 비송 ○
       '간회단', '간회합',  // 간이회생
       '국승', '국지',  // 국제도산
-      '253', '254', '255', '290',  // 개인회생 코드
-      '209', '210', '214', '245', '295', '296', '256',  // 파산 코드
+      '과',  // 과태료 ○
+      '재비합', '재비단',  // 재심 ○
+      '253', '254', '255', '256', '290',  // 개인회생 코드
+      '209', '210', '214', '245', '295', '296',  // 파산 코드
       '291', '292', '293', '294', '258',  // 회생 코드
-      '017', '175', '176',  // 파산/재심
-      '180', '018', '202',  // 회사정리/도산화의
+      '215', '216', '179',  // 비송/과태료 코드
     ];
     if (insolvencyTypes.includes(csDvsCd)) {
       return 'insolvency';
+    }
+
+    // 보호 사건 (가정보호/소년보호 등) → ssgo10i (protection) - 브라우저 XHR 캡처 확인 (2026.01.07)
+    // 실제 호출: /ssgo/ssgo10i/selectHmpgFamlyPrtctCsGnrlCtt.on
+    const protectionTypes = ['동버', '푸', '동보', '동즈', '동느', '동', '440'];
+    if (protectionTypes.includes(csDvsCd)) {
+      return 'protection';
+    }
+
+    // 감치 사건 (채무자감치 등) → ssgo106 (contempt) - 브라우저 XHR 캡처 확인 (2026.01.07)
+    // 실제 호출: /ssgo/ssgo106/selectHmpgEtcCsGnrlCtt.on
+    const contemptTypes = ['정', '정로', '정모', '정가', '정명', '정령', '100', '101', '103', '240', '241'];
+    if (contemptTypes.includes(csDvsCd)) {
+      return 'contempt';
+    }
+
+    // 형사 사건 → ssgo10g (criminal)
+    // 고단, 고합, 노, 도, 초재 등
+    const criminalTypes = [
+      '고단', '고합', '고약', '고정', '고약전', '노', '도', '로', '모', '보', '오', '조', '초',
+      '초적', '초보', '초기', '초사', '초재', '재고단', '재고합', '재고약', '재고정', '재노', '재도',
+      '감고', '감노', '감도', '감로', '감모', '감오', '감초', '감토',
+      '재감고', '재감노', '재감도',
+      '전고', '전노', '전도', '전로', '전모', '전오', '전초',
+      '075', '076', '077', '078', '079', '080', '081', '082', '083', '084', '085', '086', '087', '088', '089',
+      '090', '091', '092', '093', '094', '095', '112', '113', '114', '115', '116', '117', '118', '119',
+      '204', '205', '206', '230', '231', '234', '235',
+    ];
+    if (criminalTypes.includes(csDvsCd)) {
+      return 'criminal';
+    }
+
+    // 가사 사건 → ssgo102 (family)
+    // 드단, 드합, 느단, 느합, 르, 므, 후기, 후개 등
+    // 주의: 브, 스, 너는 항고 사건이므로 appealTypes에서 처리 (ssgo108)
+    // 미지원(X): 느(022) - 느단/느합은 지원
+    const familyTypes = [
+      '드', '드단', '드합', '느단', '느합', '르', '므', '으', '츠',
+      '후기', '후개',  // 가사 후견 ○
+      '재드', '재드단', '재드합', '재느단', '재느합', '재르', '재므',
+      '준재드', '준재드단', '준재드합', '준재느단', '준재느합', '준재르', '준재므', '준재너단', '준재너합',
+      '023', '024', '025', '027', '028', '029', '030',  // 022(느) 제외
+      '110', '143', '144', '145', '146', '147', '148', '149',
+      '150', '151', '152', '153', '154', '155', '160', '161', '162', '163', '164', '165', '166', '167', '183',
+    ];
+    if (familyTypes.includes(csDvsCd)) {
+      return 'family';
+    }
+
+    // 민사 사건 → ssgo101 (civil)
+    // 가단, 가소, 가합, 나, 다, 라, 마, 머, 자, 바 등
+    // 주의: 그(민사항고)는 appealTypes에서 처리 (ssgo108)
+    // 미지원(X): 러(020), 재자(134), 준재자(125), 준재다(170), 준재라(174)
+    const civilTypes = [
+      '가단', '가소', '가합', '나', '다', '라', '마', '머', '자', '바',
+      '재가단', '재가합', '재가소', '재나', '재다', '재라', '재마', '재머', '재차',
+      '준재가단', '준재가합', '준재가소', '준재나', '준재머',
+      '001', '002', '003', '004', '005', '007', '009', '010', '011', '021', '048',
+      '050', '051', '052', '053', '054', '058', '064', '066', '067', '068', '105', '106', '123', '124', '168',
+    ];
+    if (civilTypes.includes(csDvsCd)) {
+      return 'civil';
+    }
+
+    // 행정 사건 → ssgo101 (civil) - 행정은 민사 엔드포인트 사용
+    // 구, 구단, 구합, 누, 두, 루, 무, 부, 사 등
+    // 주의: 아(행정신청)는 adminApplicationTypes에서 처리 (ssgo105)
+    // 미지원(X): 준재두(169)
+    const administrativeTypes = [
+      '구', '구단', '구합', '누', '두', '루', '무', '부', '사',
+      '재구', '재구단', '재구합', '재누', '재두', '재루', '재무',
+      '준재구', '준재구단', '준재구합', '준재누', '준재루',
+      '033', '034', '035', '036', '037', '056', '057', '126', '127', '128', '133', '139', '140', '141', '142', '184', '186', '188', '194', '195', '196', '197', '198', '199',
+    ];
+    if (administrativeTypes.includes(csDvsCd)) {
+      return 'civil';  // 행정은 민사 엔드포인트(ssgo101) 사용
     }
 
     // 2. 새로운 매핑에서 카테고리 조회
@@ -1202,17 +1600,21 @@ export class ScourtApiClient {
    * - 전자독촉(차전): /ssgo/ssgo10c/selectHmpgElctnUrgngCsGnrlCtt.on ✅
    * - 회생/파산(개회,하단,하면): /ssgo/ssgo107/selectHmpgRhblBnkpCsGnrlCtt.on ✅
    * - 집행(타채): /ssgo/ssgo10a/selectHmpgEtexecCsGnrlCtt.on ✅
+   * - 항고/재항고(스,브): /ssgo/ssgo108/selectHmpgApalRaplCsGnrlCtt.on ✅ (2026.01.07)
    */
-  private getDetailApiEndpoints(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'order' | 'other'): string[] {
+  private getDetailApiEndpoints(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string[] {
     // 브라우저 실제 API 호출에서 확인한 엔드포인트
     const primaryEndpoints: Record<string, string> = {
       family: '/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',             // 가사사건
       criminal: '/ssgo/ssgo10g/selectHmpgCrmcsPbtrlCsGnrlCtt.on',     // 형사사건 (공판)
       civil: '/ssgo/ssgo101/selectHmpgCvlcsCsGnrlCtt.on',             // 민사사건
-      application: '/ssgo/ssgo105/selectHmpgAplyCsGnrlCtt.on',        // 신청사건
+      application: '/ssgo/ssgo105/selectHmpgAplyCsGnrlCtt.on',        // 신청사건 (아 포함)
       execution: '/ssgo/ssgo10a/selectHmpgEtexecCsGnrlCtt.on',         // 집행(타채) ✅ 브라우저 확인
       electronicOrder: '/ssgo/ssgo10c/selectHmpgElctnUrgngCsGnrlCtt.on',  // 전자독촉 (차전) - 브라우저 분석 결과
       insolvency: '/ssgo/ssgo107/selectHmpgRhblBnkpCsGnrlCtt.on',     // 회생/파산 (개회,하단,하면) - 브라우저 분석 결과
+      appeal: '/ssgo/ssgo108/selectHmpgApalRaplCsGnrlCtt.on',         // 항고/재항고 (스,브,그,너) - 브라우저 분석 결과 (2026.01.07)
+      protection: '/ssgo/ssgo10i/selectHmpgFamlyPrtctCsGnrlCtt.on',   // 보호 (동버,푸) - XHR 캡처 확인 (2026.01.07)
+      contempt: '/ssgo/ssgo106/selectHmpgEtcCsGnrlCtt.on',           // 감치 (정명) - XHR 캡처 확인 (2026.01.07)
       order: '/ssgo/ssgo106/selectHmpgDccsCsGnrlCtt.on',              // 독촉사건 (일반)
       other: '/ssgo/ssgo101/selectHmpgCvlcsCsGnrlCtt.on',             // 기타 (민사)
     };
@@ -1246,7 +1648,7 @@ export class ScourtApiClient {
   /**
    * 사건 카테고리에 따른 API 엔드포인트 결정 (단일 반환 - 호환성 유지)
    */
-  private getDetailApiEndpoint(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'order' | 'other'): string {
+  private getDetailApiEndpoint(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
     return this.getDetailApiEndpoints(caseCategory)[0];
   }
 
@@ -1276,6 +1678,22 @@ export class ScourtApiClient {
     console.log(`법원: ${params.cortCd}`);
     console.log(`사건: ${params.csYr}${params.csDvsCd}${params.csSerial}`);
     console.log(`당사자: ${params.btprNm}`);
+
+    // 지원 상태 확인 및 경고
+    const supportStatus = getCaseSupportStatus(params.csDvsCd);
+    const isUnsupported = isUnsupportedCategory(params.csDvsCd);
+
+    if (isUnsupported) {
+      console.log(`⚠️ 주의: '${params.csDvsCd}' 사건유형은 나의사건검색에서 지원되지 않을 수 있습니다.`);
+      console.log(`  이 유형의 사건은 별도의 시스템(보호관찰, 특허법원 등)을 이용해야 할 수 있습니다.`);
+    } else if (supportStatus === 'unknown') {
+      console.log(`⚠️ 주의: '${params.csDvsCd}' 사건유형은 아직 테스트되지 않았습니다.`);
+      console.log(`  민사 엔드포인트로 시도하지만 실패할 수 있습니다.`);
+    } else if (supportStatus === 'supported') {
+      console.log(`ℹ️ '${params.csDvsCd}' 사건유형은 지원되지만 아직 완전히 테스트되지 않았습니다.`);
+    } else {
+      console.log(`✅ '${params.csDvsCd}' 사건유형 지원 확인됨`);
+    }
     console.log('='.repeat(60));
 
     // 세션 초기화
@@ -1522,8 +1940,8 @@ export class ScourtApiClient {
     }
 
     // 2. 진행내용 별도 조회 (모든 사건 유형 지원)
-    // 진행내용 조회 지원 카테고리: family, civil, criminal, application, execution, electronicOrder, insolvency
-    const progressSupportedCategories = ['family', 'civil', 'criminal', 'application', 'execution', 'electronicOrder', 'insolvency'];
+    // 진행내용 조회 지원 카테고리: family, civil, criminal, application, execution, electronicOrder, insolvency, appeal
+    const progressSupportedCategories = ['family', 'civil', 'criminal', 'application', 'execution', 'electronicOrder', 'insolvency', 'appeal'];
     if (progressSupportedCategories.includes(caseCategory)) {
       console.log(`\n📋 진행내용 별도 조회 (${caseCategory})...`);
       try {
@@ -1533,7 +1951,7 @@ export class ScourtApiClient {
           csDvsCd: csDvsCdNum,
           csSerial: params.csSerial,
           encCsNo: searchResult.encCsNo,
-          caseCategory: caseCategory as 'family' | 'civil' | 'criminal' | 'application' | 'execution' | 'electronicOrder' | 'insolvency',
+          caseCategory: caseCategory as 'family' | 'civil' | 'criminal' | 'application' | 'execution' | 'electronicOrder' | 'insolvency' | 'appeal',
         });
 
         if (progressResult.success && progressResult.progress) {

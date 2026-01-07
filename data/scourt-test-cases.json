@@ -5,9 +5,9 @@
     {
       "type": "가단",
       "desc": "민사 1심 단독",
-      "court": "평택지원",
-      "caseNo": "2024가단75190",
-      "party": "홍길동",
+      "court": "대구지법 김천지원",
+      "caseNo": "2026가단30011",
+      "party": "허정혜",
       "verified": true
     },
     {
@@ -37,9 +37,9 @@
     {
       "type": "드단",
       "desc": "가사소송 1심 단독",
-      "court": "평택가정",
-      "caseNo": "2025드단20475",
-      "party": "김철수",
+      "court": "수원가정법원 평택지원",
+      "caseNo": "2026드단20014",
+      "party": "김은성",
       "verified": true
     },
     {
@@ -47,7 +47,7 @@
       "desc": "가사소송 항소",
       "court": "대전고법",
       "caseNo": "2023르1322",
-      "party": "이영희",
+      "party": "김설화",
       "verified": true
     },
     {
@@ -62,8 +62,8 @@
       "type": "너",
       "desc": "가사비송 항고",
       "court": "수원가정법원",
-      "caseNo": "2025너3762",
-      "party": "정수길",
+      "caseNo": "2023너3889",
+      "party": "권오준",
       "verified": true
     },
     {
@@ -78,16 +78,16 @@
       "type": "고단",
       "desc": "형사 1심 단독",
       "court": "천안지원",
-      "caseNo": "2024고단2703",
-      "party": "박범수",
+      "caseNo": "2023고단593",
+      "party": "유태규",
       "verified": true
     },
     {
       "type": "노",
       "desc": "형사 항소",
-      "court": "대전지법",
-      "caseNo": "2025노887",
-      "party": "김피고",
+      "court": "대전지방법원",
+      "caseNo": "2023노2410",
+      "party": "유태규",
       "verified": true
     },
     {
@@ -101,17 +101,17 @@
     {
       "type": "카불",
       "desc": "채무불이행자명부",
-      "court": "공주지원",
-      "caseNo": "2025카불3033",
-      "party": "채권자",
+      "court": "대전지법 천안지원",
+      "caseNo": "2025카불6034",
+      "party": "강호현",
       "verified": true
     },
     {
       "type": "카확",
       "desc": "소송비용확정",
-      "court": "평택지원",
-      "caseNo": "2024카확1171",
-      "party": "신청인",
+      "court": "대구지법 김천지원",
+      "caseNo": "2025카확10216",
+      "party": "괴평무지개아파트 입주자대표회의",
       "verified": true
     },
     {
@@ -125,25 +125,25 @@
     {
       "type": "타채",
       "desc": "채권압류/추심",
-      "court": "평택지원",
-      "caseNo": "2024타채33630",
-      "party": "채권자",
+      "court": "수원지법",
+      "caseNo": "2025타채139379",
+      "party": "권재경",
       "verified": true
     },
     {
       "type": "차전",
       "desc": "전자지급명령",
-      "court": "안성시법원",
-      "caseNo": "2025차전2850",
-      "party": "채권자",
+      "court": "구미시법원",
+      "caseNo": "2025차전7408",
+      "party": "최정용",
       "verified": true
     },
     {
       "type": "개회",
       "desc": "개인회생",
-      "court": "대전지방법원",
-      "caseNo": "2024개회53142",
-      "party": "신청인",
+      "court": "대전지법",
+      "caseNo": "2023개회107844",
+      "party": "안선민",
       "verified": true
     },
     {
@@ -296,6 +296,62 @@
       "court": "대구지법",
       "caseNo": "2021타배10127",
       "party": "서현피에스",
+      "verified": true
+    },
+    {
+      "type": "스",
+      "desc": "특별항고 (ssgo108)",
+      "court": "대법원",
+      "caseNo": "2023스794",
+      "party": "공준권",
+      "verified": true
+    },
+    {
+      "type": "브",
+      "desc": "가사후견항고 (ssgo108)",
+      "court": "대구가정법원",
+      "caseNo": "2025브1002",
+      "party": "박정준",
+      "verified": true
+    },
+    {
+      "type": "아",
+      "desc": "행정신청 (ssgo105)",
+      "court": "서울행정법원",
+      "caseNo": "2022아12622",
+      "party": "이준식",
+      "verified": true
+    },
+    {
+      "type": "카담",
+      "desc": "담보취소",
+      "court": "광주지방법원",
+      "caseNo": "2025카담50323",
+      "party": "주식회사 한일전력공사",
+      "verified": true
+    },
+    {
+      "type": "도",
+      "desc": "형사 상고",
+      "court": "대법원",
+      "caseNo": "2020도18249",
+      "party": "황진곤",
+      "verified": true
+    },
+    {
+      "type": "동버",
+      "desc": "가정보호 (ssgo10i)",
+      "court": "천안가정",
+      "caseNo": "2023동버44",
+      "party": "심진우",
+      "verified": true
+    },
+    {
+      "type": "정명",
+      "desc": "감치 (ssgo106)",
+      "court": "의정부지방법원",
+      "caseNo": "2018정명602",
+      "party": "최향옥",
       "verified": true
     }
   ]

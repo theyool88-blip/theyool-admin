@@ -1,6 +1,6 @@
 # SCOURT 통합 시스템
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-07
 
 대법원 나의사건검색(SCOURT) 연동 시스템의 전체 아키텍처, 데이터 흐름, 필드 매핑을 설명합니다.
 
@@ -46,7 +46,7 @@
 | `lib/scourt/party-labels.ts` | 당사자 라벨 정규화 |
 | `app/api/admin/scourt/search/route.ts` | 사건 검색 API |
 | `app/api/admin/scourt/sync/route.ts` | 사건 동기화 API |
-| `app/api/admin/scourt/detail/route.ts` | 상세 조회 API |
+| `app/api/admin/scourt/detail/route.ts` | 일반내용/진행내용 조회 API |
 
 ---
 
@@ -141,7 +141,7 @@ csNoHistLst로 검색 (14자 포맷)
 legal_cases에 enc_cs_no, scourt_wmonid 저장
 ```
 
-### 2단계: 상세 조회 및 동기화 (이후)
+### 2단계: 일반내용/진행내용 조회 및 동기화 (이후)
 
 ```
 저장된 enc_cs_no + scourt_wmonid 사용
@@ -166,35 +166,65 @@ legal_cases에 case_result 업데이트
 
 ## 필드 매핑
 
-### API 응답 → 한글 라벨
+### 실제 API 응답 필드 (dma_csBasCtt)
 
-sync/route.ts에서 `basicInfoKorean` 객체로 변환:
+> **참고**: 사건 유형에 따라 필드명이 다릅니다.
 
-| API 필드 | 한글 라벨 | 설명 |
-|----------|----------|------|
-| `csNo` | 사건번호 | 2024드단23848 |
-| `csNm` | 사건명 | 이혼 등 |
-| `cortNm` | 법원 | 수원가정법원 평택지원 |
-| `jdgNm` | 재판부 | 제2단독 |
-| `jdgTelno` | 재판부전화번호 | 031-650-3126(재판일:수...) |
-| `rcptDt` | 접수일 | 2024.10.21 |
-| `endDt` | 종국일 | 2025.12.09 |
-| `endRslt` | 종국결과 | 원고일부승 |
-| `cfrmDt` | 확정일 | 2025.12.24 |
-| `prcdStsNm` | 진행상태 | 종국 |
-| `stmpAmnt` | 인지액 | 40,000원 |
-| `aplSovAmt` | 원고소가 | 10,000,000원 |
-| `rspSovAmt` | 피고소가 | 0원 |
-| `rcptDvsNm` | 수리구분 | 제소 |
-| `prsrvCtt` | 보존여부 | 기록보존됨 |
-| `exmnrNm` | 조사관 | 조사관명 |
-| `exmnrTelNo` | 조사관연락처 | 전화번호 |
+#### 공통 필드
+
+| 실제 API 필드 | 정규화 필드 | 한글 라벨 | 예시 |
+|--------------|-----------|----------|------|
+| `userCsNo` | `csNo` | 사건번호 | 2024드단23848 |
+| `csNm` | `csNm` | 사건명 | 이혼 등 |
+| `cortNm` | `cortNm` | 법원 | 수원가정법원 평택지원 |
+| `jdbnNm` | `jdgNm` | 재판부 | 가사1단독 |
+| `jdbnTelno` | `jdgTelno` | 재판부전화번호 | 031-650-3126 |
+| `csRcptYmd` | `rcptDt` | 접수일 | 20241021 |
+| `csUltmtYmd` | `endDt` | 종국일 | 20251209 |
+| `csUltmtDvsNm` | `endRslt` | 종국결과 | 원고일부승, 인용 |
+| `csCfmtnYmd` | `cfrmDt` | 확정일 | 20251224 |
+| `stmpAtchAmt` | `stmpAmnt` | 인지액 | 40000 (숫자) |
+| `csMrgTypNm` | `mrgrDvs` | 병합구분 | 없음, 본소, 반소 |
+| `csPrsrvYn` | `prsrvYn` | 보존여부 | Y/N |
+| `prsvCtt` | `prsrvCtt` | 보존내용 | 기록보존됨 |
+
+#### 사건유형별 당사자 필드
+
+| 사건유형 | 원고/채권자 필드 | 피고/채무자 필드 |
+|---------|----------------|----------------|
+| **민사** (가소, 가단) | `rprsClmntNm` | `rprsAcsdNm` |
+| **가사** (드단, 느단) | `rprsClmntNm` | `rprsAcsdNm` |
+| **항소** (르, 나) | `rprsClmntNm` | `rprsAcsdNm` |
+| **보전** (카기, 카합) | `rprsPtnrNm` | `rprsRqstrNm` |
+| **집행** (카불) | `rprsPtnrNm` | `rprsRqstrNm` |
+
+#### 사건유형별 소가/수리구분 필드
+
+| 사건유형 | 원고소가 | 피고소가 | 청구금액 | 수리구분 |
+|---------|---------|---------|---------|---------|
+| **민사/가사/항소** | `clmntVsml` | `acsdVsml` | - | `csTkpDvsNm` 또는 `csTkpDvsCdNm` |
+| **보전** | - | - | - | `csTkpDvsNm` |
+| **집행** | - | - | `csClmAmt` | `csTkpDvsNm` |
+
+### api-client.ts 정규화 매핑
+
+api-client.ts에서 사건유형별 차이를 흡수하여 통일된 필드명으로 변환:
+
+| 정규화 필드 | 실제 API 필드 (우선순위순) |
+|-----------|-------------------------|
+| `aplNm` | `rprsClmntNm` → `rprsPtnrNm` → `clmntNm` |
+| `rspNm` | `rprsAcsdNm` → `rprsRqstrNm` → `acsdNm` |
+| `endRslt` | `csUltmtDvsNm` → `csUltmtDtlCtt` → `endRsltNm` |
+| `aplSovAmt` | `clmntVsml` → `clmntSovAmt` → `aplClmAmt` |
+| `rspSovAmt` | `acsdVsml` → `acsdSovAmt` → `rspClmAmt` |
+| `csClmAmt` | `csClmAmt` → `clmAmt` (집행 사건 청구금액) |
+| `rcptDvsNm` | `csTkpDvsNm` → `csTkpDvsCdNm` → `csRcptDvsNm` |
 
 ### 종국결과 추출 로직
 
 종국결과는 두 곳에서 가져올 수 있습니다:
 
-1. **일반내용 탭** (기본): `dma_csBasCtt.ultmtRsltNm` 또는 `dma_csBasCtt.endRslt`
+1. **일반내용 탭** (기본): `dma_csBasCtt.csUltmtDvsNm`
 2. **진행내용** (폴백): `dlt_prcdRslt`에서 `"종국 : "` 접두어가 있는 항목
 
 ```typescript
@@ -342,28 +372,44 @@ CREATE TABLE case_parties (
 
 ## 사건유형별 지원 현황
 
-| 사건 유형 | 코드 | 검색 | 상세조회 | 비고 |
-|----------|------|------|----------|------|
-| 가사 단독 | 드단, 느단 | ✅ | ✅ | 완전 지원 |
-| 가사 합의 | 드합, 느합 | ✅ | ✅ | 완전 지원 |
-| 형사 | 고단, 고합 | ✅ | ❌ | 검색만 가능 |
-| 민사 | 가단, 가합, 가소 | ✅ | ✅ | 일반내용 API 지원 |
-| 신청 | 카기 | ✅ | ✅ | 보전처분 |
+> **용어 정리**
+> - **검색**: 사건번호로 검색 (캡챠 필요) → `encCsNo` 획득
+> - **일반내용**: 검색 성공 시 기본 탭 → `dma_csBasCtt`
+> - **진행내용**: 별도 탭 클릭 → `dlt_prcdRslt`
+
+| 사건 유형 | 코드 예시 | 검색 | 일반내용 | 진행내용 | 비고 |
+|----------|----------|------|----------|----------|------|
+| 민사 | 가단, 가소, 가합 | ✅ | ✅ | ✅ | |
+| 가사 | 드단, 느단, 드합 | ✅ | ✅ | ✅ | |
+| 항소 | 나, 너, 르 | ✅ | ✅ | ✅ | |
+| 보전 | 카기, 카합 | ✅ | ✅ | ✅ | |
+| 집행 | 타채, 카불 | ✅ | ✅ | ✅ | |
+| 전자독촉 | 차전 | ✅ | ✅ | ✅ | |
+| 회생/파산 | 개회, 하단, 하면 | ✅ | ✅ | ✅ | |
+| 형사 | 고단, 고합 | ✅ | ✅ | ✅ | |
+| 보호 | 동버, 푸 | ✅ | ✅ | ✅ | ssgo10i (2026.01.07 추가) |
+| 감치 | 정명 | ✅ | ✅ | ✅ | ssgo106 (2026.01.07 추가) |
 
 ### API 엔드포인트 분기
 
 ```typescript
-// api-client.ts
+// api-client.ts - 주요 카테고리별 엔드포인트
 switch (caseCategory) {
   case 'family':
-    endpoint = 'selectHmpgFmlyCsGnrlCtt.on';  // 가사
+    endpoint = 'selectHmpgFmlyCsGnrlCtt.on';       // 가사 (ssgo102)
     break;
   case 'criminal':
-    endpoint = 'selectHmpgCrmcsCsDtl.on';     // 형사
+    endpoint = 'selectHmpgCrmcsPbtrlCsGnrlCtt.on'; // 형사 (ssgo10g)
+    break;
+  case 'protection':
+    endpoint = 'selectHmpgFamlyPrtctCsGnrlCtt.on'; // 보호 (ssgo10i)
+    break;
+  case 'contempt':
+    endpoint = 'selectHmpgEtcCsGnrlCtt.on';       // 감치 (ssgo106)
     break;
   case 'civil':
   default:
-    endpoint = 'selectHmpgCvlcsCsGnrlCtt.on'; // 민사/기타
+    endpoint = 'selectHmpgCvlcsCsGnrlCtt.on';     // 민사 (ssgo101)
 }
 ```
 
@@ -411,3 +457,4 @@ WHERE id = 'case-uuid';
 | 2026-01-02 | 기일 동기화 시스템 완성 |
 | 2026-01-03 | 당사자/대리인 정보 수집 |
 | 2026-01-06 | 종국결과 추출 로직 개선, 문서화 |
+| 2026-01-07 | 보호(ssgo10i), 감치(ssgo106) 카테고리 추가 |

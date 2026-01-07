@@ -2,12 +2,12 @@
 
 ## 개요
 
-브라우저(Puppeteer) 없이 직접 REST API 호출로 사건 검색 및 상세 조회가 가능함을 확인함.
+브라우저(Puppeteer) 없이 직접 REST API 호출로 사건 검색 및 일반내용/진행내용 조회가 가능함을 확인함.
 
 **핵심 발견 (2025-12-31):**
 - `encCsNo`는 **WMONID**에 바인딩됨 (JSESSIONID 아님)
 - `csNoHistLst` 파라미터로 64자 encCsNo 획득 가능
-- 64자 encCsNo + 동일 WMONID = **캡챠 없이 상세 조회 가능**
+- 64자 encCsNo + 동일 WMONID = **캡챠 없이 일반내용/진행내용 조회 가능**
 
 ---
 
@@ -98,7 +98,7 @@ Response:
 }
 ```
 
-### 4. 상세 조회 (캡챠 없이)
+### 4. 일반내용 조회 (캡챠 없이)
 ```
 POST /ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on
 
@@ -193,7 +193,7 @@ const encCsNo = result.dlt_csNoHistLst[0].encCsNo;  // 64자
 await db.insert({ wmonid, encCsNo, case_number: '2024드단26718' });
 ```
 
-### 2단계: 상세 조회 (이후, 캡챠 없음)
+### 2단계: 일반내용/진행내용 조회 (이후, 캡챠 없음)
 
 ```typescript
 // 1. DB에서 조회
@@ -205,7 +205,7 @@ const res = await fetch('https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www', {
 });
 const jsessionId = res.headers.get('set-cookie').match(/JSESSIONID=([^;]+)/)[1];
 
-// 3. 캡챠 없이 상세 조회
+// 3. 캡챠 없이 일반내용 조회
 const detail = await getDetail({
   encCsNo: saved.encCsNo,
   captchaAnswer: '',  // 비워도 됨!
@@ -292,5 +292,6 @@ CREATE TABLE scourt_profile_cases (
 |------|------|
 | 2025-12-29 | 최초 작성, API 분석 |
 | 2025-12-29 | 상세 API WebSquare5 차단 확인 |
-| 2025-12-31 | **WMONID 바인딩 발견**, 캡챠 없이 상세 조회 성공 |
+| 2025-12-31 | **WMONID 바인딩 발견**, 캡챠 없이 일반내용/진행내용 조회 성공 |
 | 2025-12-31 | csNoHistLst 14자 포맷 확정, DB 스키마 추가 |
+| 2026-01-07 | 보호(ssgo10i), 감치(ssgo106) 엔드포인트 추가 |

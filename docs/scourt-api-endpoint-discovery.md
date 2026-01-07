@@ -9,17 +9,20 @@
 
 ## API 엔드포인트 목록
 
-### 상세조회 (일반내용) 엔드포인트
+### 일반내용 엔드포인트
 
 | 카테고리 | 모듈 | 사건유형 예시 | 엔드포인트 | 상태 |
 |---------|------|-------------|-----------|------|
 | 민사 | ssgo101 | 가단, 가소, 가합, 머 | `selectHmpgCvlcsCsGnrlCtt.on` | ✅ 확인 |
-| 가사 | ssgo102 | 드단, 느단, 너, 르 | `selectHmpgFmlyCsGnrlCtt.on` | ✅ 확인 |
+| 가사 | ssgo102 | 드단, 느단, 르 | `selectHmpgFmlyCsGnrlCtt.on` | ✅ 확인 |
 | 형사 | ssgo10g | 고단, 고합, 노 | `selectHmpgCrmcsPbtrlCsGnrlCtt.on` | ✅ 확인 |
-| 신청/보전 | ssgo105 | 카기, 카불, 카확, 즈단 | `selectHmpgAplyCsGnrlCtt.on` | ✅ 확인 |
+| 신청/보전 | ssgo105 | 카기, 카불, 카확, 즈단, 아 | `selectHmpgAplyCsGnrlCtt.on` | ✅ 확인 |
 | 집행 | ssgo10a | 타채 | `selectHmpgEtexecCsGnrlCtt.on` | ✅ 확인 |
 | 전자독촉 | ssgo10c | 차전 | `selectHmpgElctnUrgngCsGnrlCtt.on` | ✅ 확인 |
 | 회생/파산 | ssgo107 | 개회, 하단, 하면 | `selectHmpgRhblBnkpCsGnrlCtt.on` | ✅ 확인 |
+| 항고/재항고 | ssgo108 | 스, 브, 그 | `selectHmpgApalRaplCsGnrlCtt.on` | ✅ 확인 |
+| **보호** | **ssgo10i** | **동버, 푸** | `selectHmpgFamlyPrtctCsGnrlCtt.on` | ✅ **신규 (2026.01.07)** |
+| **감치/기타** | **ssgo106** | **정명** | `selectHmpgEtcCsGnrlCtt.on` | ✅ **신규 (2026.01.07)** |
 
 ### 진행내용 엔드포인트
 
@@ -32,6 +35,9 @@
 | 집행 | ssgo10a | `selectHmpgEtexecCsProgCtt.on` | ✅ 확인 |
 | 전자독촉 | ssgo10c | `selectHmpgElctnUrgngCsProgCtt.on` | ✅ 확인 |
 | 회생/파산 | ssgo107 | `selectHmpgRhblBnkpCsProgCtt.on` | ✅ 확인 |
+| 항고/재항고 | ssgo108 | `selectHmpgApalRaplCsProgCtt.on` | ✅ 확인 |
+| **보호** | **ssgo10i** | `selectHmpgFamlyPrtctCsProgCtt.on` | ✅ **신규 (2026.01.07)** |
+| **감치/기타** | **ssgo106** | `selectHmpgEtcCsProgCtt.on` | ✅ **신규 (2026.01.07)** |
 
 ---
 
@@ -44,9 +50,11 @@
 | ssgo102 | 가사 | Fmly | 가사항소(르) 포함 |
 | ssgo103 | 비송/도산 (구) | Nssm/Dsn | 미사용 |
 | ssgo104 | 집행 (구) | Excn | **미사용** - ssgo10a 사용 |
-| ssgo105 | 신청 | Aply | 카불, 카확 등 포함 |
-| ssgo106 | 독촉 (일반) | Dccs | 미확인 |
+| ssgo105 | 신청 | Aply | 카불, 카확, 아(행정신청) 등 |
+| ssgo106 | **감치/기타** | **Etc** | **정명 등 (2026.01.07 확인)** |
 | ssgo107 | 회생/파산 | RhblBnkp | 개회, 하단, 하면 |
+| ssgo108 | 항고/재항고 | ApalRapl | 스, 브, 그 |
+| **ssgo10i** | **보호** | **FamlyPrtct** | **동버, 푸 (2026.01.07 추가)** |
 | ssgo10a | 집행 (기타) | Etexec | 타채 등 |
 | ssgo10c | 전자독촉 | ElctnUrgng | 차전 |
 | ssgo10g | 형사 | CrmcsPbtrl | 고단, 노 등 |
@@ -65,7 +73,15 @@
 ### 가사 (ssgo102)
 - 드단, 드합 (가사소송)
 - 느단, 느합 (가사비송)
-- 너, 르 (가사항고/항소)
+- 르 (가사항소)
+- 너 (가사비송항고)
+
+### 항고/재항고 (ssgo108) - 신규
+- 스 (특별항고)
+- 브 (가사후견항고)
+- 그 (민사항고)
+
+> **주의**: 너(가사비송항고)는 ssgo102(가사) 엔드포인트 사용
 
 ### 형사 (ssgo10g)
 - 고단, 고합 (1심)
@@ -78,6 +94,7 @@
 - 카불 (채무불이행자명부등재)
 - 카확 (소송비용확정)
 - 즈단, 즈기 (가사보전)
+- 아 (행정신청/집행정지) - 2026.01.07 추가
 
 ### 집행 (ssgo10a)
 - 타채 (채권압류/추심명령)
@@ -93,6 +110,18 @@
 - 하단, 하합, 하면 (파산/면책)
 - 회단, 회합 (법인회생)
 
+### 보호 (ssgo10i) - 신규 (2026.01.07)
+- 동버 (가정보호/아동학대)
+- 푸 (소년보호)
+
+> **참고**: 보호 사건은 가사/가정 관련이지만 별도 엔드포인트(ssgo10i) 사용
+
+### 감치/기타 (ssgo106) - 신규 (2026.01.07)
+- 정명 (채무자감치)
+- 정 (감치 기타)
+
+> **참고**: 감치 사건은 ssgo106(Etc) 엔드포인트 사용. 기존 문서에서 "독촉(일반)"으로 표기되었으나 실제로는 "기타(Etc)" 사건 처리
+
 ---
 
 ## URL 구조
@@ -105,7 +134,7 @@
 
 | 패턴 | 설명 |
 |-----|------|
-| `selectHmpg{유형}CsGnrlCtt` | 일반내용(상세) 조회 |
+| `selectHmpg{유형}CsGnrlCtt` | 일반내용 조회 |
 | `selectHmpg{유형}CsProgCtt` | 진행내용 조회 |
 | `selectHmpgCsSrchRsltLst` | 검색 결과 목록 |
 
@@ -145,7 +174,7 @@ interface SearchResponse {
 }
 ```
 
-### 상세조회 요청
+### 일반내용 조회 요청
 
 ```typescript
 interface DetailRequest {
@@ -323,5 +352,5 @@ window._apiCalls.filter(c => c.url.indexOf('.on') !== -1)
 
 ---
 
-*최종 업데이트: 2026-01-05*
-*테스트 확인: 민사, 가사, 형사, 신청, 집행, 전자독촉, 회생/파산*
+*최종 업데이트: 2026-01-07*
+*테스트 확인: 민사, 가사, 형사, 신청, 집행, 전자독촉, 회생/파산, 항고/재항고(ssgo108), 행정신청(ssgo105), **보호(ssgo10i)**, **감치(ssgo106)***

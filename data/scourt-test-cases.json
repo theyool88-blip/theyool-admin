@@ -1,0 +1,302 @@
+{
+  "description": "SCOURT 나의사건검색 API 테스트용 사건 목록",
+  "updated": "2026-01-07",
+  "cases": [
+    {
+      "type": "가단",
+      "desc": "민사 1심 단독",
+      "court": "평택지원",
+      "caseNo": "2024가단75190",
+      "party": "홍길동",
+      "verified": true
+    },
+    {
+      "type": "가소",
+      "desc": "민사 1심 소액",
+      "court": "울진군법원",
+      "caseNo": "2025가소10226",
+      "party": "윤종철",
+      "verified": true
+    },
+    {
+      "type": "머",
+      "desc": "민사 조정",
+      "court": "청주지법",
+      "caseNo": "2025머51837",
+      "party": "박선희",
+      "verified": true
+    },
+    {
+      "type": "나",
+      "desc": "민사 항소",
+      "court": "의정부지법",
+      "caseNo": "2025나203824",
+      "party": "이원구",
+      "verified": true
+    },
+    {
+      "type": "드단",
+      "desc": "가사소송 1심 단독",
+      "court": "평택가정",
+      "caseNo": "2025드단20475",
+      "party": "김철수",
+      "verified": true
+    },
+    {
+      "type": "르",
+      "desc": "가사소송 항소",
+      "court": "대전고법",
+      "caseNo": "2023르1322",
+      "party": "이영희",
+      "verified": true
+    },
+    {
+      "type": "느단",
+      "desc": "가사비송 단독",
+      "court": "대구가정법원 안동지원",
+      "caseNo": "2025느단1228",
+      "party": "김종률",
+      "verified": true
+    },
+    {
+      "type": "너",
+      "desc": "가사비송 항고",
+      "court": "수원가정법원",
+      "caseNo": "2025너3762",
+      "party": "정수길",
+      "verified": true
+    },
+    {
+      "type": "즈기",
+      "desc": "가사신청 기타",
+      "court": "대구가정법원",
+      "caseNo": "2025즈기1699",
+      "party": "길정희",
+      "verified": true
+    },
+    {
+      "type": "고단",
+      "desc": "형사 1심 단독",
+      "court": "천안지원",
+      "caseNo": "2024고단2703",
+      "party": "박범수",
+      "verified": true
+    },
+    {
+      "type": "노",
+      "desc": "형사 항소",
+      "court": "대전지법",
+      "caseNo": "2025노887",
+      "party": "김피고",
+      "verified": true
+    },
+    {
+      "type": "카기",
+      "desc": "기타신청",
+      "court": "평택지원",
+      "caseNo": "2025카기10680",
+      "party": "이명규",
+      "verified": true
+    },
+    {
+      "type": "카불",
+      "desc": "채무불이행자명부",
+      "court": "공주지원",
+      "caseNo": "2025카불3033",
+      "party": "채권자",
+      "verified": true
+    },
+    {
+      "type": "카확",
+      "desc": "소송비용확정",
+      "court": "평택지원",
+      "caseNo": "2024카확1171",
+      "party": "신청인",
+      "verified": true
+    },
+    {
+      "type": "카정",
+      "desc": "정정",
+      "court": "의정부지법",
+      "caseNo": "2025카정10175",
+      "party": "이원구",
+      "verified": true
+    },
+    {
+      "type": "타채",
+      "desc": "채권압류/추심",
+      "court": "평택지원",
+      "caseNo": "2024타채33630",
+      "party": "채권자",
+      "verified": true
+    },
+    {
+      "type": "차전",
+      "desc": "전자지급명령",
+      "court": "안성시법원",
+      "caseNo": "2025차전2850",
+      "party": "채권자",
+      "verified": true
+    },
+    {
+      "type": "개회",
+      "desc": "개인회생",
+      "court": "대전지방법원",
+      "caseNo": "2024개회53142",
+      "party": "신청인",
+      "verified": true
+    },
+    {
+      "type": "다",
+      "desc": "민사 상고",
+      "court": "대법원",
+      "caseNo": "2025다218702",
+      "party": "염승호",
+      "verified": true
+    },
+    {
+      "type": "가합",
+      "desc": "민사 1심 합의",
+      "court": "대구지법 김천지원",
+      "caseNo": "2025가합30150",
+      "party": "홍정애",
+      "verified": true
+    },
+    {
+      "type": "느합",
+      "desc": "가사비송 합의",
+      "court": "대구가정법원 포항지원",
+      "caseNo": "2025느합1011",
+      "party": "정찬용",
+      "verified": true
+    },
+    {
+      "type": "즈단",
+      "desc": "가사보전 단독",
+      "court": "대전가정법원 천안지원",
+      "caseNo": "2025즈단6",
+      "party": "김정아",
+      "verified": true
+    },
+    {
+      "type": "드합",
+      "desc": "가사소송 합의",
+      "court": "대구가정법원",
+      "caseNo": "2025드합1056",
+      "party": "김도형",
+      "verified": true
+    },
+    {
+      "type": "카소",
+      "desc": "소송허가",
+      "court": "대구지법 서부지원",
+      "caseNo": "2025카소3001",
+      "party": "배영희",
+      "verified": true
+    },
+    {
+      "type": "카단",
+      "desc": "보전처분 단독",
+      "court": "수원지법 평택지원",
+      "caseNo": "2025카단10332",
+      "party": "박영은",
+      "verified": true
+    },
+    {
+      "type": "카합",
+      "desc": "보전처분 합의",
+      "court": "대구지법 김천지원",
+      "caseNo": "2025카합10027",
+      "party": "최거성",
+      "verified": true
+    },
+    {
+      "type": "하면",
+      "desc": "면책",
+      "court": "대전지법",
+      "caseNo": "2022하면11075",
+      "party": "변억섭",
+      "verified": true
+    },
+    {
+      "type": "하단",
+      "desc": "파산",
+      "court": "대전지법",
+      "caseNo": "2022하단10591",
+      "party": "이종옥",
+      "verified": true
+    },
+    {
+      "type": "므",
+      "desc": "가사소송 상고",
+      "court": "대법원",
+      "caseNo": "2024므10561",
+      "party": "김설화",
+      "verified": true
+    },
+    {
+      "type": "즈합",
+      "desc": "가사보전 합의",
+      "court": "수원가정법원 평택지원",
+      "caseNo": "2023즈합1002",
+      "party": "김영희",
+      "verified": true
+    },
+    {
+      "type": "고합",
+      "desc": "형사 합의부",
+      "court": "천안지원",
+      "caseNo": "2024고합144",
+      "party": "장용훈",
+      "verified": true
+    },
+    {
+      "type": "구단",
+      "desc": "행정 1심 단독",
+      "court": "인천지방법원",
+      "caseNo": "2019구단50875",
+      "party": "김혜란",
+      "verified": true
+    },
+    {
+      "type": "구합",
+      "desc": "행정 1심 합의",
+      "court": "서울행정법원",
+      "caseNo": "2020구합59055",
+      "party": "서산시",
+      "verified": true
+    },
+    {
+      "type": "누",
+      "desc": "행정 항소",
+      "court": "대구고법",
+      "caseNo": "2023누11543",
+      "party": "구미 사곡지구 도시개발사업조합",
+      "verified": true
+    },
+    {
+      "type": "두",
+      "desc": "행정 상고",
+      "court": "대법원",
+      "caseNo": "2022두44262",
+      "party": "구미 사곡지구 도시개발사업조합",
+      "verified": true
+    },
+    {
+      "type": "카명",
+      "desc": "명령",
+      "court": "서울북부지법",
+      "caseNo": "2021카명24068",
+      "party": "김상복",
+      "verified": true
+    },
+    {
+      "type": "타배",
+      "desc": "배당",
+      "court": "대구지법",
+      "caseNo": "2021타배10127",
+      "party": "서현피에스",
+      "verified": true
+    }
+  ]
+}

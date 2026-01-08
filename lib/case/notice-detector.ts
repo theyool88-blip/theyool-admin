@@ -344,45 +344,66 @@ function detectEvidencePending(
   // 2주 이내가 아니면 스킵
   if (daysUntilHearing > 14 || daysUntilHearing < 0) return notices
 
-  // 증거신청 키워드
-  const evidenceKeywords = ['증거신청', '사실조회', '문서제출명령', '문서송부촉탁', '검증신청']
+  // 증거조사 송달 키워드 (법원이 제3자에게 보내는 것)
+  const evidenceDeliveryKeywords = ['사실조회', '제출명령', '문서송부촉탁', '송부촉탁']
+  // 제외 키워드 (당사자/변호사에게 보내는 도착통지)
+  const excludeKeywords = ['도착통지', '통지서', '원고', '피고', '신청인', '피신청인', '대리인', '변호사']
 
-  // 증거신청 목록 추출
-  const evidenceRequests: { name: string; date: string }[] = []
+  // 송달내역에서 제3자에게 보낸 증거조사 찾기
+  // progCttDvs === '4' (송달) 또는 content에 '송달' 포함
+  const evidenceDeliveries: { content: string; date: string }[] = []
 
-  for (const doc of documents) {
-    const docName = doc.content2 || doc.sbmsnCtt || ''
-    if (evidenceKeywords.some(k => docName.includes(k))) {
-      evidenceRequests.push({
-        name: docName,
-        date: doc.ofdocRcptYmd || '',
-      })
-    }
+  for (const item of progress) {
+    const content = item.content || ''
+    const isDelivery = item.progCttDvs === '4' || content.includes('송달')
+
+    if (!isDelivery) continue
+
+    // 증거조사 관련 송달인지 확인
+    const isEvidenceDelivery = evidenceDeliveryKeywords.some(k => content.includes(k))
+    if (!isEvidenceDelivery) continue
+
+    // 당사자/변호사 도착통지는 제외
+    const isExcluded = excludeKeywords.some(k => content.includes(k))
+    if (isExcluded) continue
+
+    evidenceDeliveries.push({
+      content,
+      date: item.date || '',
+    })
   }
 
-  // 각 증거신청에 대한 회신 여부 체크
-  for (const req of evidenceRequests) {
-    // 간단한 휴리스틱: 해당 키워드 관련 "회신", "송부", "제출" 등이 있는지
+  // 각 증거조사 송달에 대해 회신(제출) 여부 확인
+  for (const delivery of evidenceDeliveries) {
+    // 이후 진행내역에서 해당 기관의 제출 확인
+    // progCttDvs === '3' (제출) 또는 content에 '제출', '회신', '회보' 포함
     const hasResponse = progress.some(p => {
       const content = p.content || ''
       const date = p.date || ''
 
-      // 신청 이후 날짜여야 함
-      if (date <= req.date) return false
+      // 송달 이후 날짜여야 함
+      if (date <= delivery.date) return false
 
-      // 회신 키워드
-      return content.includes('회신') ||
-        content.includes('송부') ||
-        content.includes('회보') ||
-        (content.includes('제출') && evidenceKeywords.some(k => content.includes(k)))
+      // 제출 카테고리이거나 회신 키워드 포함
+      const isSubmission = p.progCttDvs === '3' ||
+        content.includes('제출') ||
+        content.includes('회신') ||
+        content.includes('회보')
+
+      if (!isSubmission) return false
+
+      // 해당 증거조사와 관련된 제출인지 확인 (키워드 매칭)
+      return evidenceDeliveryKeywords.some(k =>
+        delivery.content.includes(k) && content.includes(k)
+      )
     })
 
     if (!hasResponse) {
       notices.push({
-        id: `evidence_pending_${req.date}_${req.name.slice(0, 10)}`,
+        id: `evidence_pending_${delivery.date}_${delivery.content.slice(0, 10)}`,
         category: 'evidence_pending',
-        title: '증거신청 회신 미수령',
-        description: `${req.name} (${formatDateFromYYYYMMDD(req.date)}) → 회신 대기중`,
+        title: '증거회신 미수령',
+        description: `${delivery.content} (${formatDateFromYYYYMMDD(delivery.date)}) → 회신 대기중`,
         dueDate: nextHearing.hearing_date,
         daysRemaining: daysUntilHearing,
       })

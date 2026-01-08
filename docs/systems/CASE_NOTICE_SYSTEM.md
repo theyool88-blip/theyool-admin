@@ -238,11 +238,43 @@ import CaseNoticeSection from '@/components/case/CaseNoticeSection'
 
 ---
 
+## SCOURT 데이터 연동 (2026-01-08 완료)
+
+### 연동된 데이터
+
+| 데이터 | 소스 | 용도 |
+|--------|------|------|
+| `scourtProgress` | `scourt_case_snapshots.progress` | 송달 실패 감지 |
+| `scourtDocuments` | `scourt_case_snapshots.documents` | 준비서면/증거회신 감지 |
+| `clientPartyType` | `legal_cases.client_role` | 우리측/상대방 구분 |
+
+### 제출서류 데이터 구조
+
+```typescript
+{
+  date: string        // 접수일 (ofdocRcptYmd)
+  content: string     // 서류명 (content2)
+  submitter: string   // 제출자 (content1) - 원고/피고/신청인 등
+}
+```
+
+### 제출자 구분 로직
+
+```typescript
+const ourSide = clientPartyType === 'plaintiff'
+  ? ['원고', '신청인', '채권자']
+  : ['피고', '피신청인', '채무자']
+
+const isOurs = ourSide.some(s => submitter.includes(s))
+```
+
+---
+
 ## 향후 확장
 
 - [ ] 알림 읽음/처리 상태 저장 (`case_notices` 테이블)
 - [ ] 대시보드에서 모든 사건 알림 통합 조회
-- [ ] SCOURT 데이터 연동 (준비서면, 서류송달, 증거회신)
+- [x] SCOURT 데이터 연동 (준비서면, 서류송달, 증거회신) - **완료 (2026-01-08)**
 - [ ] 기일충돌 액션 핸들러 구현
 
 ---

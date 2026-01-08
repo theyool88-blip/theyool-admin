@@ -233,6 +233,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 알림 관련 상태
   const [caseNotices, setCaseNotices] = useState<CaseNotice[]>([])
+  const [dismissedNoticeIds, setDismissedNoticeIds] = useState<Set<string>>(new Set())
   const [allHearings, setAllHearings] = useState<CourtHearing[]>([])
   const [caseDeadlines, setCaseDeadlines] = useState<CaseDeadline[]>([])
   const [caseHearings, setCaseHearings] = useState<CourtHearing[]>([])
@@ -595,6 +596,22 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     fetchPayments()
   }, [caseData.id, supabase])
 
+  // 삭제된 알림 조회
+  useEffect(() => {
+    const fetchDismissedNotices = async () => {
+      try {
+        const res = await fetch(`/api/admin/cases/${caseData.id}/notices`)
+        const data = await res.json()
+        if (data.success && data.dismissedNotices) {
+          setDismissedNoticeIds(new Set(data.dismissedNotices))
+        }
+      } catch (error) {
+        console.error('Failed to fetch dismissed notices:', error)
+      }
+    }
+    fetchDismissedNotices()
+  }, [caseData.id])
+
   // 알림 감지
   useEffect(() => {
     // SCOURT 문서 데이터를 notice-detector 형식으로 변환
@@ -617,6 +634,26 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     })
     setCaseNotices(notices)
   }, [caseData.id, caseData.court_name, caseData.client_role, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
+
+  // 알림 삭제 핸들러
+  const handleDismissNotice = async (notice: CaseNotice) => {
+    try {
+      const res = await fetch(`/api/admin/cases/${caseData.id}/notices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noticeId: notice.id })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setDismissedNoticeIds(prev => new Set([...prev, notice.id]))
+      }
+    } catch (error) {
+      console.error('Failed to dismiss notice:', error)
+    }
+  }
+
+  // 삭제되지 않은 알림만 필터링
+  const filteredNotices = caseNotices.filter(n => !dismissedNoticeIds.has(n.id))
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-'
@@ -1250,7 +1287,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         {activeTab === 'notice' && (
           <div className="space-y-4">
             {/* 알림 섹션 */}
-            <CaseNoticeSection notices={caseNotices} />
+            <CaseNoticeSection notices={filteredNotices} onDismiss={handleDismissNotice} />
 
             {/* 연결 사건 */}
             {caseData.case_relations && caseData.case_relations.length > 0 && (

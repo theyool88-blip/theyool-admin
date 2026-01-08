@@ -1,15 +1,16 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { CaseNotice } from '@/types/case-notice'
 import { NOTICE_CATEGORY_ICONS, NOTICE_CATEGORY_LABELS } from '@/types/case-notice'
 
 interface CaseNoticeSectionProps {
   notices: CaseNotice[]
   onAction?: (notice: CaseNotice, actionType: string) => void
+  onDismiss?: (notice: CaseNotice) => Promise<void>
 }
 
-export default function CaseNoticeSection({ notices, onAction }: CaseNoticeSectionProps) {
+export default function CaseNoticeSection({ notices, onAction, onDismiss }: CaseNoticeSectionProps) {
   // 알림이 없으면 빈 상태 표시
   if (notices.length === 0) {
     return (
@@ -44,6 +45,7 @@ export default function CaseNoticeSection({ notices, onAction }: CaseNoticeSecti
             key={notice.id}
             notice={notice}
             onAction={onAction}
+            onDismiss={onDismiss}
           />
         ))}
       </div>
@@ -54,11 +56,23 @@ export default function CaseNoticeSection({ notices, onAction }: CaseNoticeSecti
 interface NoticeItemProps {
   notice: CaseNotice
   onAction?: (notice: CaseNotice, actionType: string) => void
+  onDismiss?: (notice: CaseNotice) => Promise<void>
 }
 
-function NoticeItem({ notice, onAction }: NoticeItemProps) {
+function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
+  const [isDismissing, setIsDismissing] = useState(false)
   const icon = NOTICE_CATEGORY_ICONS[notice.category]
   const categoryLabel = NOTICE_CATEGORY_LABELS[notice.category]
+
+  const handleDismiss = async () => {
+    if (!onDismiss || isDismissing) return
+    setIsDismissing(true)
+    try {
+      await onDismiss(notice)
+    } finally {
+      setIsDismissing(false)
+    }
+  }
 
   // D-day 표시
   const dDayText = useMemo(() => {
@@ -129,6 +143,27 @@ function NoticeItem({ notice, onAction }: NoticeItemProps) {
             </div>
           )}
         </div>
+
+        {/* 삭제 버튼 */}
+        {onDismiss && (
+          <button
+            onClick={handleDismiss}
+            disabled={isDismissing}
+            className="flex-shrink-0 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+            title="알림 삭제"
+          >
+            {isDismissing ? (
+              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
     </div>
   )

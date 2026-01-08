@@ -137,7 +137,7 @@ interface ScourtSnapshot {
   basicInfo: Record<string, string>
   hearings: ScourtHearingItem[]
   progress: ScourtProgressItem[]
-  documents: { date: string; content: string }[]
+  documents: { date: string; content: string; submitter?: string }[]
   lowerCourt: { courtName?: string; court?: string; caseNo: string; result?: string; resultDate?: string; linkedCaseId?: string | null }[]
   relatedCases: { caseNo: string; caseName?: string; relation?: string; linkedCaseId?: string | null }[]
   rawData?: Record<string, any>  // XML 렌더링용 원본 API 데이터
@@ -330,7 +330,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     // 갱신 시에는 기존 데이터 사용
     const courtName = params?.courtName || caseData.court_name
     const caseNumber = params?.caseNumber || caseData.court_case_number
-    const partyName = params?.partyName || ''
+    const partyName = params?.partyName || caseData.client?.name || ''
 
     if (!courtName || !caseNumber) {
       openLinkModal()
@@ -597,15 +597,26 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 알림 감지
   useEffect(() => {
+    // SCOURT 문서 데이터를 notice-detector 형식으로 변환
+    const scourtDocuments = (scourtSnapshot?.documents || []).map(doc => ({
+      ofdocRcptYmd: doc.date,
+      content1: doc.submitter,  // 제출자
+      content2: doc.content,    // 서류명
+    }))
+
     const notices = detectCaseNotices({
       caseId: caseData.id,
       courtName: caseData.court_name || '',
       deadlines: caseDeadlines,
       hearings: caseHearings,
-      allHearings: allHearings
+      allHearings: allHearings,
+      // SCOURT 데이터 추가
+      scourtProgress: scourtSnapshot?.progress || [],
+      scourtDocuments: scourtDocuments,
+      clientPartyType: caseData.client_role || null
     })
     setCaseNotices(notices)
-  }, [caseData.id, caseData.court_name, caseDeadlines, caseHearings, allHearings])
+  }, [caseData.id, caseData.court_name, caseData.client_role, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-'

@@ -28,8 +28,9 @@ interface ScourtDocument {
 interface ScourtProgress {
   date?: string              // 진행일
   content?: string           // 진행내용
-  result?: string            // 결과/도달
+  result?: string | null     // 결과/도달
   notice?: string            // 고지
+  progCttDvs?: string        // 진행구분 코드
 }
 
 export interface NoticeDetectorParams {

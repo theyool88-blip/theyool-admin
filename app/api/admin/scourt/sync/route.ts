@@ -17,7 +17,7 @@ import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync';
 import { getCourtCodeByName } from '@/lib/scourt/court-codes';
 import { getCaseCategory } from '@/lib/scourt/party-labels';
 import { ensureXmlCacheForCase } from '@/lib/scourt/xml-fetcher';
-import { detectCaseTypeFromCaseNumber } from '@/lib/scourt/xml-mapping';
+import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber } from '@/lib/scourt/xml-mapping';
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils';
 
 export async function POST(request: NextRequest) {
@@ -47,6 +47,33 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    let resolvedPartyName = (partyName || '').trim();
+    const ensurePartyName = async () => {
+      if (resolvedPartyName) return resolvedPartyName;
+
+      if (legalCase.client_id) {
+        const { data: client } = await supabase
+          .from('clients')
+          .select('name')
+          .eq('id', legalCase.client_id)
+          .single();
+        if (client?.name) {
+          resolvedPartyName = client.name;
+          return resolvedPartyName;
+        }
+      }
+
+      const { data: party } = await supabase
+        .from('case_parties')
+        .select('party_name, is_our_client')
+        .eq('case_id', legalCaseId)
+        .order('is_our_client', { ascending: false })
+        .limit(1)
+        .single();
+      resolvedPartyName = party?.party_name || '';
+      return resolvedPartyName;
+    };
 
     // 2. 최근 동기화 확인 (5분 이내면 스킵, forceRefresh가 아닌 경우)
     if (!forceRefresh && legalCase.scourt_last_sync) {
@@ -142,12 +169,19 @@ export async function POST(request: NextRequest) {
       if (!storedWmonid) {
         // WMONID 없으면 새로 검색 (이전 버전 데이터 호환)
         console.log(`⚠️ WMONID 없음, 새로 검색합니다`);
+        const fallbackPartyName = await ensurePartyName();
+        if (!fallbackPartyName) {
+          return NextResponse.json(
+            { error: '당사자명을 찾을 수 없습니다. 사건 상세에서 당사자명을 입력해주세요.' },
+            { status: 400 }
+          );
+        }
         const searchResult = await apiClient.searchAndRegisterCase({
           cortCd: cortCdNum,
           csYr: csYear,
           csDvsCd: csDvsNm,
           csSerial,
-          btprNm: partyName || '',
+          btprNm: fallbackPartyName,
         });
 
         if (!searchResult.success) {
@@ -205,12 +239,19 @@ export async function POST(request: NextRequest) {
         } else {
           // 실패 시 새로 검색
           console.log(`⚠️ 저장된 encCsNo 만료, 새로 검색합니다`);
+          const fallbackPartyName = await ensurePartyName();
+          if (!fallbackPartyName) {
+            return NextResponse.json(
+              { error: '당사자명을 찾을 수 없습니다. 사건 상세에서 당사자명을 입력해주세요.' },
+              { status: 400 }
+            );
+          }
           const searchResult = await apiClient.searchAndRegisterCase({
             cortCd: cortCdNum,
             csYr: csYear,
             csDvsCd: csDvsNm,
             csSerial,
-            btprNm: partyName || '',
+            btprNm: fallbackPartyName,
           });
 
           if (!searchResult.success) {
@@ -239,13 +280,15 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ 동기화 조회 완료: 일반내용=${generalData ? 'OK' : 'FAIL'}, 진행=${progressData.length}건`);
 
+    const apiResponseForXml = generalData?.raw?.data || {};
+    const caseTypeFromApi = detectCaseTypeFromApiResponse(apiResponseForXml);
+    const caseType = caseTypeFromApi || detectCaseTypeFromCaseNumber(caseNumber);
+
     // XML 캐시 확보
     // - 첫 연동: 모든 동적 추출 경로 캐시 (데이터 유무 무관)
     // - 갱신: 데이터가 있는 항목 중 미캐시된 것만 다운로드 (이전 버전 호환)
     try {
-      const caseType = detectCaseTypeFromCaseNumber(caseNumber);
       console.log(`📄 XML 캐시 확인 중 (사건유형: ${caseType}, 첫연동: ${isFirstLink})...`);
-      const apiResponseForXml = generalData?.raw?.data || {};
       // 첫 연동: cacheAllOnFirstLink=true (모든 경로 캐시)
       // 갱신: cacheAllOnFirstLink=false (데이터 있는 것만 캐시)
       await ensureXmlCacheForCase(caseType, apiResponseForXml, isFirstLink);
@@ -259,7 +302,8 @@ export async function POST(request: NextRequest) {
     const rawDocs = generalData?.raw?.data?.dlt_rcntSbmsnDocmtLst || [];
     const documentsData = rawDocs.map((d: { ofdocRcptYmd?: string; content1?: string; content2?: string; content3?: string }) => ({
       ofdocRcptYmd: d.ofdocRcptYmd || '',
-      content: d.content2 || d.content3 || d.content1 || '',
+      content: d.content2 || d.content3 || '',
+      submitter: d.content1 || '',  // 제출자 (원고/피고/신청인 등) - 알림 기능용
     }));
     console.log(`📄 제출서류 ${documentsData.length}건 추출`)
 
@@ -283,7 +327,7 @@ export async function POST(request: NextRequest) {
     // 6. 스냅샷 저장 (upsert)
     const { data: existingSnapshot } = await supabase
       .from('scourt_case_snapshots')
-      .select('id')
+      .select('id, raw_data')
       .eq('legal_case_id', legalCaseId)
       .order('scraped_at', { ascending: false })
       .limit(1)
@@ -403,15 +447,17 @@ export async function POST(request: NextRequest) {
     );
     console.log(`📋 심급내용 (원심) ${lowerCourtData.length}건, 연관사건 ${relatedCasesData.length}건 추출`);
 
+    const rawDataForSnapshot = generalData?.raw?.data || existingSnapshot?.raw_data || null;
     const snapshotData = {
       legal_case_id: legalCaseId,
+      case_type: caseType,
       basic_info: basicInfoWithParties,
       hearings: generalData?.hearings || [],
       progress: progressData,  // 기일 + 제출서류 합성
       documents: documentsData,  // 제출서류 원본
       lower_court: lowerCourtData,  // 심급내용 (원심 사건 정보)
       related_cases: relatedCasesData,  // 연관사건 (반소, 항소심, 본안 등)
-      raw_data: generalData?.raw?.data || null,  // XML 렌더링용 원본 API 데이터
+      raw_data: rawDataForSnapshot,  // XML 렌더링용 원본 API 데이터
       case_number: caseNumber,
       court_code: legalCase.court_name,
       scraped_at: new Date().toISOString(),

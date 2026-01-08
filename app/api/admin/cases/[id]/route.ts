@@ -74,7 +74,7 @@ export async function PATCH(
 
 /**
  * GET /api/admin/cases/[id]
- * Get a single case by ID
+ * Get a single case by ID with deadlines and hearings
  */
 export async function GET(
   request: NextRequest,
@@ -89,6 +89,7 @@ export async function GET(
     const { id } = await params
     const adminClient = createAdminClient()
 
+    // 사건 기본 정보 조회
     const { data, error } = await adminClient
       .from('legal_cases')
       .select(`
@@ -115,9 +116,39 @@ export async function GET(
       )
     }
 
+    // 해당 사건의 기한(deadlines) 조회
+    const { data: deadlines } = await adminClient
+      .from('case_deadlines')
+      .select('*')
+      .eq('case_id', id)
+      .order('deadline_date', { ascending: true })
+
+    // 해당 사건의 기일(hearings) 조회
+    const { data: hearings } = await adminClient
+      .from('court_hearings')
+      .select('*')
+      .eq('case_id', id)
+      .order('hearing_date', { ascending: true })
+
+    // 기일 충돌 감지를 위해 모든 사건의 기일 조회 (향후 30일)
+    const today = new Date()
+    const thirtyDaysLater = new Date(today)
+    thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
+
+    const { data: allHearings } = await adminClient
+      .from('court_hearings')
+      .select('*')
+      .gte('hearing_date', today.toISOString())
+      .lte('hearing_date', thirtyDaysLater.toISOString())
+      .eq('status', 'SCHEDULED')
+      .order('hearing_date', { ascending: true })
+
     return NextResponse.json({
       success: true,
-      data
+      data,
+      deadlines: deadlines || [],
+      hearings: hearings || [],
+      allHearings: allHearings || [],
     })
   } catch (error) {
     console.error('Error in GET /api/admin/cases/[id]:', error)

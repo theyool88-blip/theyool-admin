@@ -21,9 +21,11 @@ import AdminHeader from './AdminHeader'
 import HearingDetailModal from './HearingDetailModal'
 import CasePaymentsModal from './CasePaymentsModal'
 import CasePartiesSection from './CasePartiesSection'
+import CaseNoticeSection from './case/CaseNoticeSection'
+import { detectCaseNotices } from '@/lib/case/notice-detector'
+import type { CaseNotice } from '@/types/case-notice'
 import ScourtGeneralInfoXml from './scourt/ScourtGeneralInfoXml'
 import { getPartyLabels as getPartyLabelsFromSchema, getCaseCategory } from '@/lib/scourt/party-labels'
-import { getVisibleFields, sortFields, formatDateValue } from '@/lib/scourt/field-renderer'
 import { COURTS } from '@/lib/scourt/court-codes'
 import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber, type ScourtCaseType } from '@/lib/scourt/xml-mapping'
 import { normalizePartyLabel } from '@/types/case-party'
@@ -163,7 +165,7 @@ interface UnifiedScheduleItem {
 }
 
 // 탭 타입 정의
-type TabType = 'overview' | 'general' | 'progress' | 'contract'
+type TabType = 'notice' | 'general' | 'progress'
 
 export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [unifiedSchedules, setUnifiedSchedules] = useState<UnifiedScheduleItem[]>([])
@@ -182,10 +184,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [scourtSyncing, setScourtSyncing] = useState(false)
   const [scourtOpening, setScourtOpening] = useState(false)
   const [showProgressDetail, setShowProgressDetail] = useState(false)
-  const [showScourtDetail, setShowScourtDetail] = useState(false)
 
   // 탭 상태 - Apple 스타일 Segmented Control
-  const [activeTab, setActiveTab] = useState<TabType>('overview')
+  const [activeTab, setActiveTab] = useState<TabType>('notice')
 
   // 진행내용 필터 상태
   const [progressFilter, setProgressFilter] = useState<'all' | 'hearing' | 'order' | 'submit' | 'delivery' | 'court'>('all')
@@ -229,6 +230,12 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 출석변호사 변경 중인 기일 ID
   const [editingLawyerHearingId, setEditingLawyerHearingId] = useState<string | null>(null)
+
+  // 알림 관련 상태
+  const [caseNotices, setCaseNotices] = useState<CaseNotice[]>([])
+  const [allHearings, setAllHearings] = useState<CourtHearing[]>([])
+  const [caseDeadlines, setCaseDeadlines] = useState<CaseDeadline[]>([])
+  const [caseHearings, setCaseHearings] = useState<CourtHearing[]>([])
 
   const router = useRouter()
   const supabase = createClient()
@@ -449,6 +456,28 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
       if (deadlineError) throw deadlineError
 
+      // 알림용 데이터 저장
+      setCaseHearings(hearings as CourtHearing[] || [])
+      setCaseDeadlines(deadlines as CaseDeadline[] || [])
+
+      // 기일 충돌 감지를 위한 모든 사건 기일 조회 (향후 30일)
+      const today = new Date()
+      const thirtyDaysLater = new Date(today)
+      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
+
+      const { data: allHearingsData } = await supabase
+        .from('court_hearings')
+        .select(`
+          *,
+          legal_case:case_id(case_name, court_name)
+        `)
+        .gte('hearing_date', today.toISOString())
+        .lte('hearing_date', thirtyDaysLater.toISOString())
+        .eq('status', 'SCHEDULED')
+        .order('hearing_date', { ascending: true })
+
+      setAllHearings(allHearingsData as CourtHearing[] || [])
+
       const { data: schedules } = await supabase
         .from('general_schedules')
         .select('*')
@@ -565,6 +594,18 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     }
     fetchPayments()
   }, [caseData.id, supabase])
+
+  // 알림 감지
+  useEffect(() => {
+    const notices = detectCaseNotices({
+      caseId: caseData.id,
+      courtName: caseData.court_name || '',
+      deadlines: caseDeadlines,
+      hearings: caseHearings,
+      allHearings: allHearings
+    })
+    setCaseNotices(notices)
+  }, [caseData.id, caseData.court_name, caseDeadlines, caseHearings, allHearings])
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-'
@@ -1165,10 +1206,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         {/* Segmented Control - Apple 스타일 탭 */}
         <div className="bg-gray-100 p-1 rounded-xl mb-6 inline-flex w-full">
           {[
-            { key: 'overview', label: '개요' },
+            { key: 'notice', label: '알림' },
             { key: 'general', label: '일반' },
             { key: 'progress', label: '진행' },
-            { key: 'contract', label: '계약' },
           ].map(tab => (
             <button
               key={tab.key}
@@ -1195,210 +1235,52 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         </div>
 
         {/* 탭 콘텐츠 */}
-        {/* 개요 탭 */}
-        {activeTab === 'overview' && (
+        {/* 알림 탭 */}
+        {activeTab === 'notice' && (
           <div className="space-y-4">
-            {/* 재판부/접수일 등 핵심 정보 */}
-            {(getBasicInfo('재판부', 'jdgNm') || getBasicInfo('접수일', 'rcptDt') || caseData.judge_name) && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">사건 정보</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                  {getBasicInfo('재판부', 'jdgNm') && (
-                    <div>
-                      <span className="text-gray-500 block text-xs mb-0.5">재판부</span>
-                      <span className="text-gray-900 font-medium">{getBasicInfo('재판부', 'jdgNm')}</span>
-                      {getBasicInfo('재판부전화번호', 'jdgTelno') && (
-                        <span className="text-gray-500 text-xs ml-1">({getBasicInfo('재판부전화번호', 'jdgTelno')})</span>
-                      )}
-                    </div>
-                  )}
-                  {caseData.judge_name && (
-                    <div>
-                      <span className="text-gray-500 block text-xs mb-0.5">담당 판사</span>
-                      <span className="text-gray-900 font-medium">{caseData.judge_name}</span>
-                    </div>
-                  )}
-                  {getBasicInfo('접수일', 'rcptDt') && (
-                    <div>
-                      <span className="text-gray-500 block text-xs mb-0.5">접수일</span>
-                      <span className="text-gray-900 font-medium">{formatProgressDate(String(getBasicInfo('접수일', 'rcptDt')))}</span>
-                    </div>
-                  )}
-                  {/* 종국결과: 항상 표시 (값 없으면 '-') */}
-                  <div>
-                    <span className="text-gray-500 block text-xs mb-0.5">종국결과</span>
-                    <span className="text-gray-900 font-medium">
-                      {getBasicInfo('종국결과', 'endRslt') || caseData.case_result || '-'}
-                      {getBasicInfo('종국일', 'endDt') && (
-                        <span className="text-gray-500 text-xs ml-1">
-                          ({formatProgressDate(String(getBasicInfo('종국일', 'endDt')))})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  {getBasicInfo('인지액', 'stmpAmnt') && (
-                    <div>
-                      <span className="text-gray-500 block text-xs mb-0.5">인지액</span>
-                      <span className="text-gray-900 font-medium">{Number(getBasicInfo('인지액', 'stmpAmnt')).toLocaleString()}원</span>
-                    </div>
-                  )}
-                  {getBasicInfo('조사관', 'exmnrNm') && (
-                    <div>
-                      <span className="text-gray-500 block text-xs mb-0.5">조사관</span>
-                      <span className="text-gray-900 font-medium">{getBasicInfo('조사관', 'exmnrNm')}</span>
-                      {getBasicInfo('조사관전화번호', 'exmnrTelNo') && (
-                        <span className="text-gray-500 text-xs ml-1">({getBasicInfo('조사관전화번호', 'exmnrTelNo')})</span>
-                      )}
-                    </div>
-                  )}
-                  {getBasicInfo('판결도달일', 'jdgArvDt') && (
-                    <div>
-                      <span className="text-gray-500 block text-xs mb-0.5">판결도달일</span>
-                      <span className="text-gray-900 font-medium">{formatProgressDate(String(getBasicInfo('판결도달일', 'jdgArvDt')))}</span>
-                    </div>
-                  )}
-                  {/* 형사사건 전용 필드 */}
-                  {getBasicInfo('형제번호', 'crmcsNo') && (
-                    <div>
-                      <span className="text-gray-500 block text-xs mb-0.5">형제번호</span>
-                      <span className="text-gray-900 font-medium">{getBasicInfo('형제번호', 'crmcsNo')}</span>
-                    </div>
-                  )}
-                </div>
-                {/* 추가 뱃지 정보 */}
-                <div className="flex flex-wrap gap-2 mt-4">
-                  {getBasicInfo('보존여부', 'prsrvYn') === 'Y' && (
-                    <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-md text-sm font-medium">
-                      {getBasicInfo('보존내용', 'prsrvCtt') || '기록보존'}
-                    </span>
-                  )}
-                  {getBasicInfo('상소제기내용', 'aplCtt') && (
-                    <span className="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm font-medium">
-                      {getBasicInfo('상소제기내용', 'aplCtt')}
-                    </span>
-                  )}
-                </div>
-                {/* 동적 필드 렌더링 - 위에서 표시하지 않은 추가 필드들 */}
-                {(() => {
-                  if (!scourtSnapshot?.basicInfo) return null;
+            {/* 알림 섹션 */}
+            <CaseNoticeSection notices={caseNotices} />
 
-                  // 이미 위에서 하드코딩으로 표시한 필드들 (중복 방지)
-                  const displayedFields = new Set([
-                    '재판부', 'jdgNm', '재판부전화번호', 'jdgTelno',
-                    '접수일', 'rcptDt', '인지액', 'stmpAmnt',
-                    '병합구분', 'mrgrDvs', '종국결과', 'endRslt', '종국일', 'endDt',
-                    '판결도달일', 'jdgArvDt', '확정일', 'cfrmDt',
-                    '조사관', 'exmnrNm', '조사관전화번호', 'exmnrTelNo',
-                    '보존여부', 'prsrvYn', '보존내용', 'prsrvCtt',
-                    '형제번호', 'crmcsNo', '상소제기내용', 'aplCtt',
-                    '원고', 'aplNm', '피고', 'rspNm', '피고인명', 'dfndtNm',
-                    '사건번호', 'csNo', '사건명', 'csNm',
-                    '심급', 'caseLevelDesc', 'caseLevel',
-                    '법원', 'cortNm',
-                    '채권자', '채무자', '신청인', '피신청인',
-                    'caseCategory', 'caseType', 'parties', 'representatives',
-                  ]);
-
-                  const visibleFields = getVisibleFields(scourtSnapshot.basicInfo as Record<string, unknown>);
-                  const additionalFields = sortFields(
-                    visibleFields.filter(f => !displayedFields.has(f.key))
-                  );
-
-                  if (additionalFields.length === 0) return null;
-
-                  return (
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
-                      {additionalFields.map(field => (
-                        <div key={field.key}>
-                          <span className="text-gray-500 block text-xs mb-0.5">{field.label}</span>
-                          <span className="text-gray-900 font-medium">{field.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* SCOURT 일반내용 보기 (접을 수 있는 섹션) */}
-            {scourtSnapshot && (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <button
-                  onClick={() => setShowScourtDetail(!showScourtDetail)}
-                  className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-sm font-semibold text-gray-900">대법원 일반내용</h3>
-                    <span className="text-xs text-gray-500">
-                      {showScourtDetail ? '접기' : '전체 보기'}
-                    </span>
-                  </div>
-                  <svg
-                    className={`w-5 h-5 text-gray-400 transition-transform ${showScourtDetail ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {showScourtDetail && (
-                  <div className="px-5 pb-5 border-t border-gray-100">
-                    {scourtSnapshot.rawData ? (
-                      <ScourtGeneralInfoXml
-                        apiData={scourtSnapshot.rawData}
-                        caseType={resolvedScourtCaseType}
-                      />
-                    ) : (
-                      <div className="py-4 text-sm text-gray-500">
-                        일반내용 데이터가 없습니다. 사건을 다시 동기화해주세요.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* 관련 사건 */}
+            {/* 연결 사건 */}
             {caseData.case_relations && caseData.case_relations.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">관련 사건</h3>
-                <div className="space-y-2">
-                  {caseData.case_relations.map((relation) => {
-                    const getRelationLabel = () => {
-                      const relationType = relation.relation_type
-                      if (relationType === '하심사건' || relationType === '상심사건') {
-                        const caseLevel = relation.related_case?.case_level
-                        if (caseLevel) return `${caseLevel}사건`
-                        return relationType === '하심사건' ? '원심' : '상심'
-                      }
-                      return relationType || '관련사건'
-                    }
-
-                    return (
-                      <button
-                        key={relation.id}
-                        onClick={() => router.push(`/cases/${relation.related_case_id}`)}
-                        className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
-                            {getRelationLabel()}
-                          </span>
-                          <span className="text-sm text-gray-900">{relation.related_case?.case_name || '사건명 없음'}</span>
-                          {relation.related_case?.case_result && (
-                            <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
-                              {relation.related_case.case_result}
-                            </span>
-                          )}
-                        </div>
-                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    )
-                  })}
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-5 py-3 border-b border-gray-100">
+                  <h3 className="text-sm font-semibold text-gray-900">연결 사건</h3>
                 </div>
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left w-24">구분</th>
+                      <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">사건명</th>
+                      <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left w-24">결과</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {caseData.case_relations.map((relation) => {
+                      const getRelationLabel = () => {
+                        const relationType = relation.relation_type
+                        if (relationType === '하심사건' || relationType === '상심사건') {
+                          const caseLevel = relation.related_case?.case_level
+                          if (caseLevel) return `${caseLevel}`
+                          return relationType === '하심사건' ? '원심' : '상심'
+                        }
+                        return relationType || '관련'
+                      }
+
+                      return (
+                        <tr
+                          key={relation.id}
+                          onClick={() => router.push(`/cases/${relation.related_case_id}`)}
+                          className="hover:bg-gray-50 cursor-pointer"
+                        >
+                          <td className="px-5 py-3 text-sm text-sage-600 font-medium">{getRelationLabel()}</td>
+                          <td className="px-5 py-3 text-sm text-gray-900">{relation.related_case?.case_name || '사건명 없음'}</td>
+                          <td className="px-5 py-3 text-sm text-gray-600">{relation.related_case?.case_result || '-'}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
 
@@ -1419,58 +1301,58 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               )
 
               return filteredLowerCourt.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-4">심급내용 (원심)</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="py-2 px-3 text-left text-gray-500 font-medium">법원</th>
-                          <th className="py-2 px-3 text-left text-gray-500 font-medium">사건번호</th>
-                          <th className="py-2 px-3 text-left text-gray-500 font-medium">결과</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredLowerCourt.map((item: any, idx: number) => (
-                          <tr key={`lower-${idx}`} className="border-b border-gray-100 last:border-0">
-                            <td className="py-2.5 px-3 text-gray-700">{item.courtName || item.court || '-'}</td>
-                            <td className="py-2.5 px-3">
-                              {item.linkedCaseId ? (
-                                <button
-                                  onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
-                                  className="text-sage-600 hover:text-sage-700 font-medium flex items-center gap-1"
-                                >
-                                  {item.caseNo || '-'}
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                  </svg>
-                                </button>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-gray-900">{item.caseNo || '-'}</span>
-                                  <button
-                                    onClick={() => {
-                                      const partyName = caseData.opponent_name || caseData.client?.name || ''
-                                      const clientId = caseData.client_id || ''
-                                      router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || '')}&courtName=${encodeURIComponent(item.courtName || item.court || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}`)
-                                    }}
-                                    className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
-                                  >
-                                    등록
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                            <td className="py-2.5 px-3 text-gray-600">
-                              {item.resultDate ? `${formatProgressDate(item.resultDate)} ` : ''}
-                              {item.result || '-'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900">심급</h3>
                   </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">법원</th>
+                        <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">사건번호</th>
+                        <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">결과</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredLowerCourt.map((item: any, idx: number) => (
+                        <tr key={`lower-${idx}`} className="hover:bg-gray-50">
+                          <td className="px-5 py-3 text-sm text-gray-700">{item.courtName || item.court || '-'}</td>
+                          <td className="px-5 py-3 text-sm">
+                            {item.linkedCaseId ? (
+                              <button
+                                onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
+                                className="text-sage-600 hover:text-sage-700 font-medium flex items-center gap-1"
+                              >
+                                {item.caseNo || '-'}
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                </svg>
+                              </button>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-900">{item.caseNo || '-'}</span>
+                                <button
+                                  onClick={() => {
+                                    const partyName = caseData.opponent_name || caseData.client?.name || ''
+                                    const clientId = caseData.client_id || ''
+                                    router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || '')}&courtName=${encodeURIComponent(item.courtName || item.court || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}`)
+                                  }}
+                                  className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
+                                >
+                                  등록
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-5 py-3 text-sm text-gray-600">
+                            {item.resultDate ? `${formatProgressDate(item.resultDate)} ` : ''}
+                            {item.result || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )
             })()}
@@ -1492,23 +1374,24 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               )
 
               return filteredRelatedCases.length > 0 && (
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <h3 className="text-sm font-semibold text-gray-900 mb-4">관련사건 (대법원)</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="py-2 px-3 text-left text-gray-500 font-medium w-24">구분</th>
-                          <th className="py-2 px-3 text-left text-gray-500 font-medium">법원</th>
-                          <th className="py-2 px-3 text-left text-gray-500 font-medium">사건번호</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredRelatedCases.map((item: any, idx: number) => (
-                          <tr key={`related-${idx}`} className="border-b border-gray-100 last:border-0">
-                            <td className="py-2.5 px-3 text-sage-600 font-medium">{item.relation || item.relation_type || '관련사건'}</td>
-                            <td className="py-2.5 px-3 text-gray-700">{item.caseName || item.court_name || '-'}</td>
-                            <td className="py-2.5 px-3">
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="px-5 py-3 border-b border-gray-100">
+                    <h3 className="text-sm font-semibold text-gray-900">관련사건</h3>
+                  </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                        <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left w-24">구분</th>
+                        <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">법원</th>
+                        <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">사건번호</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {filteredRelatedCases.map((item: any, idx: number) => (
+                        <tr key={`related-${idx}`} className="hover:bg-gray-50">
+                          <td className="px-5 py-3 text-sm text-sage-600 font-medium">{item.relation || item.relation_type || '관련사건'}</td>
+                          <td className="px-5 py-3 text-sm text-gray-700">{item.caseName || item.court_name || '-'}</td>
+                          <td className="px-5 py-3 text-sm">
                               {item.linkedCaseId ? (
                                 <button
                                   onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
@@ -1540,14 +1423,15 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                         ))}
                       </tbody>
                     </table>
-                  </div>
                 </div>
               )
             })()}
 
-            {/* 당사자 정보 */}
-            <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">당사자 정보</h3>
+            {/* 당사자 */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900">당사자</h3>
+              </div>
               <CasePartiesSection
                 caseId={caseData.id}
                 courtCaseNumber={caseData.court_case_number}
@@ -1560,8 +1444,76 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   router.refresh()
                 }}
                 scourtParties={(scourtSnapshot?.basicInfo as any)?.parties || []}
-                scourtRepresentatives={(scourtSnapshot?.basicInfo as any)?.representatives || []}
               />
+            </div>
+
+            {/* 계약 */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100">
+                <h3 className="text-sm font-semibold text-gray-900">계약</h3>
+              </div>
+              <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <span className="text-xs text-gray-500 block mb-0.5">계약번호</span>
+                  <span className="text-sm text-gray-900">{caseData.contract_number || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-0.5">계약일</span>
+                  <span className="text-sm text-gray-900">{formatDate(caseData.contract_date)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-0.5">사건종류</span>
+                  <span className="text-sm text-gray-900">{caseData.case_type || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-0.5">의뢰인</span>
+                  <button
+                    className="text-sm text-sage-600 hover:text-sage-700 font-medium"
+                    onClick={() => caseData.client && router.push(`/clients/${caseData.client_id}`)}
+                  >
+                    {caseData.client?.name || '-'}
+                  </button>
+                </div>
+              </div>
+
+              {/* 수임료 */}
+              <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
+                <h4 className="text-xs font-medium text-gray-500">수임료</h4>
+              </div>
+              <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <span className="text-xs text-gray-500 block mb-0.5">착수금</span>
+                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.retainer_fee)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-0.5">성공보수</span>
+                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.calculated_success_fee)}</span>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(true)}
+                    className="text-xs text-gray-500 hover:text-sage-600 block mb-0.5"
+                  >
+                    입금액 &rsaquo;
+                  </button>
+                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(paymentTotal ?? caseData.total_received)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-0.5">미수금</span>
+                  <span className={`text-sm font-semibold ${calculateOutstandingBalance() > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                    {formatCurrency(calculateOutstandingBalance())}
+                  </span>
+                </div>
+              </div>
+
+              {/* 성공보수 약정 */}
+              {caseData.success_fee_agreement && (
+                <div className="px-5 py-3 border-t border-gray-100">
+                  <span className="text-xs text-gray-500 block mb-1">성공보수 약정</span>
+                  <p className="text-sm text-gray-700">{caseData.success_fee_agreement}</p>
+                </div>
+              )}
             </div>
 
             {/* 메모 */}
@@ -1715,74 +1667,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           </div>
         )}
 
-        {/* 계약 탭 */}
-        {activeTab === 'contract' && (
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            {/* 계약 기본 정보 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-              <div>
-                <span className="text-xs text-gray-500 block mb-1">계약번호</span>
-                <span className="text-sm text-gray-900 font-medium">{caseData.contract_number || '-'}</span>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500 block mb-1">계약일</span>
-                <span className="text-sm text-gray-900 font-medium">{formatDate(caseData.contract_date)}</span>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500 block mb-1">사건종류</span>
-                <span className="text-sm text-gray-900 font-medium">{caseData.case_type || '기타'}</span>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500 block mb-1">의뢰인</span>
-                <button
-                  className="text-sm text-sage-600 hover:text-sage-700 font-medium"
-                  onClick={() => caseData.client && router.push(`/clients/${caseData.client_id}`)}
-                >
-                  {caseData.client?.name || '-'}
-                </button>
-              </div>
-            </div>
-
-            {/* 수임료 정보 */}
-            <div className="border-t border-gray-100 pt-5">
-              <h4 className="text-sm font-semibold text-gray-900 mb-4">수임료</h4>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div>
-                  <span className="text-xs text-gray-500 block mb-1">착수금</span>
-                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.retainer_fee)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500 block mb-1">발생 성공보수</span>
-                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.calculated_success_fee)}</span>
-                </div>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowPaymentModal(true)}
-                    className="text-xs text-gray-500 hover:text-sage-600 block mb-1"
-                  >
-                    입금액 &rsaquo;
-                  </button>
-                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(paymentTotal ?? caseData.total_received)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500 block mb-1">미수금</span>
-                  <span className={`text-sm font-semibold ${calculateOutstandingBalance() > 0 ? 'text-red-600' : 'text-gray-900'}`}>
-                    {formatCurrency(calculateOutstandingBalance())}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* 성공보수 약정 */}
-            {caseData.success_fee_agreement && (
-              <div className="border-t border-gray-100 pt-5 mt-5">
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">성공보수 약정</h4>
-                <p className="text-sm text-gray-700">{caseData.success_fee_agreement}</p>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Unified Schedule Modal */}

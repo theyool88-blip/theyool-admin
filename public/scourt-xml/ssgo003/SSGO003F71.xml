@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003F71(대리인내용 목록) 화면 XML
+
+============ ============ ==========================
+ Date         Author       Description
+============ ============ ==========================
+2022.05.12.   최연구       [NELS]최초 생성
+============ ============ ==========================
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="대리인내용 목록" >
+    	<w2:type>DEFAULT</w2:type>
+        <w2:buildDate/>
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <!-- 대리인내용 -->
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_atrnyCttLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="atrnyDvsNm" name="변호인구분명" dataType="text"></w2:column>
+                        <w2:column id="atrnyFullNm" name="변호인명" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection>
+            </w2:workflowCollection>
+        </xf:model>
+         <script type="text/javascript" lazy="false"><![CDATA[/**
+ * 화면 pageload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */ 
+scwin.onpageload = function() {
+    var dlt_param   = com.data.getParameter() || ssgo.getParameter();
+    
+    dlt_atrnyCttLst.removeAll();
+    dlt_atrnyCttLst.setJSON(dlt_param);  
+
+    // 그리드 사이즈조정시 캔버스뒤로 숨는 오류처리
+    ssgo.setGrdResizeAddEvt(grd_atrnyCttLst);        
+};
+
+/**
+ * 화면 pageunload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageunload = function() {
+};
+
+	]]></script>
+	<style type="text/css"><![CDATA[
+			
+		 ]]></style>
+    </head>
+   <body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+
+   	<w2:span class="con_stit ic pt10" id="" label="변호인내용" style=""></w2:span>
+   	<w2:gridView adaptive="" adaptiveThreshold="" autoFit="none" autoFitMinWidth="" captionTitle="당사자내용 그리드" class="grid" contextMenu=""
+   		dataList="data:dlt_atrnyCttLst" id="grd_atrnyCttLst" readOnly="true" style="height:110px;" visibleRowNum="all" noResultMessage="조회된 내용이 없습니다." titleFormatter="ssgo.setGrdTitle">
+   		<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+   		<w2:header id="header1" style="">
+   			<w2:row id="row1" style="">
+   				<w2:column displayMode="label" id="column19" inputType="text" style="height:20px;" value="구분" width="30"></w2:column>
+   				<w2:column displayMode="label" id="column20" inputType="text" style="height:20px" value="이름" width="90"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody id="gBody1" style="">
+   			<w2:row id="row2" style="">
+   				<w2:column displayMode="label" excelCellType="" id="atrnyDvsNm" inputType="text" style=""></w2:column>
+   				<w2:column displayMode="label" id="atrnyFullNm" inputType="text" style="height:20px" value="" textAlign="left"></w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+
+
+   </body>
+</html>

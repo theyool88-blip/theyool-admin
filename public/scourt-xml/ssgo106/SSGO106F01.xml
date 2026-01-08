@@ -1,0 +1,504 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	SSGO106F01(홈페이지 기타사건 일반내용 상세조회) 화면 XML
+
+	============ ============ ==========================
+	Date Author Description
+	============ ============ ==========================
+	2022.05.12. 최연구 [NELS]최초 생성
+	============ ============ ==========================
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="기타사건 일반내용 상세조회">
+		<w2:type>DEFAULT</w2:type>
+		<w2:buildDate />
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <!-- 사건 검색조건 -->
+                <w2:dataMap baseNode="map" id="dma_search">
+                    <w2:keyInfo>
+                        <w2:key id="cortCd" name="법원코드" dataType="text"></w2:key>
+                        <w2:key id="csNo" name="사건번호" dataType="text"></w2:key>
+                        <w2:key id="encCsNo" name="암호화사건번호" dataType="text"></w2:key>
+                        <w2:key id="csYear" name="년도" dataType="text"></w2:key>
+                        <w2:key id="csDvsCd" name="사건구분" dataType="text"></w2:key>
+                        <w2:key id="csSerial" name="사건번호" dataType="text"></w2:key>
+                        <w2:key id="btprtNm" name="당사자명" dataType="text"></w2:key>
+                        <w2:key id="captchaAnswer" name="중복방지텍스트" dataType="text"></w2:key>
+                        <w2:key id="callDomain" name="호출도메인" dataType="text"></w2:key>
+                        
+                        <w2:key id="csDvsNm" name="사건구분명" dataType="text"></w2:key>
+                        <w2:key id="prwlKey" name="밀행키" dataType="text"></w2:key>
+                        <w2:key id="preProgYn" name="진행내역먼저보기여부" dataType="text"></w2:key>
+                        <w2:key id="typ" name="타입" dataType="text"></w2:key>
+                        <w2:key id="atho" name="사건번호(SEED)" dataType="text"></w2:key>
+                        <w2:key id="dcRgstNoIndctYn" name="전자독촉 우체국 등기번호 표시여부" dataType="text"></w2:key>
+                        <w2:key id="myCslistLinkYn" name="내부요청여부" dataType="text"></w2:key>
+                        <w2:key id="mode" name="모드(모바일앱)" dataType="text"></w2:key>
+                        <w2:key id="mcsDomain" name="mcs도메인(모바일앱)" dataType="text"></w2:key>
+                        <w2:key id="callTyp" name="호출타입(모바일앱)" dataType="text"></w2:key>
+                        <w2:key id="ckiStrgYn" name="쿠키저장여부 (모바일앱)" dataType="text"></w2:key> 
+                        <w2:key id="link" name="링크여부" dataType="text"></w2:key>
+                        <w2:key id="linkValue" name="원링크정보" dataType="text"></w2:key>
+                        <w2:key id="srchDvs" name="검색구분" dataType="text"></w2:key>
+                        <w2:key id="nrlnmDvsCd" name="비실명화유형코드" dataType="text"></w2:key>
+                        <w2:key id="inqScop" name="송달구분코드" dataType="text"></w2:key>
+
+                        <w2:key id="inUseCallDomain" name="내부사용호출도메인" dataType="text"></w2:key>
+                        <w2:key id="etc1" name="기타1" dataType="text"></w2:key>
+                        <w2:key id="etc2" name="기타2" dataType="text"></w2:key>
+                        <w2:key id="etc3" name="기타3" dataType="text"></w2:key>                                                                                                     
+                    </w2:keyInfo>
+                </w2:dataMap>
+                
+                <!-- 사건 기본내용 -->
+                <w2:dataMap baseNode="map" id="dma_csBasCtt">
+                    <w2:keyInfo>
+                        <!-- 인터페이스 -->
+                        <w2:key id="cortCd" name="법원코드" dataType="text"></w2:key>
+                        <w2:key id="csNo" name="사건번호" dataType="text"></w2:key>
+                        <w2:key id="csNm" name="사건명" dataType="text"></w2:key>
+                        <w2:key id="rprsPtnrNm" name="대표원고명" dataType="text"></w2:key>
+                        <w2:key id="ptnrCnt" name="원고수" dataType="text"></w2:key>
+                        <w2:key id="rprsRqstrNm" name="대표피고명" dataType="text"></w2:key>
+                        <w2:key id="rqstrCnt" name="피고수" dataType="text"></w2:key>
+                        <w2:key id="jdbnCd" name="재판부코드" dataType="text"></w2:key>
+                        <w2:key id="jdbnNm" name="재판부명" dataType="text"></w2:key>
+                        <w2:key id="ultmtJdbnNm" name="종국재판부명" dataType="text"></w2:key>
+                        <w2:key id="jdbnTelno" name="재판부전화안내내용" dataType="text"></w2:key>
+                        <w2:key id="csRcptYmd" name="접수일자" dataType="text"></w2:key>
+                        <w2:key id="csUltmtYmd" name="종국일자" dataType="text"></w2:key>
+                        <w2:key id="csUltmtDvsCd" name="종국구분코드" dataType="text"></w2:key>
+                        <w2:key id="csMrgTypCd" name="병합구분" dataType="text"></w2:key>
+                        <w2:key id="adjdocRchYmd" name="판결송달일" dataType="text"></w2:key>
+                        <w2:key id="csPrsrvYn" name="보존된사건표시" dataType="text"></w2:key>
+                        <w2:key id="csDvsCd" name="사건구분코드" dataType="text"></w2:key>
+                        <w2:key id="csTkpDvsCd" name="사건수리구분코드" dataType="text"></w2:key>
+                        <w2:key id="aplyCsKndCd" name="신청사건명코드" dataType="text"></w2:key>
+                        <w2:key id="lwstDvsCd" name="사건접수유형코드" dataType="text"></w2:key>
+                        <w2:key id="dxdyRqrdSchdTimeRlsYn" name="기일소요예정시간공개여부" dataType="text"></w2:key>
+                        
+                        <!-- 가공데이터(코드등) -->
+                        <w2:key id="userCsNo" name="사용자식별 사건번호" dataType="text"></w2:key>
+                        <w2:key id="amtYn" name="송달료,보관금종결여부" dataType="text"></w2:key>
+                        <w2:key id="prsvCtt" name="보존,폐기여부" dataType="text"></w2:key>
+                        <w2:key id="cortNm" name="법원명" dataType="text"></w2:key>   
+                        <w2:key id="csUltmtDvsNm" name="종국결과명" dataType="text"></w2:key>   
+                        <w2:key id="csTkpDvsNm" name="사건수리구분명 [CD033]" dataType="text"></w2:key>   
+                        <w2:key id="csMrgTypNm" name="병합구분 [CD069]" dataType="text"></w2:key>   
+                        <w2:key id="titRprsPtnr" name="원고레이블명" dataType="text"></w2:key>   
+                        <w2:key id="titRprsRqstr" name="피고레이블명" dataType="text"></w2:key>   
+                        <w2:key id="titJdbnNm" name="재판부레이블명" dataType="text"></w2:key>
+                        <w2:key id="encCsNo" name="암호화사건번호" dataType="text"></w2:key>                        
+                        
+                  </w2:keyInfo>
+                </w2:dataMap>
+            </w2:dataCollection>
+            <w2:workflowCollection></w2:workflowCollection>
+            <xf:submission id="sbm_search" ref="data:json,dma_search" 
+                target='data:json,[{"id":"dma_csBasCtt","key":"data.dma_csBasCtt"}]'
+                action="/ssgo/ssgo106/selectHmpgEtcCsGnrlCtt.on" method="post" mediatype="application/json" encoding="UTF-8" instance="" replace=""
+                errorHandler="" customHandler="" mode="asynchronous" processMsg="사건검색중입니다" ev:submit="scwin.sbm_search_submit" ev:submitdone="scwin.sbm_search_submitdone"
+                ev:submiterror="scwin.sbm_search_submiterror" abortTrigger="">
+            </xf:submission>            
+        </xf:model>
+		
+		<script type="text/javascript" lazy="false"><![CDATA[/**
+ * 전역 변수
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.param   = {};  // 파라메터
+
+
+/**
+ * 화면 pageload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageload = function() {
+    // 보존정보 row숨김처리
+    tr_prsvCtt.hide();
+
+    scwin.param = com.data.getParameter().paramInfo;
+    ssgo.initCsSrch();
+};
+
+/**
+ * 화면 pageunload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageunload = function() {
+};
+
+/**
+ *********************************************************************************************************
+ * Submission Event Handler
+ *********************************************************************************************************
+ */
+/**
+ * submit 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.sbm_search_submit = function(e) {
+}; 
+ 
+/**
+ * submitdone 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.sbm_search_submitdone = function(e) {
+    var csRsltData = e.responseJSON.data;
+    
+    // 새로 열릴 화면에 데이터를 전달 (dataObject를 통해 전달 가능)         
+    var wfObj = {"dataObject": {"type" : "json", "name" : "paramData", "data" : null,}}; 
+    
+    // 가공처리되는 정보 ------------------------------------------------
+    scwin.ufn_setDataArilPrcs();
+    
+    // 최근기일내용
+    wfObj.dataObject.data = csRsltData.dlt_rcntDxdyLst;
+
+    // 기일소요예상시간공개여부    
+    if(dma_csBasCtt.get("dxdyRqrdSchdTimeRlsYn") === "Y" ) {
+        wfRcntDxdyLst.setSrc(ssgo.getCtxtPathUrl("/ui/ssgo003/SSGO003F30.xml"), wfObj); 
+    } else {
+        wfRcntDxdyLst.setSrc(ssgo.getCtxtPathUrl("/ui/ssgo003/SSGO003F32.xml"), wfObj); 
+    }         
+
+    // 최근 제출서류 접수내용
+    wfObj.dataObject.data = csRsltData.dlt_rcntSbmsnDocmtLst;
+    wfRcntSbmsnDocmtLst.setSrc(ssgo.getCtxtPathUrl("/ui/ssgo003/SSGO003F40.xml"), wfObj);    
+
+    // 관련사건내용
+    if(!ssgo.isLenZero(csRsltData.dlt_reltCsLst)) {
+        wfObj.dataObject.data = csRsltData.dlt_reltCsLst;
+        wfReltCsLst.setSrc(ssgo.getCtxtPathUrl("/ui/ssgo003/SSGO003F50.xml"), wfObj);    
+    }
+
+    // 당사자내용
+    if(!ssgo.isLenZero(csRsltData.dlt_btprtCttLst)) {
+        wfObj.dataObject.data = csRsltData.dlt_btprtCttLst;
+        wfBtprtCttLst.setSrc(ssgo.getCtxtPathUrl("/ui/ssgo003/SSGO003F63.xml"), wfObj);    
+    }
+
+    // 대리인내용
+    if(!ssgo.isLenZero(csRsltData.dlt_agntCttLst)) {
+        wfObj.dataObject.data = csRsltData.dlt_agntCttLst;
+        wfAgntCttLst.setSrc(ssgo.getCtxtPathUrl("/ui/ssgo003/SSGO003F70.xml"), wfObj);    
+    }
+    
+    // 사건검색 후  callback
+    ssgo.callbackCsSrchDetail(scwin.param, e);
+};    
+
+scwin.sbm_search_submiterror = function(e) {
+    // 사건검색 후  callback    
+    ssgo.callbackCsSrchDetail(scwin.param, e);
+};
+
+
+/**
+ *********************************************************************************************************
+ * Event Handler
+ *********************************************************************************************************
+ */
+
+/**
+ *********************************************************************************************************
+ * Validate 
+ *********************************************************************************************************
+ */
+
+/**
+ *********************************************************************************************************
+ * User Function
+ *********************************************************************************************************
+ */
+
+/**
+ * 화면제어 및 가공되는 데이터를 처리한다.
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.ufn_setDataArilPrcs = function() {
+
+    // 전자 여부
+    if(dma_csBasCtt.get("lwstDvsCd") !== "2") {
+        txt_isElctn.hide();
+    }
+    
+    // 원고, 피고 레이블구성
+    txt_rprsPtnrNm.setValue(ssgo.getCsBtprNmInclCnt(dma_csBasCtt.get("rprsPtnrNm"), dma_csBasCtt.get("ptnrCnt")));
+    txt_rprsRqstrNm.setValue(ssgo.getCsBtprNmInclCnt(dma_csBasCtt.get("rprsRqstrNm"), dma_csBasCtt.get("rqstrCnt")));
+
+    // 재판부 fulltext구성
+    var txtjdbnNm = dma_csBasCtt.get("jdbnNm");
+    if(!scutilo.isEmpty(dma_csBasCtt.get("csUltmtYmd")) && !scutilo.isEmpty(dma_csBasCtt.get("ultmtJdbnNm"))) {
+        txtjdbnNm = dma_csBasCtt.get("ultmtJdbnNm");
+    }
+    if(dma_csBasCtt.get("csPrsrvYn") !== "Y" && !scutilo.isEmpty(dma_csBasCtt.get("jdbnTelno"))) {
+        txtjdbnNm += " (전화:" + dma_csBasCtt.get("jdbnTelno") + ")";
+    }
+    txt_jdbnNm.setValue(txtjdbnNm);
+
+    // 종국내용은 현재날짜보다 작을 경우에만 보여줌
+    let today = scdateo.getDateStr(new Date());
+    if(!scutilo.isEmpty(dma_csBasCtt.get("csUltmtYmd")) && scdateo.getDaysBetween(dma_csBasCtt.get("csUltmtYmd"), today) >= 0) {
+        var csUltmtYmdFmt = (!scutilo.isEmpty(dma_csBasCtt.get("csUltmtYmd"))) ? $p.getFormattedDate(scdateo.getDateObj(dma_csBasCtt.get("csUltmtYmd")), 'yyyy.MM.dd') : "";
+        txt_csUltmtDvsNm.setValue(csUltmtYmdFmt + " " + dma_csBasCtt.get("csUltmtDvsNm"));
+    } else  {
+        txt_csUltmtDvsNm.setValue("");
+    }
+    
+    // 보존,폐기 view
+    if(!scutilo.isEmpty(dma_csBasCtt.get("prsvCtt"))) {
+        if(dma_csBasCtt.get("prsvCtt") === "보존") {
+            txt_titPrsvCtt.setValue("보존여부");
+            txt_prsvCtt.setValue("기록보존됨");
+        } else if(dma_csBasCtt.get("prsvCtt") === "폐기") {
+            txt_titPrsvCtt.setValue("폐기여부");
+            txt_prsvCtt.setValue("기록폐기됨");
+        }
+        tr_prsvCtt.show("");
+    } else  {
+        tr_prsvCtt.hide();
+    }
+
+    // 송달료,보관금 view
+    if(dma_csBasCtt.get("amtYn") === "Y") {
+        txt_dlvrBlnc.hide();
+    } else {
+        btn_chkDlvrBlnc.hide();
+    }    
+}]]></script>
+		<style type="text/css"><![CDATA[
+			
+		 ]]></style>
+	</head>
+	<body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+	<div id="printAreaCsRsltGnrl">
+		<!-- <xf:group class="titlearea bg " id="" style=""> -->
+		<xf:group id="" style="">
+			<w2:span class="con_stit ic" escape="false" id="" label='기본내용' style=""></w2:span><w2:span id="txt_cortNm" label="(서울중앙지방법원)" ref="data:dma_csBasCtt.cortNm" class="txt pl5 pb10" displayFormatter="ssgo.setStrCortNm" style=""></w2:span>
+			<xf:group class="btn_top_group" id="" style="">
+				<xf:trigger class="btn_ic btn_ic_print" id="btnCsSrchPrint" style="" type="button" ev:onclick="ssgo.goPrintPopup('printAreaCsRsltGnrl')" title="출력화면 열기">
+					<xf:label><![CDATA[인쇄]]></xf:label>
+				</xf:trigger>
+				<w2:span id="" label="" style="width:5px; height:23px; "></w2:span>
+				<xf:trigger class="btn_infcm" id="btn_mvmnCsSrch" style="" type="button" title="검색화면으로 이동">
+					<xf:label><![CDATA[검색화면]]></xf:label>
+				</xf:trigger>
+				<w2:span id="" label="" style="width:5px; height:23px; "></w2:span>
+				<xf:trigger class="btn_infcm" id="btn_cortView" style="" type="button" title="청사배치 새창열기">
+					<xf:label><![CDATA[청사배치]]></xf:label>
+				</xf:trigger>
+				<w2:span id="" label="" style="width:5px; height:23px; "></w2:span>
+			</xf:group>
+			
+		</xf:group>
+		<xf:group class="stbox" id="" style=""></xf:group>
+		<xf:group class="stbox" id="" style=""></xf:group>
+		<xf:group class="stbox" id="" style="">
+			<xf:group class="frm_title_group" id="" style=""></xf:group>
+		</xf:group>
+		<xf:group class="w2tb ct_tbl " id="" style="width:100%;" tagname="table">
+			<w2:attributes>
+				<w2:summary></w2:summary>
+			</w2:attributes>
+			<xf:group tagname="caption"></xf:group>
+			<xf:group tagname="colgroup">
+				<xf:group style="width:15%;" tagname="col"></xf:group>
+				<xf:group style="width:30%" tagname="col"></xf:group>
+				<xf:group style="width:15%" tagname="col"></xf:group>
+				<xf:group style="" tagname="col"></xf:group>
+			</xf:group>
+
+			<xf:group style="" tagname="tr">
+				<xf:group class="w2tb_th" style="" tagname="th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="사건번호" style=""></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" style="" tagname="td">
+					<w2:span id="" label="2018자18" style="" ref="data:dma_csBasCtt.userCsNo"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_th" style="" tagname="th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="사건명" style=""></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" style="" tagname="td">
+					<w2:span class="fc_green" id="txt_isElctn" label="[전자]" style=""></w2:span>
+					<w2:span id="" label="건물명도" style="" ref="data:dma_csBasCtt.csNm"></w2:span>
+
+				</xf:group>
+			</xf:group>
+			<xf:group tagname="tr" style="">
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="원고" ref="data:dma_csBasCtt.titRprsPtnr" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes></w2:attributes>
+					<w2:span id="txt_rprsPtnrNm" label="김OO" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="피고" ref="data:dma_csBasCtt.titRprsRqstr" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes></w2:attributes>
+					<w2:span id="txt_rprsRqstrNm" label="홍OO" style=""></w2:span>
+				</xf:group>
+			</xf:group>
+			<xf:group tagname="tr" style="">
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="재판부" ref="data:dma_csBasCtt.titJdbnNm" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes>
+						<w2:colspan>3</w2:colspan>
+						<w2:rowspan>1</w2:rowspan>
+					</w2:attributes>
+					<w2:span id="txt_jdbnNm" label="제1파산단독" style=""></w2:span>
+				</xf:group>
+			</xf:group>
+			<xf:group tagname="tr" style="">
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="접수일" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes></w2:attributes>
+					<w2:span dataType="text" id="" label="2019.01.31" ref="data:dma_csBasCtt.csRcptYmd" style="" displayFormat="####.##.##"></w2:span>
+				</xf:group>
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="종국결과" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes></w2:attributes>
+					<w2:span id="txt_csUltmtDvsNm" label="종국결과" ref="" style=""></w2:span>
+				</xf:group>
+			</xf:group>
+			<xf:group tagname="tr" style="">
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="" label="병합구분" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes>
+						<w2:colspan>3</w2:colspan>
+						<w2:rowspan>1</w2:rowspan>
+					</w2:attributes>
+					<w2:span class="txt" id="" label="본소" ref="data:dma_csBasCtt.csMrgTypNm" style=""></w2:span>
+				</xf:group>
+			</xf:group>
+			<xf:group tagname="tr"  id="tr_prsvCtt">
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+					</w2:attributes>
+					<w2:span id="txt_titPrsvCtt" label="보존여부/폐기여부" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes><w2:colspan>3</w2:colspan><w2:rowspan>1</w2:rowspan></w2:attributes>
+					<w2:span id="txt_prsvCtt" label="기록보존됨/기록폐기됨" style=""></w2:span>
+				</xf:group></xf:group><xf:group tagname="tr" style="">
+				<xf:group tagname="th" class="w2tb_th">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+						<w2:colspan>2</w2:colspan>
+						<w2:rowspan>1</w2:rowspan>
+					</w2:attributes>
+					<w2:span id="" label="송달료,보관금,종결에 따른 잔액조회" style=""></w2:span>
+				</xf:group>
+				<xf:group tagname="td" class="w2tb_td">
+					<w2:attributes>
+						<w2:scope>row</w2:scope>
+						<w2:colspan>2</w2:colspan>
+						<w2:rowspan>1</w2:rowspan>
+					</w2:attributes>
+					<xf:trigger class="btn_fcm ty1" id="btn_chkDlvrBlnc" style="" type="button" title="잔액조회 새창열기">
+						<xf:label><![CDATA[잔액조회]]></xf:label>
+					</xf:trigger>
+					<w2:span id="txt_dlvrBlnc" label="사건이 종결되고 송달료 종결 혹은 보관금계좌가 종결된 경우에만 조회 가능합니다." ref="" style=""></w2:span>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+
+        <!-- 최근기일내용 -->
+        <xf:group id="" class="accordion_area">
+            <w2:wframe id="wfRcntDxdyLst" src="" class="" ></w2:wframe>
+        </xf:group>
+
+        <!-- 최근 제출서류 접수내용 -->
+        <xf:group id="" class="accordion_area">
+            <w2:wframe id="wfRcntSbmsnDocmtLst" src="" class="" ></w2:wframe>
+        </xf:group>
+        
+        <!-- 관련사건내용 -->
+        <xf:group id="" class="accordion_area">
+            <w2:wframe id="wfReltCsLst" src="" class="" ></w2:wframe>
+        </xf:group>
+        
+        <!-- 당사자내용 -->
+        <xf:group id="" class="accordion_area">
+            <w2:wframe id="wfBtprtCttLst" src="" class="" ></w2:wframe>
+        </xf:group>
+        
+        <!-- 대리인내용 -->
+        <xf:group id="" class="accordion_area">
+            <w2:wframe id="wfAgntCttLst" src="" class="" ></w2:wframe>
+        </xf:group>
+        
+        </div>    
+	</body>
+</html>

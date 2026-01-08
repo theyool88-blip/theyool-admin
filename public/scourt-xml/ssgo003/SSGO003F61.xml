@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003F61(당사자내용 목록 - 가사) 화면 XML
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="당사자내용 목록">
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <!-- 당사자내용 -->
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_btprtCttLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="btprtDvsNm" name="구분명" dataType="text"></w2:column>
+                        <w2:column id="btprtNm" name="이름" dataType="text"></w2:column>
+                        <w2:column id="ultmtDvsNm" name="종국결과" dataType="text"></w2:column>
+                        <w2:column id="adjdocRchYmd" name="판결문도달일자" dataType="text"></w2:column>
+                        <w2:column id="indvdCfmtnYmd" name="확정일" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+        </xf:model>
+    </head>
+   <body>
+   	<w2:span class="con_stit ic pt10" label="당사자내용"></w2:span>
+   	<w2:gridView captionTitle="당사자내용 그리드" dataList="data:dlt_btprtCttLst" id="grd_btprtCttLst"
+   		readOnly="true" style="height:110px;" visibleRowNum="all" noResultMessage="조회된 내용이 없습니다.">
+   		<w2:header>
+   			<w2:row>
+   				<w2:column value="구분" width="20"></w2:column>
+   				<w2:column value="이름" width="60"></w2:column>
+   				<w2:column value="판결도달일" width="25"></w2:column>
+   				<w2:column value="확정일" width="25"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody>
+   			<w2:row>
+   				<w2:column id="btprtDvsNm"></w2:column>
+   				<w2:column id="btprtNm" textAlign="left"></w2:column>
+   				<w2:column id="adjdocRchYmd" displayFormat="####.##.##"></w2:column>
+   				<w2:column id="indvdCfmtnYmd" displayFormat="####.##.##"></w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+   </body>
+</html>

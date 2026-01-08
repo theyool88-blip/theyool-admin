@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003F50(관련사건내용 목록) 화면 XML
+
+============ ============ ==========================
+ Date         Author       Description
+============ ============ ==========================
+2022.05.12.   최연구       [NELS]최초 생성
+============ ============ ==========================
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="관련사건내용 목록" >
+    	<w2:type>DEFAULT</w2:type>
+        <w2:buildDate/>
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <!-- 관련사건내용 -->
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_reltCsLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="reltCsCortCd" name="관련사건법원코드" dataType="text"></w2:column>
+                        <w2:column id="reltCsCortNm" name="관련사건법원명" dataType="text"></w2:column>
+                        <w2:column id="reltCsNo" name="관련사건번호" dataType="text"></w2:column>
+                        <w2:column id="reltCsDvsCd" name="관련사건구분코드" dataType="text"></w2:column>
+                        <w2:column id="reltCsDvsNm" name="관련사건구분명" dataType="text"></w2:column>
+                        
+                        <w2:column id="comTaskTypCd" name="공통업무유형코드" dataType="text"></w2:column>
+                        <w2:column id="encCsNo" name="암호화사건번호" dataType="text"></w2:column>
+                        <w2:column id="isLink" name="사건번호링크여부" dataType="text"></w2:column>
+                        <w2:column id="userCsNo" name="관련사건번호(사용자가 인식할 수 있는 사건번호)" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection>
+            </w2:workflowCollection>
+        </xf:model>
+         <script type="text/javascript" lazy="false"><![CDATA[/**
+ * 화면 pageload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */ 
+scwin.onpageload = function() {
+    var dlt_param   = com.data.getParameter() || ssgo.getParameter();
+    
+    dlt_reltCsLst.removeAll();
+    dlt_reltCsLst.setJSON(dlt_param);
+
+    // 그리드 사이즈조정시 캔버스뒤로 숨는 오류처리
+    ssgo.setGrdResizeAddEvt(grd_reltCsCtt);
+};
+
+/**
+ * 화면 pageunload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageunload = function() {
+};
+	
+/**
+ * 그리드 이벤트처리
+ *
+ * ============= ============ ==========================
+ *  Date          Author       Description
+ * ============= ============ ==========================
+ *  2022.06.24.   최연구       [NELS]최초생성
+ * ============= ============ ==========================
+ */
+scwin.grd_reltCsCtt_oncellclick = function(row, col, colId) {
+    
+    var dltObj = com.util.getGridViewDataList(this);
+    var realRowIndex = this.getRealRowIndex(row);
+    var newValue = dltObj.getCellData(realRowIndex, col);
+
+    // 사건번호 Cell 클릭시 
+    if (newValue != "" && col == 1) {
+        var param = dltObj.getRowJSON(row);
+        
+        if(param.isLink !== 'Y') {
+            return false;
+        }
+        
+        let parent = $p.parent();
+        param.linkValue = parent.dma_search.getJSON(); // history back 정보
+        param.linkValue.cortCd   = parent.dma_csBasCtt.getJSON().cortCd; 
+        param.linkValue.csDvsCd  = parent.dma_csBasCtt.getJSON().csNo.substring(4,7);
+        param.linkValue.csSerial = parent.dma_csBasCtt.getJSON().csNo.substring(7);
+        param.linkValue.encCsNo  = parent.dma_csBasCtt.getJSON().encCsNo;        
+                
+        param.cortCd = param.reltCsCortCd;
+        param.cortNm = param.reltCsCortNm;
+        param.csNo   = param.reltCsNo;
+
+        // 사건상세 화면 이동
+        ssgo.goCsSrchDetail(param);     
+
+    }
+};
+
+
+/**
+ * 관련사건 번호 클릭 이벤트 (ssgo.js로 이동예정)
+ *
+ * ============= ============ ==========================
+ *  Date          Author       Description
+ * ============= ============ ==========================
+ *  2022.06.24.   최연구       [NELS]최초생성
+ * ============= ============ ==========================
+ */
+scwin.inputReltCsBtprNm = function() {
+}
+
+/**
+ * 동적input type 설정
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.getReltCsCttType = function ( info ) {
+    return ssgo.setTypeGetter(info, dlt_reltCsLst);
+}]]></script>
+	<style type="text/css"><![CDATA[
+			
+		 ]]></style>
+    </head>
+   <body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+
+   	<w2:span class="con_stit ic pt10" id="" label="관련사건내용" style=""></w2:span>
+   	<w2:gridView adaptive="" adaptiveThreshold="" autoFitMinWidth="" captionTitle="관련사건내용 그리드" class="grid" contextMenu=""
+   		dataList="data:dlt_reltCsLst" id="grd_reltCsCtt" readOnly="true" style="height:110px;" visibleRowNum="all" autoFit="none" ev:oncellclick="scwin.grd_reltCsCtt_oncellclick" noResultMessage="조회된 내용이 없습니다." titleFormatter="ssgo.setGrdTitle">
+   		<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+   		<w2:header id="header1" style="">
+   			<w2:row id="row1" style="">
+   				<w2:column displayMode="label" id="column19" inputType="text" value="법원" width="40"></w2:column>
+   				<w2:column displayMode="label" id="column18" inputType="text" value="사건번호" width="40"></w2:column>
+   				<w2:column displayMode="label" id="column15" inputType="text" value="구분" width="40"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody id="gBody1" style="">
+   			<w2:row id="row2" style="">
+   				<w2:column displayMode="label" excelCellType="" id="reltCsCortNm" inputType="text" style=""></w2:column>
+   				<w2:column displayMode="label" excelCellType="" id="userCsNo" inputType="custom" sortLabel="" sortable="" style=""
+   					typeGetter="scwin.getReltCsCttType">
+   				</w2:column>
+   				<w2:column displayMode="label" id="reltCsDvsNm" inputType="text" style=""></w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+
+
+   </body>
+</html>

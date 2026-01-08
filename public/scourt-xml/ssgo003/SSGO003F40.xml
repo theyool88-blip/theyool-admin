@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003F40(최근 제출서류 접수내용 목록) 화면 XML
+
+============ ============ ==========================
+ Date         Author       Description
+============ ============ ==========================
+2022.05.12.   최연구       [NELS]최초 생성
+============ ============ ==========================
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="최근 제출서류 접수내용 목록" >
+    	<w2:type>DEFAULT</w2:type>
+        <w2:buildDate/>
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_rcntSbmsnDocmtLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="ofdocRcptYmd" name="접수일자" dataType="text"></w2:column>
+                        <w2:column id="content1" name="내용1" dataType="text"></w2:column>
+                        <w2:column id="content2" name="내용2" dataType="text"></w2:column>
+                        <w2:column id="content3" name="내용3" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection>
+            </w2:workflowCollection>
+        </xf:model>
+         
+         <script type="text/javascript" lazy="false"><![CDATA[/**
+ * 화면 pageload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */ 
+scwin.onpageload = function() {
+    var dlt_param   = com.data.getParameter();
+    dlt_param = ssgo.setReversLst(dlt_param);
+
+    dlt_rcntSbmsnDocmtLst.removeAll();
+    dlt_rcntSbmsnDocmtLst.setJSON(dlt_param);
+    
+    if(!scutilo.isEmpty(dlt_param) && !scutilo.isEmpty(dlt_param[0].execIntgCsNmCd)){
+        // 채권압류 및 전부명령 또는 추심명령일 경우 메시지 표시
+        var execIntgCsNmCd = dlt_param[0].execIntgCsNmCd;
+        if(execIntgCsNmCd == "10" || execIntgCsNmCd == "11" || execIntgCsNmCd == "12" || execIntgCsNmCd == "13"
+        || execIntgCsNmCd == "15" || execIntgCsNmCd == "16" || execIntgCsNmCd == "20" || execIntgCsNmCd == "23") {
+            txt_bndAtchmMsg.show("");
+        } else {
+            txt_bndAtchmMsg.hide();
+        }
+    } else {
+        txt_bndAtchmMsg.hide();
+    }
+
+    // 조회건수 없을시 버튼숨김
+    if(dlt_rcntSbmsnDocmtLst.getRowCount() == 0) {
+        btn_csDocProgList.hide();
+    }
+
+    // 그리드 사이즈조정시 캔버스뒤로 숨는 오류처리
+    ssgo.setGrdResizeAddEvt(grd_rcntSbmsnDocmtLst);  
+};
+
+/**
+ * 화면 pageunload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageunload = function() {
+};
+	
+/**
+ * 내용필드 expression
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.04.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.setExpressOfdocCtt = function (colIdx) {
+    var gridObj   = dlt_rcntSbmsnDocmtLst;
+    var content1 = gridObj.getCellData(colIdx, "content1");
+    var content2   = gridObj.getCellData(colIdx, "content2");
+    var content3   = gridObj.getCellData(colIdx, "content3");    
+
+    return content1 + " " +  content2 + " " + content3;
+}]]></script>
+	<style type="text/css"><![CDATA[
+			
+		 ]]></style>
+    </head>
+   <body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+
+   	<w2:span class="con_stit ic pt10" id="" label="최근 제출서류 접수내용" style=""></w2:span>
+   	<xf:trigger class="btn_fcm btn_list fr mal10" id="btn_csDocProgList" style="" type="button" title="최근 제출서류 접수내용 상세보기 이동" ev:onclick="ssgo.goCsSrchProgList('3')">
+   		<xf:label><![CDATA[상세보기]]></xf:label>
+   	</xf:trigger>
+   	<w2:gridView adaptive="" adaptiveThreshold="" autoFitMinWidth="" captionTitle="최근제출서류접수내용 그리드" class="grid" contextMenu=""
+   		dataList="data:dlt_rcntSbmsnDocmtLst" id="grd_rcntSbmsnDocmtLst" style="height:110px;" visibleRowNum="all" autoFit="none"
+   		noResultMessage="접수된 문서내용이 없습니다." titleFormatter="ssgo.setGrdTitle">
+   		<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+   		<w2:header id="header1" style="">
+   			<w2:row id="row1" style="">
+   				<w2:column displayMode="label" id="ofdocRcptYmd" inputType="text" value="일자" width="30" style="height:20px;"></w2:column>
+   				<w2:column displayMode="label" id="ofdocCtt" inputType="text" value="내용" width="90" style="height:20px;"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody id="gBody1" style="">
+   			<w2:row id="row2" style="">
+   				<w2:column displayMode="label" id="ofdocRcptYmd" inputType="text" style="height:35px;" readOnly="true"
+   					displayFormat="####.##.##">
+   				</w2:column>
+   				<w2:column displayMode="label" id="ofdocCtt" inputType="expression" style="height:35px;" textAlign="left"
+   					expression="scwin.setExpressOfdocCtt(rowIndex())" readOnly="true">
+   				</w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+   	<w2:textbox class="txt_exl " escape="false" id="" label="&lt;p&gt;※ 최근 제출서류 순으로 일부만 보입니다. 반드시 상세보기로 확인하시기 바랍니다.&lt;/p&gt;"
+   		style="">
+   	</w2:textbox>
+   	<w2:textbox class="txt_exl " escape="false" id="txt_bndAtchmMsg" label="&lt;p&gt;※ 채권압류 및 전부명령 또는 추심명령사건일경우 제3채무자가 존재시 제3채무자에게 송달이 이루어지지 않은 경우는 제출서류내용이 표시되지 않습니다.&lt;/p&gt;" style=""></w2:textbox>
+   </body>
+</html>

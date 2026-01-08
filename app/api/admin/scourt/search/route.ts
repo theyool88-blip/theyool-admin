@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
     const apiClient = getScourtApiClient();
 
-    // API로 사건 검색 및 encCsNo 획득 (상세 조회 포함)
+    // API로 사건 검색 및 encCsNo 획득 (일반내용 조회 포함)
     const result = await apiClient.searchAndRegisterCase({
       cortCd: courtName,
       csYr: caseYear,
@@ -78,10 +78,10 @@ export async function POST(request: NextRequest) {
         }
       };
 
-      // 상세 데이터에서 원고/피고 마스킹 이름 추출
-      if (result.detailData) {
-        const plaintiffName = result.detailData.aplNm || ''; // 예: "권O철"
-        const defendantName = result.detailData.rspNm || ''; // 예: "김O일"
+      // 일반내용에서 원고/피고 마스킹 이름 추출
+      if (result.generalData) {
+        const plaintiffName = result.generalData.aplNm || ''; // 예: "권O철"
+        const defendantName = result.generalData.rspNm || ''; // 예: "김O일"
 
         if (matchesName(plaintiffName, partyName)) {
           clientRole = 'plaintiff';
@@ -94,9 +94,9 @@ export async function POST(request: NextRequest) {
 
       console.log(`✅ 검색 성공: encCsNo=${result.encCsNo.substring(0, 20)}...`);
 
-      // 상세 조회 실패 = 법원명이 잘못되었을 가능성 높음 → 등록 차단
-      if (!result.detailData) {
-        console.error(`❌ 상세 조회 실패 - 법원명이 잘못되었을 수 있습니다.`);
+      // 일반내용 조회 실패 = 법원명이 잘못되었을 가능성 높음 → 등록 차단
+      if (!result.generalData) {
+        console.error(`❌ 일반내용 조회 실패 - 법원명이 잘못되었을 수 있습니다.`);
         console.error(`   입력한 법원: "${courtName}"`);
         return NextResponse.json({
           success: false,
@@ -106,8 +106,8 @@ export async function POST(request: NextRequest) {
         }, { status: 422 });
       }
 
-      // 법원명 불일치 감지 (상세 조회는 성공했지만 법원명이 다른 경우)
-      const scourtCourtName = result.detailData.cortNm;
+      // 법원명 불일치 감지 (일반내용 조회는 성공했지만 법원명이 다른 경우)
+      const scourtCourtName = result.generalData.cortNm;
       const courtNameMismatch = scourtCourtName && scourtCourtName !== courtName;
 
       // 법원명 불일치 + 자동수정 미확인 → 사용자에게 확인 요청
@@ -134,63 +134,63 @@ export async function POST(request: NextRequest) {
         console.log(`✅ 법원명 수정 확인됨: "${courtName}" → "${scourtCourtName}"`);
       }
 
-      // 스냅샷 저장 (상세 데이터가 있는 경우만 - 위에서 이미 확인됨)
+      // 스냅샷 저장 (일반내용 데이터가 있는 경우만 - 위에서 이미 확인됨)
       let hasSnapshot = false;
-      if (legalCaseId && result.detailData) {
+      if (legalCaseId && result.generalData) {
         try {
           const supabase = createAdminClient();
           const caseNumber = `${caseYear}${caseType}${caseSerial}`;
 
           // 스냅샷 저장 (한글 라벨로 저장)
           const basicInfoKorean: Record<string, string | undefined> = {
-            '사건번호': result.detailData.csNo || caseNumber,
-            '사건명': result.detailData.csNm || '',
-            '법원': result.detailData.cortNm || courtName,
-            '원고': result.detailData.aplNm || '',
-            '피고': result.detailData.rspNm || '',
+            '사건번호': result.generalData.csNo || caseNumber,
+            '사건명': result.generalData.csNm || '',
+            '법원': result.generalData.cortNm || courtName,
+            '원고': result.generalData.aplNm || '',
+            '피고': result.generalData.rspNm || '',
             // 사건 카테고리 (UI에서 당사자 라벨 결정용)
-            caseCategory: result.detailData.caseCategory,
+            caseCategory: result.generalData.caseCategory,
           };
 
           // 형사사건 전용 필드
-          if (result.detailData.dfndtNm) basicInfoKorean['피고인명'] = result.detailData.dfndtNm;
-          if (result.detailData.crmcsNo) basicInfoKorean['형제번호'] = result.detailData.crmcsNo;
-          if (result.detailData.aplCtt) basicInfoKorean['상소제기내용'] = result.detailData.aplCtt;
+          if (result.generalData.dfndtNm) basicInfoKorean['피고인명'] = result.generalData.dfndtNm;
+          if (result.generalData.crmcsNo) basicInfoKorean['형제번호'] = result.generalData.crmcsNo;
+          if (result.generalData.aplCtt) basicInfoKorean['상소제기내용'] = result.generalData.aplCtt;
 
           // 추가 필드가 있으면 포함 (DB에 저장, UI에서 일부 필터링)
-          if (result.detailData.jdgNm) basicInfoKorean['재판부'] = result.detailData.jdgNm;
-          if (result.detailData.rcptDt) basicInfoKorean['접수일'] = result.detailData.rcptDt;
+          if (result.generalData.jdgNm) basicInfoKorean['재판부'] = result.generalData.jdgNm;
+          if (result.generalData.rcptDt) basicInfoKorean['접수일'] = result.generalData.rcptDt;
           // 종국결과: 날짜 + 결과 (예: "2025.08.20 원고패")
-          if (result.detailData.endRslt) {
-            const endDt = result.detailData.endDt;
+          if (result.generalData.endRslt) {
+            const endDt = result.generalData.endDt;
             const endDtFormatted = endDt && endDt.length === 8
               ? `${endDt.slice(0,4)}.${endDt.slice(4,6)}.${endDt.slice(6,8)}`
               : '';
             basicInfoKorean['종국결과'] = endDtFormatted
-              ? `${endDtFormatted} ${result.detailData.endRslt}`
-              : result.detailData.endRslt;
+              ? `${endDtFormatted} ${result.generalData.endRslt}`
+              : result.generalData.endRslt;
           }
-          if (result.detailData.cfrmDt) basicInfoKorean['확정일'] = result.detailData.cfrmDt;
-          if (result.detailData.stmpAmnt) basicInfoKorean['인지액'] = result.detailData.stmpAmnt;
-          if (result.detailData.mrgrDvs) basicInfoKorean['병합구분'] = result.detailData.mrgrDvs;
-          if (result.detailData.aplDt) basicInfoKorean['상소일'] = result.detailData.aplDt;
-          if (result.detailData.aplDsmsDt) basicInfoKorean['상소각하일'] = result.detailData.aplDsmsDt;
-          if (result.detailData.jdgArvDt) basicInfoKorean['판결도달일'] = result.detailData.jdgArvDt;
+          if (result.generalData.cfrmDt) basicInfoKorean['확정일'] = result.generalData.cfrmDt;
+          if (result.generalData.stmpAmnt) basicInfoKorean['인지액'] = result.generalData.stmpAmnt;
+          if (result.generalData.mrgrDvs) basicInfoKorean['병합구분'] = result.generalData.mrgrDvs;
+          if (result.generalData.aplDt) basicInfoKorean['상소일'] = result.generalData.aplDt;
+          if (result.generalData.aplDsmsDt) basicInfoKorean['상소각하일'] = result.generalData.aplDsmsDt;
+          if (result.generalData.jdgArvDt) basicInfoKorean['판결도달일'] = result.generalData.jdgArvDt;
           // 추가 필드: 재판부 전화번호, 보존, 조사관 정보
-          if (result.detailData.jdgTelno) basicInfoKorean['재판부전화번호'] = result.detailData.jdgTelno;
-          if (result.detailData.prsrvYn) basicInfoKorean['보존여부'] = result.detailData.prsrvYn;
-          if (result.detailData.prsrvCtt) basicInfoKorean['보존내용'] = result.detailData.prsrvCtt;
-          if (result.detailData.exmnrNm) basicInfoKorean['조사관'] = result.detailData.exmnrNm;
-          if (result.detailData.exmnrTelNo) basicInfoKorean['조사관전화번호'] = result.detailData.exmnrTelNo;
+          if (result.generalData.jdgTelno) basicInfoKorean['재판부전화번호'] = result.generalData.jdgTelno;
+          if (result.generalData.prsrvYn) basicInfoKorean['보존여부'] = result.generalData.prsrvYn;
+          if (result.generalData.prsrvCtt) basicInfoKorean['보존내용'] = result.generalData.prsrvCtt;
+          if (result.generalData.exmnrNm) basicInfoKorean['조사관'] = result.generalData.exmnrNm;
+          if (result.generalData.exmnrTelNo) basicInfoKorean['조사관전화번호'] = result.generalData.exmnrTelNo;
 
           // 당사자 정보 (판결도달일, 확정일 포함)
-          const partiesData = result.detailData.parties || [];
+          const partiesData = result.generalData.parties || [];
 
           // 대리인 정보
-          const representativesData = result.detailData.representatives || [];
+          const representativesData = result.generalData.representatives || [];
 
           // 제출서류 추출
-          const rawDocs = result.detailData.raw?.data?.dlt_rcntSbmsnDocmtLst || [];
+          const rawDocs = result.generalData.raw?.data?.dlt_rcntSbmsnDocmtLst || [];
           const documentsData = rawDocs.map((d: { ofdocRcptYmd?: string; content1?: string; content2?: string; content3?: string }) => ({
             ofdocRcptYmd: d.ofdocRcptYmd || '',
             content: d.content2 || d.content3 || d.content1 || '',
@@ -200,15 +200,21 @@ export async function POST(request: NextRequest) {
           const progressData = result.progressData || [];
 
           // 심급 정보 추가
-          if (result.detailData.caseLevelDesc) {
-            basicInfoKorean['심급'] = result.detailData.caseLevelDesc;
+          if (result.generalData.caseLevelDesc) {
+            basicInfoKorean['심급'] = result.generalData.caseLevelDesc;
           }
 
-          // basic_info에 당사자/대리인 정보 포함
+          // basic_info에 당사자/대리인 정보 + raw API 데이터 포함
+          // raw API 데이터는 동적 렌더러에서 dma_csBasCtt, dlt_* 구조 사용
           const basicInfoWithParties = {
             ...basicInfoKorean,
             parties: partiesData,
             representatives: representativesData,
+            // 동적 렌더링용 raw API 데이터 (dma_csBasCtt, dlt_* 포함)
+            generalData: {
+              raw: result.generalData.raw,
+              caseCategory: result.generalData.caseCategory,
+            },
           };
 
           // 시스템 내 사건 연결을 위해 tenant_id 조회
@@ -222,7 +228,7 @@ export async function POST(request: NextRequest) {
           // 연관사건 정보 가공 (UI 필드명에 맞춤: caseNo, caseName, relation)
           // linkedCaseId: 시스템 내 사건이 있으면 해당 사건 ID
           const relatedCasesData = await Promise.all(
-            (result.detailData.relatedCases || []).map(async rc => {
+            (result.generalData.relatedCases || []).map(async rc => {
               let linkedCaseId = null;
               if (rc.userCsNo && tenantId) {
                 const { data: linkedCase } = await supabase
@@ -237,7 +243,7 @@ export async function POST(request: NextRequest) {
                 caseNo: rc.userCsNo,           // 사건번호
                 caseName: rc.reltCsCortNm,     // 법원명
                 relation: rc.reltCsDvsNm,      // 관계유형 (반소, 항소심, 본안사건 등)
-                encCsNo: rc.encCsNo || null,   // 암호화 사건번호 (상세조회용)
+                encCsNo: rc.encCsNo || null,   // 암호화 사건번호 (일반내용/진행내용 조회용)
                 linkedCaseId,                  // 시스템 내 사건 ID
               };
             })
@@ -246,7 +252,7 @@ export async function POST(request: NextRequest) {
           // 심급내용/원심 사건 정보 가공 (UI 필드명에 맞춤)
           // linkedCaseId: 시스템 내 사건이 있으면 해당 사건 ID
           const lowerCourtData = await Promise.all(
-            (result.detailData.lowerCourtCases || []).map(async lc => {
+            (result.generalData.lowerCourtCases || []).map(async lc => {
               let linkedCaseId = null;
               if (lc.userCsNo && tenantId) {
                 const { data: linkedCase } = await supabase
@@ -262,7 +268,7 @@ export async function POST(request: NextRequest) {
                 courtName: lc.cortNm,          // 법원명 (예: 수원가정법원 평택지원)
                 result: lc.ultmtDvsNm,         // 결과 (예: 원고패, 청구인용)
                 resultDate: lc.ultmtYmd,       // 종국일 (YYYYMMDD)
-                encCsNo: lc.encCsNo || null,   // 암호화 사건번호 (상세조회용)
+                encCsNo: lc.encCsNo || null,   // 암호화 사건번호 (일반내용/진행내용 조회용)
                 linkedCaseId,                  // 시스템 내 사건 ID
               };
             })
@@ -274,7 +280,7 @@ export async function POST(request: NextRequest) {
             .insert({
               legal_case_id: legalCaseId,
               basic_info: basicInfoWithParties,
-              hearings: result.detailData.hearings || [],
+              hearings: result.generalData.hearings || [],
               progress: progressData,  // 진행내용 (별도 API)
               documents: documentsData,  // 제출서류 원본
               lower_court: lowerCourtData,  // 심급내용 (원심 사건 정보)
@@ -285,7 +291,7 @@ export async function POST(request: NextRequest) {
 
           if (!snapshotError) {
             hasSnapshot = true;
-            console.log(`📸 스냅샷 저장 완료: 기일 ${result.detailData.hearings?.length || 0}건, 진행 ${progressData.length}건, 서류 ${documentsData.length}건, 당사자 ${partiesData.length}명, 대리인 ${representativesData.length}명`);
+            console.log(`📸 스냅샷 저장 완료: 기일 ${result.generalData.hearings?.length || 0}건, 진행 ${progressData.length}건, 서류 ${documentsData.length}건, 당사자 ${partiesData.length}명, 대리인 ${representativesData.length}명`);
 
             // ============================================================
             // 연관사건 자동 연결 로직
@@ -467,9 +473,9 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // 심급 정보 결정 (상세 데이터 우선, 없으면 입력된 caseType으로 추론)
-            const caseLevel = result.detailData?.caseLevelDesc || inferCaseLevelFromType(caseType);
-            console.log(`📋 심급 정보: ${caseLevel} (상세=${result.detailData?.caseLevelDesc}, 추론=${inferCaseLevelFromType(caseType)})`);
+            // 심급 정보 결정 (일반내용 데이터 우선, 없으면 입력된 caseType으로 추론)
+            const caseLevel = result.generalData?.caseLevelDesc || inferCaseLevelFromType(caseType);
+            console.log(`📋 심급 정보: ${caseLevel} (일반내용=${result.generalData?.caseLevelDesc}, 추론=${inferCaseLevelFromType(caseType)})`);
 
             // 공용 함수로 encCsNo 저장 (실제 법원명 사용)
             await saveEncCsNoToCase({
@@ -527,8 +533,8 @@ export async function POST(request: NextRequest) {
         },
         captchaAttempts: 1,
         hasSnapshot,
-        detailData: {
-          hearings: result.detailData.hearings?.length || 0,
+        generalData: {
+          hearings: result.generalData.hearings?.length || 0,
           progress: result.progressData?.length || 0,  // 진행내용 수
         },
         // 법원명이 수정된 경우 알림

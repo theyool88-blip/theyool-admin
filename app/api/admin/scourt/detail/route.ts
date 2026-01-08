@@ -1,9 +1,9 @@
 /**
- * 대법원 사건 상세 조회 API
+ * 대법원 사건 일반내용 조회 API
  *
  * POST /api/admin/scourt/detail
  *
- * 핵심: 저장된 encCsNo가 있으면 캡챠 없이 상세 조회 가능!
+ * 핵심: 저장된 encCsNo가 있으면 캡챠 없이 일반내용 조회 가능!
  *
  * 요청:
  * - caseNumber: 사건번호 (필수, 예: 2024드단26718)
@@ -11,7 +11,7 @@
  *
  * 응답:
  * - success: 성공 여부
- * - detail: 사건 상세 정보 (기일, 당사자 등)
+ * - general: 사건 일반내용 (기일, 당사자 등)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -90,15 +90,15 @@ export async function POST(request: NextRequest) {
 
     const courtName = caseData?.court_name || '서울가정법원';
 
-    console.log(`📍 상세 조회 시작: ${caseNumber} (캡챠 불필요)`);
+    console.log(`📍 일반내용 조회 시작: ${caseNumber} (캡챠 불필요)`);
     console.log(`  encCsNo: ${stored.encCsNo.substring(0, 20)}...`);
 
     // 동기화 상태 업데이트
     await updateSyncStatus(legalCaseId, 'syncing');
 
-    // API 클라이언트로 상세 조회 (캡챠 불필요!)
+    // API 클라이언트로 일반내용 조회 (캡챠 불필요!)
     const apiClient = getScourtApiClient();
-    const result = await apiClient.getCaseDetailWithStoredEncCsNo(
+    const result = await apiClient.getCaseGeneralWithStoredEncCsNo(
       stored.wmonid,
       stored.encCsNo,
       {
@@ -150,7 +150,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 응답 데이터 변환
-      const transformedDetail = {
+      const transformedGeneral = {
         ...result.data,
         hearings: transformHearings(hearings),
         progress: transformProgress(result.data.progress || []),
@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        detail: transformedDetail,
+        general: transformedGeneral,
         hearingSync: hearingSyncResult,
       });
     } else {
@@ -168,13 +168,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           success: false,
-          error: result.error || '상세 조회 실패',
+          error: result.error || '일반내용 조회 실패',
         },
         { status: 422 }
       );
     }
   } catch (error) {
-    console.error('상세 조회 API 에러:', error);
+    console.error('일반내용 조회 API 에러:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : '알 수 없는 에러' },
       { status: 500 }

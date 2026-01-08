@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	SSGO102F01(홈페이지 가사사건 일반내용 상세조회) 화면 XML
+-->
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:ev="http://www.w3.org/2001/xml-events" xmlns:w2="http://www.inswave.com/websquare"
+	xmlns:xf="http://www.w3.org/2002/xforms">
+	<head meta_screenName="가사사건 일반내용 상세조회">
+		<w2:type>DEFAULT</w2:type>
+		<w2:buildDate />
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <!-- 사건 기본내용 -->
+                <w2:dataMap baseNode="map" id="dma_csBasCtt">
+                    <w2:keyInfo>
+                        <w2:key id="cortCd" name="법원코드" dataType="text"></w2:key>
+                        <w2:key id="csNo" name="사건번호" dataType="text"></w2:key>
+                        <w2:key id="csNm" name="사건명" dataType="text"></w2:key>
+                        <w2:key id="rprsClmntNm" name="대표원고명" dataType="text"></w2:key>
+                        <w2:key id="clmntCnt" name="원고수" dataType="text"></w2:key>
+                        <w2:key id="rprsAcsdNm" name="대표피고명" dataType="text"></w2:key>
+                        <w2:key id="acsdCnt" name="피고수" dataType="text"></w2:key>
+                        <w2:key id="csDstrtYn" name="사건배당여부" dataType="text"></w2:key>
+                        <w2:key id="jdbnCd" name="재판부코드" dataType="text"></w2:key>
+                        <w2:key id="jdbnNm" name="재판부명" dataType="text"></w2:key>
+                        <w2:key id="ultmtJdbnNm" name="종국재판부명" dataType="text"></w2:key>
+                        <w2:key id="jdbnTelno" name="재판부전화안내내용" dataType="text"></w2:key>
+                        <w2:key id="cfupMarkNm" name="주심" dataType="text"></w2:key>
+                        <w2:key id="csRcptYmd" name="접수일자" dataType="text"></w2:key>
+                        <w2:key id="csUltmtYmd" name="종국일자" dataType="text"></w2:key>
+                        <w2:key id="csUltmtDtlCtt" name="종국구분코드" dataType="text"></w2:key>
+                        <w2:key id="csMrgTypCd" name="병합구분" dataType="text"></w2:key>
+                        <w2:key id="adjdocRchYmd" name="판결송달일" dataType="text"></w2:key>
+                        <w2:key id="aplYmd" name="상소일자" dataType="text"></w2:key>
+                        <w2:key id="aplRjctnYmd" name="상소각하일자" dataType="text"></w2:key>
+                        <w2:key id="hskpExmnrJdbnCd" name="조사관구분" dataType="text"></w2:key>
+                        <w2:key id="exmnrAcptnYn" name="조사관인수" dataType="text"></w2:key>
+                        <w2:key id="csPrsrvYn" name="보존된사건표시" dataType="text"></w2:key>
+                        <w2:key id="lwstDvsCd" name="본안소송사건접수유형코드" dataType="text"></w2:key>
+                        <w2:key id="stmpAtchAmt" name="인지금액" dataType="text"></w2:key>
+                        <w2:key id="stmpRfndAmt" name="환급금" dataType="text"></w2:key>
+                        <w2:key id="csCfmtnYmd" name="확정일자" dataType="text"></w2:key>
+                        <w2:key id="dxdyRqrdSchdTimeRlsYn" name="기일소요예정시간공개여부" dataType="text"></w2:key>
+                        <w2:key id="vdeoJdcpcProgYn" name="영상재판여부" dataType="text"></w2:key>
+                        <w2:key id="userCsNo" name="사용자식별 사건번호" dataType="text"></w2:key>
+                        <w2:key id="amtYn" name="송달료,보관금종결여부" dataType="text"></w2:key>
+                        <w2:key id="prsvCtt" name="보존,폐기여부" dataType="text"></w2:key>
+                        <w2:key id="cortNm" name="법원명" dataType="text"></w2:key>
+                        <w2:key id="ultmtDvsNm" name="종국결과명" dataType="text"></w2:key>
+                        <w2:key id="csMrgTypNm" name="병합구분 [CD069]" dataType="text"></w2:key>
+                        <w2:key id="exmnrNm" name="가사조사관명" dataType="text"></w2:key>
+                        <w2:key id="exmnrTelNo" name="가사조사관내선번호" dataType="text"></w2:key>
+                        <w2:key id="titRprsPtnr" name="당사자명레이블명" dataType="text"></w2:key>
+                        <w2:key id="titRprsRqstr" name="피당사자명레이블명" dataType="text"></w2:key>
+                        <w2:key id="isHrngProgCurst" name="심리진행상황여부" dataType="text"></w2:key>
+                        <w2:key id="encCsNo" name="암호화사건번호" dataType="text"></w2:key>
+                    </w2:keyInfo>
+                </w2:dataMap>
+            </w2:dataCollection>
+        </xf:model>
+	</head>
+	<body>
+		<!-- 기본내용 테이블 레이아웃 -->
+		<xf:group class="w2tb ct_tbl" tagname="table" style="width:100%;">
+			<xf:group tagname="colgroup">
+				<xf:group style="width:15%;" tagname="col"></xf:group>
+				<xf:group style="width:30%" tagname="col"></xf:group>
+				<xf:group style="width:15%" tagname="col"></xf:group>
+				<xf:group style="" tagname="col"></xf:group>
+			</xf:group>
+			<!-- 사건번호 / 사건명 -->
+			<xf:group tagname="tr">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="사건번호"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span ref="data:dma_csBasCtt.userCsNo"></w2:span>
+					<w2:span id="txt_isVdeo" label="[영상]" class="fc_red"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="사건명"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span id="txt_isElctn" label="[전자]" class="fc_green"></w2:span>
+					<w2:span ref="data:dma_csBasCtt.csNm"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 원고 / 피고 -->
+			<xf:group tagname="tr">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span ref="data:dma_csBasCtt.titRprsPtnr" label="원고"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span id="txt_rprsClmntNm"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span ref="data:dma_csBasCtt.titRprsRqstr" label="피고"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span id="txt_rprsAcsdNm"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 재판부 / 가사조사관 (조사관 있을 때) -->
+			<xf:group tagname="tr" id="tr_jdbnUp">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="재판부"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span id="txt_jdbnNm1"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="가사조사관"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span ref="data:dma_csBasCtt.exmnrNm"></w2:span>
+					<w2:span ref="data:dma_csBasCtt.exmnrTelNo"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 재판부 (조사관 없을 때 - colspan 3) -->
+			<xf:group tagname="tr" id="tr_jdbnDw">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="재판부"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td" colspan="3">
+					<w2:span id="txt_jdbnNm2"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 접수일 / 종국결과 -->
+			<xf:group tagname="tr">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="접수일"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span ref="data:dma_csBasCtt.csRcptYmd" displayFormat="####.##.##"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="종국결과"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span id="txt_csUltmtDvsNm"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 병합구분 -->
+			<xf:group tagname="tr">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="병합구분"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td" colspan="3">
+					<w2:span ref="data:dma_csBasCtt.csMrgTypNm"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 상소일 / 상소각하일 -->
+			<xf:group tagname="tr">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="상소일"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span ref="data:dma_csBasCtt.aplYmd" displayFormat="####.##.##"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="상소각하일"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span ref="data:dma_csBasCtt.aplRjctnYmd" displayFormat="####.##.##"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 보존여부 -->
+			<xf:group tagname="tr" id="tr_prsvCtt">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span id="txt_titPrsvCtt" label="보존여부"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td" colspan="3">
+					<w2:span id="txt_prsvCtt"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 인지액 -->
+			<xf:group tagname="tr" id="tr_stmpAmt">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="인지액"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td" colspan="3">
+					<w2:span ref="data:dma_csBasCtt.stmpAtchAmt" displayFormat="#,###" dataType="number"></w2:span>
+					<w2:span label="원"></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 송달료,보관금,종결에 따른 잔액조회 -->
+			<xf:group tagname="tr">
+				<xf:group class="w2tb_th" tagname="th" colspan="2">
+					<w2:span label="송달료,보관금,종결에 따른 잔액조회"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td" colspan="2">
+					<xf:trigger id="btn_chkDlvrBlnc" type="button">
+						<xf:label>잔액조회</xf:label>
+					</xf:trigger>
+					<w2:span id="txt_dlvrBlnc" label="사건이 종결되고 송달료 종결 혹은 보관금계좌가 종결된 경우에만 조회 가능합니다."></w2:span>
+				</xf:group>
+			</xf:group>
+			<!-- 판결도달일 / 확정일 -->
+			<xf:group tagname="tr">
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="판결도달일"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span ref="data:dma_csBasCtt.adjdocRchYmd" displayFormat="####.##.##"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_th" tagname="th">
+					<w2:span label="확정일"></w2:span>
+				</xf:group>
+				<xf:group class="w2tb_td" tagname="td">
+					<w2:span ref="data:dma_csBasCtt.csCfmtnYmd" displayFormat="####.##.##"></w2:span>
+				</xf:group>
+			</xf:group>
+		</xf:group>
+
+		<!-- 하위 컴포넌트들 -->
+		<w2:wframe id="wfInscrtDtsLst" src="SSGO003F10.xml"></w2:wframe>
+		<w2:wframe id="wfRcntDxdyLst" src="SSGO003F32.xml"></w2:wframe>
+		<w2:wframe id="wfRcntSbmsnDocmtLst" src="SSGO003F40.xml"></w2:wframe>
+		<w2:wframe id="wfReltCsLst" src="SSGO003F50.xml"></w2:wframe>
+		<w2:wframe id="wfBtprtCttLst" src="SSGO003F61.xml"></w2:wframe>
+		<w2:wframe id="wfAgntCttLst" src="SSGO003F70.xml"></w2:wframe>
+		<w2:wframe id="wfGurdnCttLst" src="SSGO003F90.xml"></w2:wframe>
+	</body>
+</html>

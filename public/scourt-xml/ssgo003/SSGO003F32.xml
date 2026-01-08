@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003F32(최근기일내용 목록) 화면 XML
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="최근기일내용 목록">
+        <xf:model>
+            <w2:dataCollection baseNode="map">
+                <!-- 최근기일내용 -->
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_rcntDxdyLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="dxdyYmd" name="기일" dataType="text"></w2:column>
+                        <w2:column id="dxdyHm" name="기일시간" dataType="text"></w2:column>
+                        <w2:column id="dxdyKndCd" name="기일종류코드" dataType="text"></w2:column>
+                        <w2:column id="dxdyKndNm" name="기일종류코드명" dataType="text"></w2:column>
+                        <w2:column id="dxdyPlcNm" name="기일장소" dataType="text"></w2:column>
+                        <w2:column id="dxdyRsltCd" name="기일결과코드" dataType="text"></w2:column>
+                        <w2:column id="dxdyRsltNm" name="기일결과코드명" dataType="text"></w2:column>
+                        <w2:column id="dxdyRqrdExptHm" name="기일소요예상시분" dataType="text"></w2:column>
+                        <w2:column id="dxdyUltmtCtt" name="종국내용" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+        </xf:model>
+    </head>
+   <body>
+   	<w2:span class="con_stit ic pt10" label="최근기일내용"></w2:span>
+   	<xf:trigger id="btn_csDxsyProgList" type="button" title="기일내용 상세보기 이동">
+   		<xf:label>상세보기</xf:label>
+   	</xf:trigger>
+   	<w2:gridView captionTitle="최근기일내용 그리드" dataList="data:dlt_rcntDxdyLst" id="grd_rcntDxdyLst"
+   		readOnly="true" style="height:110px;" visibleRowNum="all"
+   		noResultMessage="지정된 기일내용이 없습니다.">
+   		<w2:header>
+   			<w2:row>
+   				<w2:column value="일자" width="25"></w2:column>
+   				<w2:column value="시각" width="15"></w2:column>
+   				<w2:column value="기일구분" width="24"></w2:column>
+   				<w2:column value="기일장소" width="24"></w2:column>
+   				<w2:column value="결과" width="24"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody>
+   			<w2:row>
+   				<w2:column id="dxdyYmd" displayFormat="####.##.##" textAlign="center"></w2:column>
+   				<w2:column id="dxdyHm" displayFormat="##:##"></w2:column>
+   				<w2:column id="dxdyKndNm"></w2:column>
+   				<w2:column id="dxdyPlcNm" textAlign="left"></w2:column>
+   				<w2:column id="dxdyRsltNm"></w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+   	<w2:textbox escape="false" label="&lt;p&gt;※ 최근 기일 순으로 일부만 보입니다. 반드시 상세보기로 확인하시기 바랍니다.&lt;/p&gt;"></w2:textbox>
+   </body>
+</html>

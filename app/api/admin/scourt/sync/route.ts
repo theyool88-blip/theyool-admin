@@ -2,7 +2,7 @@
  * 대법원 사건 동기화 API
  *
  * POST /api/admin/scourt/sync
- * - 캡챠 인증 후 상세 조회 + 진행내용 조회 → 스냅샷 저장
+ * - 캡챠 인증 후 일반내용 조회 + 진행내용 조회 → 스냅샷 저장
  * - REST API 기반 (Puppeteer 불필요)
  *
  * 진행내용(getCaseProgress)은 캡챠 인증된 세션이 필요하므로
@@ -16,6 +16,9 @@ import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync';
 import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync';
 import { getCourtCodeByName } from '@/lib/scourt/court-codes';
 import { getCaseCategory } from '@/lib/scourt/party-labels';
+import { ensureXmlCacheForCase } from '@/lib/scourt/xml-fetcher';
+import { detectCaseTypeFromCaseNumber } from '@/lib/scourt/xml-mapping';
+import { parseCaseNumber } from '@/lib/scourt/case-number-utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -61,22 +64,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. 사건번호 파싱
-    const caseNumberPattern = /(\d{4})([가-힣]+)(\d+)/;
-    const match = caseNumber.match(caseNumberPattern);
-    if (!match) {
+    // 3. 사건번호 정규화 및 파싱 (공통 유틸리티 사용)
+    const parsed = parseCaseNumber(caseNumber);
+    if (!parsed.valid) {
       return NextResponse.json(
-        { error: '사건번호 형식이 올바르지 않습니다' },
+        { error: `사건번호 형식이 올바르지 않습니다: ${caseNumber}` },
         { status: 400 }
       );
     }
-    const [, csYear, csDvsNm, csSerial] = match;
+    const { year: csYear, caseType: csDvsNm, serial: csSerial } = parsed;
 
-    // 5. searchAndRegisterCase로 캡챠 인증 + 상세/진행내용 조회
-    // (진행내용 API는 캡챠 인증된 세션 필요)
+    // 5. SCOURT API 조회
     const apiClient = getScourtApiClient();
-
-    console.log(`🔄 동기화 시작: ${caseNumber} (캡챠 인증 포함)`);
 
     // 법원코드 변환 (한글 → 숫자)
     const effectiveCourtName = courtName || legalCase.court_name || '';
@@ -85,48 +84,179 @@ export async function POST(request: NextRequest) {
     // 첫 연동 여부 확인 (enc_cs_no 없으면 첫 연동)
     const isFirstLink = !legalCase.enc_cs_no;
 
-    // 첫 연동 시 당사자명 필수
-    if (isFirstLink && !partyName) {
-      return NextResponse.json(
-        { error: '첫 연동 시 당사자명이 필요합니다' },
-        { status: 400 }
-      );
+    let generalData: any = null;
+    let progressData: any[] = [];
+    let newEncCsNo: string | undefined;
+    let newWmonid: string | undefined;
+
+    if (isFirstLink) {
+      // === 첫 연동: 캡챠 인증 필요 ===
+      console.log(`🔄 첫 연동 시작: ${caseNumber} (캡챠 인증 필요)`);
+
+      // 첫 연동 시 당사자명 필수
+      if (!partyName) {
+        return NextResponse.json(
+          { error: '첫 연동 시 당사자명이 필요합니다' },
+          { status: 400 }
+        );
+      }
+
+      // searchAndRegisterCase: 캡챠 인증 → 검색 → 일반내용 조회 → 진행내용 조회
+      const searchResult = await apiClient.searchAndRegisterCase({
+        cortCd: cortCdNum,
+        csYr: csYear,
+        csDvsCd: csDvsNm,
+        csSerial,
+        btprNm: partyName,
+      });
+
+      if (!searchResult.success) {
+        return NextResponse.json(
+          { error: searchResult.error || '일반내용 조회 실패' },
+          { status: 500 }
+        );
+      }
+
+      generalData = searchResult.generalData;
+      progressData = searchResult.progressData || [];
+      newEncCsNo = searchResult.encCsNo;
+      newWmonid = searchResult.wmonid;
+
+      // encCsNo/WMONID 저장 (이후 갱신에서 재사용)
+      if (newEncCsNo && newWmonid) {
+        await supabase
+          .from('legal_cases')
+          .update({
+            enc_cs_no: newEncCsNo,
+            scourt_wmonid: newWmonid,
+          })
+          .eq('id', legalCaseId);
+      }
+    } else {
+      // === 갱신: 저장된 encCsNo로 직접 조회 (캡챠 불필요) ===
+      console.log(`🔄 갱신 시작: ${caseNumber} (저장된 encCsNo 사용)`);
+
+      const storedEncCsNo = legalCase.enc_cs_no;
+      const storedWmonid = legalCase.scourt_wmonid;
+
+      if (!storedWmonid) {
+        // WMONID 없으면 새로 검색 (이전 버전 데이터 호환)
+        console.log(`⚠️ WMONID 없음, 새로 검색합니다`);
+        const searchResult = await apiClient.searchAndRegisterCase({
+          cortCd: cortCdNum,
+          csYr: csYear,
+          csDvsCd: csDvsNm,
+          csSerial,
+          btprNm: partyName || '',
+        });
+
+        if (!searchResult.success) {
+          return NextResponse.json(
+            { error: searchResult.error || '일반내용 조회 실패' },
+            { status: 500 }
+          );
+        }
+
+        generalData = searchResult.generalData;
+        progressData = searchResult.progressData || [];
+
+        // 새 encCsNo/WMONID 저장
+        if (searchResult.encCsNo && searchResult.wmonid) {
+          await supabase
+            .from('legal_cases')
+            .update({
+              enc_cs_no: searchResult.encCsNo,
+              scourt_wmonid: searchResult.wmonid,
+            })
+            .eq('id', legalCaseId);
+        }
+      } else {
+        // 저장된 encCsNo+WMONID로 직접 일반내용 조회 (캡챠 불필요!)
+        const generalResult = await apiClient.getCaseGeneralWithStoredEncCsNo(
+          storedWmonid,
+          storedEncCsNo,
+          {
+            cortCd: cortCdNum,
+            csYear: csYear,
+            csDvsCd: csDvsNm,
+            csSerial: csSerial,
+          }
+        );
+
+        if (generalResult.success && generalResult.data) {
+          // CaseGeneralResult.data를 generalData로 사용
+          generalData = generalResult.data;
+          // 진행내용은 별도 조회 필요 - getCaseProgress 호출
+          try {
+            const progressResult = await apiClient.getCaseProgress({
+              cortCd: cortCdNum,
+              csYear,
+              csDvsCd: csDvsNm,  // 한글 사건유형 전달 (내부에서 코드로 변환)
+              csSerial,
+              encCsNo: storedEncCsNo,
+            });
+            if (progressResult.success && progressResult.progress) {
+              progressData = progressResult.progress;
+            }
+          } catch (progressError) {
+            console.warn('⚠️ 진행내용 조회 실패:', progressError);
+            progressData = [];
+          }
+        } else {
+          // 실패 시 새로 검색
+          console.log(`⚠️ 저장된 encCsNo 만료, 새로 검색합니다`);
+          const searchResult = await apiClient.searchAndRegisterCase({
+            cortCd: cortCdNum,
+            csYr: csYear,
+            csDvsCd: csDvsNm,
+            csSerial,
+            btprNm: partyName || '',
+          });
+
+          if (!searchResult.success) {
+            return NextResponse.json(
+              { error: searchResult.error || '일반내용 조회 실패' },
+              { status: 500 }
+            );
+          }
+
+          generalData = searchResult.generalData;
+          progressData = searchResult.progressData || [];
+
+          // 새 encCsNo/WMONID 저장
+          if (searchResult.encCsNo && searchResult.wmonid) {
+            await supabase
+              .from('legal_cases')
+              .update({
+                enc_cs_no: searchResult.encCsNo,
+                scourt_wmonid: searchResult.wmonid,
+              })
+              .eq('id', legalCaseId);
+          }
+        }
+      }
     }
 
-    // searchAndRegisterCase: 캡챠 인증 → 검색 → 상세조회 → 진행내용 조회 (전체 플로우)
-    const searchResult = await apiClient.searchAndRegisterCase({
-      cortCd: cortCdNum,
-      csYr: csYear,
-      csDvsCd: csDvsNm,
-      csSerial,
-      btprNm: partyName || '',  // 첫 연동 시 당사자명 사용
-    });
+    console.log(`✅ 동기화 조회 완료: 일반내용=${generalData ? 'OK' : 'FAIL'}, 진행=${progressData.length}건`);
 
-    if (!searchResult.success) {
-      return NextResponse.json(
-        { error: searchResult.error || '상세 조회 실패' },
-        { status: 500 }
-      );
+    // XML 캐시 확보
+    // - 첫 연동: 모든 동적 추출 경로 캐시 (데이터 유무 무관)
+    // - 갱신: 데이터가 있는 항목 중 미캐시된 것만 다운로드 (이전 버전 호환)
+    try {
+      const caseType = detectCaseTypeFromCaseNumber(caseNumber);
+      console.log(`📄 XML 캐시 확인 중 (사건유형: ${caseType}, 첫연동: ${isFirstLink})...`);
+      const apiResponseForXml = generalData?.raw?.data || {};
+      // 첫 연동: cacheAllOnFirstLink=true (모든 경로 캐시)
+      // 갱신: cacheAllOnFirstLink=false (데이터 있는 것만 캐시)
+      await ensureXmlCacheForCase(caseType, apiResponseForXml, isFirstLink);
+      console.log(`✅ XML 캐시 확보 완료`);
+    } catch (xmlError) {
+      // XML 캐시 실패해도 동기화는 계속 진행
+      console.warn(`⚠️ XML 캐시 실패 (동기화는 계속):`, xmlError);
     }
-
-    const detailData = searchResult.detailData;
-    const progressData = searchResult.progressData || [];
-
-    // encCsNo/WMONID 업데이트 (새로 발급받은 것으로 갱신)
-    if (searchResult.encCsNo && searchResult.wmonid) {
-      await supabase
-        .from('legal_cases')
-        .update({
-          enc_cs_no: searchResult.encCsNo,
-          scourt_wmonid: searchResult.wmonid,
-        })
-        .eq('id', legalCaseId);
-    }
-
-    console.log(`✅ 동기화 조회 완료: 상세=${detailData ? 'OK' : 'FAIL'}, 진행=${progressData.length}건`);
 
     // 제출서류 (원본 응답에서 추출)
-    const rawDocs = detailData?.raw?.data?.dlt_rcntSbmsnDocmtLst || [];
+    const rawDocs = generalData?.raw?.data?.dlt_rcntSbmsnDocmtLst || [];
     const documentsData = rawDocs.map((d: { ofdocRcptYmd?: string; content1?: string; content2?: string; content3?: string }) => ({
       ofdocRcptYmd: d.ofdocRcptYmd || '',
       content: d.content2 || d.content3 || d.content1 || '',
@@ -134,8 +264,8 @@ export async function POST(request: NextRequest) {
     console.log(`📄 제출서류 ${documentsData.length}건 추출`)
 
     // 5-1. 종국결과 추출 (API 응답 또는 진행내용에서)
-    let extractedEndRslt = detailData?.endRslt || null;
-    let extractedEndDt = detailData?.endDt || null;
+    let extractedEndRslt = generalData?.endRslt || null;
+    let extractedEndDt = generalData?.endDt || null;
 
     // API 응답에 종국결과가 없으면 진행내용에서 "종국 : " 항목 찾기
     if (!extractedEndRslt && progressData.length > 0) {
@@ -159,44 +289,58 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single();
 
+    // 사건 카테고리 결정 (당사자 라벨용)
+    const caseCategoryForLabel = getCaseCategory(caseNumber);
+    const isProtectionCase = ['가정보호', '소년보호'].includes(caseCategoryForLabel);
+
     // 스냅샷 데이터 (한글 라벨로 저장)
+    // 보호사건은 "행위자" 라벨 사용, 일반사건은 "원고/피고"
     const basicInfoKorean: Record<string, string> = {
-      '사건번호': detailData?.csNo || caseNumber,
-      '사건명': detailData?.csNm || '',
-      '법원': detailData?.cortNm || legalCase.court_name,
-      '원고': detailData?.aplNm || '',
-      '피고': detailData?.rspNm || '',
+      '사건번호': generalData?.csNo || caseNumber,
+      '사건명': generalData?.csNm || '',
+      '법원': generalData?.cortNm || legalCase.court_name,
+      [isProtectionCase ? '행위자' : '원고']: generalData?.aplNm || '',
+      [isProtectionCase ? '' : '피고']: generalData?.rspNm || '',
     };
+    // 빈 키 제거 (보호사건의 피고 라벨)
+    if (basicInfoKorean[''] !== undefined) delete basicInfoKorean[''];
 
     // 추가 필드가 있으면 포함 (DB에 저장, UI에서 일부 필터링)
-    if (detailData?.jdgNm) basicInfoKorean['재판부'] = detailData.jdgNm;
-    if (detailData?.rcptDt) basicInfoKorean['접수일'] = detailData.rcptDt;
+    if (generalData?.jdgNm) basicInfoKorean['재판부'] = generalData.jdgNm;
+    if (generalData?.rcptDt) basicInfoKorean['접수일'] = generalData.rcptDt;
     if (extractedEndDt) basicInfoKorean['종국일'] = extractedEndDt;
-    if (extractedEndRslt) basicInfoKorean['종국결과'] = extractedEndRslt;
-    if (detailData?.cfrmDt) basicInfoKorean['확정일'] = detailData.cfrmDt;
-    if (detailData?.stmpAmnt) basicInfoKorean['인지액'] = detailData.stmpAmnt;
-    if (detailData?.mrgrDvs) basicInfoKorean['병합구분'] = detailData.mrgrDvs;
-    if (detailData?.aplDt) basicInfoKorean['상소일'] = detailData.aplDt;
-    if (detailData?.aplDsmsDt) basicInfoKorean['상소각하일'] = detailData.aplDsmsDt;
-    if (detailData?.jdgArvDt) basicInfoKorean['판결도달일'] = detailData.jdgArvDt;
-    if (detailData?.prcdStsNm) basicInfoKorean['진행상태'] = detailData.prcdStsNm;
-    if (detailData?.caseLevelDesc) basicInfoKorean['심급'] = detailData.caseLevelDesc;
+    // 종국결과: 항상 표시 (값이 없어도 빈 문자열로)
+    basicInfoKorean['종국결과'] = extractedEndRslt || '';
+    if (generalData?.cfrmDt) basicInfoKorean['확정일'] = generalData.cfrmDt;
+    if (generalData?.stmpAmnt) basicInfoKorean['인지액'] = generalData.stmpAmnt;
+    if (generalData?.mrgrDvs) basicInfoKorean['병합구분'] = generalData.mrgrDvs;
+    if (generalData?.aplDt) basicInfoKorean['상소일'] = generalData.aplDt;
+    if (generalData?.aplDsmsDt) basicInfoKorean['상소각하일'] = generalData.aplDsmsDt;
+    if (generalData?.jdgArvDt) basicInfoKorean['판결도달일'] = generalData.jdgArvDt;
+    if (generalData?.prcdStsNm) basicInfoKorean['진행상태'] = generalData.prcdStsNm;
+    // 심급: 보호사건은 심급 표시 안함
+    if (!isProtectionCase && generalData?.caseLevelDesc) basicInfoKorean['심급'] = generalData.caseLevelDesc;
 
     // 추가 필드: 소가, 수리구분, 보존여부
-    if (detailData?.aplSovAmt) basicInfoKorean['원고소가'] = detailData.aplSovAmt;
-    if (detailData?.rspSovAmt) basicInfoKorean['피고소가'] = detailData.rspSovAmt;
-    if (detailData?.rcptDvsNm) basicInfoKorean['수리구분'] = detailData.rcptDvsNm;
-    if (detailData?.prsrvYn || detailData?.prsrvCtt) {
+    if (generalData?.aplSovAmt) basicInfoKorean['원고소가'] = generalData.aplSovAmt;
+    if (generalData?.rspSovAmt) basicInfoKorean['피고소가'] = generalData.rspSovAmt;
+    if (generalData?.rcptDvsNm) basicInfoKorean['수리구분'] = generalData.rcptDvsNm;
+    if (generalData?.prsrvYn || generalData?.prsrvCtt) {
       // 보존여부는 Y/N 또는 내용으로 표시
-      basicInfoKorean['보존여부'] = detailData.prsrvCtt || (detailData.prsrvYn === 'Y' ? '기록보존됨' : '');
+      basicInfoKorean['보존여부'] = generalData.prsrvCtt || (generalData.prsrvYn === 'Y' ? '기록보존됨' : '');
     }
-    if (detailData?.jdgTelno) basicInfoKorean['재판부전화'] = detailData.jdgTelno;
+    if (generalData?.jdgTelno) basicInfoKorean['재판부전화'] = generalData.jdgTelno;
+
+    // 형사/보호 사건 전용: 형제번호 (검찰사건번호)
+    if (generalData?.siblingCsNo || generalData?.crmcsNo) {
+      basicInfoKorean['형제사건번호'] = generalData.siblingCsNo || generalData.crmcsNo || '';
+    }
 
     // 당사자 정보 (판결도달일, 확정일 포함)
-    const partiesData = detailData?.parties || [];
+    const partiesData = generalData?.parties || [];
 
     // 대리인 정보
-    const representativesData = detailData?.representatives || [];
+    const representativesData = generalData?.representatives || [];
 
     // basic_info에 당사자/대리인 정보 포함 (search API와 동일하게)
     const basicInfoWithParties = {
@@ -213,7 +357,7 @@ export async function POST(request: NextRequest) {
     // 연관사건 정보 가공 (UI 필드명에 맞춤: caseNo, caseName, relation)
     // linkedCaseId: 시스템 내 사건이 있으면 해당 사건 ID
     const relatedCasesData = await Promise.all(
-      (detailData?.relatedCases || []).map(async rc => {
+      (generalData?.relatedCases || []).map(async (rc: { userCsNo?: string; reltCsCortNm?: string; reltCsDvsNm?: string; encCsNo?: string }) => {
         let linkedCaseId = null;
         if (rc.userCsNo && tenantId) {
           const { data: linkedCase } = await supabase
@@ -236,7 +380,7 @@ export async function POST(request: NextRequest) {
 
     // 심급내용/원심 사건 정보 가공 (UI 필드명에 맞춤)
     const lowerCourtData = await Promise.all(
-      (detailData?.lowerCourtCases || []).map(async lc => {
+      (generalData?.lowerCourtCases || []).map(async (lc: { userCsNo?: string; cortNm?: string; ultmtDvsNm?: string; ultmtYmd?: string; encCsNo?: string }) => {
         let linkedCaseId = null;
         if (lc.userCsNo && tenantId) {
           const { data: linkedCase } = await supabase
@@ -262,11 +406,12 @@ export async function POST(request: NextRequest) {
     const snapshotData = {
       legal_case_id: legalCaseId,
       basic_info: basicInfoWithParties,
-      hearings: detailData?.hearings || [],
+      hearings: generalData?.hearings || [],
       progress: progressData,  // 기일 + 제출서류 합성
       documents: documentsData,  // 제출서류 원본
       lower_court: lowerCourtData,  // 심급내용 (원심 사건 정보)
       related_cases: relatedCasesData,  // 연관사건 (반소, 항소심, 본안 등)
+      raw_data: generalData?.raw?.data || null,  // XML 렌더링용 원본 API 데이터
       case_number: caseNumber,
       court_code: legalCase.court_name,
       scraped_at: new Date().toISOString(),
@@ -304,8 +449,8 @@ export async function POST(request: NextRequest) {
 
     // 7. 기일 동기화 (court_hearings 테이블)
     let hearingSyncResult = null;
-    if (detailData?.hearings && detailData.hearings.length > 0) {
-      const hearingsForSync = detailData.hearings.map((h: {
+    if (generalData?.hearings && generalData.hearings.length > 0) {
+      const hearingsForSync = generalData.hearings.map((h: {
         trmDt?: string;
         trmHm?: string;
         trmNm?: string;
@@ -480,9 +625,8 @@ export async function POST(request: NextRequest) {
     }
 
     // 10. legal_cases 업데이트 (종국결과, 심급 포함)
-    // 신청/집행/가사신청 사건은 심급 표시 안함
-    const caseCategory = getCaseCategory(caseNumber);
-    const shouldSetCaseLevel = !['신청', '집행', '가사신청'].includes(caseCategory);
+    // 신청/집행/가사신청/보호 사건은 심급 표시 안함
+    const shouldSetCaseLevel = !['신청', '집행', '가사신청', '가정보호', '소년보호'].includes(caseCategoryForLabel);
 
     // extractedEndRslt, extractedEndDt는 위에서 이미 추출됨 (API 또는 진행내용에서)
 
@@ -491,11 +635,11 @@ export async function POST(request: NextRequest) {
       .update({
         scourt_last_sync: new Date().toISOString(),
         scourt_sync_status: 'synced',
-        scourt_case_name: detailData?.csNm,
-        court_name: detailData?.cortNm || null,  // 법원명 (SCOURT에서 가져온 값으로 업데이트)
+        scourt_case_name: generalData?.csNm,
+        court_name: generalData?.cortNm || null,  // 법원명 (SCOURT에서 가져온 값으로 업데이트)
         case_result: extractedEndRslt,  // 종국결과 (원고일부승, 원고패, 청구인용 등) - API 또는 진행내용에서 추출
         case_result_date: extractedEndDt,  // 종국일
-        case_level: shouldSetCaseLevel ? (detailData?.caseLevelDesc || null) : null,  // 심급 (1심, 항소심 등) - 신청/집행 사건은 제외
+        case_level: shouldSetCaseLevel ? (generalData?.caseLevelDesc || null) : null,  // 심급 (1심, 항소심 등) - 신청/집행 사건은 제외
       })
       .eq('id', legalCaseId);
 
@@ -503,9 +647,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       caseNumber,
-      caseName: detailData?.csNm,
+      caseName: generalData?.csNm,
       snapshotId,
-      hearingsCount: detailData?.hearings?.length || 0,
+      hearingsCount: generalData?.hearings?.length || 0,
       progressCount: progressData.length,
       documentsCount: documentsData.length,
       partiesCount: partiesData.length,

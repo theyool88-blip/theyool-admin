@@ -41,17 +41,17 @@ export interface CaseSearchResult {
   data?: any;
   error?: string;
   captchaAttempts?: number;
-  encCsNo?: string; // 암호화된 사건번호 (상세 조회용)
+  encCsNo?: string; // 암호화된 사건번호 (일반내용/진행내용 조회용)
   captchaAnswer?: string; // 민사사건용 captchaAnswer (답변 + 토큰)
 }
 
-export interface CaseDetailResult {
+export interface CaseGeneralResult {
   success: boolean;
-  data?: CaseDetailData;
+  data?: CaseGeneralData;
   error?: string;
 }
 
-export interface CaseDetailData {
+export interface CaseGeneralData {
   // 기본 정보
   csNo?: string;           // 사건번호
   csDvsNm?: string;        // 사건유형명
@@ -153,7 +153,7 @@ export interface CaseDetailData {
     reltCsDvsCd: string;     // 관계유형 코드
     reltCsCortNm: string;    // 법원명
     reltCsCortCd: string;    // 법원코드
-    encCsNo?: string;        // 암호화된 사건번호 (상세조회용)
+    encCsNo?: string;        // 암호화된 사건번호 (일반내용/진행내용 조회용)
     comTaskTypCd?: string;   // 업무유형코드
   }>;
 
@@ -163,7 +163,7 @@ export interface CaseDetailData {
     userCsNo: string;        // 사건번호 (예: "2024드단23848")
     ultmtDvsNm: string;      // 결과 (예: "원고패", "청구인용")
     ultmtYmd: string;        // 종국일 (YYYYMMDD, 예: "20250820")
-    encCsNo?: string;        // 암호화된 사건번호 (상세조회용)
+    encCsNo?: string;        // 암호화된 사건번호 (일반내용/진행내용 조회용)
   }>;
 
   // 추가 LIST 타입 (제공필드.csv 기반)
@@ -212,6 +212,8 @@ export interface CaseDetailData {
   // 원본 응답
   raw?: any;
 }
+
+// Type aliases removed - use CaseGeneralResult and CaseGeneralData directly
 
 interface SessionInfo {
   jsessionId: string;
@@ -515,10 +517,10 @@ export class ScourtApiClient {
   }
 
   /**
-   * 사건 상세 정보 조회 (모든 사건 유형 지원)
+   * 사건 일반내용 조회 (모든 사건 유형 지원)
    * 실패 시 대체 엔드포인트 자동 시도
    */
-  async getCaseDetail(params: {
+  async getCaseGeneral(params: {
     cortCd: string;       // 법원코드 (숫자 또는 한글)
     csYear: string;       // 연도
     csDvsCd: string;      // 사건유형코드 (숫자 또는 한글)
@@ -528,16 +530,16 @@ export class ScourtApiClient {
     captchaAnswer: string; // 캡챠 답
     csNo?: string;        // 14자리 사건번호 (검색 결과에서)
     caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other';  // 사건 카테고리
-  }): Promise<CaseDetailResult> {
+  }): Promise<CaseGeneralResult> {
     if (!this.session) {
       return { success: false, error: '세션이 초기화되지 않았습니다.' };
     }
 
     // 사건 카테고리 결정 (전달되지 않은 경우 자동 감지)
     const caseCategory = params.caseCategory || this.getCaseCategory(params.csDvsCd);
-    const apiEndpoints = this.getDetailApiEndpoints(caseCategory);
+    const apiEndpoints = this.getGeneralApiEndpoints(caseCategory);
 
-    console.log(`📋 사건 상세 정보 조회 중... (카테고리: ${caseCategory})`);
+    console.log(`📋 사건 일반내용 조회 중... (카테고리: ${caseCategory})`);
     console.log(`  API 엔드포인트: ${apiEndpoints[0]} (대체: ${apiEndpoints.length - 1}개)`);
 
     // 브라우저 분석 결과 기반 파라미터 변환
@@ -588,7 +590,7 @@ export class ScourtApiClient {
       },
     };
 
-    console.log('상세 조회 요청:', JSON.stringify(requestBody, null, 2));
+    console.log('일반내용 조회 요청:', JSON.stringify(requestBody, null, 2));
 
     // 여러 엔드포인트 시도
     let lastError = '';
@@ -612,7 +614,7 @@ export class ScourtApiClient {
         });
 
         const data = await response.json();
-        console.log('상세 API 응답:', JSON.stringify(data).substring(0, 1000));
+        console.log('일반내용 API 응답:', JSON.stringify(data).substring(0, 1000));
 
         // 오류 체크
         if (data.error || data.errMsg || data.errors?.errorMessage) {
@@ -636,7 +638,7 @@ export class ScourtApiClient {
         }
 
         // 응답 데이터 파싱 (사건 카테고리 전달)
-        const detailData = this.parseDetailResponse(data, caseCategory);
+        const generalData = this.parseGeneralResponse(data, caseCategory);
 
         if (isFallback) {
           console.log(`  ✅ 대체 엔드포인트 ${apiEndpoint} 성공!`);
@@ -644,10 +646,10 @@ export class ScourtApiClient {
 
         return {
           success: true,
-          data: detailData,
+          data: generalData,
         };
       } catch (error) {
-        console.error(`❌ 상세 API 호출 실패 (${apiEndpoint}):`, error);
+        console.error(`❌ 일반내용 API 호출 실패 (${apiEndpoint}):`, error);
         lastError = String(error);
 
         // JSON 파싱 에러가 아니면 다음 엔드포인트 시도
@@ -797,7 +799,7 @@ export class ScourtApiClient {
   }
 
   /**
-   * 상세 응답 파싱
+   * 일반내용 응답 파싱
    *
    * API 응답 구조 (사건 유형별):
    *
@@ -812,11 +814,11 @@ export class ScourtApiClient {
    * - dma_csBasCtt: 기본 정보 (dfndtNm 피고인명, crmcsNo 형제번호 등)
    * - 원고/피고 대신 피고인 사용
    */
-  private parseDetailResponse(
+  private parseGeneralResponse(
     response: any,
     caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'
-  ): CaseDetailData {
-    const result: CaseDetailData = {
+  ): CaseGeneralData {
+    const result: CaseGeneralData = {
       raw: response,
       caseCategory: caseCategory,
     };
@@ -945,15 +947,22 @@ export class ScourtApiClient {
 
         // 보호 사건 전용 필드 추출 (ssgo10i - 동버, 푸 등) - 2026.01.07 추가
         if (caseCategory === 'protection') {
-          // 보호 사건 특수 당사자명 (행위자/피해아동)
-          result.aplNm = caseInfo.actorNm || caseInfo.hngwzNm || result.aplNm;                            // 행위자명
-          result.rspNm = caseInfo.victimNm || caseInfo.phaDongNm || result.rspNm;                         // 피해아동명
+          // 디버그: 보호사건 API 응답 필드 로깅
+          console.log(`📋 보호사건 API 응답 필드:`, Object.keys(caseInfo).filter(k => caseInfo[k]).join(', '));
+
+          // 보호 사건 특수 당사자명 (행위자)
+          // API 응답: btprtNm에 행위자명이 있음 (예: "심OO")
+          result.aplNm = caseInfo.btprtNm || caseInfo.hngwzNm || caseInfo.actorNm ||
+                         caseInfo.offenderNm || caseInfo.pnshObjNm || result.aplNm;  // 행위자명
+
           // 보호 사건 특수 필드
-          result.exmnrNm = caseInfo.invstgtrNm || caseInfo.jsgrNm || result.exmnrNm;                      // 조사관명
-          result.siblingCsNo = caseInfo.siblingCsNo || caseInfo.hyjeNo || caseInfo.crmcsNo;               // 형제번호
+          result.exmnrNm = caseInfo.invstgtrNm || caseInfo.jsgrNm || caseInfo.exmnrNm || result.exmnrNm;  // 조사관명
+          result.siblingCsNo = caseInfo.prsctrCsNo || caseInfo.siblingCsNo || caseInfo.hyjeNo || caseInfo.crmcsNo;  // 형제번호 (검찰사건번호)
           result.trnsfDt = caseInfo.hndvrYmd || caseInfo.ingyeIl || result.trnsfDt;                       // 인계일
-          // 종국결과 (날짜+결과 포맷: "2023.07.17 불처분결정")
-          result.endRslt = caseInfo.csUltmtDtlCtt || caseInfo.jgRsltCtt || result.endRslt;
+          // 종국결과 (API: crmcsUltmtDvsNm, 예: "불처분결정")
+          result.endRslt = caseInfo.crmcsUltmtDvsNm || caseInfo.csUltmtDtlCtt || caseInfo.jgRsltCtt || result.endRslt;
+
+          console.log(`📋 보호사건 당사자: 행위자=${result.aplNm}, 형제번호=${result.siblingCsNo}`);
         }
 
         // 감치 사건 전용 필드 추출 (ssgo106 - 정명 등) - 2026.01.07 추가
@@ -970,17 +979,143 @@ export class ScourtApiClient {
         }
       }
 
-      // 당사자 정보 추출 (dlt_btprtCttLst 또는 dlt_btprLst)
-      const partiesList = response?.data?.dlt_btprtCttLst ||
-                          response?.data?.dlt_btprLst ||
-                          [];
+      // 당사자 정보 추출 - 모든 리스트 병합 (2026.01.07 개선)
+      // 기존: OR 로직으로 첫 번째만 사용 → 개선: 모든 소스 병합
+      const allParties: any[] = [];
+
+      // 1. 기본 당사자 (민사/가사/신청/집행 등)
+      if (response?.data?.dlt_btprtCttLst?.length) {
+        allParties.push(...response.data.dlt_btprtCttLst.map((p: any) => ({
+          ...p,
+          _source: 'btprtCttLst'
+        })));
+      }
+
+      // 2. 대체 당사자 필드 (일부 사건 유형)
+      if (response?.data?.dlt_btprLst?.length) {
+        allParties.push(...response.data.dlt_btprLst.map((p: any) => ({
+          ...p,
+          _source: 'btprLst'
+        })));
+      }
+
+      // 3. 행위자 목록 (보호사건 - 동버, 푸 등)
+      if (response?.data?.dlt_actorCttLst?.length) {
+        allParties.push(...response.data.dlt_actorCttLst.map((p: any) => ({
+          ...p,
+          btprDvsNm: p.btprDvsNm || p.lwstRltnrDvsNm || '행위자',
+          _source: 'actorCttLst'
+        })));
+      }
+
+      // 4. 소송관계인 목록 (보호사건의 보조인, 피해아동 등)
+      if (response?.data?.dlt_lwstRltnrCttLst?.length) {
+        console.log(`🔍 lwstRltnrCttLst 원본 데이터 (${response.data.dlt_lwstRltnrCttLst.length}개):`);
+        response.data.dlt_lwstRltnrCttLst.forEach((p: any, idx: number) => {
+          console.log(`  [${idx}] 전체 필드:`, JSON.stringify(p, null, 2));
+        });
+
+        // 이름 중복 감지를 위한 카운터
+        const nameCountMap = new Map<string, number>();
+
+        response.data.dlt_lwstRltnrCttLst.forEach((p: any) => {
+          const baseName = p.btprNm || p.lwstRltnrNm || p.nm || '미상';
+          const dvsNm = p.btprDvsNm || p.lwstRltnrDvsNm || p.rltnDvsNm || '관련자';
+          const key = `${dvsNm}_${baseName}`;
+          const count = nameCountMap.get(key) || 0;
+          nameCountMap.set(key, count + 1);
+
+          // 이름이 번호로 시작하지 않고, 같은 유형+이름이 여러 개면 번호 추가
+          let finalName = baseName;
+          if (count > 0 && !baseName.match(/^\d+\./)) {
+            finalName = `${count + 1}. ${baseName}`;
+          } else if (nameCountMap.get(key) === 1) {
+            // 첫 번째 항목인 경우 나중에 중복 발견되면 1번 부여해야 함
+            // → 전체 순회 후 처리 필요. 일단 별도 배열에 저장
+          }
+
+          allParties.push({
+            ...p,
+            btprNm: finalName,
+            btprDvsNm: dvsNm,
+            _source: 'lwstRltnrCttLst',
+            _nameKey: key,
+          });
+        });
+
+        // 중복된 이름에 번호 부여 (첫 번째 항목도 "1." 추가)
+        const duplicateKeys = new Set<string>();
+        nameCountMap.forEach((count, key) => {
+          if (count > 1) duplicateKeys.add(key);
+        });
+
+        if (duplicateKeys.size > 0) {
+          const keyIndexMap = new Map<string, number>();
+          allParties.forEach((p) => {
+            if (p._source === 'lwstRltnrCttLst' && duplicateKeys.has(p._nameKey)) {
+              const idx = (keyIndexMap.get(p._nameKey) || 0) + 1;
+              keyIndexMap.set(p._nameKey, idx);
+              // 이미 번호가 있으면 유지, 없으면 추가
+              if (!p.btprNm.match(/^\d+\./)) {
+                p.btprNm = `${idx}. ${p.btprNm}`;
+              }
+            }
+          });
+        }
+      }
+
+      // 디버그: 병합된 당사자 소스 로깅
+      const sourceCount = {
+        btprtCttLst: response?.data?.dlt_btprtCttLst?.length || 0,
+        btprLst: response?.data?.dlt_btprLst?.length || 0,
+        actorCttLst: response?.data?.dlt_actorCttLst?.length || 0,
+        lwstRltnrCttLst: response?.data?.dlt_lwstRltnrCttLst?.length || 0,
+      };
+      console.log(`📋 당사자 소스별 수: btprt=${sourceCount.btprtCttLst}, btpr=${sourceCount.btprLst}, actor=${sourceCount.actorCttLst}, lwstRltnr=${sourceCount.lwstRltnrCttLst}, 총=${allParties.length}`);
+
+      const partiesList = allParties;
+
+      // 원고측/피고측 라벨 (titRprsPtnr, titRprsRqstr 필드 사용)
+      const plaintiffLabel = response?.data?.titRprsPtnr || '원고';  // 신청인, 채권자 등
+      const defendantLabel = response?.data?.titRprsRqstr || '피고'; // 피신청인, 채무자 등
+      console.log(`📋 당사자 라벨: 원고측="${plaintiffLabel}", 피고측="${defendantLabel}"`);
+
       if (partiesList.length > 0) {
-        result.parties = partiesList.map((p: any) => ({
-          btprNm: p.btprNm || p.btprtNm,
-          btprDvsNm: p.btprDvsNm || p.btprtStndngNm,
-          adjdocRchYmd: p.adjdocRchYmd,    // 판결도달일
-          indvdCfmtnYmd: p.indvdCfmtnYmd,  // 확정일
-        }));
+        console.log(`📋 SCOURT 당사자 원본 (${partiesList.length}명):`);
+        partiesList.forEach((p: any, idx: number) => {
+          console.log(`  [${idx}] btprNm="${p.btprNm || p.btprtNm}", btprDvsNm="${p.btprDvsNm}", btprtStndngNm="${p.btprtStndngNm}"`);
+        });
+
+        result.parties = partiesList.map((p: any, idx: number) => {
+          // btprDvsNm이 있으면 사용, 없으면 순서와 라벨로 구분
+          let partyLabel = p.btprDvsNm || p.btprtStndngNm;
+
+          if (!partyLabel) {
+            // btprDvsNm이 없으면: 첫 번째 = 원고측, 나머지 = 피고측 (또는 순서대로)
+            // 더 정확하게: 이름이 aplNm과 일치하면 원고측, rspNm과 일치하면 피고측
+            const name = p.btprNm || p.btprtNm || '';
+            const nameClean = name.replace(/^\d+\.\s*/, '').trim();
+            const aplNmClean = (result.aplNm || '').replace(/^\d+\.\s*/, '').trim();
+            const rspNmClean = (result.rspNm || '').replace(/^\d+\.\s*/, '').trim();
+
+            if (aplNmClean && nameClean.startsWith(aplNmClean.charAt(0))) {
+              partyLabel = plaintiffLabel;
+            } else if (rspNmClean && nameClean.startsWith(rspNmClean.charAt(0))) {
+              partyLabel = defendantLabel;
+            } else {
+              // fallback: 순서로 구분 (첫 번째 = 원고측)
+              partyLabel = idx === 0 ? plaintiffLabel : defendantLabel;
+            }
+            console.log(`    → btprDvsNm 없음, 추론: "${name}" → "${partyLabel}"`);
+          }
+
+          return {
+            btprNm: p.btprNm || p.btprtNm,
+            btprDvsNm: partyLabel,
+            adjdocRchYmd: p.adjdocRchYmd,    // 판결도달일
+            indvdCfmtnYmd: p.indvdCfmtnYmd,  // 확정일
+          };
+        });
       }
 
       // aplNm/rspNm이 있고 parties 목록에 없으면 추가
@@ -990,12 +1125,22 @@ export class ScourtApiClient {
       }
 
       // 원고/신청인/채권자 추가 (aplNm)
+      // 주의: parties 목록에 이미 원고측 당사자가 있으면 추가하지 않음
       if (result.aplNm) {
         const plaintiffLabels = ['원고', '신청인', '채권자', '항소인', '상고인', '청구인'];
-        const alreadyHasPlaintiff = result.parties.some(p =>
-          p.btprNm === result.aplNm ||
-          (p.btprDvsNm && plaintiffLabels.some(label => p.btprDvsNm?.includes(label)))
-        );
+        // 번호 제거 후 비교 (예: "1. 주OOO" → "주OOO")
+        const aplNmClean = result.aplNm.replace(/^\d+\.\s*/, '').trim();
+        const alreadyHasPlaintiff = result.parties.some(p => {
+          const pNameClean = p.btprNm.replace(/^\d+\.\s*/, '').trim();
+          // 이름이 같거나 첫글자가 같으면 동일인으로 간주
+          const nameMatch = pNameClean === aplNmClean ||
+                           pNameClean.startsWith(aplNmClean) ||
+                           aplNmClean.startsWith(pNameClean) ||
+                           pNameClean.charAt(0) === aplNmClean.charAt(0);
+          // 또는 이미 원고측 라벨이 있으면 추가 안 함
+          const labelMatch = p.btprDvsNm && plaintiffLabels.some(label => p.btprDvsNm?.includes(label));
+          return nameMatch || labelMatch;
+        });
         if (!alreadyHasPlaintiff) {
           result.parties.unshift({
             btprNm: result.aplNm,
@@ -1008,10 +1153,17 @@ export class ScourtApiClient {
       // 피고/피신청인/채무자 추가 (rspNm)
       if (result.rspNm) {
         const defendantLabels = ['피고', '피신청인', '채무자', '피항소인', '피상고인', '피청구인'];
-        const alreadyHasDefendant = result.parties.some(p =>
-          p.btprNm === result.rspNm ||
-          (p.btprDvsNm && defendantLabels.some(label => p.btprDvsNm?.includes(label)))
-        );
+        // 번호 제거 후 비교
+        const rspNmClean = result.rspNm.replace(/^\d+\.\s*/, '').trim();
+        const alreadyHasDefendant = result.parties.some(p => {
+          const pNameClean = p.btprNm.replace(/^\d+\.\s*/, '').trim();
+          const nameMatch = pNameClean === rspNmClean ||
+                           pNameClean.startsWith(rspNmClean) ||
+                           rspNmClean.startsWith(pNameClean) ||
+                           pNameClean.charAt(0) === rspNmClean.charAt(0);
+          const labelMatch = p.btprDvsNm && defendantLabels.some(label => p.btprDvsNm?.includes(label));
+          return nameMatch || labelMatch;
+        });
         if (!alreadyHasDefendant) {
           result.parties.push({
             btprNm: result.rspNm,
@@ -1087,7 +1239,7 @@ export class ScourtApiClient {
           userCsNo: lc.userCsNo || '',      // 사건번호
           ultmtDvsNm: lc.ultmtDvsNm || '',  // 결과 (원고패, 청구인용 등)
           ultmtYmd: lc.ultmtYmd || '',      // 종국일 (YYYYMMDD)
-          encCsNo: lc.encCsNo || '',        // 암호화된 사건번호 (상세조회용)
+          encCsNo: lc.encCsNo || '',        // 암호화된 사건번호 (일반내용/진행내용 조회용)
         }));
         console.log(`📋 심급내용 (원심): ${lowerCourtList.length}건`);
       }
@@ -1174,27 +1326,27 @@ export class ScourtApiClient {
 
       // 응답에 어떤 필드가 있는지 디버그 로깅
       const availableFields = response?.data ? Object.keys(response.data) : [];
-      console.log(`📋 상세 파싱 완료: 기일 ${result.hearings?.length || 0}건, 진행 ${result.progress?.length || 0}건, 당사자 ${result.parties?.length || 0}명, 대리인 ${result.representatives?.length || 0}명`);
+      console.log(`📋 일반내용 파싱 완료: 기일 ${result.hearings?.length || 0}건, 진행 ${result.progress?.length || 0}건, 당사자 ${result.parties?.length || 0}명, 대리인 ${result.representatives?.length || 0}명`);
       console.log(`📋 응답 필드 목록: ${availableFields.join(', ')}`);
       if (result.relatedCases && result.relatedCases.length > 0) {
         console.log(`📋 연관사건: ${result.relatedCases.length}건`);
       }
     } catch (e) {
-      console.log('상세 정보 파싱 중 에러:', e);
+      console.log('일반내용 파싱 중 에러:', e);
     }
 
     return result;
   }
 
   /**
-   * 검색 + 상세 조회를 한 번에 수행
+   * 검색 + 일반내용 조회를 한 번에 수행
    */
-  async searchAndGetDetail(params: CaseSearchParams): Promise<{
+  async searchAndGetGeneral(params: CaseSearchParams): Promise<{
     searchResult: CaseSearchResult;
-    detailResult?: CaseDetailResult;
+    generalResult?: CaseGeneralResult;
   }> {
     console.log('\n' + '='.repeat(60));
-    console.log('🚀 사건 검색 및 상세 정보 조회');
+    console.log('🚀 사건 검색 및 일반내용 조회');
     console.log('='.repeat(60));
 
     // 세션 초기화
@@ -1207,7 +1359,7 @@ export class ScourtApiClient {
       }
     }
 
-    // 캡챠 해결 + 검색 + 상세 조회
+    // 캡챠 해결 + 검색 + 일반내용 조회
     for (let attempt = 1; attempt <= this.maxCaptchaRetries; attempt++) {
       console.log(`\n📝 시도 ${attempt}/${this.maxCaptchaRetries}`);
 
@@ -1261,9 +1413,9 @@ export class ScourtApiClient {
 
         console.log('✅ 검색 성공!');
 
-        // 암호화된 사건번호가 있으면 상세 조회
+        // 암호화된 사건번호가 있으면 일반내용 조회
         if (searchResult.encCsNo) {
-          console.log('\n📋 상세 정보 조회 시작...');
+          console.log('\n📋 일반내용 조회 시작...');
 
           // 사건 카테고리 결정 (법원코드 변환에 필요)
           const caseCategory = this.getCaseCategory(params.csDvsCd);
@@ -1276,7 +1428,7 @@ export class ScourtApiClient {
           const fullCaptchaAnswer = captchaText + captchaData.token;
           console.log(`  captchaAnswer: ${captchaText} + ${captchaData.token.substring(0, 20)}...`);
 
-          const detailResult = await this.getCaseDetail({
+          const generalResult = await this.getCaseGeneral({
             cortCd: cortCdNum,
             csYear: params.csYr,
             csDvsCd: csDvsCdNum,
@@ -1288,7 +1440,7 @@ export class ScourtApiClient {
 
           return {
             searchResult: { ...searchResult, captchaAttempts: attempt },
-            detailResult,
+            generalResult,
           };
         }
 
@@ -1602,7 +1754,7 @@ export class ScourtApiClient {
    * - 집행(타채): /ssgo/ssgo10a/selectHmpgEtexecCsGnrlCtt.on ✅
    * - 항고/재항고(스,브): /ssgo/ssgo108/selectHmpgApalRaplCsGnrlCtt.on ✅ (2026.01.07)
    */
-  private getDetailApiEndpoints(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string[] {
+  private getGeneralApiEndpoints(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string[] {
     // 브라우저 실제 API 호출에서 확인한 엔드포인트
     const primaryEndpoints: Record<string, string> = {
       family: '/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',             // 가사사건
@@ -1648,8 +1800,8 @@ export class ScourtApiClient {
   /**
    * 사건 카테고리에 따른 API 엔드포인트 결정 (단일 반환 - 호환성 유지)
    */
-  private getDetailApiEndpoint(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
-    return this.getDetailApiEndpoints(caseCategory)[0];
+  private getGeneralApiEndpoint(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
+    return this.getGeneralApiEndpoints(caseCategory)[0];
   }
 
   /**
@@ -1805,7 +1957,7 @@ export class ScourtApiClient {
   }
 
   /**
-   * 저장된 encCsNo로 캡챠 없이 상세 조회
+   * 저장된 encCsNo로 캡챠 없이 일반내용 조회
    *
    * 핵심: encCsNo는 WMONID에 바인딩됨. 같은 WMONID를 사용해야 함.
    *
@@ -1813,7 +1965,7 @@ export class ScourtApiClient {
    * @param encCsNo - 저장된 암호화 사건번호
    * @param params - 기본 사건 정보
    */
-  async getCaseDetailWithStoredEncCsNo(
+  async getCaseGeneralWithStoredEncCsNo(
     wmonid: string,
     encCsNo: string,
     params: {
@@ -1822,8 +1974,8 @@ export class ScourtApiClient {
       csDvsCd: string;     // 사건유형(한글) 또는 코드(숫자)
       csSerial: string;
     }
-  ): Promise<CaseDetailResult> {
-    console.log('\n📋 저장된 encCsNo로 상세 조회 (캡챠 없음)...');
+  ): Promise<CaseGeneralResult> {
+    console.log('\n📋 저장된 encCsNo로 일반내용 조회 (캡챠 없음)...');
     console.log(`  WMONID: ${wmonid}`);
     console.log(`  encCsNo: ${encCsNo.substring(0, 30)}...`);
 
@@ -1842,8 +1994,8 @@ export class ScourtApiClient {
     console.log(`  법원코드: ${params.cortCd} → ${cortCdNum} (카테고리: ${caseCategory})`);
     console.log(`  사건유형코드: ${params.csDvsCd} → ${csDvsCdNum}`);
 
-    // 캡챠 없이 상세 조회
-    return this.getCaseDetail({
+    // 캡챠 없이 일반내용 조회
+    return this.getCaseGeneral({
       cortCd: cortCdNum,
       csYear: params.csYear,
       csDvsCd: csDvsCdNum,
@@ -1858,14 +2010,14 @@ export class ScourtApiClient {
    * API로 사건 검색 및 encCsNo 획득 (WMONID 바인딩)
    *
    * 반환값의 wmonid와 encCsNo를 함께 저장해야 나중에 재사용 가능
-   * 64자 encCsNo 획득 시 자동으로 상세 조회까지 수행
+   * 64자 encCsNo 획득 시 자동으로 일반내용 조회까지 수행
    */
   async searchAndRegisterCase(params: CaseSearchParams): Promise<{
     success: boolean;
     wmonid?: string;
     encCsNo?: string;
     caseData?: any;
-    detailData?: CaseDetailData;  // 상세 데이터 (기일 등)
+    generalData?: CaseGeneralData;  // 일반내용 데이터 (기일 등)
     progressData?: Array<{ prcdDt: string; prcdNm: string; prcdRslt?: string; progCttDvs?: string }>;  // 진행내용 (별도 API)
     error?: string;
   }> {
@@ -1902,23 +2054,23 @@ export class ScourtApiClient {
     const caseCategory = this.getCaseCategory(params.csDvsCd);
     console.log(`  사건 카테고리: ${caseCategory}`);
 
-    // 상세 조회 (64자 또는 108자 encCsNo 모두 지원)
-    let detailData: CaseDetailData | undefined;
+    // 일반내용 조회 (64자 또는 108자 encCsNo 모두 지원)
+    let generalData: CaseGeneralData | undefined;
     let progressData: Array<{ prcdDt: string; prcdNm: string; prcdRslt?: string; progCttDvs?: string }> | undefined;
 
-    // 법원코드 변환 (진행내용 조회용 - 상세조회는 한글명 사용)
+    // 법원코드 변환 (진행내용 조회용 - 일반내용 조회는 한글명 사용)
     const cortCdNum = this.getCourtCode(params.cortCd, caseCategory);
     const csDvsCdNum = this.getCaseTypeCode(params.csDvsCd);
 
-    // 1. 상세 조회 (사건 카테고리에 따라 적절한 API 엔드포인트 사용)
+    // 1. 일반내용 조회 (사건 카테고리에 따라 적절한 API 엔드포인트 사용)
     // 모든 사건유형에 encCsNo 사용 (검색 결과에서 받은 암호화된 사건번호)
-    console.log(`\n📋 상세 조회 시도... (encCsNo: ${searchResult.encCsNo.length}자)`);
+    console.log(`\n📋 일반내용 조회 시도... (encCsNo: ${searchResult.encCsNo.length}자)`);
     try {
-      const detailResult = await this.getCaseDetail({
+      const generalResult = await this.getCaseGeneral({
         cortCd: params.cortCd,      // getCourtCode에서 숫자 코드로 변환
         csYear: params.csYr,
         csDvsCd: params.csDvsCd,    // getCaseTypeCode에서 숫자 코드로 변환
-        csSerial: params.csSerial,  // getCaseDetail에서 7자리 패딩
+        csSerial: params.csSerial,  // getCaseGeneral에서 7자리 패딩
         btprNm: params.btprNm,      // 당사자명 전달 (필수!)
         encCsNo: searchResult.encCsNo,  // 모든 사건유형에 encCsNo 사용
         captchaAnswer: '',          // captchaAnswer는 사용하지 않음
@@ -1926,22 +2078,22 @@ export class ScourtApiClient {
         caseCategory,
       });
 
-      if (detailResult.success && detailResult.data) {
-        detailData = detailResult.data;
-        console.log(`✅ 상세 조회 성공: 기일 ${detailData.hearings?.length || 0}건, 당사자 ${detailData.parties?.length || 0}명`);
+      if (generalResult.success && generalResult.data) {
+        generalData = generalResult.data;
+        console.log(`✅ 일반내용 조회 성공: 기일 ${generalData.hearings?.length || 0}건, 당사자 ${generalData.parties?.length || 0}명`);
         if (caseCategory === 'criminal') {
-          console.log(`  피고인: ${detailData.dfndtNm}, 형제번호: ${detailData.crmcsNo}`);
+          console.log(`  피고인: ${generalData.dfndtNm}, 형제번호: ${generalData.crmcsNo}`);
         }
       } else {
-        console.log(`⚠️ 상세 조회 실패: ${detailResult.error}`);
+        console.log(`⚠️ 일반내용 조회 실패: ${generalResult.error}`);
       }
     } catch (e) {
-      console.log(`⚠️ 상세 조회 에러: ${e}`);
+      console.log(`⚠️ 일반내용 조회 에러: ${e}`);
     }
 
     // 2. 진행내용 별도 조회 (모든 사건 유형 지원)
     // 진행내용 조회 지원 카테고리: family, civil, criminal, application, execution, electronicOrder, insolvency, appeal
-    const progressSupportedCategories = ['family', 'civil', 'criminal', 'application', 'execution', 'electronicOrder', 'insolvency', 'appeal'];
+    const progressSupportedCategories = ['family', 'civil', 'criminal', 'application', 'execution', 'electronicOrder', 'insolvency', 'appeal', 'protection', 'contempt'];
     if (progressSupportedCategories.includes(caseCategory)) {
       console.log(`\n📋 진행내용 별도 조회 (${caseCategory})...`);
       try {
@@ -1970,7 +2122,7 @@ export class ScourtApiClient {
       wmonid: wmonid,
       encCsNo: searchResult.encCsNo,
       caseData: searchResult.data,
-      detailData,
+      generalData,
       progressData,
     };
   }

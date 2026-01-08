@@ -21,9 +21,13 @@ import AdminHeader from './AdminHeader'
 import HearingDetailModal from './HearingDetailModal'
 import CasePaymentsModal from './CasePaymentsModal'
 import CasePartiesSection from './CasePartiesSection'
+import { ScourtGeneralInfo } from './scourt/ScourtGeneralInfo'
+import ScourtGeneralInfoXml from './scourt/ScourtGeneralInfoXml'
 import { getPartyLabels as getPartyLabelsFromSchema, getCaseCategory } from '@/lib/scourt/party-labels'
 import { getVisibleFields, sortFields, formatDateValue } from '@/lib/scourt/field-renderer'
 import { COURTS } from '@/lib/scourt/court-codes'
+import { detectCaseTypeFromCaseNumber } from '@/lib/scourt/xml-mapping'
+import { normalizePartyLabel } from '@/types/case-party'
 
 interface Client {
   id: string
@@ -135,6 +139,7 @@ interface ScourtSnapshot {
   documents: { date: string; content: string }[]
   lowerCourt: { courtName?: string; court?: string; caseNo: string; result?: string; resultDate?: string; linkedCaseId?: string | null }[]
   relatedCases: { caseNo: string; caseName?: string; relation?: string; linkedCaseId?: string | null }[]
+  rawData?: Record<string, any>  // XML 렌더링용 원본 API 데이터
 }
 
 interface ScourtSyncStatus {
@@ -158,6 +163,9 @@ interface UnifiedScheduleItem {
   source: CourtHearing | CaseDeadline | Schedule
 }
 
+// 탭 타입 정의
+type TabType = 'overview' | 'general' | 'progress' | 'contract'
+
 export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [unifiedSchedules, setUnifiedSchedules] = useState<UnifiedScheduleItem[]>([])
   const [loading, setLoading] = useState(false)
@@ -175,18 +183,13 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [scourtSyncing, setScourtSyncing] = useState(false)
   const [scourtOpening, setScourtOpening] = useState(false)
   const [showProgressDetail, setShowProgressDetail] = useState(false)
+  const [showScourtDetail, setShowScourtDetail] = useState(false)
 
-  // 탭 상태: 'schedules' | 'progress'
-  const [activeTab, setActiveTab] = useState<'schedules' | 'progress'>('schedules')
+  // 탭 상태 - Apple 스타일 Segmented Control
+  const [activeTab, setActiveTab] = useState<TabType>('overview')
 
   // 진행내용 필터 상태
   const [progressFilter, setProgressFilter] = useState<'all' | 'hearing' | 'order' | 'submit' | 'delivery' | 'court'>('all')
-
-  // 계약 정보 드롭다운 상태
-  const [showContractInfo, setShowContractInfo] = useState(false)
-
-  // 당사자 정보 드롭다운 상태
-  const [showPartiesInfo, setShowPartiesInfo] = useState(false)
 
   // 대법원 연동 모달 상태
   const [showLinkModal, setShowLinkModal] = useState(false)
@@ -385,7 +388,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     })
   }
 
-  // SCOURT 사건 상세 페이지 열기 (Puppeteer)
+  // SCOURT 사건 일반내용 탭 열기 (Puppeteer)
   const handleOpenScourtCase = async () => {
     if (!caseData.court_case_number) {
       alert('사건번호가 없습니다.')
@@ -591,7 +594,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     return `${year}.${month}.${day} ${hour}:${minute}`
   }
 
-  // 진행내용 일자 포맷 (YYYYMMDD → YY.MM.DD)
+  // 진행내용 일자 포맷 (YYYYMMDD -> YY.MM.DD)
   const formatProgressDate = (dateStr: string | null) => {
     if (!dateStr) return '-'
     // YYYYMMDD 형식
@@ -651,7 +654,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     return 'court'
   }
 
-  // 진행내용 색상 결정 (SCOURT와 동일한 색상)
+  // 진행내용 색상 결정 (SCOURT와 동일한 색상) - 5색 분류 유지
   // - Blue (#003399): 기일 (progCttDvs=1)
   // - Green (#336633): 명령 (progCttDvs=2)
   // - Dark Red (#660000): 제출 (progCttDvs=3)
@@ -720,45 +723,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const getCaseStatusInfo = () => {
     // 확정일이 있으면 "확정사건"
     if (getBasicInfo('확정일', 'cfrmDt')) {
-      return { label: '확정사건', style: 'bg-gray-200 text-gray-700' }
+      return { label: '확정', style: 'bg-gray-100 text-gray-600' }
     }
     // 종국결과가 있으면 "판결선고"
     if (getBasicInfo('종국결과', 'endRslt') || caseData.case_result) {
-      return { label: '판결선고', style: 'bg-amber-100 text-amber-700' }
+      return { label: '선고', style: 'bg-amber-50 text-amber-700' }
     }
     // 기본 상태
     return caseData.status === '진행중'
-      ? { label: '진행중', style: 'bg-sage-100 text-sage-700' }
+      ? { label: '진행중', style: 'bg-sage-50 text-sage-700' }
       : { label: caseData.status, style: 'bg-gray-100 text-gray-500' }
-  }
-
-  const getOfficeStyle = (office: string | null) => {
-    switch (office) {
-      case '평택': return 'bg-blue-50 text-blue-700'
-      case '천안': return 'bg-purple-50 text-purple-700'
-      case '소송구조': return 'bg-amber-50 text-amber-700'
-      default: return 'bg-gray-100 text-gray-600'
-    }
-  }
-
-  const getScheduleTypeStyle = (type: 'court_hearing' | 'deadline' | 'schedule', subtype?: string) => {
-    if (type === 'court_hearing') {
-      if (subtype === 'HEARING_LAWYER_MEETING') {
-        return 'border-l-teal-400 bg-teal-50'
-      }
-      return 'border-l-blue-400 bg-blue-50'
-    } else if (type === 'deadline') {
-      return 'border-l-orange-400 bg-orange-50'
-    } else {
-      if (subtype === 'trial') {
-        return 'border-l-purple-400 bg-purple-50'
-      } else if (subtype === 'consultation') {
-        return 'border-l-indigo-400 bg-indigo-50'
-      } else if (subtype === 'meeting') {
-        return 'border-l-emerald-400 bg-emerald-50'
-      }
-      return 'border-l-gray-400 bg-gray-50'
-    }
   }
 
   // 당사자 정보에서 "의뢰인 v 상대방" 문자열 생성
@@ -781,1145 +755,1023 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     return `${ourClientName} v ${opponentName}`
   }, [caseParties, caseData.client?.name, caseData.opponent_name])
 
+  // 당사자 정보 렌더링 (간소화)
+  const renderPartyInfo = () => {
+    const partyLabels = getPartyLabels()
+
+    // case_parties 데이터가 있으면 사용
+    if (caseParties.length > 0) {
+      // "사건본인"으로 시작하는 당사자 제외, party_type_label 기준으로 그룹화
+      const labelGroups = new Map<string, typeof caseParties>()
+
+      // 번호 접두사 제거 함수 (예: "1. 정OO" -> "정OO")
+      const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, '')
+
+      // 표준 당사자 라벨 목록 (2026.01.07 보호사건/형사사건 추가)
+      const standardLabels = [
+        '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
+        '항소인', '피항소인', '상고인', '피상고인',
+        // 보호사건
+        '행위자', '피해아동', '피해자', '보조인', '보호소년', '조사관',
+        // 형사사건
+        '피고인', '피고인명',
+        // 기타
+        '제3채무자', '관련자', '소송관계인'
+      ]
+      const PARTY_TYPE_LABEL_MAP: Record<string, string> = {
+        plaintiff: '원고',
+        defendant: '피고',
+        creditor: '채권자',
+        debtor: '채무자',
+        applicant: '신청인',
+        respondent: '피신청인',
+        third_debtor: '제3채무자',
+        // 보호사건 (2026.01.07 추가)
+        actor: '행위자',
+        victim: '피해아동',
+        assistant: '보조인',
+        juvenile: '보호소년',
+        investigator: '조사관',
+        // 형사사건
+        accused: '피고인',
+        crime_victim: '피해자',
+        // 기타
+        related: '관련자',
+      }
+
+      // 히어로 영역에 표시할 당사자 라벨만 필터링
+      // 보호사건: 행위자만, 형사사건: 피고인만, 민사/가사: 원고/피고 등
+      const heroPartyLabels = [
+        '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
+        '항소인', '피항소인', '상고인', '피상고인', '항고인', '상대방',
+        '행위자', '보호소년',  // 보호사건 당사자
+        '피고인', '피고인명',  // 형사사건 당사자
+        '제3채무자'
+      ]
+      // 소송관계인은 히어로에서 제외 (피해아동, 보조인, 피해자, 조사관 등)
+
+      const plaintiffLabels = ['원고', '채권자', '신청인', '항소인', '상고인', '항고인']
+      const defendantLabels = ['피고', '채무자', '피신청인', '피항소인', '피상고인', '상대방', '행위자', '보호소년', '피고인', '피고인명']
+
+      caseParties
+        // 히어로에 표시할 당사자만 필터링 (소송관계인 제외)
+        .filter(p => {
+          const rawLabel = p.party_type_label || ''
+          const normalizedLabel = normalizePartyLabel(rawLabel)
+          if (normalizedLabel.startsWith('사건본인')) return false
+          // 히어로에 표시할 당사자 타입만
+          return heroPartyLabels.includes(normalizedLabel) ||
+                 ['plaintiff', 'defendant', 'creditor', 'debtor', 'applicant', 'respondent', 'actor', 'juvenile', 'accused', 'third_debtor'].includes(p.party_type || '')
+        })
+        .forEach(p => {
+          // 사건유형 기반으로 당사자 라벨 결정
+          const rawLabel = p.party_type_label || ''
+          const normalizedLabel = normalizePartyLabel(rawLabel)
+          let label: string
+
+          // 보호사건/형사사건 특수 라벨은 원래 라벨 그대로 유지
+          if (['행위자', '보호소년', '피고인', '피고인명'].includes(normalizedLabel)) {
+            label = rawLabel
+          }
+          // rawLabel이 원고측 라벨이면 → 사건유형에 맞는 원고측 라벨 사용
+          else if (plaintiffLabels.includes(normalizedLabel) || p.party_type === 'plaintiff') {
+            label = partyLabels.plaintiff || rawLabel || '원고'
+          }
+          // rawLabel이 피고측 라벨이면 → 사건유형에 맞는 피고측 라벨 사용
+          else if (defendantLabels.includes(normalizedLabel) || p.party_type === 'defendant') {
+            label = partyLabels.defendant || rawLabel || '피고'
+          }
+          // 기타
+          else {
+            label = rawLabel || PARTY_TYPE_LABEL_MAP[p.party_type || 'plaintiff'] || '기타'
+          }
+
+          if (!labelGroups.has(label)) {
+            labelGroups.set(label, [])
+          }
+          labelGroups.get(label)!.push(p)
+        })
+
+      // 표시할 그룹 생성
+      const groups: { label: string; name: string; isClient: boolean; otherCount: number }[] = []
+
+      labelGroups.forEach((parties, label) => {
+        const clientParty = parties.find(p => p.is_our_client)
+        const rawName = clientParty
+          ? (clientParty.clients?.name || clientParty.party_name)
+          : parties[0]?.party_name || '-'
+        const displayName = removeNumberPrefix(rawName)
+        const otherCount = parties.length - 1
+
+        groups.push({
+          label,
+          name: displayName,
+          isClient: !!clientParty,
+          otherCount,
+        })
+      })
+
+      // 의뢰인을 먼저 정렬
+      groups.sort((a, b) => {
+        if (a.isClient && !b.isClient) return -1
+        if (!a.isClient && b.isClient) return 1
+        return 0
+      })
+
+      return groups.map((group, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          {group.isClient ? (
+            <>
+              <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
+                의뢰인 {group.label}
+              </span>
+              <span className="text-sm font-semibold text-gray-900">
+                {group.name}
+                {group.otherCount > 0 && (
+                  <span className="font-normal text-gray-500 ml-1">외 {group.otherCount}</span>
+                )}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">{group.label}</span>
+              <span className="text-sm text-gray-700">
+                {group.name}
+                {group.otherCount > 0 && (
+                  <span className="text-gray-500 ml-1">외 {group.otherCount}</span>
+                )}
+              </span>
+            </>
+          )}
+        </div>
+      ))
+    }
+
+    // case_parties 데이터가 없으면 기존 로직 사용 (형사사건 포함)
+    if (partyLabels.isCriminal) {
+      const defendantName = String(getBasicInfo('피고인명', 'dfndtNm') || getBasicInfo('피고', 'rspNm') || '-')
+      const isClient = caseData.client_role === 'defendant'
+      return (
+        <div className="flex items-center gap-2">
+          {isClient ? (
+            <>
+              <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
+                의뢰인 {partyLabels.defendant}
+              </span>
+              <span className="text-sm font-semibold text-gray-900">
+                {caseData.client?.name || defendantName}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">{partyLabels.defendant}</span>
+              <span className="text-sm text-gray-700">{defendantName}</span>
+            </>
+          )}
+        </div>
+      )
+    }
+
+    // SCOURT 스냅샷 기반 fallback
+    const partiesArray = (scourtSnapshot?.basicInfo as any)?.parties || []
+    const findPartyByType = (types: string[]) => {
+      const found = partiesArray.find((p: any) =>
+        types.some(t => p.btprDvsNm?.includes(t))
+      )
+      return found?.btprNm || ''
+    }
+
+    const getPlaintiffName = () => {
+      const fromBasicInfo =
+        getBasicInfo('채권자', 'crdtNm') ||
+        getBasicInfo('신청인', 'aplcNm') ||
+        getBasicInfo('원고', 'aplNm')
+      if (fromBasicInfo) return fromBasicInfo
+      const fromParties = findPartyByType(['채권자', '신청인', '원고', '항고인'])
+      if (fromParties) return fromParties
+      return partiesArray[0]?.btprNm || '-'
+    }
+
+    const getDefendantName = () => {
+      const fromBasicInfo =
+        getBasicInfo('채무자', 'dbtNm') ||
+        getBasicInfo('피신청인', 'rspNm') ||
+        getBasicInfo('피고', 'rspNm')
+      if (fromBasicInfo) return fromBasicInfo
+      const fromParties = findPartyByType(['채무자', '피신청인', '피고', '상대방', '피항고인'])
+      if (fromParties) return fromParties
+      return partiesArray[1]?.btprNm || '-'
+    }
+
+    const plaintiffInfo = getPartyName('plaintiff', String(getPlaintiffName()))
+    const defendantInfo = getPartyName('defendant', String(getDefendantName()))
+
+    const parties = [
+      { role: 'plaintiff', label: partyLabels.plaintiff, info: plaintiffInfo },
+      { role: 'defendant', label: partyLabels.defendant, info: defendantInfo }
+    ]
+
+    parties.sort((a, b) => {
+      if (a.info.isClient && !b.info.isClient) return -1
+      if (!a.info.isClient && b.info.isClient) return 1
+      return 0
+    })
+
+    return parties.map((party) => (
+      <div key={party.role} className="flex items-center gap-2">
+        {party.info.isClient ? (
+          <>
+            <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
+              의뢰인 {party.label}
+            </span>
+            <span className="text-sm font-semibold text-gray-900">
+              {party.info.name}
+            </span>
+          </>
+        ) : (
+          <>
+            <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">{party.label}</span>
+            <span className="text-sm text-gray-700">{party.info.name}</span>
+          </>
+        )}
+      </div>
+    ))
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminHeader title="사건 상세" subtitle={caseData.case_name} />
 
-      <div className="max-w-5xl mx-auto pt-20 pb-8 px-4">
-        {/* Header Actions */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-2">
-            <span className={`px-2 py-0.5 text-xs font-medium rounded ${getOfficeStyle(caseData.office)}`}>
-              {caseData.office || '-'}
-            </span>
+      <div className="max-w-4xl mx-auto pt-20 pb-8 px-4">
+        {/* Hero Section - Apple 스타일 심플 디자인 */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 mb-6 shadow-sm">
+          {/* 상단: 상태 뱃지들 */}
+          <div className="flex items-center gap-2 mb-4">
+            {caseData.office && (
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                {caseData.office}
+              </span>
+            )}
             {(() => {
               const statusInfo = getCaseStatusInfo()
               return (
-                <span className={`px-2 py-0.5 text-xs font-medium rounded ${statusInfo.style}`}>
+                <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${statusInfo.style}`}>
                   {statusInfo.label}
                 </span>
               )
             })()}
-            {/* 심급 표시 - 신청/집행/가사신청 사건은 심급 표시 안함 */}
+            {/* 심급 표시 */}
             {(() => {
-              // 신청/집행/가사신청 사건인지 확인 (카단, 카합, 타채, 즈단, 즈합, 즈기 등)
               const category = getCaseCategory(caseData.court_case_number || '')
               const isApplicationCase = ['신청', '집행', '가사신청'].includes(category)
-
-              // 신청 계열 사건이거나 case_level이 '신청', '기타'면 표시 안함
               if (isApplicationCase || !caseData.case_level || ['신청', '기타'].includes(caseData.case_level)) {
                 return null
               }
-
               return (
-                <span className="px-2 py-0.5 text-xs font-medium rounded bg-indigo-100 text-indigo-700">
+                <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                   {caseData.case_level}
                 </span>
               )
             })()}
-            {/* 병합구분 표시 (본소/반소 등) */}
+            {/* 병합구분 표시 */}
             {(() => {
               const mrgrDvs = scourtSnapshot?.basicInfo?.['병합구분'] || scourtSnapshot?.basicInfo?.mrgrDvs
               return mrgrDvs && mrgrDvs !== '없음' && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded bg-purple-100 text-purple-700">
+                <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
                   {mrgrDvs}
                 </span>
               )
             })()}
-            {/* 주사건 표시 */}
-            {caseData.main_case_id && caseData.main_case_id === caseData.id && (
-              <span className="px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-700 flex items-center gap-1">
-                <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-                </svg>
-                주사건
+            {/* 종국결과/확정 뱃지 */}
+            {(getBasicInfo('종국결과', 'endRslt') || caseData.case_result) && (
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-amber-50 text-amber-700">
+                {getBasicInfo('종국결과', 'endRslt') || caseData.case_result}
+                {getBasicInfo('종국일', 'endDt') && (
+                  <span className="ml-1 opacity-75">({formatProgressDate(String(getBasicInfo('종국일', 'endDt')))})</span>
+                )}
               </span>
             )}
-            {/* 원심 사건 연결 (현재 사건이 주사건이 아닌 경우) */}
-            {caseData.main_case_id && caseData.main_case_id !== caseData.id && caseData.main_case && (
-              <button
-                onClick={() => router.push(`/cases/${caseData.main_case_id}`)}
-                className="px-2 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600 hover:bg-gray-200 flex items-center gap-1 transition-colors"
-                title={`주사건으로 이동: ${caseData.main_case.court_case_number}`}
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 9l3 3m0 0l-3 3m3-3H8m13 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                주사건: {caseData.main_case.court_case_number}
-              </button>
+            {getBasicInfo('확정일', 'cfrmDt') && (
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">
+                {formatProgressDate(String(getBasicInfo('확정일', 'cfrmDt')))} 확정
+              </span>
             )}
-            {/* 문서 폴더 뱃지 */}
+          </div>
+
+          {/* 메인 타이틀: 법원 사건번호 */}
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+            {caseData.court_name} {caseData.court_case_number}
+          </h1>
+
+          {/* 사건명 */}
+          <p className="text-lg text-gray-600 mb-5">
+            {getBasicInfo('사건명', 'csNm') || caseData.scourt_case_name || caseData.case_name}
+          </p>
+
+          {/* 당사자 정보 - 간소화 */}
+          <div className="flex flex-wrap gap-4 mb-6">
+            {renderPartyInfo()}
+          </div>
+
+          {/* Quick Actions Bar - Apple 스타일 */}
+          <div className="flex items-center gap-3 pt-5 border-t border-gray-100">
+            {/* 서류 폴더 */}
             {caseData.onedrive_folder_url && (
               <a
                 href={caseData.onedrive_folder_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="px-2 py-0.5 text-xs font-medium rounded flex items-center gap-1 bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-                title="소송 서류 폴더 열기"
+                className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium"
               >
-                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M7.71 3.5l1.6 1.5h5.36a1.5 1.5 0 0 1 1.5 1.5v1h2.33a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 17V5a1.5 1.5 0 0 1 1.5-1.5h2.21z"/>
                 </svg>
-                Drive
+                서류 폴더
               </a>
             )}
-          </div>
-          <button
-            onClick={() => router.push(`/cases/${caseData.id}/edit`)}
-            className="px-4 py-1.5 text-sm font-medium text-sage-700 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
-          >
-            수정
-          </button>
-        </div>
 
-        {/* Case Overview - 법원 사건번호 사건명 형식 + 계약정보 드롭다운 */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm">
-          {/* 제목: 법원 사건번호 사건명 + 종국결과/확정 뱃지 + 나의사건보기 버튼 */}
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xl font-bold text-gray-900">
-                {caseData.court_name} {caseData.court_case_number} {getBasicInfo('사건명', 'csNm') || caseData.scourt_case_name || caseData.case_name}
-              </h2>
-              {/* 종국결과 뱃지 */}
-              {(getBasicInfo('종국결과', 'endRslt') || caseData.case_result) && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded bg-amber-50 text-amber-700 border border-amber-200">
-                  {getBasicInfo('종국결과', 'endRslt') || caseData.case_result}
-                  {getBasicInfo('종국일', 'endDt') && (
-                    <span className="ml-1 opacity-75">({formatProgressDate(String(getBasicInfo('종국일', 'endDt')))})</span>
-                  )}
-                </span>
-              )}
-              {/* 확정 뱃지 */}
-              {getBasicInfo('확정일', 'cfrmDt') && (
-                <span className="px-2 py-0.5 text-xs font-medium rounded bg-green-50 text-green-700 border border-green-200">
-                  확정 {formatProgressDate(String(getBasicInfo('확정일', 'cfrmDt')))}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              {isLinked ? (
-                <>
-                  {/* 최종 업데이트 일시 */}
-                  {scourtSyncStatus?.lastSync && (
-                    <span className="text-xs text-gray-400">
-                      {(() => {
-                        const d = new Date(scourtSyncStatus.lastSync)
-                        const now = new Date()
-                        const diffMs = now.getTime() - d.getTime()
-                        const diffMins = Math.floor(diffMs / 60000)
-                        const diffHours = Math.floor(diffMs / 3600000)
-                        const diffDays = Math.floor(diffMs / 86400000)
-
-                        if (diffMins < 1) return '방금 전 갱신'
-                        if (diffMins < 60) return `${diffMins}분 전 갱신`
-                        if (diffHours < 24) return `${diffHours}시간 전 갱신`
-                        if (diffDays < 7) return `${diffDays}일 전 갱신`
-                        return `${d.getMonth() + 1}/${d.getDate()} 갱신`
-                      })()}
-                    </span>
-                  )}
-                  {/* 갱신 버튼 */}
-                  <button
-                    onClick={() => handleScourtSync()}
-                    disabled={scourtSyncing}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-sage-600 hover:text-sage-700 hover:bg-sage-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="대법원 정보 갱신"
-                  >
-                    {scourtSyncing ? (
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                    )}
-                    {scourtSyncing ? '갱신 중...' : '갱신'}
-                  </button>
-                </>
-              ) : (
-                /* 연동 버튼 - 아직 대법원 연동이 안 된 경우 */
-                <button
-                  onClick={() => handleScourtSync()}
-                  disabled={scourtSyncing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="대법원 나의사건검색 연동"
-                >
-                  {scourtSyncing ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  ) : (
-                    /* 저울 아이콘 (법원/정의) */
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                    </svg>
-                  )}
-                  {scourtSyncing ? '연동 중...' : '대법원 연동하기'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* 당사자 정보 - case_parties 데이터 기반 */}
-          <div className="flex flex-wrap gap-6 mb-5">
-            {(() => {
-              const partyLabels = getPartyLabels()
-
-              // case_parties 데이터가 있으면 사용
-              if (caseParties.length > 0) {
-                // "사건본인"으로 시작하는 당사자 제외, party_type_label 기준으로 그룹화
-                const labelGroups = new Map<string, typeof caseParties>()
-
-                // 번호 접두사 제거 함수 (예: "1. 정OO" → "정OO")
-                const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, '')
-
-                // 표준 당사자 라벨 목록
-                const standardLabels = ['원고', '피고', '채권자', '채무자', '신청인', '피신청인', '항소인', '피항소인', '상고인', '피상고인']
-                const PARTY_TYPE_LABEL_MAP: Record<string, string> = {
-                  plaintiff: '원고',
-                  defendant: '피고',
-                  creditor: '채권자',
-                  debtor: '채무자',
-                  applicant: '신청인',
-                  respondent: '피신청인',
-                }
-
-                caseParties
-                  // "사건본인"으로 시작하는 라벨 필터링
-                  .filter(p => {
-                    const rawLabel = p.party_type_label || ''
-                    return !rawLabel.startsWith('사건본인')
-                  })
-                  .forEach(p => {
-                    // 라벨 정규화: 표준 라벨이 아니면 party_type 기반으로 변환
-                    const rawLabel = p.party_type_label || ''
-                    const label = standardLabels.includes(rawLabel)
-                      ? rawLabel
-                      : PARTY_TYPE_LABEL_MAP[p.party_type || 'plaintiff'] || p.party_type || '기타'
-                    if (!labelGroups.has(label)) {
-                      labelGroups.set(label, [])
-                    }
-                    labelGroups.get(label)!.push(p)
-                  })
-
-                // 표시할 그룹 생성
-                const groups: { label: string; name: string; isClient: boolean; otherCount: number }[] = []
-
-                labelGroups.forEach((parties, label) => {
-                  const clientParty = parties.find(p => p.is_our_client)
-                  const rawName = clientParty
-                    ? (clientParty.clients?.name || clientParty.party_name)
-                    : parties[0]?.party_name || '-'
-                  const displayName = removeNumberPrefix(rawName)
-                  const otherCount = parties.length - 1
-
-                  groups.push({
-                    label,
-                    name: displayName,
-                    isClient: !!clientParty,
-                    otherCount,
-                  })
-                })
-
-                // 의뢰인을 먼저 정렬
-                groups.sort((a, b) => {
-                  if (a.isClient && !b.isClient) return -1
-                  if (!a.isClient && b.isClient) return 1
-                  return 0
-                })
-
-                return groups.map((group, idx) => (
-                  <div key={idx} className="flex items-center gap-2">
-                    {group.isClient ? (
-                      <>
-                        <span className="px-2.5 py-1 bg-sage-100 text-sage-700 rounded-md text-sm">
-                          <span className="font-bold">의뢰인</span> {group.label}
-                        </span>
-                        <span className="text-base font-semibold text-gray-900">
-                          {group.name}
-                          {group.otherCount > 0 && (
-                            <span className="font-normal text-gray-500 ml-1">외 {group.otherCount}명</span>
-                          )}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-sm font-medium">{group.label}</span>
-                        <span className="text-base text-gray-700">
-                          {group.name}
-                          {group.otherCount > 0 && (
-                            <span className="text-gray-500 ml-1">외 {group.otherCount}명</span>
-                          )}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                ))
-              }
-
-              // case_parties 데이터가 없으면 기존 로직 사용 (형사사건 포함)
-              if (partyLabels.isCriminal) {
-                const defendantName = String(getBasicInfo('피고인명', 'dfndtNm') || getBasicInfo('피고', 'rspNm') || '-')
-                const isClient = caseData.client_role === 'defendant'
-                return (
-                  <div className="flex items-center gap-2">
-                    {isClient ? (
-                      <>
-                        <span className="px-2.5 py-1 bg-sage-100 text-sage-700 rounded-md text-sm">
-                          <span className="font-bold">의뢰인</span> {partyLabels.defendant}
-                        </span>
-                        <span className="text-base font-semibold text-gray-900">
-                          {caseData.client?.name || defendantName}
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-sm font-medium">{partyLabels.defendant}</span>
-                        <span className="text-base text-gray-700">{defendantName}</span>
-                      </>
-                    )}
-                  </div>
-                )
-              }
-
-              // SCOURT 스냅샷 기반 fallback
-              const partiesArray = (scourtSnapshot?.basicInfo as any)?.parties || []
-              const findPartyByType = (types: string[]) => {
-                const found = partiesArray.find((p: any) =>
-                  types.some(t => p.btprDvsNm?.includes(t))
-                )
-                return found?.btprNm || ''
-              }
-
-              const getPlaintiffName = () => {
-                const fromBasicInfo =
-                  getBasicInfo('채권자', 'crdtNm') ||
-                  getBasicInfo('신청인', 'aplcNm') ||
-                  getBasicInfo('원고', 'aplNm')
-                if (fromBasicInfo) return fromBasicInfo
-                const fromParties = findPartyByType(['채권자', '신청인', '원고', '항고인'])
-                if (fromParties) return fromParties
-                return partiesArray[0]?.btprNm || '-'
-              }
-
-              const getDefendantName = () => {
-                const fromBasicInfo =
-                  getBasicInfo('채무자', 'dbtNm') ||
-                  getBasicInfo('피신청인', 'rspNm') ||
-                  getBasicInfo('피고', 'rspNm')
-                if (fromBasicInfo) return fromBasicInfo
-                const fromParties = findPartyByType(['채무자', '피신청인', '피고', '상대방', '피항고인'])
-                if (fromParties) return fromParties
-                return partiesArray[1]?.btprNm || '-'
-              }
-
-              const plaintiffInfo = getPartyName('plaintiff', String(getPlaintiffName()))
-              const defendantInfo = getPartyName('defendant', String(getDefendantName()))
-
-              const parties = [
-                { role: 'plaintiff', label: partyLabels.plaintiff, info: plaintiffInfo },
-                { role: 'defendant', label: partyLabels.defendant, info: defendantInfo }
-              ]
-
-              parties.sort((a, b) => {
-                if (a.info.isClient && !b.info.isClient) return -1
-                if (!a.info.isClient && b.info.isClient) return 1
-                return 0
-              })
-
-              return parties.map((party) => (
-                <div key={party.role} className="flex items-center gap-2">
-                  {party.info.isClient ? (
-                    <>
-                      <span className="px-2.5 py-1 bg-sage-100 text-sage-700 rounded-md text-sm">
-                        <span className="font-bold">의뢰인</span> {party.label}
-                      </span>
-                      <span className="text-base font-semibold text-gray-900">
-                        {party.info.name}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-sm font-medium">{party.label}</span>
-                      <span className="text-base text-gray-700">{party.info.name}</span>
-                    </>
-                  )}
-                </div>
-              ))
-            })()}
-          </div>
-
-          {/* 추가 정보 (재판부, 접수일, 인지액 등) */}
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm mt-1">
-            {getBasicInfo('재판부', 'jdgNm') && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">재판부</span>
-                <span className="text-gray-800 font-medium">{getBasicInfo('재판부', 'jdgNm')}</span>
-                {getBasicInfo('재판부전화번호', 'jdgTelno') && (
-                  <span className="text-gray-600 text-xs ml-1">({getBasicInfo('재판부전화번호', 'jdgTelno')})</span>
-                )}
-              </div>
-            )}
-            {caseData.judge_name && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">담당 판사</span>
-                <span className="text-gray-800 font-medium">{caseData.judge_name}</span>
-              </div>
-            )}
-            {getBasicInfo('접수일', 'rcptDt') && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">접수일</span>
-                <span className="text-gray-800 font-medium">{formatProgressDate(String(getBasicInfo('접수일', 'rcptDt')))}</span>
-              </div>
-            )}
-            {getBasicInfo('인지액', 'stmpAmnt') && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">인지액</span>
-                <span className="text-gray-800 font-medium">{Number(getBasicInfo('인지액', 'stmpAmnt')).toLocaleString()}원</span>
-              </div>
-            )}
-            {getBasicInfo('판결도달일', 'jdgArvDt') && (
-              <span className="text-sm text-gray-600">
-                판결도달 {formatProgressDate(String(getBasicInfo('판결도달일', 'jdgArvDt')))}
-              </span>
-            )}
-            {getBasicInfo('조사관', 'exmnrNm') && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">조사관</span>
-                <span className="text-gray-800 font-medium">{getBasicInfo('조사관', 'exmnrNm')}</span>
-                {getBasicInfo('조사관전화번호', 'exmnrTelNo') && (
-                  <span className="text-gray-600 text-xs ml-1">({getBasicInfo('조사관전화번호', 'exmnrTelNo')})</span>
-                )}
-              </div>
-            )}
-            {getBasicInfo('보존여부', 'prsrvYn') === 'Y' && (
-              <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-md text-sm font-medium">
-                {getBasicInfo('보존내용', 'prsrvCtt') || '기록보존'}
-              </span>
-            )}
-            {/* 형사사건 전용 필드 */}
-            {getBasicInfo('형제번호', 'crmcsNo') && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-gray-500">형제번호</span>
-                <span className="text-gray-800 font-medium">{getBasicInfo('형제번호', 'crmcsNo')}</span>
-              </div>
-            )}
-            {getBasicInfo('상소제기내용', 'aplCtt') && (
-              <span className="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm font-medium">
-                {getBasicInfo('상소제기내용', 'aplCtt')}
-              </span>
-            )}
-
-            {/* 동적 필드 렌더링 - 위에서 표시하지 않은 추가 필드들 */}
-            {(() => {
-              if (!scourtSnapshot?.basicInfo) return null;
-
-              // 이미 위에서 하드코딩으로 표시한 필드들 (중복 방지)
-              const displayedFields = new Set([
-                '재판부', 'jdgNm', '재판부전화번호', 'jdgTelno',
-                '접수일', 'rcptDt', '인지액', 'stmpAmnt',
-                '병합구분', 'mrgrDvs', '종국결과', 'endRslt', '종국일', 'endDt',
-                '판결도달일', 'jdgArvDt', '확정일', 'cfrmDt',
-                '조사관', 'exmnrNm', '조사관전화번호', 'exmnrTelNo',
-                '보존여부', 'prsrvYn', '보존내용', 'prsrvCtt',
-                '형제번호', 'crmcsNo', '상소제기내용', 'aplCtt',
-                '원고', 'aplNm', '피고', 'rspNm', '피고인명', 'dfndtNm',
-                '사건번호', 'csNo', '사건명', 'csNm',
-                '심급', 'caseLevelDesc', 'caseLevel',  // 심급은 별도 처리
-                '법원', 'cortNm',  // 법원은 이미 헤더에 표시
-                '채권자', '채무자', '신청인', '피신청인',  // 당사자는 별도 표시
-                'caseCategory', 'caseType', 'parties', 'representatives',
-              ]);
-
-              const visibleFields = getVisibleFields(scourtSnapshot.basicInfo as Record<string, any>);
-              const additionalFields = sortFields(
-                visibleFields.filter(f => !displayedFields.has(f.key))
-              );
-
-              if (additionalFields.length === 0) return null;
-
-              return additionalFields.map(field => (
-                <div key={field.key} className="flex items-center gap-1.5">
-                  <span className="text-gray-500">{field.label}</span>
-                  <span className="text-gray-800 font-medium">{field.value}</span>
-                </div>
-              ));
-            })()}
-          </div>
-
-          {/* 계약 정보 드롭다운 */}
-          <div className="border-t border-gray-100 mt-5 pt-4">
-            <button
-              onClick={() => setShowContractInfo(!showContractInfo)}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <span className="text-sm font-medium text-gray-700">계약 정보</span>
-              <svg
-                className={`w-5 h-5 text-gray-400 transition-transform ${showContractInfo ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {/* 대법원 갱신/연동 */}
+            {isLinked ? (
+              <button
+                onClick={() => handleScourtSync()}
+                disabled={scourtSyncing}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                {scourtSyncing ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                )}
+                {scourtSyncing ? '갱신 중...' : '갱신'}
+              </button>
+            ) : (
+              <button
+                onClick={() => handleScourtSync()}
+                disabled={scourtSyncing}
+                className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium disabled:opacity-50"
+              >
+                {scourtSyncing ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                  </svg>
+                )}
+                {scourtSyncing ? '연동 중...' : '대법원 연동'}
+              </button>
+            )}
+
+            {/* 수정 버튼 */}
+            <button
+              onClick={() => router.push(`/cases/${caseData.id}/edit`)}
+              className="flex items-center gap-2 px-4 py-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-sm font-medium ml-auto"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
+              수정
             </button>
 
-            {showContractInfo && (
-              <div className="mt-4 space-y-4">
-                {/* 계약 기본 정보 */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <label className="text-xs text-gray-400">계약번호</label>
-                    <p className="mt-0.5 text-gray-900">{caseData.contract_number || '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400">계약일</label>
-                    <p className="mt-0.5 text-gray-900">{formatDate(caseData.contract_date)}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400">사건종류</label>
-                    <p className="mt-0.5 text-gray-900">{caseData.case_type || '기타'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400">의뢰인</label>
-                    <p
-                      className="mt-0.5 text-gray-900 cursor-pointer hover:text-sage-600"
-                      onClick={() => caseData.client && router.push(`/clients/${caseData.client_id}`)}
-                    >
-                      {caseData.client?.name || '-'} &rsaquo;
-                    </p>
-                  </div>
-                </div>
+            {/* 최종 갱신 시각 */}
+            {scourtSyncStatus?.lastSync && (
+              <span className="text-xs text-gray-400">
+                {(() => {
+                  const d = new Date(scourtSyncStatus.lastSync)
+                  const now = new Date()
+                  const diffMs = now.getTime() - d.getTime()
+                  const diffMins = Math.floor(diffMs / 60000)
+                  const diffHours = Math.floor(diffMs / 3600000)
+                  const diffDays = Math.floor(diffMs / 86400000)
 
-                {/* 수임료 정보 */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm border-t border-gray-100 pt-4">
-                  <div>
-                    <label className="text-xs text-gray-400">착수금</label>
-                    <p className="mt-0.5 text-gray-900">{formatCurrency(caseData.retainer_fee)}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400">발생 성공보수</label>
-                    <p className="mt-0.5 text-gray-900">{formatCurrency(caseData.calculated_success_fee)}</p>
-                  </div>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentModal(true)}
-                      className="text-xs text-gray-400 hover:text-sage-600"
-                    >
-                      입금액 &rsaquo;
-                    </button>
-                    <p className="mt-0.5 text-gray-900">{formatCurrency(paymentTotal ?? caseData.total_received)}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-gray-400">미수금</label>
-                    <p className="mt-0.5 text-red-600 font-medium">{formatCurrency(calculateOutstandingBalance())}</p>
-                  </div>
-                </div>
-
-                {/* 성공보수 약정 */}
-                <div className="text-sm border-t border-gray-100 pt-4">
-                  <label className="text-xs text-gray-400">성공보수 약정</label>
-                  <p className="mt-0.5 text-gray-700">{caseData.success_fee_agreement || '-'}</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 당사자 정보 드롭다운 */}
-          <div className="border-t border-gray-100 mt-5 pt-4">
-            <button
-              onClick={() => setShowPartiesInfo(!showPartiesInfo)}
-              className="flex items-center justify-between w-full text-left"
-            >
-              <span className="text-sm font-medium text-gray-700">당사자 정보</span>
-              <svg
-                className={`w-5 h-5 text-gray-400 transition-transform ${showPartiesInfo ? 'rotate-180' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-
-            {showPartiesInfo && (
-              <div className="mt-3">
-                <CasePartiesSection
-                  caseId={caseData.id}
-                  clientId={caseData.client_id}
-                  clientName={caseData.client?.name}
-                  clientRole={caseData.client_role}
-                  opponentName={caseData.opponent_name}
-                  onPartiesUpdate={() => {
-                    fetchCaseParties()
-                    router.refresh()
-                  }}
-                  scourtParties={(scourtSnapshot?.basicInfo as any)?.parties || []}
-                  scourtRepresentatives={(scourtSnapshot?.basicInfo as any)?.representatives || []}
-                />
-              </div>
+                  if (diffMins < 1) return '방금 전'
+                  if (diffMins < 60) return `${diffMins}분 전`
+                  if (diffHours < 24) return `${diffHours}시간 전`
+                  if (diffDays < 7) return `${diffDays}일 전`
+                  return `${d.getMonth() + 1}/${d.getDate()}`
+                })()}
+              </span>
             )}
           </div>
         </div>
 
-        {/* Related Cases */}
-        {caseData.case_relations && caseData.case_relations.length > 0 && (
-          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">관련 사건</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-              {caseData.case_relations.map((relation) => {
-                // 관계 라벨 결정
-                const getRelationLabel = () => {
-                  const relationType = relation.relation_type
-                  // 심급 관련 관계만 case_level로 변환
-                  if (relationType === '하심사건' || relationType === '상심사건') {
-                    const caseLevel = relation.related_case?.case_level
-                    if (caseLevel) return `${caseLevel}사건`
-                    // case_level이 없으면 원본 유지
-                    return relationType === '하심사건' ? '원심' : '상심'
-                  }
-                  // 반소, 본소, 가압류, 가처분 등은 그대로 표시
-                  return relationType || '관련사건'
-                }
+        {/* Segmented Control - Apple 스타일 탭 */}
+        <div className="bg-gray-100 p-1 rounded-xl mb-6 inline-flex w-full">
+          {[
+            { key: 'overview', label: '개요' },
+            { key: 'general', label: '일반' },
+            { key: 'progress', label: '진행' },
+            { key: 'contract', label: '계약' },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as TabType)}
+              className={`flex-1 py-2.5 px-4 text-sm font-medium rounded-lg transition-all ${
+                activeTab === tab.key
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+              {tab.key === 'general' && scourtSnapshot?.rawData && (
+                <span className={`ml-1.5 text-xs ${activeTab === tab.key ? 'text-sage-600' : 'text-gray-400'}`}>
+                  ●
+                </span>
+              )}
+              {tab.key === 'progress' && scourtSnapshot?.progress && scourtSnapshot.progress.length > 0 && (
+                <span className={`ml-1.5 text-xs ${activeTab === tab.key ? 'text-sage-600' : 'text-gray-400'}`}>
+                  {scourtSnapshot.progress.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
 
-                return (
-                  <div
-                    key={relation.id}
-                    onClick={() => router.push(`/cases/${relation.related_case_id}`)}
-                    className="flex items-center justify-between p-3 border border-gray-200 rounded hover:border-sage-300 hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="inline-block px-1.5 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded">
-                        {getRelationLabel()}
-                      </span>
-                      <span className="text-sm text-gray-900 font-medium">{relation.related_case?.case_name || '사건명 없음'}</span>
-                      {relation.related_case?.case_result && (
-                        <span className="inline-block px-1.5 py-0.5 text-xs font-medium bg-amber-50 text-amber-700 rounded">
-                          {relation.related_case.case_result}
-                        </span>
+        {/* 탭 콘텐츠 */}
+        {/* 개요 탭 */}
+        {activeTab === 'overview' && (
+          <div className="space-y-4">
+            {/* 재판부/접수일 등 핵심 정보 */}
+            {(getBasicInfo('재판부', 'jdgNm') || getBasicInfo('접수일', 'rcptDt') || caseData.judge_name) && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">사건 정보</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                  {getBasicInfo('재판부', 'jdgNm') && (
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-0.5">재판부</span>
+                      <span className="text-gray-900 font-medium">{getBasicInfo('재판부', 'jdgNm')}</span>
+                      {getBasicInfo('재판부전화번호', 'jdgTelno') && (
+                        <span className="text-gray-500 text-xs ml-1">({getBasicInfo('재판부전화번호', 'jdgTelno')})</span>
                       )}
                     </div>
-                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
+                  )}
+                  {caseData.judge_name && (
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-0.5">담당 판사</span>
+                      <span className="text-gray-900 font-medium">{caseData.judge_name}</span>
+                    </div>
+                  )}
+                  {getBasicInfo('접수일', 'rcptDt') && (
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-0.5">접수일</span>
+                      <span className="text-gray-900 font-medium">{formatProgressDate(String(getBasicInfo('접수일', 'rcptDt')))}</span>
+                    </div>
+                  )}
+                  {/* 종국결과: 항상 표시 (값 없으면 '-') */}
+                  <div>
+                    <span className="text-gray-500 block text-xs mb-0.5">종국결과</span>
+                    <span className="text-gray-900 font-medium">
+                      {getBasicInfo('종국결과', 'endRslt') || caseData.case_result || '-'}
+                      {getBasicInfo('종국일', 'endDt') && (
+                        <span className="text-gray-500 text-xs ml-1">
+                          ({formatProgressDate(String(getBasicInfo('종국일', 'endDt')))})
+                        </span>
+                      )}
+                    </span>
                   </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
+                  {getBasicInfo('인지액', 'stmpAmnt') && (
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-0.5">인지액</span>
+                      <span className="text-gray-900 font-medium">{Number(getBasicInfo('인지액', 'stmpAmnt')).toLocaleString()}원</span>
+                    </div>
+                  )}
+                  {getBasicInfo('조사관', 'exmnrNm') && (
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-0.5">조사관</span>
+                      <span className="text-gray-900 font-medium">{getBasicInfo('조사관', 'exmnrNm')}</span>
+                      {getBasicInfo('조사관전화번호', 'exmnrTelNo') && (
+                        <span className="text-gray-500 text-xs ml-1">({getBasicInfo('조사관전화번호', 'exmnrTelNo')})</span>
+                      )}
+                    </div>
+                  )}
+                  {getBasicInfo('판결도달일', 'jdgArvDt') && (
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-0.5">판결도달일</span>
+                      <span className="text-gray-900 font-medium">{formatProgressDate(String(getBasicInfo('판결도달일', 'jdgArvDt')))}</span>
+                    </div>
+                  )}
+                  {/* 형사사건 전용 필드 */}
+                  {getBasicInfo('형제번호', 'crmcsNo') && (
+                    <div>
+                      <span className="text-gray-500 block text-xs mb-0.5">형제번호</span>
+                      <span className="text-gray-900 font-medium">{getBasicInfo('형제번호', 'crmcsNo')}</span>
+                    </div>
+                  )}
+                </div>
+                {/* 추가 뱃지 정보 */}
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {getBasicInfo('보존여부', 'prsrvYn') === 'Y' && (
+                    <span className="px-2.5 py-1 bg-gray-100 text-gray-700 border border-gray-200 rounded-md text-sm font-medium">
+                      {getBasicInfo('보존내용', 'prsrvCtt') || '기록보존'}
+                    </span>
+                  )}
+                  {getBasicInfo('상소제기내용', 'aplCtt') && (
+                    <span className="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 rounded-md text-sm font-medium">
+                      {getBasicInfo('상소제기내용', 'aplCtt')}
+                    </span>
+                  )}
+                </div>
+                {/* 동적 필드 렌더링 - 위에서 표시하지 않은 추가 필드들 */}
+                {(() => {
+                  if (!scourtSnapshot?.basicInfo) return null;
 
-        {/* Notes */}
-        {caseData.notes && (
-          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">메모</h2>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap">{caseData.notes}</p>
-          </div>
-        )}
+                  // 이미 위에서 하드코딩으로 표시한 필드들 (중복 방지)
+                  const displayedFields = new Set([
+                    '재판부', 'jdgNm', '재판부전화번호', 'jdgTelno',
+                    '접수일', 'rcptDt', '인지액', 'stmpAmnt',
+                    '병합구분', 'mrgrDvs', '종국결과', 'endRslt', '종국일', 'endDt',
+                    '판결도달일', 'jdgArvDt', '확정일', 'cfrmDt',
+                    '조사관', 'exmnrNm', '조사관전화번호', 'exmnrTelNo',
+                    '보존여부', 'prsrvYn', '보존내용', 'prsrvCtt',
+                    '형제번호', 'crmcsNo', '상소제기내용', 'aplCtt',
+                    '원고', 'aplNm', '피고', 'rspNm', '피고인명', 'dfndtNm',
+                    '사건번호', 'csNo', '사건명', 'csNm',
+                    '심급', 'caseLevelDesc', 'caseLevel',
+                    '법원', 'cortNm',
+                    '채권자', '채무자', '신청인', '피신청인',
+                    'caseCategory', 'caseType', 'parties', 'representatives',
+                  ]);
 
-        {/* 일정 섹션 */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-5 shadow-sm relative">
-          {/* 일정 추가 버튼 - 우측 상단 */}
-          <button
-            onClick={() => setShowScheduleModal(true)}
-            className="absolute top-4 right-4 p-2 text-sage-600 hover:bg-sage-50 rounded-lg transition-colors"
-            title="일정 추가"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
+                  const visibleFields = getVisibleFields(scourtSnapshot.basicInfo as Record<string, unknown>);
+                  const additionalFields = sortFields(
+                    visibleFields.filter(f => !displayedFields.has(f.key))
+                  );
 
-          {loading ? (
-            <div className="py-10 text-center text-gray-400 text-base">
-              로딩 중...
-            </div>
-          ) : unifiedSchedules.length === 0 ? (
-            <div className="py-10 text-center text-gray-400 text-base">
-              등록된 일정이 없습니다
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {unifiedSchedules.map((item) => {
-                const isHearing = item.type === 'court_hearing'
-                const isDeadline = item.type === 'deadline'
-                    const source = item.source
-                    const itemKey = `${item.type}-${item.id}`
-                    const hasReport = isHearing && 'report' in source && source.report
+                  if (additionalFields.length === 0) return null;
+
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm mt-4 pt-4 border-t border-gray-100">
+                      {additionalFields.map(field => (
+                        <div key={field.key}>
+                          <span className="text-gray-500 block text-xs mb-0.5">{field.label}</span>
+                          <span className="text-gray-900 font-medium">{field.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* SCOURT 일반내용 보기 (접을 수 있는 섹션) */}
+            {scourtSnapshot && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <button
+                  onClick={() => setShowScourtDetail(!showScourtDetail)}
+                  className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-sm font-semibold text-gray-900">대법원 일반내용</h3>
+                    <span className="text-xs text-gray-500">
+                      {showScourtDetail ? '접기' : '전체 보기'}
+                    </span>
+                  </div>
+                  <svg
+                    className={`w-5 h-5 text-gray-400 transition-transform ${showScourtDetail ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {showScourtDetail && (
+                  <div className="px-5 pb-5 border-t border-gray-100">
+                    <ScourtGeneralInfo snapshotData={scourtSnapshot} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 관련 사건 */}
+            {caseData.case_relations && caseData.case_relations.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="text-sm font-semibold text-gray-900 mb-4">관련 사건</h3>
+                <div className="space-y-2">
+                  {caseData.case_relations.map((relation) => {
+                    const getRelationLabel = () => {
+                      const relationType = relation.relation_type
+                      if (relationType === '하심사건' || relationType === '상심사건') {
+                        const caseLevel = relation.related_case?.case_level
+                        if (caseLevel) return `${caseLevel}사건`
+                        return relationType === '하심사건' ? '원심' : '상심'
+                      }
+                      return relationType || '관련사건'
+                    }
 
                     return (
-                      <div
-                        key={itemKey}
-                        onClick={() => {
-                          if (isHearing) {
-                            setSelectedHearing(item.source as CourtHearing)
-                            setShowHearingModal(true)
-                          }
-                        }}
-                        className={`border-l-4 rounded p-3 cursor-pointer hover:shadow-sm transition-shadow ${getScheduleTypeStyle(item.type, item.subtype)}`}
+                      <button
+                        key={relation.id}
+                        onClick={() => router.push(`/cases/${relation.related_case_id}`)}
+                        className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-left"
                       >
-                        {/* 첫 번째 줄: [기일종류] 의뢰인 v 상대방 + D-day */}
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold text-gray-800">
-                              [{item.title}]
-                            </span>
-                            {isHearing && (
-                              <span className="text-sm font-medium text-gray-900">
-                                {getPartyVsString()}
-                              </span>
-                            )}
-                            {!isHearing && (
-                              <span className="text-sm text-gray-700">{item.title}</span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {item.status && (
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                isHearing
-                                  ? item.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                                    item.status === 'POSTPONED' ? 'bg-yellow-100 text-yellow-700' :
-                                    item.status === 'CANCELLED' ? 'bg-gray-100 text-gray-500' :
-                                    'bg-blue-100 text-blue-700'
-                                  : item.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :
-                                    item.status === 'OVERDUE' ? 'bg-red-100 text-red-700' :
-                                    'bg-yellow-100 text-yellow-700'
-                              }`}>
-                                {isHearing
-                                  ? item.status === 'COMPLETED'
-                                    ? '완료'
-                                    : HEARING_STATUS_LABELS[item.status as HearingStatus]
-                                  : DEADLINE_STATUS_LABELS[item.status as DeadlineStatus]}
-                              </span>
-                            )}
-                            {item.days_until !== undefined && (
-                              <span className={`text-xs font-bold ${
-                                item.days_until <= 1 ? 'text-red-600' :
-                                item.days_until <= 3 ? 'text-orange-600' :
-                                item.days_until <= 7 ? 'text-yellow-600' :
-                                'text-green-600'
-                              }`}>
-                                {formatDaysUntil(item.days_until)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* 두 번째 줄: 날짜/시간 | 장소 */}
-                        <div className="flex items-center gap-2 text-xs text-gray-600">
-                          <span className="flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            {item.datetime ? formatDateTime(item.datetime) : formatDate(item.date)}
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
+                            {getRelationLabel()}
                           </span>
-                          {item.location && (
-                            <>
-                              <span className="text-gray-400">|</span>
-                              <span className="flex items-center gap-1">
-                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                </svg>
-                                {item.location}
-                              </span>
-                            </>
+                          <span className="text-sm text-gray-900">{relation.related_case?.case_name || '사건명 없음'}</span>
+                          {relation.related_case?.case_result && (
+                            <span className="text-xs px-2 py-0.5 bg-amber-50 text-amber-700 rounded">
+                              {relation.related_case.case_result}
+                            </span>
                           )}
                         </div>
-
-                        {/* 세 번째 줄: 출석변호사 (기일만) */}
-                        {isHearing && (
-                          <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
-                            <span className="flex items-center gap-1">
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                              </svg>
-                              출석:
-                            </span>
-                            {editingLawyerHearingId === item.id ? (
-                              <select
-                                value={(source as any).attending_lawyer_id || ''}
-                                onChange={(e) => {
-                                  e.stopPropagation()
-                                  updateAttendingLawyer(item.id, e.target.value || null)
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                                className="text-xs border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                                autoFocus
-                                onBlur={() => setEditingLawyerHearingId(null)}
-                              >
-                                <option value="">담당변호사</option>
-                                {tenantMembers.map(member => (
-                                  <option key={member.id} value={member.id}>
-                                    {member.display_name}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setEditingLawyerHearingId(item.id)
-                                }}
-                                className="text-gray-700 hover:text-blue-600 hover:underline flex items-center gap-1"
-                              >
-                                {(source as any).attending_lawyer?.display_name || '담당변호사'}
-                                <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                </svg>
-                              </button>
-                            )}
-                          </div>
-                        )}
-
-                        {/* 보고서 버튼 (있는 경우) */}
-                        {hasReport && (
-                          <div className="mt-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setReportModal({
-                                  title: `${item.title || '재판기일'} 보고서`,
-                                  report: source.report || '',
-                                  court: caseData.court_name,
-                                  caseNumber: caseData.court_case_number,
-                                  date: item.date
-                                })
-                              }}
-                              className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
-                              보고서 보기
-                            </button>
-                          </div>
-                        )}
-
-                        {isDeadline && (
-                          <div className="mt-2 text-xs text-gray-500">
-                            기산일: {formatDate((source as CaseDeadline).trigger_date)}
-                            {(source as CaseDeadline).completed_at && (
-                              <span className="ml-3 text-green-600">
-                                완료: {formatDateTime((source as CaseDeadline).completed_at!)}
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {(('notes' in source && source.notes) || ('description' in source && source.description)) && (
-                          <p className="mt-2 text-xs text-gray-500 italic">
-                            {('notes' in source && source.notes) || ('description' in source && source.description)}
-                          </p>
-                        )}
-                      </div>
+                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
                     )
                   })}
                 </div>
-              )}
-        </div>
-
-        {/* SCOURT 정보 섹션 */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-
-          {!caseData.court_case_number ? (
-            <div className="py-10 text-center text-gray-400 text-base">
-              사건번호를 먼저 등록해주세요
-            </div>
-          ) : scourtLoading ? (
-            <div className="py-10 text-center text-gray-400 text-base">
-              로딩 중...
-            </div>
-          ) : !(isLinked || scourtSyncStatus?.isLinked) ? (
-            <div className="py-10 text-center text-gray-400">
-              <p className="text-base">대법원 사건 연동이 필요합니다.</p>
-              <p className="mt-2 text-sm">사건번호로 검색하여 사건을 연동해주세요.</p>
-            </div>
-          ) : !scourtSnapshot ? (
-            <div className="py-10 text-center text-gray-400">
-              <p className="text-base">동기화된 데이터가 없습니다.</p>
-              <p className="mt-2 text-sm">동기화 버튼을 눌러 대법원에서 정보를 가져오세요.</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {/* 심급내용 (원심 사건 정보) - case_relations에 이미 연결된 사건은 제외 */}
-              {(() => {
-                // case_relations에 있는 사건 ID들과 사건번호들 (이미 위에 표시되므로 제외)
-                const linkedCaseIds = new Set(
-                  (caseData.case_relations || []).map(r => r.related_case_id)
-                )
-                const linkedCaseNumbers = new Set(
-                  (caseData.case_relations || [])
-                    .map(r => r.related_case?.court_case_number)
-                    .filter(Boolean)
-                )
-                // 중복 제외된 심급내용 (ID 또는 사건번호로 체크)
-                const filteredLowerCourt = (scourtSnapshot.lowerCourt || []).filter(
-                  (item: any) => {
-                    // linkedCaseId가 있고 case_relations에 있으면 제외
-                    if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
-                    // 사건번호가 case_relations의 사건번호와 일치하면 제외
-                    if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
-                    return true
-                  }
-                )
-
-                return filteredLowerCourt.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <svg className="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      심급내용 (원심)
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-amber-50 border-b border-amber-200">
-                            <th className="py-3 px-4 text-left text-sm text-amber-700 font-semibold">법원</th>
-                            <th className="py-3 px-4 text-left text-sm text-amber-700 font-semibold">사건번호</th>
-                            <th className="py-3 px-4 text-left text-sm text-amber-700 font-semibold w-40">결과</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredLowerCourt.map((item: any, idx: number) => (
-                            <tr key={`lower-${idx}`} className="border-b border-gray-100 last:border-0 hover:bg-amber-50/50 transition-colors">
-                              <td className="py-3 px-4 text-sm text-gray-700">{item.courtName || item.court || '-'}</td>
-                              <td className="py-3 px-4 text-sm text-gray-900 font-medium">
-                                {item.linkedCaseId ? (
-                                  <button
-                                    onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
-                                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium flex items-center gap-1"
-                                    title="시스템 내 사건으로 이동"
-                                  >
-                                    {item.caseNo || '-'}
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                    </svg>
-                                  </button>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <span>{item.caseNo || '-'}</span>
-                                    <button
-                                      onClick={() => {
-                                        // 당사자명: 상대방 또는 의뢰인 이름 사용
-                                        const partyName = caseData.opponent_name || caseData.client?.name || ''
-                                        const clientId = caseData.client_id || ''
-                                        router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || '')}&courtName=${encodeURIComponent(item.courtName || item.court || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}`)
-                                      }}
-                                      className="px-2 py-0.5 text-xs bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
-                                      title="이 사건을 시스템에 등록"
-                                    >
-                                      등록하기
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                              <td className="py-3 px-4 text-sm text-amber-600 font-medium">
-                                {item.resultDate ? `${formatProgressDate(item.resultDate)} ` : ''}
-                                {item.result || '-'}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* 관련사건 - case_relations에 이미 연결된 사건은 제외 */}
-              {(() => {
-                // case_relations에 있는 사건 ID들과 사건번호들 (이미 위에 표시되므로 제외)
-                const linkedCaseIds = new Set(
-                  (caseData.case_relations || []).map(r => r.related_case_id)
-                )
-                const linkedCaseNumbers = new Set(
-                  (caseData.case_relations || [])
-                    .map(r => r.related_case?.court_case_number)
-                    .filter(Boolean)
-                )
-                // 중복 제외된 관련사건 (ID 또는 사건번호로 체크)
-                const filteredRelatedCases = (scourtSnapshot.relatedCases || []).filter(
-                  (item: any) => {
-                    // linkedCaseId가 있고 case_relations에 있으면 제외
-                    if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
-                    // 사건번호가 case_relations의 사건번호와 일치하면 제외
-                    if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
-                    return true
-                  }
-                )
-
-                return filteredRelatedCases.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <svg className="w-4 h-4 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      관련사건
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-purple-50 border-b border-purple-200">
-                            <th className="py-3 px-4 text-left text-sm text-purple-700 font-semibold w-32">구분</th>
-                            <th className="py-3 px-4 text-left text-sm text-purple-700 font-semibold">법원</th>
-                            <th className="py-3 px-4 text-left text-sm text-purple-700 font-semibold">사건번호</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredRelatedCases.map((item: any, idx: number) => (
-                            <tr key={`related-${idx}`} className="border-b border-gray-100 last:border-0 hover:bg-purple-50/50 transition-colors">
-                              <td className="py-3 px-4 text-sm text-purple-600 font-medium">{item.relation || item.relation_type || '관련사건'}</td>
-                              <td className="py-3 px-4 text-sm text-gray-700">{item.caseName || item.court_name || '-'}</td>
-                              <td className="py-3 px-4 text-sm text-gray-900 font-medium">
-                                {item.linkedCaseId ? (
-                                  <button
-                                    onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
-                                    className="text-blue-600 hover:text-blue-800 hover:underline font-medium flex items-center gap-1"
-                                    title="시스템 내 사건으로 이동"
-                                  >
-                                    {item.caseNo || item.case_number || '-'}
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                    </svg>
-                                  </button>
-                                ) : (
-                                  <div className="flex items-center gap-2">
-                                    <span>{item.caseNo || item.case_number || '-'}</span>
-                                    <button
-                                      onClick={() => {
-                                        // 당사자명: 상대방 또는 의뢰인 이름 사용
-                                        const partyName = caseData.opponent_name || caseData.client?.name || ''
-                                        const clientId = caseData.client_id || ''
-                                        router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || item.case_number || '')}&courtName=${encodeURIComponent(item.caseName || item.court_name || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}`)
-                                      }}
-                                      className="px-2 py-0.5 text-xs bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
-                                      title="이 사건을 시스템에 등록"
-                                    >
-                                      등록하기
-                                    </button>
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )
-              })()}
-
-              {/* 당사자/대리인 내용은 CasePartiesSection에서 통합 표시 */}
-
-            </div>
-          )}
-        </div>
-
-        {/* 진행내용 섹션 - 별도 카드 */}
-        {scourtSnapshot && scourtSnapshot.progress && scourtSnapshot.progress.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mt-5 shadow-sm">
-            {/* 헤더 + 필터 탭 */}
-            <div className="flex items-center gap-4 mb-4">
-              <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <svg className="w-4 h-4 text-sage-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                </svg>
-                진행내용
-                <span className="text-xs font-normal text-gray-400">
-                  ({filterProgress(scourtSnapshot.progress).length}건)
-                </span>
-              </h3>
-
-              {/* 필터 탭 */}
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { key: 'all', label: '전체' },
-                  { key: 'hearing', label: '기일' },
-                  { key: 'order', label: '명령' },
-                  { key: 'submit', label: '제출' },
-                  { key: 'delivery', label: '송달' },
-                  { key: 'court', label: '법원' },
-                ].map(tab => {
-                  const isActive = progressFilter === tab.key
-                  const count = tab.key === 'all'
-                    ? scourtSnapshot.progress.length
-                    : scourtSnapshot.progress.filter(item => getProgressCategory(item) === tab.key).length
-
-                  if (tab.key !== 'all' && count === 0) return null
-
-                  return (
-                    <button
-                      key={tab.key}
-                      onClick={() => {
-                        setProgressFilter(tab.key as typeof progressFilter)
-                        setShowProgressDetail(false) // 필터 변경 시 더보기 상태 초기화
-                      }}
-                      className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
-                        isActive
-                          ? 'bg-sage-600 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      {tab.label}
-                      <span className={`ml-1 ${isActive ? 'opacity-80' : 'text-gray-400'}`}>
-                        {count}
-                      </span>
-                    </button>
-                  )
-                })}
               </div>
-            </div>
+            )}
 
-            {/* 진행내용 테이블 */}
+            {/* 심급내용 (원심) - SCOURT */}
             {(() => {
-              const filteredItems = filterProgress(scourtSnapshot.progress)
-              const displayItems = showProgressDetail ? filteredItems : filteredItems.slice(0, 15)
+              const linkedCaseIds = new Set((caseData.case_relations || []).map(r => r.related_case_id))
+              const linkedCaseNumbers = new Set(
+                (caseData.case_relations || [])
+                  .map(r => r.related_case?.court_case_number)
+                  .filter(Boolean)
+              )
+              const filteredLowerCourt = (scourtSnapshot?.lowerCourt || []).filter(
+                (item: any) => {
+                  if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
+                  if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
+                  return true
+                }
+              )
 
-              return filteredItems.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-sage-50 border-b border-sage-200">
-                        <th className="py-3 px-4 text-left text-sm text-sage-700 font-semibold w-28">일자</th>
-                        <th className="py-3 px-4 text-left text-sm text-sage-700 font-semibold">내용</th>
-                        <th className="py-3 px-4 text-left text-sm text-sage-700 font-semibold w-28">결과</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {displayItems.map((item, idx) => {
-                        const textColor = getProgressColor(item)
-                        return (
-                          <tr key={idx} className="border-b border-gray-100 last:border-0 hover:bg-sage-50/50 transition-colors">
-                            <td className="py-3 px-4 text-sm font-medium whitespace-nowrap" style={{ color: textColor }}>{formatProgressDate(item.date)}</td>
-                            <td className="py-3 px-4 text-sm leading-relaxed" style={{ color: textColor }}>{item.content || '-'}</td>
-                            <td className="py-3 px-4 text-sm" style={{ color: textColor }}>{item.result ? formatProgressDate(item.result) : '-'}</td>
+              return filteredLowerCourt.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">심급내용 (원심)</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="py-2 px-3 text-left text-gray-500 font-medium">법원</th>
+                          <th className="py-2 px-3 text-left text-gray-500 font-medium">사건번호</th>
+                          <th className="py-2 px-3 text-left text-gray-500 font-medium">결과</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredLowerCourt.map((item: any, idx: number) => (
+                          <tr key={`lower-${idx}`} className="border-b border-gray-100 last:border-0">
+                            <td className="py-2.5 px-3 text-gray-700">{item.courtName || item.court || '-'}</td>
+                            <td className="py-2.5 px-3">
+                              {item.linkedCaseId ? (
+                                <button
+                                  onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
+                                  className="text-sage-600 hover:text-sage-700 font-medium flex items-center gap-1"
+                                >
+                                  {item.caseNo || '-'}
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-900">{item.caseNo || '-'}</span>
+                                  <button
+                                    onClick={() => {
+                                      const partyName = caseData.opponent_name || caseData.client?.name || ''
+                                      const clientId = caseData.client_id || ''
+                                      router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || '')}&courtName=${encodeURIComponent(item.courtName || item.court || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}`)
+                                    }}
+                                    className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
+                                  >
+                                    등록
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-gray-600">
+                              {item.resultDate ? `${formatProgressDate(item.resultDate)} ` : ''}
+                              {item.result || '-'}
+                            </td>
                           </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                  {!showProgressDetail && filteredItems.length > 15 && (
-                    <button
-                      onClick={() => setShowProgressDetail(true)}
-                      className="w-full py-3 text-sm text-sage-600 hover:text-sage-700 hover:bg-sage-50 transition-colors mt-2 border-t border-gray-100 font-medium"
-                    >
-                      + {filteredItems.length - 15}건 더보기
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="py-8 text-center text-gray-400 text-sm">
-                  해당 카테고리의 진행내용이 없습니다.
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )
             })()}
+
+            {/* 관련사건 - SCOURT */}
+            {(() => {
+              const linkedCaseIds = new Set((caseData.case_relations || []).map(r => r.related_case_id))
+              const linkedCaseNumbers = new Set(
+                (caseData.case_relations || [])
+                  .map(r => r.related_case?.court_case_number)
+                  .filter(Boolean)
+              )
+              const filteredRelatedCases = (scourtSnapshot?.relatedCases || []).filter(
+                (item: any) => {
+                  if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
+                  if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
+                  return true
+                }
+              )
+
+              return filteredRelatedCases.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">관련사건 (대법원)</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="py-2 px-3 text-left text-gray-500 font-medium w-24">구분</th>
+                          <th className="py-2 px-3 text-left text-gray-500 font-medium">법원</th>
+                          <th className="py-2 px-3 text-left text-gray-500 font-medium">사건번호</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredRelatedCases.map((item: any, idx: number) => (
+                          <tr key={`related-${idx}`} className="border-b border-gray-100 last:border-0">
+                            <td className="py-2.5 px-3 text-sage-600 font-medium">{item.relation || item.relation_type || '관련사건'}</td>
+                            <td className="py-2.5 px-3 text-gray-700">{item.caseName || item.court_name || '-'}</td>
+                            <td className="py-2.5 px-3">
+                              {item.linkedCaseId ? (
+                                <button
+                                  onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
+                                  className="text-sage-600 hover:text-sage-700 font-medium flex items-center gap-1"
+                                >
+                                  {item.caseNo || item.case_number || '-'}
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                  </svg>
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-gray-900">{item.caseNo || item.case_number || '-'}</span>
+                                  <button
+                                    onClick={() => {
+                                      const partyName = caseData.opponent_name || caseData.client?.name || ''
+                                      const clientId = caseData.client_id || ''
+                                      router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || item.case_number || '')}&courtName=${encodeURIComponent(item.caseName || item.court_name || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}`)
+                                    }}
+                                    className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
+                                  >
+                                    등록
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            })()}
+
+            {/* 당사자 정보 */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">당사자 정보</h3>
+              <CasePartiesSection
+                caseId={caseData.id}
+                courtCaseNumber={caseData.court_case_number}
+                clientId={caseData.client_id}
+                clientName={caseData.client?.name}
+                clientRole={caseData.client_role}
+                opponentName={caseData.opponent_name}
+                onPartiesUpdate={() => {
+                  fetchCaseParties()
+                  router.refresh()
+                }}
+                scourtParties={(scourtSnapshot?.basicInfo as any)?.parties || []}
+                scourtRepresentatives={(scourtSnapshot?.basicInfo as any)?.representatives || []}
+              />
+            </div>
+
+            {/* 메모 */}
+            {caseData.notes && (
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">메모</h3>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{caseData.notes}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 일반 탭 - SCOURT 일반내용 (XML 기반) */}
+        {activeTab === 'general' && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            {!caseData.court_case_number ? (
+              <div className="py-12 text-center text-gray-400">
+                사건번호를 먼저 등록해주세요
+              </div>
+            ) : scourtLoading ? (
+              <div className="py-12 text-center text-gray-400">로딩 중...</div>
+            ) : !(isLinked || scourtSyncStatus?.isLinked) ? (
+              <div className="py-12 text-center">
+                <p className="text-gray-400 mb-4">대법원 연동이 필요합니다</p>
+              </div>
+            ) : !scourtSnapshot?.rawData ? (
+              <div className="py-12 text-center">
+                <p className="text-gray-400 mb-4">일반내용 데이터가 없습니다</p>
+                <p className="text-gray-400 text-sm">사건을 다시 동기화해주세요</p>
+              </div>
+            ) : (
+              <ScourtGeneralInfoXml
+                apiData={scourtSnapshot.rawData}
+                caseType={detectCaseTypeFromCaseNumber(caseData.court_case_number || '')}
+              />
+            )}
+          </div>
+        )}
+
+        {/* 진행 탭 - 5색 분류 유지 */}
+        {activeTab === 'progress' && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            {!caseData.court_case_number ? (
+              <div className="py-12 text-center text-gray-400">
+                사건번호를 먼저 등록해주세요
+              </div>
+            ) : scourtLoading ? (
+              <div className="py-12 text-center text-gray-400">로딩 중...</div>
+            ) : !(isLinked || scourtSyncStatus?.isLinked) ? (
+              <div className="py-12 text-center">
+                <p className="text-gray-400 mb-4">대법원 연동이 필요합니다</p>
+                <button
+                  onClick={() => handleScourtSync()}
+                  disabled={scourtSyncing}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors text-sm font-medium disabled:opacity-50"
+                >
+                  대법원 연동하기
+                </button>
+              </div>
+            ) : !scourtSnapshot || !scourtSnapshot.progress || scourtSnapshot.progress.length === 0 ? (
+              <div className="py-12 text-center text-gray-400">
+                진행내용이 없습니다
+              </div>
+            ) : (
+              <>
+                {/* 필터 탭 */}
+                <div className="flex flex-wrap gap-2 mb-5">
+                  {[
+                    { key: 'all', label: '전체' },
+                    { key: 'hearing', label: '기일', color: '#003399' },
+                    { key: 'order', label: '명령', color: '#336633' },
+                    { key: 'submit', label: '제출', color: '#660000' },
+                    { key: 'delivery', label: '송달', color: '#CC6600' },
+                    { key: 'court', label: '법원', color: '#000000' },
+                  ].map(tab => {
+                    const isActive = progressFilter === tab.key
+                    const count = tab.key === 'all'
+                      ? scourtSnapshot.progress.length
+                      : scourtSnapshot.progress.filter(item => getProgressCategory(item) === tab.key).length
+
+                    if (tab.key !== 'all' && count === 0) return null
+
+                    return (
+                      <button
+                        key={tab.key}
+                        onClick={() => {
+                          setProgressFilter(tab.key as typeof progressFilter)
+                          setShowProgressDetail(false)
+                        }}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                          isActive
+                            ? 'text-white'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        style={isActive && tab.color ? { backgroundColor: tab.color } : isActive ? { backgroundColor: '#87A96B' } : {}}
+                      >
+                        {tab.label}
+                        <span className={`ml-1 ${isActive ? 'opacity-80' : 'text-gray-400'}`}>
+                          {count}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* 진행내용 테이블 */}
+                {(() => {
+                  const filteredItems = filterProgress(scourtSnapshot.progress)
+                  const displayItems = showProgressDetail ? filteredItems : filteredItems.slice(0, 15)
+
+                  return filteredItems.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-gray-200">
+                            <th className="py-2 px-3 text-left text-gray-500 font-medium w-24">일자</th>
+                            <th className="py-2 px-3 text-left text-gray-500 font-medium">내용</th>
+                            <th className="py-2 px-3 text-left text-gray-500 font-medium w-24">결과</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {displayItems.map((item, idx) => {
+                            const textColor = getProgressColor(item)
+                            return (
+                              <tr key={idx} className="border-b border-gray-100 last:border-0">
+                                <td className="py-2.5 px-3 font-medium whitespace-nowrap" style={{ color: textColor }}>{formatProgressDate(item.date)}</td>
+                                <td className="py-2.5 px-3 leading-relaxed" style={{ color: textColor }}>{item.content || '-'}</td>
+                                <td className="py-2.5 px-3" style={{ color: textColor }}>{item.result ? formatProgressDate(item.result) : '-'}</td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                      {!showProgressDetail && filteredItems.length > 15 && (
+                        <button
+                          onClick={() => setShowProgressDetail(true)}
+                          className="w-full py-3 text-sm text-sage-600 hover:text-sage-700 hover:bg-gray-50 transition-colors mt-2 border-t border-gray-100 font-medium"
+                        >
+                          + {filteredItems.length - 15}건 더보기
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="py-8 text-center text-gray-400 text-sm">
+                      해당 카테고리의 진행내용이 없습니다.
+                    </div>
+                  )
+                })()}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* 계약 탭 */}
+        {activeTab === 'contract' && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            {/* 계약 기본 정보 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">계약번호</span>
+                <span className="text-sm text-gray-900 font-medium">{caseData.contract_number || '-'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">계약일</span>
+                <span className="text-sm text-gray-900 font-medium">{formatDate(caseData.contract_date)}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">사건종류</span>
+                <span className="text-sm text-gray-900 font-medium">{caseData.case_type || '기타'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">의뢰인</span>
+                <button
+                  className="text-sm text-sage-600 hover:text-sage-700 font-medium"
+                  onClick={() => caseData.client && router.push(`/clients/${caseData.client_id}`)}
+                >
+                  {caseData.client?.name || '-'}
+                </button>
+              </div>
+            </div>
+
+            {/* 수임료 정보 */}
+            <div className="border-t border-gray-100 pt-5">
+              <h4 className="text-sm font-semibold text-gray-900 mb-4">수임료</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div>
+                  <span className="text-xs text-gray-500 block mb-1">착수금</span>
+                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.retainer_fee)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-1">발생 성공보수</span>
+                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.calculated_success_fee)}</span>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPaymentModal(true)}
+                    className="text-xs text-gray-500 hover:text-sage-600 block mb-1"
+                  >
+                    입금액 &rsaquo;
+                  </button>
+                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(paymentTotal ?? caseData.total_received)}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-gray-500 block mb-1">미수금</span>
+                  <span className={`text-sm font-semibold ${calculateOutstandingBalance() > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                    {formatCurrency(calculateOutstandingBalance())}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* 성공보수 약정 */}
+            {caseData.success_fee_agreement && (
+              <div className="border-t border-gray-100 pt-5 mt-5">
+                <h4 className="text-sm font-semibold text-gray-900 mb-2">성공보수 약정</h4>
+                <p className="text-sm text-gray-700">{caseData.success_fee_agreement}</p>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1951,7 +1803,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       {/* Report Modal */}
       {reportModal && (
         <div className="fixed inset-0 z-[20050] flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white w-full max-w-2xl rounded-lg border border-gray-200 overflow-hidden max-h-[90vh] overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-2xl border border-gray-200 overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="relative px-6 pt-4 pb-3 flex items-center justify-center border-b border-gray-100">
               <Image
                 src="/images/logo-horizontal.png"
@@ -2048,7 +1900,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       {/* 대법원 연동 모달 */}
       {showLinkModal && (
         <div className="fixed inset-0 z-[20050] flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white w-full max-w-md rounded-lg border border-gray-200 overflow-hidden shadow-xl">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-gray-200 overflow-hidden shadow-xl">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-900">대법원 연동</h3>
               <button
@@ -2072,7 +1924,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   value={linkCaseNumber}
                   onChange={(e) => setLinkCaseNumber(e.target.value)}
                   placeholder="2024드단12345"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
                 />
               </div>
 
@@ -2091,10 +1943,10 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   onFocus={() => setShowCourtDropdown(true)}
                   onBlur={() => setTimeout(() => setShowCourtDropdown(false), 150)}
                   placeholder="검색 또는 선택..."
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
                 />
                 {showCourtDropdown && filteredCourts.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                     {filteredCourts.map(c => (
                       <div
                         key={c.code}
@@ -2121,7 +1973,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   value={linkPartyName}
                   onChange={(e) => setLinkPartyName(e.target.value)}
                   placeholder="원고 또는 피고 이름"
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
                   onKeyDown={(e) => e.key === 'Enter' && handleLinkConfirm()}
                 />
                 <p className="mt-1.5 text-xs text-gray-500">
@@ -2133,14 +1985,14 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-2">
               <button
                 onClick={() => setShowLinkModal(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={handleLinkConfirm}
                 disabled={scourtSyncing || !linkCaseNumber.trim() || !linkCourtName.trim() || !linkPartyName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-xl hover:bg-sage-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
                 {scourtSyncing && (
                   <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">

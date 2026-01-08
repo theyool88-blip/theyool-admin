@@ -21,12 +21,11 @@ import AdminHeader from './AdminHeader'
 import HearingDetailModal from './HearingDetailModal'
 import CasePaymentsModal from './CasePaymentsModal'
 import CasePartiesSection from './CasePartiesSection'
-import { ScourtGeneralInfo } from './scourt/ScourtGeneralInfo'
 import ScourtGeneralInfoXml from './scourt/ScourtGeneralInfoXml'
 import { getPartyLabels as getPartyLabelsFromSchema, getCaseCategory } from '@/lib/scourt/party-labels'
 import { getVisibleFields, sortFields, formatDateValue } from '@/lib/scourt/field-renderer'
 import { COURTS } from '@/lib/scourt/court-codes'
-import { detectCaseTypeFromCaseNumber } from '@/lib/scourt/xml-mapping'
+import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber, type ScourtCaseType } from '@/lib/scourt/xml-mapping'
 import { normalizePartyLabel } from '@/types/case-party'
 
 interface Client {
@@ -132,7 +131,7 @@ interface ScourtHearingItem {
 interface ScourtSnapshot {
   id: string
   scrapedAt: string
-  caseType: string
+  caseType?: string
   basicInfo: Record<string, string>
   hearings: ScourtHearingItem[]
   progress: ScourtProgressItem[]
@@ -205,6 +204,10 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 나의사건 연동 상태
   const isLinked = !!caseData.enc_cs_no || scourtSyncStatus?.isLinked
+  const resolvedScourtCaseType =
+    detectCaseTypeFromApiResponse(scourtSnapshot?.rawData || {}) ||
+    (scourtSnapshot?.caseType as ScourtCaseType | undefined) ||
+    detectCaseTypeFromCaseNumber(caseData.court_case_number || '')
 
   // 당사자 정보 (사건개요 표시용)
   const [caseParties, setCaseParties] = useState<{
@@ -721,10 +724,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 사건 상태 결정 (SCOURT 데이터 기반)
   const getCaseStatusInfo = () => {
-    // 확정일이 있으면 "확정사건"
-    if (getBasicInfo('확정일', 'cfrmDt')) {
-      return { label: '확정', style: 'bg-gray-100 text-gray-600' }
-    }
+    // 확정일은 별도 뱃지로 날짜와 함께 표시 (여기서는 제외)
     // 종국결과가 있으면 "판결선고"
     if (getBasicInfo('종국결과', 'endRslt') || caseData.case_result) {
       return { label: '선고', style: 'bg-amber-50 text-amber-700' }
@@ -1344,7 +1344,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 </button>
                 {showScourtDetail && (
                   <div className="px-5 pb-5 border-t border-gray-100">
-                    <ScourtGeneralInfo snapshotData={scourtSnapshot} />
+                    {scourtSnapshot.rawData ? (
+                      <ScourtGeneralInfoXml
+                        apiData={scourtSnapshot.rawData}
+                        caseType={resolvedScourtCaseType}
+                      />
+                    ) : (
+                      <div className="py-4 text-sm text-gray-500">
+                        일반내용 데이터가 없습니다. 사건을 다시 동기화해주세요.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1586,7 +1595,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             ) : (
               <ScourtGeneralInfoXml
                 apiData={scourtSnapshot.rawData}
-                caseType={detectCaseTypeFromCaseNumber(caseData.court_case_number || '')}
+                caseType={resolvedScourtCaseType}
               />
             )}
           </div>

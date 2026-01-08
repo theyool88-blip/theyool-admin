@@ -234,7 +234,8 @@ function detectBriefRequired(
     }
   }
 
-  // 상대방이 서면 제출했는데 우리가 그 이후 제출 안 한 경우
+  // 재판 2주전까지 마지막으로 상대방이 서면 제출한 상태일 때 → 반박서면 제출 필요
+  // (상대방 최신 서면 > 우리 최신 서면인 경우)
   if (theirLastBrief && (!ourLastBrief || (theirLastBrief.ofdocRcptYmd || '') > (ourLastBrief.ofdocRcptYmd || ''))) {
     const docName = theirLastBrief.content2 || theirLastBrief.sbmsnCtt || '서면'
     const dateStr = theirLastBrief.ofdocRcptYmd ? formatDateFromYYYYMMDD(theirLastBrief.ofdocRcptYmd) : ''
@@ -242,20 +243,8 @@ function detectBriefRequired(
     notices.push({
       id: `brief_response_${theirLastBrief.ofdocRcptYmd || 'unknown'}`,
       category: 'brief_required',
-      title: '상대방 서면 제출 → 답변 필요',
-      description: `상대방 ${docName} ${dateStr} 접수`,
-      dueDate: nextHearing.hearing_date,
-      daysRemaining: daysUntilHearing,
-    })
-  }
-
-  // 기일 2주전인데 서면 제출 없는 경우
-  if (!ourLastBrief && daysUntilHearing <= 14) {
-    notices.push({
-      id: `brief_before_hearing_${nextHearing.id}`,
-      category: 'brief_required',
-      title: '기일 2주 전 - 준비서면 제출 필요',
-      description: `${formatDate(nextHearing.hearing_date)} 기일 예정`,
+      title: '반박서면 제출 필요',
+      description: `상대방 ${docName} ${dateStr} 접수 → 답변 필요`,
       dueDate: nextHearing.hearing_date,
       daysRemaining: daysUntilHearing,
     })

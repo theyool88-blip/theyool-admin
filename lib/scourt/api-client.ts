@@ -463,10 +463,16 @@ export class ScourtApiClient {
     // csNoHistLst 생성 (64자 encCsNo 획득을 위해 필수)
     const csNoHistLst = this.generateCsNoHistLst(params.csYr, params.csDvsCd, params.csSerial);
 
+    // 법원코드 변환 (한글명 → 숫자 코드)
+    // "평택지원" 등 축약명도 숫자 코드로 변환 (예: 000253)
+    const caseCategory = this.getCaseCategory(params.csDvsCd);
+    const cortCdNum = this.getCourtCode(params.cortCd, caseCategory);
+    console.log(`  법원코드 변환: "${params.cortCd}" → "${cortCdNum}"`);
+
     try {
       const requestBody = {
         dma_search: {
-          cortCd: params.cortCd,
+          cortCd: cortCdNum,
           cdScope: 'ALL',
           csNoHistLst: csNoHistLst,  // 14자 포맷으로 전송
           csDvsCd: params.csDvsCd,
@@ -2088,9 +2094,26 @@ export class ScourtApiClient {
         }
       } else {
         console.log(`⚠️ 일반내용 조회 실패: ${generalResult.error}`);
+        // "사건이 존재하지 않습니다" 에러는 사건 미존재를 의미 - 연동 실패 처리
+        if (generalResult.error?.includes('존재하지 않') || generalResult.error?.includes('I_0002')) {
+          console.log(`❌ 사건 미존재 확인됨 - 연동 실패 처리`);
+          return {
+            success: false,
+            error: generalResult.error || '대법원에서 사건을 찾을 수 없습니다',
+          };
+        }
       }
     } catch (e) {
-      console.log(`⚠️ 일반내용 조회 에러: ${e}`);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      console.log(`⚠️ 일반내용 조회 에러: ${errorMsg}`);
+      // 사건 미존재 에러 체크
+      if (errorMsg.includes('존재하지 않') || errorMsg.includes('I_0002')) {
+        console.log(`❌ 사건 미존재 확인됨 - 연동 실패 처리`);
+        return {
+          success: false,
+          error: '대법원에서 사건을 찾을 수 없습니다',
+        };
+      }
     }
 
     // 2. 진행내용 별도 조회 (모든 사건 유형 지원)

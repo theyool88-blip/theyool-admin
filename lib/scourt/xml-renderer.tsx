@@ -14,6 +14,7 @@ import {
   extractFieldId,
 } from './xml-parser';
 import { getExpressionFields, getViewFieldMapping, checkRowVisibility } from './xml-mapping';
+import { normalizeCaseNumber } from './case-number-utils';
 
 // ============================================================================
 // 값 포맷팅
@@ -224,15 +225,17 @@ interface GridTableProps {
   layout: GridLayout;
   data: any[];
   className?: string;
+  caseLinkMap?: Record<string, string>;
 }
 
 /**
  * 그리드 (테이블 목록) 렌더링
  */
-export function GridTable({ layout, data, className }: GridTableProps) {
+export function GridTable({ layout, data, className, caseLinkMap }: GridTableProps) {
   if (!layout) return null;
 
   const hasData = data && data.length > 0;
+  const enableCaseLinks = layout.dataListId === 'dlt_reltCsLst' && caseLinkMap && Object.keys(caseLinkMap).length > 0;
 
   // expression 컬럼 중 모든 행에서 빈 값인 컬럼 필터링
   const visibleColumns = layout.columns.filter(col => {
@@ -305,13 +308,23 @@ export function GridTable({ layout, data, className }: GridTableProps) {
                       }
                     }
 
+                    const caseLink = enableCaseLinks
+                      ? getCaseLink(displayValue, caseLinkMap)
+                      : null;
+
                     return (
                       <td
                         key={colIndex}
                         className="px-3 py-2 text-sm text-gray-900"
                         style={{ textAlign: (col.textAlign as any) || 'center' }}
                       >
-                        {displayValue}
+                        {caseLink ? (
+                          <a href={caseLink} className="text-sage-700 hover:underline">
+                            {displayValue}
+                          </a>
+                        ) : (
+                          displayValue
+                        )}
                       </td>
                     );
                   })}
@@ -323,6 +336,30 @@ export function GridTable({ layout, data, className }: GridTableProps) {
       )}
     </div>
   );
+}
+
+const CASE_NUMBER_PATTERN = /\d{4}\s*[가-힣]+\s*\d+/;
+const NORMALIZED_CASE_NUMBER_PATTERN = /^\d{4}[가-힣]+\d+$/;
+
+function getCaseLink(value: string, caseLinkMap?: Record<string, string>): string | null {
+  if (!caseLinkMap || !value) return null;
+
+  const rawValue = String(value);
+  const match = rawValue.match(CASE_NUMBER_PATTERN);
+  let normalized = '';
+
+  if (match) {
+    normalized = normalizeCaseNumber(match[0]);
+  } else {
+    const candidate = normalizeCaseNumber(rawValue);
+    if (NORMALIZED_CASE_NUMBER_PATTERN.test(candidate)) {
+      normalized = candidate;
+    }
+  }
+
+  if (!normalized) return null;
+  const caseId = caseLinkMap[normalized] || caseLinkMap[match?.[0] ?? ''] || caseLinkMap[rawValue];
+  return caseId ? `/cases/${caseId}` : null;
 }
 
 // ============================================================================

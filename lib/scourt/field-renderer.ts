@@ -355,6 +355,14 @@ export const DLT_COLUMN_LABELS: Record<string, string> = {
   crctnOrdYmd: '보정명령일',
   crctnRsnNm: '보정사유',
   crctnRsnCd: '보정사유코드',
+
+  // 담보내용 테이블 (dlt_scrtyCttLst)
+  scrtyAmt: '담보금액',
+  grtInsuCoCd: '보증보험사코드',
+  scrtyPvsnCtt: '담보제공내용',
+  scrtyStngYmd: '담보설정일',
+  prsvDspsScrtyDvsCd: '담보구분코드',
+  prsvDspsScrtyDvsNm: '담보구분',
 };
 
 /**
@@ -369,6 +377,7 @@ export const DLT_TABLE_COLUMNS: Record<string, string[]> = {
   dlt_reltCsLst: ['reltCsCortNm', 'userCsNo', 'reltCsDvsNm'],
   dlt_inscrtDtsLst: ['cortNm', 'userCsNo', 'ultmtDvsNm', 'ultmtYmd'],
   dlt_crctnOrdLst: ['crctnOrdYmd', 'crctnRsnNm'],
+  dlt_scrtyCttLst: ['scrtyAmt', 'grtInsuCoCd', 'scrtyPvsnCtt', 'scrtyStngYmd', 'prsvDspsScrtyDvsNm'],
 };
 
 /**

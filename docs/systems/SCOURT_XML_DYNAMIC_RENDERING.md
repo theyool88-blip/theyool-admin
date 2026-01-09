@@ -49,6 +49,11 @@ const basicInfoPath = resolveBasicInfoXmlPath({ caseType, apiResponse, templateI
 
 > 템플릿 ID가 있으면 **사건유형 매핑보다 우선**합니다.
 
+**보강 사항**
+- 템플릿 ID 탐색은 응답 전체에서 `F01`(기본정보 화면) 템플릿을 우선 선택합니다.
+- 템플릿 XML 로드 실패 시 사건유형 기본 XML로 재시도합니다.
+- 사건번호 파싱은 법원명 포함 문자열에서도 `YYYY + 사건코드 + 일련번호` 패턴을 추출합니다.
+
 ### 1단계: 기본정보 XML에서 하위 XML 경로 추출
 
 **SCOURT 기본정보 XML (예: SSGO105F01.xml):**
@@ -117,6 +122,31 @@ function extractSubXmlPaths(basicInfoXml: string): Record<string, string> {
 |------|------|-------------|
 | 신청인 | 이OO | 2024.03.21 |
 | 채권자 | ㈜OOO | - |
+
+## 일반내용 사용자 입력 반영
+
+일반 탭에서 의뢰인/상대방 이름을 **사용자 입력값으로 덮어써서 표시**합니다.
+
+- 적용 위치: 기본내용(`dma_csBasCtt`) + 당사자 리스트(`dlt_btprtCttLst`, `dlt_acsCttLst`)
+- 라벨 결정: 사건번호 기반 `getPartyLabels()` 결과 사용
+- 안전 규칙:
+  - 형사사건은 피고인만 기본 적용
+  - 당사자 리스트는 라벨이 **유일하게 매칭되는 경우에만** 이름 교체
+
+```typescript
+// components/scourt/ScourtGeneralInfoXml.tsx
+const { plaintiffLabel, defendantLabel } = getPartyLabelsForCase(caseNumber, basicInfoData)
+applyPartyNameOverride(dma_csBasCtt, clientSide, clientName, label)
+updatePartyListRows(dlt_btprtCttLst, label, clientName)
+```
+
+## 관련사건 내부 링크
+
+등록된 관련 사건이 있으면 일반 탭에서도 바로 이동할 수 있습니다.
+
+- 대상 리스트: `dlt_reltCsLst`
+- 매칭 키: `normalizeCaseNumber`로 사건번호 정규화
+- 링크: `/cases/{caseId}`
 
 ## 파일 구조
 

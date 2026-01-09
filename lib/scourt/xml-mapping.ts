@@ -99,34 +99,62 @@ function normalizeTemplateId(value: string): string | null {
   return match ? match[0].toUpperCase() : null;
 }
 
-function findTemplateIdDeep(value: unknown, depth: number): string | null {
-  if (depth < 0 || value === null || value === undefined) return null;
-  if (typeof value === 'string') {
-    return normalizeTemplateId(value);
-  }
-  if (typeof value !== 'object') return null;
+function collectTemplateIdsDeep(
+  value: unknown,
+  maxDepth: number
+): string[] {
+  const results: string[] = [];
+  const seen = new Set<string>();
+  const visited = new WeakSet<object>();
+  const queue: Array<{ value: unknown; depth: number }> = [
+    { value, depth: maxDepth },
+  ];
 
-  const entries = Object.entries(value as Record<string, unknown>);
-  for (const [key, item] of entries) {
-    if (TEMPLATE_KEY_REGEX.test(key) && typeof item === 'string') {
-      const normalized = normalizeTemplateId(item);
-      if (normalized) return normalized;
+  while (queue.length > 0) {
+    const { value: current, depth } = queue.shift()!;
+    if (current === null || current === undefined) continue;
+
+    if (typeof current === 'string') {
+      const normalized = normalizeTemplateId(current);
+      if (normalized && !seen.has(normalized)) {
+        seen.add(normalized);
+        results.push(normalized);
+      }
+      continue;
+    }
+
+    if (typeof current !== 'object') continue;
+    if (visited.has(current as object)) continue;
+    visited.add(current as object);
+
+    const entries = Object.entries(current as Record<string, unknown>);
+
+    for (const [key, item] of entries) {
+      if (typeof item === 'string') {
+        const normalized = normalizeTemplateId(item);
+        if (normalized && !seen.has(normalized)) {
+          seen.add(normalized);
+          results.push(normalized);
+        }
+      }
+
+      if (TEMPLATE_KEY_REGEX.test(key) && typeof item === 'string') {
+        const normalized = normalizeTemplateId(item);
+        if (normalized && !seen.has(normalized)) {
+          seen.add(normalized);
+          results.push(normalized);
+        }
+      }
+    }
+
+    if (depth > 0) {
+      for (const [, item] of entries) {
+        queue.push({ value: item, depth: depth - 1 });
+      }
     }
   }
 
-  for (const [, item] of entries) {
-    const normalized = findTemplateIdDeep(item, depth - 1);
-    if (normalized) return normalized;
-  }
-
-  return null;
-}
-
-export function extractTemplateIdFromResponse(
-  apiResponse?: Record<string, unknown>
-): string | null {
-  if (!apiResponse || typeof apiResponse !== 'object') return null;
-  return findTemplateIdDeep(apiResponse, 3);
+  return results;
 }
 
 export function templateIdToXmlPath(templateId: string): string | null {
@@ -138,6 +166,20 @@ export function templateIdToXmlPath(templateId: string): string | null {
 
 function isBasicInfoTemplateId(templateId: string): boolean {
   return /F01$/i.test(templateId);
+}
+
+function pickPreferredTemplateId(ids: string[]): string | null {
+  if (ids.length === 0) return null;
+  const basicInfo = ids.find((id) => isBasicInfoTemplateId(id));
+  return basicInfo || ids[0];
+}
+
+export function extractTemplateIdFromResponse(
+  apiResponse?: Record<string, unknown>
+): string | null {
+  if (!apiResponse || typeof apiResponse !== 'object') return null;
+  const ids = collectTemplateIdsDeep(apiResponse, 6);
+  return pickPreferredTemplateId(ids);
 }
 
 export function detectCaseTypeFromTemplateId(
@@ -520,6 +562,10 @@ export function detectCaseTypeFromApiResponse(
   apiResponse: Record<string, unknown>
 ): ScourtCaseType | null {
   if (!apiResponse || typeof apiResponse !== "object") return null;
+
+  const templateId = extractTemplateIdFromResponse(apiResponse);
+  const templateCaseType = templateId ? detectCaseTypeFromTemplateId(templateId) : null;
+  if (templateCaseType) return templateCaseType;
 
   const data = (apiResponse as { data?: Record<string, unknown> }).data || apiResponse;
   const caseInfo = (data as Record<string, unknown>)?.dma_csBasCtt ||

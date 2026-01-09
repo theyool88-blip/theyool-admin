@@ -406,11 +406,9 @@ async function updateExistingCase(
   if (!existingCase) return
 
   // 업데이트할 필드 결정 (빈 필드만)
+  // case_type은 자동 분류되므로 업데이트 대상에서 제외
   const updates: Record<string, unknown> = {}
 
-  if (!existingCase.case_type && row.case_type) {
-    updates.case_type = row.case_type
-  }
   if (!existingCase.opponent_name && row.opponent_name) {
     updates.opponent_name = row.opponent_name
   }
@@ -419,6 +417,9 @@ async function updateExistingCase(
   }
   if (!existingCase.success_fee_agreement && row.success_fee_agreement) {
     updates.success_fee_agreement = row.success_fee_agreement
+  }
+  if (!existingCase.earned_success_fee && row.earned_success_fee) {
+    updates.earned_success_fee = row.earned_success_fee
   }
   if (!existingCase.notes && row.notes) {
     updates.notes = row.notes

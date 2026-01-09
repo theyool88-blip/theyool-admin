@@ -4,21 +4,27 @@
 
 import * as XLSX from 'xlsx'
 
-// 템플릿 컬럼 정의
+// 템플릿 컬럼 정의 (확정 열 순서)
+// 계약일 → 담당변호사 → 담당직원 → 법원명 → 사건번호 → 사건명 → 의뢰인명 → 상대방명 →
+// 착수금 → 성공보수약정 → 발생성공보수 → 의뢰인연락처 → 계좌번호 → 의뢰인이메일 → 생년월일 → 주소 → 메모
+// 사건유형은 자동 분류되므로 제외
 const TEMPLATE_COLUMNS = [
-  { key: 'court_case_number', label: '사건번호', required: true, example: '2024드단25547' },
-  { key: 'court_name', label: '법원명', required: true, example: '수원가정법원' },
-  { key: 'client_name', label: '의뢰인명', required: true, example: '김철수' },
-  { key: 'case_name', label: '사건명', required: false, example: '이혼 및 위자료' },
-  { key: 'case_type', label: '사건유형', required: false, example: '이혼' },
-  { key: 'opponent_name', label: '상대방명', required: false, example: '이영희' },
+  { key: 'contract_date', label: '계약일', required: false, example: '2024-01-15' },
   { key: 'assigned_lawyer', label: '담당변호사', required: false, example: '박변호사' },
   { key: 'assigned_staff', label: '담당직원', required: false, example: '최직원' },
-  { key: 'contract_date', label: '계약일', required: false, example: '2024-01-15' },
+  { key: 'court_name', label: '법원명', required: true, example: '수원가정법원' },
+  { key: 'court_case_number', label: '사건번호', required: true, example: '2024드단25547' },
+  { key: 'case_name', label: '사건명', required: false, example: '이혼 및 위자료' },
+  { key: 'client_name', label: '의뢰인명', required: true, example: '김철수' },
+  { key: 'opponent_name', label: '상대방명', required: false, example: '이영희' },
   { key: 'retainer_fee', label: '착수금', required: false, example: '5000000' },
   { key: 'success_fee_agreement', label: '성공보수약정', required: false, example: '승소시 10%' },
+  { key: 'earned_success_fee', label: '발생성공보수', required: false, example: '0' },
   { key: 'client_phone', label: '의뢰인연락처', required: false, example: '010-1234-5678' },
+  { key: 'client_bank_account', label: '계좌번호', required: false, example: '국민 123-456-789012' },
   { key: 'client_email', label: '의뢰인이메일', required: false, example: 'client@email.com' },
+  { key: 'client_birth_date', label: '생년월일', required: false, example: '1980-01-15' },
+  { key: 'client_address', label: '주소', required: false, example: '서울시 강남구' },
   { key: 'notes', label: '메모', required: false, example: '급한 사건' },
 ]
 
@@ -54,22 +60,29 @@ export function downloadTemplate(): void {
     [''],
     ['선택 필드 (빈칸 가능)'],
     ['- 사건명: 사건 제목 (없으면 자동 생성)'],
-    ['- 사건유형: 이혼, 상속, 민사 등'],
     ['- 상대방명: 상대방 이름'],
     ['- 담당변호사: 담당 변호사 이름 또는 ID'],
     ['- 담당직원: 담당 직원 이름 또는 ID'],
     ['- 계약일: YYYY-MM-DD 형식'],
     ['- 착수금: 숫자만 입력 (원 단위)'],
     ['- 성공보수약정: 성공 보수 내용'],
+    ['- 발생성공보수: 확정된 성공보수 금액 (원 단위)'],
     ['- 의뢰인연락처: 신규 의뢰인 생성 시 사용'],
+    ['- 계좌번호: 의뢰인 계좌 정보'],
     ['- 의뢰인이메일: 신규 의뢰인 생성 시 사용'],
+    ['- 생년월일: YYYY-MM-DD 형식'],
+    ['- 주소: 의뢰인 주소'],
     ['- 메모: 기타 메모 사항'],
+    [''],
+    ['자동 처리 항목'],
+    ['- 사건유형: 사건번호 패턴에서 자동 분류됩니다 (입력 불필요)'],
     [''],
     ['주의사항'],
     ['- 첫 번째 행은 헤더이므로 삭제하지 마세요'],
     ['- 예시 데이터(2행)는 삭제하고 실제 데이터를 입력하세요'],
     ['- 기존 의뢰인이 있으면 이름으로 자동 매칭됩니다'],
     ['- 중복 사건번호+법원명 처리 옵션을 선택할 수 있습니다'],
+    ['- 의뢰인과 상대방 성씨가 같으면 역할 확인이 필요합니다'],
   ]
 
   const guideSheet = XLSX.utils.aoa_to_sheet(guideData)

@@ -5,6 +5,7 @@
 
 import type { StandardCaseRow, ClientRole, ValidationResult, ImportError, ImportWarning } from '@/types/onboarding'
 import { KOREAN_ROLE_MAP, KOREAN_COLUMN_ALIASES } from '@/types/onboarding'
+import { getCaseTypeAuto } from '@/lib/constants/case-types'
 
 // 필드 정의 타입
 interface FieldDefinition {
@@ -46,6 +47,7 @@ export const REQUIRED_FIELDS: FieldDefinition[] = [
 ]
 
 // 선택 필드 정의
+// case_type은 자동 분류로 처리되므로 사용자 입력에서 제거
 export const OPTIONAL_FIELDS: FieldDefinition[] = [
   {
     name: 'case_name',
@@ -54,14 +56,6 @@ export const OPTIONAL_FIELDS: FieldDefinition[] = [
     type: 'string',
     required: false,
     autoGenerate: true  // 없으면 자동 생성
-  },
-  {
-    name: 'case_type',
-    label: 'Case Type',
-    labelKorean: '사건유형',
-    type: 'string',
-    required: false,
-    defaultValue: '기타'
   },
   {
     name: 'client_role',
@@ -115,6 +109,13 @@ export const OPTIONAL_FIELDS: FieldDefinition[] = [
     required: false
   },
   {
+    name: 'earned_success_fee',
+    label: 'Earned Success Fee',
+    labelKorean: '발생성공보수',
+    type: 'number',
+    required: false
+  },
+  {
     name: 'notes',
     label: 'Notes',
     labelKorean: '메모',
@@ -136,11 +137,56 @@ export const OPTIONAL_FIELDS: FieldDefinition[] = [
     type: 'string',
     required: false,
     pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  },
+  {
+    name: 'client_birth_date',
+    label: 'Client Birth Date',
+    labelKorean: '생년월일',
+    type: 'date',
+    required: false,
+    pattern: /^\d{4}-\d{2}-\d{2}$/  // YYYY-MM-DD
+  },
+  {
+    name: 'client_address',
+    label: 'Client Address',
+    labelKorean: '주소',
+    type: 'string',
+    required: false
+  },
+  {
+    name: 'client_bank_account',
+    label: 'Client Bank Account',
+    labelKorean: '계좌번호',
+    type: 'string',
+    required: false
   }
 ]
 
 // 모든 필드
 export const ALL_FIELDS = [...REQUIRED_FIELDS, ...OPTIONAL_FIELDS]
+
+// 확정 열 순서 (SpreadsheetEditor용)
+// 계약일 → 담당변호사 → 담당직원 → 법원명 → 사건번호 → 사건명 → 의뢰인명 → 상대방명 →
+// 착수금 → 성공보수약정 → 발생성공보수 → 의뢰인연락처 → 계좌번호 → 의뢰인이메일 → 생년월일 → 주소 → 메모
+export const COLUMN_ORDER: (keyof StandardCaseRow)[] = [
+  'contract_date',
+  'assigned_lawyer',
+  'assigned_staff',
+  'court_name',
+  'court_case_number',
+  'case_name',
+  'client_name',
+  'opponent_name',
+  'retainer_fee',
+  'success_fee_agreement',
+  'earned_success_fee',
+  'client_phone',
+  'client_bank_account',
+  'client_email',
+  'client_birth_date',
+  'client_address',
+  'notes',
+]
 
 // 필드명으로 필드 정의 찾기
 export function getFieldDefinition(fieldName: keyof StandardCaseRow): FieldDefinition | undefined {
@@ -358,8 +404,12 @@ function parseDateString(value: string): string | null {
 /**
  * 기본값 적용
  */
-export function applyDefaults(row: Partial<StandardCaseRow>): StandardCaseRow {
-  const result = { ...row } as StandardCaseRow
+export function applyDefaults(row: Partial<StandardCaseRow>): StandardCaseRow & { case_type: string } {
+  const result = { ...row } as StandardCaseRow & { case_type: string }
+
+  // case_type 자동 분류 (사용자 입력 없음, 항상 자동 분류)
+  const autoType = getCaseTypeAuto(result.court_case_number, result.case_name)
+  result.case_type = autoType || '기타'
 
   // case_name 자동 생성
   if (!result.case_name) {
@@ -368,11 +418,6 @@ export function applyDefaults(row: Partial<StandardCaseRow>): StandardCaseRow {
     } else if (result.court_case_number) {
       result.case_name = result.court_case_number
     }
-  }
-
-  // case_type 기본값
-  if (!result.case_type) {
-    result.case_type = '기타'
   }
 
   // contract_date 기본값 (오늘)

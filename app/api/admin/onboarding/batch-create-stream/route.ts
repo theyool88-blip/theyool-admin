@@ -19,6 +19,7 @@ import { saveSnapshot } from '@/lib/scourt/case-storage'
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 import { inferClientRoleFromGeneralData } from '@/lib/scourt/party-role'
+import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync'
 
 // 딜레이 유틸리티
 function delay(ms: number): Promise<void> {
@@ -302,7 +303,10 @@ export async function POST(request: NextRequest) {
                     tenant_id: tenant.tenantId,
                     name: row.client_name,
                     phone: row.client_phone,
-                    email: row.client_email || null
+                    email: row.client_email || null,
+                    birth_date: row.client_birth_date || null,
+                    address: row.client_address || null,
+                    bank_account: row.client_bank_account || null,
                   }])
                   .select()
                   .single()
@@ -351,7 +355,7 @@ export async function POST(request: NextRequest) {
               .insert([{
                 tenant_id: tenant.tenantId,
                 case_name: row.case_name || row.court_case_number,
-                case_type: row.case_type,
+                case_type: (row as { case_type?: string }).case_type || '기타',
                 court_case_number: row.court_case_number,
                 court_name: row.court_name,
                 client_id: clientId,
@@ -362,6 +366,7 @@ export async function POST(request: NextRequest) {
                 contract_date: row.contract_date,
                 retainer_fee: row.retainer_fee || null,
                 success_fee_agreement: row.success_fee_agreement || null,
+                earned_success_fee: row.earned_success_fee || null,
                 notes: row.notes || null,
                 // 대법원 연동 정보
                 enc_cs_no: scourtResult.encCsNo,
@@ -448,6 +453,28 @@ export async function POST(request: NextRequest) {
                   field: 'snapshot',
                   message: '스냅샷 저장 실패 (사건은 정상 등록됨)'
                 })
+              }
+            }
+
+            // 4-5. SCOURT 당사자 동기화 (NewCaseForm과 동일)
+            if (scourtResult.generalData) {
+              const generalData = scourtResult.generalData
+              if ((generalData.parties && generalData.parties.length > 0) ||
+                  (generalData.representatives && generalData.representatives.length > 0)) {
+                try {
+                  await syncPartiesFromScourtServer(adminClient, {
+                    legalCaseId: newCase.id,
+                    tenantId: tenant.tenantId,
+                    parties: generalData.parties || [],
+                    representatives: generalData.representatives || []
+                  })
+                } catch (syncError) {
+                  console.error('당사자 동기화 실패:', syncError)
+                  warnings.push({
+                    field: 'party_sync',
+                    message: '당사자 동기화 실패 (사건은 정상 등록됨)'
+                  })
+                }
               }
             }
 

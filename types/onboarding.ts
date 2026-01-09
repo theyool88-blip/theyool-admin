@@ -20,7 +20,7 @@ export interface StandardCaseRow {
 
   // 선택 필드 (자동 처리됨)
   case_name?: string           // 사건명 (없으면 자동 생성)
-  case_type?: string           // 사건유형 (없으면 "기타")
+  // case_type은 자동 분류로 처리됨 (사용자 입력 제거)
   client_role?: ClientRole     // 의뢰인 역할
   opponent_name?: string       // 상대방명
   assigned_lawyer?: string     // 담당변호사 (이름 또는 ID)
@@ -28,9 +28,13 @@ export interface StandardCaseRow {
   contract_date?: string       // 계약일 (YYYY-MM-DD)
   retainer_fee?: number        // 착수금 (원)
   success_fee_agreement?: string // 성공보수 약정
+  earned_success_fee?: number  // 발생성공보수 (원)
   notes?: string               // 메모
   client_phone?: string        // 의뢰인 연락처
   client_email?: string        // 의뢰인 이메일
+  client_birth_date?: string   // 의뢰인 생년월일 (YYYY-MM-DD)
+  client_address?: string      // 의뢰인 주소
+  client_bank_account?: string // 의뢰인 계좌번호
 }
 
 // 파싱된 파일 결과
@@ -207,8 +211,7 @@ export const KOREAN_COLUMN_ALIASES: Record<string, keyof StandardCaseRow> = {
   '사건명': 'case_name',
   '법원': 'court_name',
   '법원명': 'court_name',
-  '유형': 'case_type',
-  '사건유형': 'case_type',
+  // case_type은 자동 분류로 제거됨
   '상대방': 'opponent_name',
   '상대방명': 'opponent_name',
   '담당변호사': 'assigned_lawyer',
@@ -219,6 +222,8 @@ export const KOREAN_COLUMN_ALIASES: Record<string, keyof StandardCaseRow> = {
   '착수금': 'retainer_fee',
   '착수료': 'retainer_fee',
   '성공보수': 'success_fee_agreement',
+  '성공보수약정': 'success_fee_agreement',
+  '발생성공보수': 'earned_success_fee',
   '메모': 'notes',
   '비고': 'notes',
   '연락처': 'client_phone',
@@ -226,4 +231,10 @@ export const KOREAN_COLUMN_ALIASES: Record<string, keyof StandardCaseRow> = {
   '의뢰인연락처': 'client_phone',
   '이메일': 'client_email',
   '의뢰인이메일': 'client_email',
+  '생년월일': 'client_birth_date',
+  '주소': 'client_address',
+  '의뢰인주소': 'client_address',
+  '계좌번호': 'client_bank_account',
+  '계좌': 'client_bank_account',
+  '의뢰인계좌': 'client_bank_account',
 }

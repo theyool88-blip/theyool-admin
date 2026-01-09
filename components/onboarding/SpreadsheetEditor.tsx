@@ -2,30 +2,41 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import type { StandardCaseRow } from '@/types/onboarding'
-import { ALL_FIELDS } from '@/lib/onboarding/csv-schema'
 
 interface SpreadsheetEditorProps {
   initialRows?: Partial<StandardCaseRow>[]
   onChange?: (rows: Partial<StandardCaseRow>[]) => void
+  onSameSurnameRows?: (rows: Array<{ rowIndex: number; clientName: string; opponentName: string }>) => void
   disabled?: boolean
   maxRows?: number
 }
 
-// 표시할 컬럼 (표준 스키마 전체)
+// 한글 성씨 추출 (첫 글자)
+function extractSurname(name: string | undefined): string {
+  if (!name || name.trim().length === 0) return ''
+  return name.trim().charAt(0)
+}
+
+// 표시할 컬럼 (확정 열 순서)
+// 계약일 → 담당변호사 → 담당직원 → 법원명 → 사건번호 → 사건명 → 의뢰인명 → 상대방명 →
+// 착수금 → 성공보수약정 → 발생성공보수 → 의뢰인연락처 → 계좌번호 → 의뢰인이메일 → 생년월일 → 주소 → 메모
 const DISPLAY_COLUMNS = [
-  { key: 'court_case_number', label: '사건번호', required: true, width: 140 },
-  { key: 'court_name', label: '법원명', required: true, width: 180 },
-  { key: 'client_name', label: '의뢰인명', required: true, width: 100 },
-  { key: 'case_name', label: '사건명', required: false, width: 150 },
-  { key: 'case_type', label: '사건유형', required: false, width: 100 },
-  { key: 'opponent_name', label: '상대방', required: false, width: 100 },
+  { key: 'contract_date', label: '계약일', required: false, width: 110 },
   { key: 'assigned_lawyer', label: '담당변호사', required: false, width: 100 },
   { key: 'assigned_staff', label: '담당직원', required: false, width: 100 },
-  { key: 'contract_date', label: '계약일', required: false, width: 110 },
+  { key: 'court_name', label: '법원명', required: true, width: 180 },
+  { key: 'court_case_number', label: '사건번호', required: true, width: 140 },
+  { key: 'case_name', label: '사건명', required: false, width: 150 },
+  { key: 'client_name', label: '의뢰인명', required: true, width: 100 },
+  { key: 'opponent_name', label: '상대방명', required: false, width: 100 },
   { key: 'retainer_fee', label: '착수금', required: false, width: 100 },
   { key: 'success_fee_agreement', label: '성공보수약정', required: false, width: 120 },
+  { key: 'earned_success_fee', label: '발생성공보수', required: false, width: 100 },
   { key: 'client_phone', label: '의뢰인연락처', required: false, width: 120 },
+  { key: 'client_bank_account', label: '계좌번호', required: false, width: 120 },
   { key: 'client_email', label: '의뢰인이메일', required: false, width: 150 },
+  { key: 'client_birth_date', label: '생년월일', required: false, width: 110 },
+  { key: 'client_address', label: '주소', required: false, width: 200 },
   { key: 'notes', label: '메모', required: false, width: 200 },
 ] as const
 
@@ -34,6 +45,7 @@ type ColumnKey = typeof DISPLAY_COLUMNS[number]['key']
 export default function SpreadsheetEditor({
   initialRows = [],
   onChange,
+  onSameSurnameRows,
   disabled = false,
   maxRows = 100
 }: SpreadsheetEditorProps) {
@@ -47,16 +59,42 @@ export default function SpreadsheetEditor({
   const [editingValue, setEditingValue] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // 변경 알림
+  // 변경 알림 및 성씨 동일 체크
   useEffect(() => {
+    // 빈 행 제외
+    const nonEmptyRows = rows.filter(row =>
+      Object.values(row).some(v => v && String(v).trim())
+    )
+
     if (onChange) {
-      // 빈 행 제외
-      const nonEmptyRows = rows.filter(row =>
-        Object.values(row).some(v => v && String(v).trim())
-      )
       onChange(nonEmptyRows)
     }
-  }, [rows, onChange])
+
+    // 성씨 동일 체크
+    if (onSameSurnameRows) {
+      const sameSurnameRows: Array<{ rowIndex: number; clientName: string; opponentName: string }> = []
+
+      rows.forEach((row, index) => {
+        const clientName = row.client_name
+        const opponentName = row.opponent_name
+
+        if (clientName && opponentName) {
+          const clientSurname = extractSurname(clientName)
+          const opponentSurname = extractSurname(opponentName)
+
+          if (clientSurname && opponentSurname && clientSurname === opponentSurname) {
+            sameSurnameRows.push({
+              rowIndex: index,
+              clientName,
+              opponentName
+            })
+          }
+        }
+      })
+
+      onSameSurnameRows(sameSurnameRows)
+    }
+  }, [rows, onChange, onSameSurnameRows])
 
   // 셀 클릭
   const handleCellClick = useCallback((rowIndex: number, colKey: ColumnKey) => {

@@ -5,6 +5,7 @@ import AdminHeader from '@/components/AdminHeader'
 import type { ImportOptions, ImportReport, ColumnMappingResult } from '@/types/onboarding'
 import { downloadReport } from '@/lib/onboarding/import-report-generator'
 import { downloadTemplate } from '@/lib/onboarding/template-generator'
+import { getCourtAbbrev } from '@/lib/scourt/court-codes'
 
 type Step = 'input' | 'mapping' | 'preview' | 'importing' | 'complete'
 
@@ -269,6 +270,16 @@ export default function OnboardingImportPage() {
     setProgress(null)
   }, [])
 
+  // 미리보기 셀 값 포맷팅 (법원명은 약어로 표시)
+  const formatPreviewValue = useCallback((col: string, value: string | undefined) => {
+    if (!value) return '-'
+    // 해당 컬럼이 court_name에 매핑되어 있으면 약어로 변환
+    if (columnMapping[col] === 'court_name') {
+      return getCourtAbbrev(value)
+    }
+    return value
+  }, [columnMapping])
+
   return (
     <div className="min-h-screen bg-gray-50">
       <AdminHeader
@@ -393,7 +404,10 @@ export default function OnboardingImportPage() {
                   <strong>필수 컬럼:</strong> 사건번호, 법원명, 의뢰인명
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
-                  선택 컬럼: 사건유형, 상대방명, 의뢰인연락처, 담당변호사, 착수금 등
+                  선택 컬럼: 상대방명, 의뢰인연락처, 담당변호사, 착수금, 생년월일, 계좌번호 등
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  * 사건유형은 사건번호로 자동 분류됩니다
                 </p>
               </div>
             </div>
@@ -427,14 +441,28 @@ export default function OnboardingImportPage() {
                         <option value="court_name">법원명</option>
                         <option value="client_name">의뢰인명</option>
                       </optgroup>
-                      <optgroup label="선택">
+                      <optgroup label="사건 정보">
                         <option value="case_name">사건명</option>
-                        <option value="case_type">사건유형</option>
                         <option value="client_role">의뢰인역할</option>
                         <option value="opponent_name">상대방명</option>
-                        <option value="client_phone">의뢰인연락처</option>
                         <option value="assigned_lawyer">담당변호사</option>
+                        <option value="assigned_staff">담당직원</option>
+                        <option value="contract_date">계약일</option>
+                      </optgroup>
+                      <optgroup label="금액">
                         <option value="retainer_fee">착수금</option>
+                        <option value="success_fee_agreement">성공보수약정</option>
+                        <option value="earned_success_fee">발생성공보수</option>
+                      </optgroup>
+                      <optgroup label="의뢰인 정보">
+                        <option value="client_phone">의뢰인연락처</option>
+                        <option value="client_email">의뢰인이메일</option>
+                        <option value="client_birth_date">생년월일</option>
+                        <option value="client_address">주소</option>
+                        <option value="client_bank_account">계좌번호</option>
+                      </optgroup>
+                      <optgroup label="기타">
+                        <option value="notes">메모</option>
                       </optgroup>
                     </select>
                   </div>
@@ -505,7 +533,7 @@ export default function OnboardingImportPage() {
                         <td className="px-3 py-2 text-gray-400">{idx + 1}</td>
                         {parsedData.columns.slice(0, 5).map(col => (
                           <td key={col} className="px-3 py-2 text-gray-900 truncate max-w-[150px]">
-                            {row[col] || '-'}
+                            {formatPreviewValue(col, row[col])}
                           </td>
                         ))}
                       </tr>

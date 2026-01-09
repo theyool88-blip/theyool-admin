@@ -229,9 +229,16 @@ const notices = detectCaseNotices({
 import CaseNoticeSection from '@/components/case/CaseNoticeSection'
 
 <CaseNoticeSection
-  notices={caseNotices}
+  notices={filteredNotices}
   onAction={(notice, actionType) => {
     // 액션 처리 (기일충돌 버튼 등)
+  }}
+  onDismiss={async (notice) => {
+    // 알림 삭제 처리
+    await fetch(`/api/admin/cases/${caseId}/notices`, {
+      method: 'POST',
+      body: JSON.stringify({ noticeId: notice.id })
+    })
   }}
 />
 ```
@@ -282,9 +289,42 @@ const isOurs = ourSide.some(s => submitter.includes(s))
 
 ---
 
+## 알림 삭제 기능 (2026-01-09 완료)
+
+변호사가 확인한 알림을 삭제할 수 있습니다.
+
+### 테이블 구조
+
+```sql
+CREATE TABLE dismissed_case_notices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  case_id UUID NOT NULL REFERENCES legal_cases(id) ON DELETE CASCADE,
+  notice_id TEXT NOT NULL,  -- 알림 고유 ID
+  dismissed_by UUID REFERENCES tenant_members(id),
+  dismissed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(case_id, notice_id)
+);
+```
+
+### API 엔드포인트
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/api/admin/cases/[id]/notices` | 삭제된 알림 ID 목록 조회 |
+| POST | `/api/admin/cases/[id]/notices` | 알림 삭제 (body: `{ noticeId }`) |
+| DELETE | `/api/admin/cases/[id]/notices?noticeId=xxx` | 삭제된 알림 복구 |
+
+### UI
+
+- 각 알림 우측에 X 버튼 표시
+- 클릭 시 즉시 삭제 (로딩 스피너 표시)
+- 삭제된 알림은 새로고침해도 다시 표시되지 않음
+
+---
+
 ## 향후 확장
 
-- [ ] 알림 읽음/처리 상태 저장 (`case_notices` 테이블)
+- [x] 알림 삭제 기능 (`dismissed_case_notices` 테이블) - **완료 (2026-01-09)**
 - [ ] 대시보드에서 모든 사건 알림 통합 조회
 - [x] SCOURT 데이터 연동 (준비서면, 서류송달, 증거회신) - **완료 (2026-01-08)**
 - [ ] 기일충돌 액션 핸들러 구현

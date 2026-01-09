@@ -367,3 +367,57 @@ export function getCourtByName(name: string): CourtInfo | undefined {
 export function searchCourts(query: string): CourtInfo[] {
   return COURTS.filter(court => court.name.includes(query));
 }
+
+/**
+ * 정식명 → 약어 변환 (UI 표시용)
+ *
+ * 규칙:
+ * - 가정법원 지원: "수원가정법원 평택지원" → "평택가정"
+ * - 지방법원 지원: "수원지방법원 평택지원" → "평택지원"
+ * - 고등법원: "서울고등법원" → "서울고법"
+ * - 본원: "서울가정법원" → "서울가정"
+ *
+ * 저장/API 호출 시에는 정식명을 그대로 사용해야 함
+ */
+export function getCourtAbbrev(fullName: string | null | undefined): string {
+  if (!fullName) return '';
+
+  // 1. COURT_ABBREV_MAP 역방향 조회 (기존 약어 매핑 활용)
+  const entry = Object.entries(COURT_ABBREV_MAP).find(([, full]) => full === fullName);
+  if (entry) return entry[0];
+
+  // 2. 패턴 기반 약어 생성
+
+  // 2-1. 가정법원 지원: "OO가정법원 XX지원" → "XX가정"
+  const familyBranchMatch = fullName.match(/(.+)가정법원\s+(.+)지원/);
+  if (familyBranchMatch) {
+    return `${familyBranchMatch[2]}가정`;
+  }
+
+  // 2-2. 지방법원 지원: "OO지방법원 XX지원" → "XX지원"
+  const civilBranchMatch = fullName.match(/(.+)지방법원\s+(.+)지원/);
+  if (civilBranchMatch) {
+    return `${civilBranchMatch[2]}지원`;
+  }
+
+  // 2-3. 고등법원: "OO고등법원" → "OO고법"
+  const highCourtMatch = fullName.match(/(.+)고등법원/);
+  if (highCourtMatch) {
+    return `${highCourtMatch[1]}고법`;
+  }
+
+  // 2-4. 가정법원 본원: "OO가정법원" → "OO가정"
+  const familyMainMatch = fullName.match(/(.+)가정법원$/);
+  if (familyMainMatch) {
+    return `${familyMainMatch[1]}가정`;
+  }
+
+  // 2-5. 지방법원 본원: "OO지방법원" → "OO지방"
+  const civilMainMatch = fullName.match(/(.+)지방법원$/);
+  if (civilMainMatch) {
+    return `${civilMainMatch[1]}지방`;
+  }
+
+  // 3. 매핑 없으면 원본 반환
+  return fullName;
+}

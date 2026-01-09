@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { getCourtAbbrev } from '@/lib/scourt/court-codes'
 
 interface RelatedCaseInfo {
   case_number: string       // "2025가소6582"
@@ -115,7 +116,7 @@ export default function RelatedCaseConfirmModal({
                 {currentCase.case_number}
               </p>
               <p className="text-sm text-gray-600">
-                {currentCase.court_name}
+                {getCourtAbbrev(currentCase.court_name)}
               </p>
             </div>
 

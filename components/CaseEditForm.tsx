@@ -5,7 +5,14 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import AdminHeader from './AdminHeader'
-import { COURTS } from '@/lib/scourt/court-codes'
+import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
+import {
+  CASE_TYPE_OPTIONS,
+  CASE_TYPE_GROUPS,
+  getGroupedCaseTypes,
+  getCaseTypeAuto,
+  isApplicationCaseType
+} from '@/lib/constants/case-types'
 
 interface Client {
   id: string
@@ -123,45 +130,20 @@ export default function CaseEditForm({
   // 법원명 수정 알림
   const [courtNameCorrected, setCourtNameCorrected] = useState<{original: string, corrected: string} | null>(null)
 
-  // 사건종류 옵션 (카테고리별 그룹)
-  const caseTypeOptions = [
-    // 가사
-    { value: '이혼', label: '이혼', group: '가사' },
-    { value: '가사', label: '가사', group: '가사' },
-    { value: '양육권 등', label: '양육권 등', group: '가사' },
-    { value: '사전처분', label: '사전처분', group: '가사' },
-    { value: '가처분 가압류', label: '가처분 가압류', group: '가사' },
-    // 상간자
-    { value: '상간자', label: '상간자', group: '상간자' },
-    // 민사/형사/집행
-    { value: '민사', label: '민사', group: '민사' },
-    { value: '형사', label: '형사', group: '형사' },
-    { value: '집행', label: '집행', group: '집행' },
-    // 심급/절차 (같은 분쟁의 다른 단계)
-    { value: '항소', label: '항소 (2심)', group: '심급/절차' },
-    { value: '상고', label: '상고 (3심)', group: '심급/절차' },
-    { value: '조정', label: '조정', group: '심급/절차' },
-    { value: '반소', label: '반소', group: '심급/절차' },
-    { value: '이송', label: '이송', group: '심급/절차' },
-    // 기타
-    { value: '증거보전', label: '증거보전', group: '기타' },
-    { value: '합의서작성', label: '합의서작성', group: '기타' },
-    { value: '기타', label: '기타', group: '기타' },
-  ]
+  // 그룹별 사건 유형 옵션 (메모이제이션)
+  const groupedCaseTypes = useMemo(() => getGroupedCaseTypes(), [])
 
-  // 신청사건 유형 옵션
-  const applicationTypeOptions = [
-    '부동산 가압류',
-    '채권 가압류',
-    '부동산 가처분',
-    '채권 가처분',
-    '기타 신청'
-  ]
+  // 사건종류가 신청사건인지 확인 (보전처분, 가사신청 포함)
+  const isApplicationCase = isApplicationCaseType(formData.case_type, formData.court_case_number)
 
-  // 사건종류가 신청사건인지 확인
-  const isApplicationCase = formData.case_type?.includes('신청') ||
-    formData.court_case_number?.includes('카단') ||
-    formData.court_case_number?.includes('카합')
+  // 사건번호 또는 사건명 변경 시 자동분류
+  const handleAutoClassify = (caseNumber: string, caseName: string) => {
+    const autoType = getCaseTypeAuto(caseNumber, caseName)
+    if (autoType && !formData.case_type) {
+      // 사건유형이 비어있을 때만 자동분류 적용
+      setFormData(prev => ({ ...prev, case_type: autoType }))
+    }
+  }
 
   const [allClients, setAllClients] = useState<Client[]>([])
   const [loadingClients, setLoadingClients] = useState(true)
@@ -531,7 +513,14 @@ export default function CaseEditForm({
                 <input
                   type="text"
                   value={formData.case_name}
-                  onChange={(e) => setFormData({...formData, case_name: e.target.value})}
+                  onChange={(e) => {
+                    const newCaseName = e.target.value
+                    setFormData({...formData, case_name: newCaseName})
+                    // 사건유형이 비어있을 때 자동분류 시도
+                    if (!formData.case_type) {
+                      handleAutoClassify(formData.court_case_number, newCaseName)
+                    }
+                  }}
                   required
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
                 />
@@ -615,7 +604,7 @@ export default function CaseEditForm({
                       </div>
                       <div>
                         <span className="text-green-700 text-xs">법원</span>
-                        <p className="font-medium text-green-900">{formData.court_name}</p>
+                        <p className="font-medium text-green-900">{getCourtAbbrev(formData.court_name)}</p>
                       </div>
                       {formData.client_role && (
                         <div>
@@ -632,7 +621,7 @@ export default function CaseEditForm({
                       <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
                         <span className="text-yellow-700 font-medium">ℹ️ 법원명이 수정되었습니다:</span>
                         <span className="text-yellow-900 ml-1">
-                          {courtNameCorrected.original} → {courtNameCorrected.corrected}
+                          {getCourtAbbrev(courtNameCorrected.original)} → {getCourtAbbrev(courtNameCorrected.corrected)}
                         </span>
                       </div>
                     )}
@@ -657,7 +646,14 @@ export default function CaseEditForm({
                         <input
                           type="text"
                           value={formData.court_case_number}
-                          onChange={(e) => setFormData({...formData, court_case_number: e.target.value})}
+                          onChange={(e) => {
+                            const newCaseNumber = e.target.value
+                            setFormData({...formData, court_case_number: newCaseNumber})
+                            // 사건유형이 비어있을 때 자동분류 시도
+                            if (!formData.case_type) {
+                              handleAutoClassify(newCaseNumber, formData.case_name)
+                            }
+                          }}
                           placeholder="2024드단12345"
                           className="w-full px-3 py-2 text-sm border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                         />
@@ -687,7 +683,7 @@ export default function CaseEditForm({
                                   setShowCourtDropdown(false)
                                 }}
                               >
-                                {c.name}
+                                {getCourtAbbrev(c.name)}
                               </div>
                             ))}
                           </div>
@@ -726,36 +722,24 @@ export default function CaseEditForm({
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1">사건종류</label>
-                <input
-                  type="text"
-                  list="case-type-options"
+                <select
                   value={formData.case_type}
                   onChange={(e) => setFormData({...formData, case_type: e.target.value})}
-                  placeholder="선택 또는 직접 입력"
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-                <datalist id="case-type-options">
-                  {caseTypeOptions.map(o => (
-                    <option key={o.value} value={o.value}>{o.group} - {o.label}</option>
+                >
+                  <option value="">선택하세요</option>
+                  {CASE_TYPE_GROUPS.map(group => (
+                    <optgroup key={group} label={group}>
+                      {groupedCaseTypes[group]?.map(opt => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </optgroup>
                   ))}
-                </datalist>
+                </select>
+                {formData.case_type && !CASE_TYPE_OPTIONS.find(o => o.value === formData.case_type) && (
+                  <p className="text-xs text-gray-400 mt-1">직접 입력: {formData.case_type}</p>
+                )}
               </div>
-              {isApplicationCase && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">신청사건 유형</label>
-                  <select
-                    value={formData.application_type}
-                    onChange={(e) => setFormData({...formData, application_type: e.target.value})}
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                  >
-                    <option value="">선택하세요</option>
-                    {applicationTypeOptions.map(option => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-400 mt-1">파일 자동 정리시 사용됩니다</p>
-                </div>
-              )}
             </div>
           </div>
 

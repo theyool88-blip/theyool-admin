@@ -11,6 +11,7 @@ import type {
   CaseDetailResponse,
   ErrorResponse
 } from '@/types/client-preview';
+import { getCourtAbbrev } from '@/lib/scourt/court-codes';
 
 interface ClientPreviewModalProps {
   clientId: string;
@@ -151,7 +152,7 @@ export default function ClientPreviewModal({
                               {hearing.case_name}
                             </p>
                             <p className="text-sm text-blue-700">
-                              {hearing.court_name} | {hearing.case_number}
+                              {getCourtAbbrev(hearing.court_name)} | {hearing.case_number}
                             </p>
                           </div>
                           <div className="text-right">
@@ -276,7 +277,7 @@ export default function ClientPreviewModal({
                                   {hearing.hearing_date} {hearing.hearing_time}
                                 </p>
                                 <p className="text-sm text-gray-600">
-                                  {hearing.court_name} | {hearing.hearing_type}
+                                  {getCourtAbbrev(hearing.court_name)} | {hearing.hearing_type}
                                 </p>
                                 {hearing.hearing_result && (
                                   <p className="text-sm text-gray-600">

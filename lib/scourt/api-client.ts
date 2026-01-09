@@ -703,7 +703,8 @@ export class ScourtApiClient {
 
     try {
       // csNo 생성: 연도(4) + 사건유형코드(3) + 일련번호(7, 0패딩)
-      const csNo = `${params.csYear}${params.csDvsCd}${params.csSerial.padStart(7, '0')}`;
+      const csDvsCdNum = this.getCaseTypeCode(params.csDvsCd);
+      const csNo = `${params.csYear}${csDvsCdNum}${params.csSerial.padStart(7, '0')}`;
 
       const requestBody = {
         dma_search: {
@@ -711,7 +712,7 @@ export class ScourtApiClient {
           csNo: csNo,              // 브라우저와 동일하게 csNo 추가
           encCsNo: params.encCsNo,
           csYear: params.csYear,
-          csDvsCd: params.csDvsCd,
+          csDvsCd: csDvsCdNum,
           csSerial: params.csSerial.padStart(7, '0'),  // 7자리로 패딩
           progCttDvs: '0',         // 진행구분 (전체=0) - 필드명 수정!
           srchDvs: '06',           // 검색구분 추가
@@ -722,6 +723,7 @@ export class ScourtApiClient {
 
       // 진행내용 API 엔드포인트 (사건유형별 분기)
       // 브라우저 분석으로 확인된 엔드포인트 (2026.01.05)
+      const resolvedCategory = params.caseCategory || this.getCaseCategory(params.csDvsCd);
       const progressEndpoints: Record<string, string> = {
         family: '/ssgo/ssgo102/selectHmpgFmlyCsProgCtt.on',           // 가사
         civil: '/ssgo/ssgo101/selectHmpgCvlcsCsProgCtt.on',            // 민사
@@ -734,8 +736,8 @@ export class ScourtApiClient {
         protection: '/ssgo/ssgo10i/selectHmpgFamlyPrtctCsProgCtt.on', // 보호 (동버,푸) - 2026.01.07 추가
         contempt: '/ssgo/ssgo106/selectHmpgEtcCsProgCtt.on',          // 감치 (정명) - 2026.01.07 추가
       };
-      const endpoint = progressEndpoints[params.caseCategory || 'family'] || progressEndpoints.civil;
-      console.log(`  엔드포인트: ${endpoint} (${params.caseCategory || 'family'})`);
+      const endpoint = progressEndpoints[resolvedCategory] || progressEndpoints.civil;
+      console.log(`  엔드포인트: ${endpoint} (${resolvedCategory})`);
 
       // submissionid도 사건유형별로 다름
       const submissionIds: Record<string, string> = {
@@ -748,7 +750,7 @@ export class ScourtApiClient {
         headers: {
           ...this.defaultHeaders,
           'Cookie': `WMONID=${this.session.wmonid}; JSESSIONID=${this.session.jsessionId}`,
-          'submissionid': submissionIds[params.caseCategory || 'family'] || submissionIds.family,
+          'submissionid': submissionIds[resolvedCategory] || submissionIds.family,
         },
         body: JSON.stringify(requestBody),
       });

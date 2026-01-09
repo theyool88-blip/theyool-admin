@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import Dashboard, { type Schedule } from '@/components/Dashboard'
 import AdminHeader from '@/components/AdminHeader'
 import { HEARING_TYPE_LABELS, DEADLINE_TYPE_LABELS, HearingType, DeadlineType } from '@/types/court-hearing'
@@ -13,6 +14,7 @@ type UnifiedCalendarRow = {
   event_type: 'COURT_HEARING' | 'CONSULTATION' | 'DEADLINE' | string
   location: string | null
   reference_id: string | null
+  tenant_id: string | null
 }
 
 export default async function Home() {
@@ -38,6 +40,12 @@ export default async function Home() {
     redirect('/login')
   }
 
+  // 테넌트 컨텍스트 조회
+  const tenantContext = await getCurrentTenantContext()
+  if (!tenantContext) {
+    redirect('/login')
+  }
+
   // 이번 주 일정 가져오기 (통합 캘린더 사용)
   const today = new Date()
   const dayOfWeek = today.getDay() // 0=일요일, 1=월요일, ..., 6=토요일
@@ -55,11 +63,18 @@ export default async function Home() {
   const weekEnd = new Date(weekStart)
   weekEnd.setDate(weekStart.getDate() + 6) // 일요일
 
-  const { data: calendarData } = await adminClient
+  let calendarQuery = adminClient
     .from('unified_calendar')
     .select('*')
     .gte('event_date', weekStart.toISOString().split('T')[0])
     .lte('event_date', weekEnd.toISOString().split('T')[0])
+
+  // 슈퍼 어드민이 아니면 테넌트 필터 적용
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    calendarQuery = calendarQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: calendarData } = await calendarQuery
     .order('event_date', { ascending: true })
     .order('event_time', { ascending: true })
 

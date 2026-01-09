@@ -87,12 +87,12 @@ async function verifyCase(client: any, tc: TestCase): Promise<VerificationResult
       btprNm: tc.party,
     });
 
-    if (!apiResult.success || !apiResult.detailData?.raw?.data) {
+    if (!apiResult.success || !apiResult.generalData?.raw?.data) {
       result.error = apiResult.error || 'No data returned';
       return result;
     }
 
-    const data = apiResult.detailData.raw.data;
+    const data = apiResult.generalData.raw.data;
 
     // 1. 일반내용 검증
     const caseInfo = data.dma_csBasCtt || {};
@@ -206,7 +206,7 @@ async function main() {
   originalLog(`✅ 성공: ${successCount}개`);
   if (failCount > 0) originalLog(`❌ 실패: ${failCount}개`);
 
-  originalLog('\n### 상세 결과 ###\n');
+  originalLog('\n### 일반내용 결과 ###\n');
   originalLog('| 유형 | 설명 | 상태 | 일반내용 | 진행내용 | 당사자라벨 |');
   originalLog('|------|------|:----:|:--------:|:--------:|-----------|');
 

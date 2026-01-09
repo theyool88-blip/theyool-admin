@@ -177,7 +177,7 @@ interface SearchResponse {
 ### 일반내용 조회 요청
 
 ```typescript
-interface DetailRequest {
+interface GeneralRequest {
   dma_search: {
     cortCd: string;      // 법원코드 (숫자 6자리)
     encCsNo: string;     // 암호화된 사건번호 (64자)
@@ -333,7 +333,7 @@ window._apiCalls.filter(c => c.url.indexOf('.on') !== -1)
 ### 3. 코드 업데이트
 
 1. `lib/scourt/api-client.ts`의 `getCaseCategory()` 함수에 사건유형 추가
-2. `getDetailApiEndpoints()`에 엔드포인트 추가
+2. `getGeneralApiEndpoints()`에 엔드포인트 추가
 3. `getCaseProgress()`의 `progressEndpoints`에 추가
 4. `lib/scourt/case-type-codes.ts`에 코드 매핑 추가
 

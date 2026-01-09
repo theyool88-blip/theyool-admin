@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import CaseEditForm from '@/components/CaseEditForm'
 
 type RelatedCaseRecord = {
@@ -39,26 +40,42 @@ export default async function CaseEditPage({ params }: { params: Promise<{ id: s
     redirect('/login')
   }
 
-  // 사건 상세 정보 가져오기
-  const { data: caseData } = await adminClient
+  // 테넌트 컨텍스트 조회
+  const tenantContext = await getCurrentTenantContext()
+  if (!tenantContext) {
+    redirect('/login')
+  }
+
+  // 사건 상세 정보 가져오기 (테넌트 필터 적용)
+  let caseQuery = adminClient
     .from('legal_cases')
     .select(`
       *,
       client:clients(*)
     `)
     .eq('id', id)
-    .single()
+
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    caseQuery = caseQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: caseData } = await caseQuery.single()
 
   if (!caseData) {
     redirect('/cases')
   }
 
-  // 모든 사건 목록 (관련 사건 연결용)
-  const { data: allCases } = await adminClient
+  // 모든 사건 목록 (관련 사건 연결용) - 테넌트 필터 적용
+  let allCasesQuery = adminClient
     .from('legal_cases')
     .select('id, case_name, contract_number, status')
     .neq('id', id)
-    .order('created_at', { ascending: false })
+
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    allCasesQuery = allCasesQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: allCases } = await allCasesQuery.order('created_at', { ascending: false })
 
   // 현재 사건의 관련 사건
   const { data: relatedCasesData } = await adminClient

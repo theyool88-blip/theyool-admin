@@ -1,5 +1,5 @@
 /**
- * SCOURT 사건 상세 페이지 열기 API
+ * SCOURT 사건 페이지(일반내용 탭) 열기 API
  *
  * POST /api/admin/scourt/open-case
  *
@@ -11,7 +11,7 @@
  * - success: 성공 여부
  * - error: 에러 메시지 (실패 시)
  *
- * Puppeteer로 SCOURT 브라우저를 열고 사건을 찾아 상세 페이지를 띄워줍니다.
+ * Puppeteer로 SCOURT 브라우저를 열고 사건을 찾아 일반내용 탭 화면을 띄워줍니다.
  * DB에서 wmonid를 조회하여 API 세션과 브라우저 세션을 동기화합니다.
  */
 
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     if (result.success) {
       return NextResponse.json({
         success: true,
-        message: `${caseNumber} 사건 상세 페이지를 열었습니다`,
+        message: `${caseNumber} 사건 일반내용 탭 화면을 열었습니다`,
       });
     } else {
       return NextResponse.json(

@@ -114,6 +114,13 @@ function extractFieldDefinitions(doc: Document): Record<string, string> {
   return fields;
 }
 
+const DERIVED_FIELD_IDS = new Set([
+  'ultmtDvsNm',
+  'csUltmtDvsNm',
+  'aplPrpndCtt',
+  'prsvCtt',
+]);
+
 /**
  * txt_XXX 형태의 ID에서 실제 필드 ID 찾기
  * 예: txt_csUltmtDvsNm → ultmtDvsNm (필드 정의에서 매칭)
@@ -148,21 +155,20 @@ function resolveFieldIdFromSpanId(spanId: string, fieldDefinitions: Record<strin
     }
   }
 
-  // 3. 부분 매칭 (baseName이 포함된 필드 찾기)
+  // 3. 대소문자만 다른 경우의 정확 매칭
   for (const fieldId of validFieldIds) {
     // 대소문자 무시하고 비교
     if (fieldId.toLowerCase() === baseName.toLowerCase()) {
       return fieldId;
     }
-    // baseName이 fieldId를 포함하거나, fieldId가 baseName을 포함하는 경우
-    if (baseName.toLowerCase().includes(fieldId.toLowerCase()) ||
-        fieldId.toLowerCase().includes(baseName.toLowerCase())) {
-      return fieldId;
-    }
   }
 
-  // 4. 매칭 실패 - 원래 이름 반환 (숫자 접미사 제거)
-  return baseName.replace(/\d+$/, '');
+  // 4. 매칭 실패 - 자동 매핑 중단
+  if (DERIVED_FIELD_IDS.has(baseName)) {
+    return baseName;
+  }
+
+  return null;
 }
 
 /**

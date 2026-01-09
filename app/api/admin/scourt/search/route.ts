@@ -285,6 +285,7 @@ export async function POST(request: NextRequest) {
               documents: documentsData,  // 제출서류 원본
               lower_court: lowerCourtData,  // 심급내용 (원심 사건 정보)
               related_cases: relatedCasesData,  // 연관사건 (반소, 항소심, 본안 등)
+              raw_data: result.generalData.raw || null,  // XML 렌더링용 원본 데이터
               case_number: caseNumber,
               court_code: actualCourtName,  // SCOURT 실제 법원명 사용
             });

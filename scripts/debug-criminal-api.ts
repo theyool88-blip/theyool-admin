@@ -1,7 +1,7 @@
 /**
  * 형사사건 API 디버깅 스크립트
  *
- * 검색은 성공하지만 상세 조회가 실패하는 원인 분석
+ * 검색은 성공하지만 일반내용 조회가 실패하는 원인 분석
  */
 import { getScourtApiClient } from '../lib/scourt/api-client';
 import * as dotenv from 'dotenv';
@@ -55,8 +55,8 @@ async function main() {
     }
   }
 
-  // Step 4: 상세 조회 시도 (다양한 파라미터 조합)
-  console.log('\n📍 Step 4: 상세 조회 테스트');
+  // Step 4: 일반내용 조회 시도 (다양한 파라미터 조합)
+  console.log('\n📍 Step 4: 일반내용 조회 테스트');
 
   const wmonid = (apiClient as any).getWmonid();
   const jsessionId = (apiClient as any).session?.jsessionId;

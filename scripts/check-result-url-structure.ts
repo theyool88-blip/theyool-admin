@@ -155,7 +155,7 @@ async function checkResultStructure() {
       console.log('하지만 그리드 구조를 보면:\n');
       console.log('✅ 결과가 있을 때는 다음과 같이 동작할 것으로 예상됩니다:');
       console.log('   1. 테이블에 결과 행이 추가됨');
-      console.log('   2. 각 행을 클릭하면 상세 페이지로 이동하거나');
+      console.log('   2. 각 행을 클릭하면 일반내용 탭 화면로 이동하거나');
       console.log('   3. JavaScript로 팝업/모달이 열림\n');
       console.log('💡 고유 URL 여부는 결과가 있는 사건으로 테스트해야 확정할 수 있습니다.');
     }

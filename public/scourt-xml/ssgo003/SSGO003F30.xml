@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003F30(최근기일내용 목록) 화면 XML
+
+============ ============ ==========================
+ Date         Author       Description
+============ ============ ==========================
+2022.05.12.   최연구       [NELS]최초 생성
+============ ============ ==========================
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="최근기일내용 목록" >
+    	<w2:type>DEFAULT</w2:type>
+        <w2:buildDate/>
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <!-- 최근기일내용 -->
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_rcntDxdyLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="dxdyYmd" name="기일" dataType="text"></w2:column>
+                        <w2:column id="dxdyHm" name="기일시간" dataType="text"></w2:column>
+                        <w2:column id="dxdyKndCd" name="기일종류코드" dataType="text"></w2:column>
+                        <w2:column id="dxdyKndNm" name="기일종류코드명" dataType="text"></w2:column>
+                        <w2:column id="dxdyPlcNm" name="기일장소" dataType="text"></w2:column>
+                        <w2:column id="dxdyRsltCd" name="기일결과코드" dataType="text"></w2:column>
+                        <w2:column id="dxdyRsltNm" name="기일결과코드명" dataType="text"></w2:column>
+                        <w2:column id="dxdyRqrdExptHm" name="기일소요예상시분" dataType="text"></w2:column>
+                        <w2:column id="dxdyUltmtCtt" name="종국내용" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection>
+            </w2:workflowCollection>
+        </xf:model>
+        
+        <script type="text/javascript" lazy="false"><![CDATA[/**
+ * 화면 pageload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */ 
+scwin.onpageload = function() {
+    var dlt_param   = com.data.getParameter() || ssgo.getParameter();
+    dlt_param = ssgo.setReversLst(dlt_param);
+
+    dlt_rcntDxdyLst.removeAll();
+    dlt_rcntDxdyLst.setJSON(dlt_param);    
+
+    // 조회건수 없을시 버튼숨김
+    if(dlt_rcntDxdyLst.getRowCount() == 0) {
+        btn_csDxsyProgList.hide();
+    }    
+
+    // 그리드 사이즈조정시 캔버스뒤로 숨는 오류처리
+    ssgo.setGrdResizeAddEvt(grd_rcntDxdyLst);       
+
+};
+
+/**
+ * 화면 pageunload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageunload = function() {
+};
+
+    ]]></script>
+	<style type="text/css"><![CDATA[
+			
+		 ]]></style>
+    </head>
+   <body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+
+   	<w2:span class="con_stit ic pt10" id="" label="최근기일내용" style=""></w2:span>
+   	<xf:trigger class="btn_fcm btn_list fr pstR mal10" id="btn_csDxsyProgList" style="" type="button" title="기일내용 상세보기 이동" ev:onclick="ssgo.goCsSrchProgList('1')">
+   		<xf:label><![CDATA[상세보기]]></xf:label>
+   	</xf:trigger>
+   	<w2:gridView adaptive="" adaptiveThreshold="" autoFit="none" autoFitMinWidth="" captionTitle="최근기일내용 그리드" class="grid" contextMenu=""
+   		dataList="data:dlt_rcntDxdyLst" id="grd_rcntDxdyLst" readOnly="true" style="height:110px;" visibleRowNum="all" noResultMessage="지정된 기일내용이 없습니다." titleFormatter="ssgo.setGrdTitle">
+   		<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+   		<w2:header id="header1" style="">
+   			<w2:row id="row1" style="">
+   				<w2:column displayMode="label" id="column19" inputType="text" style="height:20px;" value="일자" width="25"></w2:column>
+   				<w2:column displayMode="label" id="column20" inputType="text" style="height:20px" value="시각" width="15"></w2:column>
+   				<w2:column inputType="text" style="height:20px" id="column23" value="소요예상시간" displayMode="label" width="20"></w2:column>
+   				<w2:column displayMode="label" id="column18" inputType="text" style="height:20px;" value="기일구분" width="20"></w2:column>
+   				<w2:column displayMode="label" id="column15" inputType="text" style="height:20px;" value="기일장소" width="20"></w2:column>
+   				<w2:column displayMode="label" id="column22" inputType="text" style="height:20px" value="결과" width="20"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody id="gBody1" style="">
+   			<w2:row id="row2" style="">
+   				<w2:column displayMode="label" excelCellType="" id="dxdyYmd" inputType="text" style="" displayFormat="####.##.##"></w2:column>
+   				<w2:column displayMode="label" id="dxdyHm" inputType="text" style="height:20px" value="" displayFormat="##:##"></w2:column>
+   				<w2:column inputType="text" style="height:20px" id="dxdyRqrdExptHm" value="" displayMode="label"></w2:column>
+   				<w2:column displayMode="label" excelCellType="" id="dxdyKndNm" inputType="text" sortLabel="" sortable="" style="">
+   				</w2:column>
+   				<w2:column displayMode="label" id="dxdyPlcNm" inputType="text" style="" textAlign="left"></w2:column>
+   				<w2:column displayMode="label" id="dxdyRsltNm" inputType="text" style="height:20px" value=""></w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+   	<w2:textbox class="txt_exl " escape="false" id="" label="&lt;p&gt;※ 최근 기일 순으로 일부만 보입니다. 반드시 상세보기로 확인하시기 바랍니다.&lt;/p&gt;" style=""></w2:textbox>
+
+
+   </body>
+</html>

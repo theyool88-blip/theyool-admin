@@ -122,9 +122,9 @@ async function main() {
   const dataKeys = Object.keys(gnrlData.data || {});
   console.log(dataKeys.join('\n'));
 
-  // 4. 각 필드 상세 확인
+  // 4. 각 필드 구조 확인
   console.log('\n' + '='.repeat(60));
-  console.log('📋 각 필드 상세:');
+  console.log('📋 각 필드 구조:');
   console.log('='.repeat(60));
 
   for (const key of dataKeys) {

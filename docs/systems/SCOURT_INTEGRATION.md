@@ -146,7 +146,7 @@ legal_cases에 enc_cs_no, scourt_wmonid 저장
 ```
 저장된 enc_cs_no + scourt_wmonid 사용
     ↓
-캡챠 없이 상세 API 호출
+캡챠 없이 일반내용/진행내용 API 호출
     ↓
 응답 파싱:
   - dma_csBasCtt → basic_info
@@ -229,8 +229,8 @@ api-client.ts에서 사건유형별 차이를 흡수하여 통일된 필드명�
 
 ```typescript
 // sync/route.ts의 종국결과 추출 로직
-let extractedEndRslt = detailData?.endRslt || null;
-let extractedEndDt = detailData?.endDt || null;
+let extractedEndRslt = generalData?.endRslt || null;
+let extractedEndDt = generalData?.endDt || null;
 
 // API 응답에 종국결과가 없으면 진행내용에서 "종국 : " 항목 찾기
 if (!extractedEndRslt && progressData.length > 0) {

@@ -1,5 +1,5 @@
 /**
- * 사건 상세 정보 API 캡처
+ * 사건 일반내용 API 캡처
  * 검색 성공 후 사건 클릭 시 호출되는 API를 캡처
  */
 
@@ -20,8 +20,8 @@ interface NetworkRequest {
   type: string;
 }
 
-async function captureDetailApi() {
-  console.log('🔍 사건 상세 API 캡처 시작...\n');
+async function captureGeneralApi() {
+  console.log('🔍 사건 일반내용 API 캡처 시작...\n');
 
   const browser = await puppeteer.launch({
     headless: false,
@@ -192,7 +192,7 @@ async function captureDetailApi() {
 
     console.log('\n📋 검색 결과:', resultInfo);
 
-    // 요청 배열 초기화 (상세 API만 캡처하기 위해)
+    // 요청 배열 초기화 (일반내용 API만 캡처하기 위해)
     requests.length = 0;
     console.log('\n' + '='.repeat(60));
     console.log('🖱️ 첫 번째 사건 클릭...');
@@ -210,11 +210,11 @@ async function captureDetailApi() {
     // 응답 대기
     await new Promise((r) => setTimeout(r, 8000));
 
-    // 상세 정보 탭/영역 확인
-    const detailTabs = await targetFrame.evaluate(() => {
+    // 일반내용 탭/영역 확인
+    const generalTabs = await targetFrame.evaluate(() => {
       // 탭 메뉴 확인
       const tabs = document.querySelectorAll('[class*="tab"], [id*="tab"]');
-      // 상세 정보 테이블 확인
+      // 일반내용 테이블 확인
       const tables = document.querySelectorAll('table');
 
       return {
@@ -224,10 +224,10 @@ async function captureDetailApi() {
       };
     });
 
-    console.log('\n📊 상세 화면 구조:', detailTabs);
+    console.log('\n📊 일반내용 화면 구조:', generalTabs);
 
     // 결과 저장
-    const outputDir = path.join(process.cwd(), 'temp', 'detail-api-capture');
+    const outputDir = path.join(process.cwd(), 'temp', 'general-api-capture');
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -235,18 +235,18 @@ async function captureDetailApi() {
     // API 요청 저장
     const apiRequests = requests.filter((r) => r.url.includes('.on'));
     fs.writeFileSync(
-      path.join(outputDir, 'detail-api-requests.json'),
+      path.join(outputDir, 'general-api-requests.json'),
       JSON.stringify(apiRequests, null, 2)
     );
 
     // 스크린샷
     await page.screenshot({
-      path: path.join(outputDir, 'detail-page.png'),
+      path: path.join(outputDir, 'general-page.png'),
       fullPage: true,
     });
 
     console.log('\n' + '='.repeat(60));
-    console.log('📊 캡처된 상세 API 요청');
+    console.log('📊 캡처된 일반내용 API 요청');
     console.log('='.repeat(60));
 
     apiRequests.forEach((req, idx) => {
@@ -261,10 +261,10 @@ async function captureDetailApi() {
       }
     });
 
-    console.log('\n✅ 결과 저장: temp/detail-api-capture/');
+    console.log('\n✅ 결과 저장: temp/general-api-capture/');
 
     // 브라우저 유지
-    console.log('\n브라우저를 60초간 열어둡니다. 상세 화면을 확인하세요...');
+    console.log('\n브라우저를 60초간 열어둡니다. 일반내용 화면을 확인하세요...');
     await new Promise((r) => setTimeout(r, 60000));
 
   } finally {
@@ -272,7 +272,7 @@ async function captureDetailApi() {
   }
 }
 
-captureDetailApi()
+captureGeneralApi()
   .then(() => {
     console.log('\n✅ 캡처 완료');
     process.exit(0);

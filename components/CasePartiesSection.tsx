@@ -3,16 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import type {
   CaseParty,
-  CaseRepresentative,
   PartyType,
 } from '@/types/case-party'
-import { PARTY_TYPE_LABELS, getOppositePartyType } from '@/types/case-party'
-
-// 날짜 포맷 함수 (YYYYMMDD → YYYY.MM.DD)
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr || dateStr.length !== 8) return '-'
-  return `${dateStr.slice(0, 4)}.${dateStr.slice(4, 6)}.${dateStr.slice(6, 8)}`
-}
+import { PARTY_TYPE_LABELS, getOppositePartyType, normalizePartyLabel } from '@/types/case-party'
+import { getPartyLabels } from '@/lib/scourt/party-labels'
 
 interface Client {
   id: string
@@ -29,15 +23,21 @@ interface ScourtSnapshotParty {
   indvdCfmtnYmd?: string
 }
 
-// SCOURT 스냅샷 대리인 타입
-interface ScourtSnapshotRep {
-  agntNm: string
-  agntDvsNm: string
-  jdafrCorpNm?: string
+// 실제 당사자 유형 (사건본인, 제3자 제외)
+const REAL_PARTY_LABELS = [
+  '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
+  '항소인', '피항소인', '상고인', '피상고인', '항고인', '상대방',
+  '청구인', '피청구인', '소송수계인'
+]
+
+function isRealParty(label: string): boolean {
+  const normalized = normalizePartyLabel(label)
+  return REAL_PARTY_LABELS.some(l => normalized.includes(l))
 }
 
 interface CasePartiesSectionProps {
   caseId: string
+  courtCaseNumber?: string | null  // 사건번호 (사건유형 기반 라벨 결정용)
   clientId?: string | null
   clientName?: string | null
   clientRole?: PartyType | null
@@ -45,21 +45,21 @@ interface CasePartiesSectionProps {
   onPartiesUpdate?: () => void
   // SCOURT 스냅샷 데이터 (case_parties 비어있을 때 표시용)
   scourtParties?: ScourtSnapshotParty[]
-  scourtRepresentatives?: ScourtSnapshotRep[]
 }
 
 export default function CasePartiesSection({
   caseId,
+  courtCaseNumber,
   clientId,
   clientName,
   clientRole,
   opponentName,
   onPartiesUpdate,
   scourtParties = [],
-  scourtRepresentatives = [],
 }: CasePartiesSectionProps) {
+  // 사건유형 기반 당사자 라벨 결정
+  const partyLabels = getPartyLabels(courtCaseNumber || '')
   const [parties, setParties] = useState<CaseParty[]>([])
-  const [representatives, setRepresentatives] = useState<CaseRepresentative[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -74,14 +74,6 @@ export default function CasePartiesSection({
     fee_allocation_amount: number | null
   } | null>(null)
 
-  // 새 당사자 추가 폼
-  const [showAddForm, setShowAddForm] = useState(false)
-  const [newPartyType, setNewPartyType] = useState<PartyType>('plaintiff')
-  const [newPartyName, setNewPartyName] = useState('')
-  const [newIsClient, setNewIsClient] = useState(false)
-  const [newClientId, setNewClientId] = useState<string | null>(null)
-  const [newFeeAmount, setNewFeeAmount] = useState<number | null>(null)
-
   // 당사자 목록 조회
   const fetchParties = useCallback(async () => {
     try {
@@ -94,7 +86,6 @@ export default function CasePartiesSection({
         setError(data.error)
       } else {
         setParties(data.parties || [])
-        setRepresentatives(data.representatives || [])
       }
     } catch (err) {
       setError('당사자 목록 조회 실패')
@@ -122,25 +113,41 @@ export default function CasePartiesSection({
     fetchClients()
   }, [fetchParties, fetchClients])
 
-  // 당사자 유형별 그룹화 (party_type_label 기준)
-  // 표준 라벨 목록 - 이 목록에 없는 라벨은 party_type 기반으로 정규화
-  const standardLabels = ['원고', '피고', '채권자', '채무자', '신청인', '피신청인', '항소인', '피항소인', '상고인', '피상고인', '사건본인']
+  // 당사자 유형별 그룹화 (사건유형 기반 라벨 사용)
+  // 원고측/피고측 라벨 매핑
+  const plaintiffLabels = ['원고', '채권자', '신청인', '항소인', '상고인', '항고인', '청구인']
+  const defendantLabels = ['피고', '채무자', '피신청인', '피항소인', '피상고인', '상대방', '피청구인']
 
-  const partyGroups = parties.reduce((groups, party) => {
+  // 실제 당사자만 필터링 (사건본인, 제3자 제외)
+  const realParties = parties.filter((party) => {
     const rawLabel = party.party_type_label || ''
-    // 표준 라벨이거나 사건본인으로 시작하면 그대로 사용, 아니면 party_type 기반 라벨
-    const label = standardLabels.includes(rawLabel) || rawLabel.startsWith('사건본인')
-      ? rawLabel
-      : PARTY_TYPE_LABELS[party.party_type] || '기타'
+    return isRealParty(rawLabel) || party.party_type === 'plaintiff' || party.party_type === 'defendant'
+  })
+
+  const partyGroups = realParties.reduce((groups, party) => {
+    const rawLabel = party.party_type_label || ''
+    const normalizedLabel = normalizePartyLabel(rawLabel)
+    let label: string
+
+    // 원고측 라벨이면 → 사건유형에 맞는 원고측 라벨 사용
+    if (plaintiffLabels.includes(normalizedLabel) || party.party_type === 'plaintiff') {
+      label = partyLabels.plaintiff || rawLabel || '원고'
+    }
+    // 피고측 라벨이면 → 사건유형에 맞는 피고측 라벨 사용
+    else if (defendantLabels.includes(normalizedLabel) || party.party_type === 'defendant') {
+      label = partyLabels.defendant || rawLabel || '피고'
+    }
+    // 기타
+    else {
+      label = rawLabel || PARTY_TYPE_LABELS[party.party_type] || '기타'
+    }
+
     if (!groups[label]) {
       groups[label] = []
     }
     groups[label].push(party)
     return groups
   }, {} as Record<string, CaseParty[]>)
-
-  // 의뢰인 수
-  const clientCount = parties.filter(p => p.is_our_client).length
 
   // 당사자 의뢰인 상태 수정
   const handleSaveParty = async (partyId: string) => {
@@ -177,76 +184,6 @@ export default function CasePartiesSection({
     }
   }
 
-  // 새 당사자 추가
-  const handleAddParty = async () => {
-    if (!newPartyName.trim()) {
-      setError('당사자명을 입력해주세요.')
-      return
-    }
-
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/admin/cases/${caseId}/parties`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          party_name: newPartyName.trim(),
-          party_type: newPartyType,
-          party_type_label: PARTY_TYPE_LABELS[newPartyType],
-          is_our_client: newIsClient,
-          client_id: newIsClient ? newClientId : null,
-          fee_allocation_amount: newIsClient ? newFeeAmount : null,
-        }),
-      })
-
-      if (res.ok) {
-        await fetchParties()
-        setShowAddForm(false)
-        setNewPartyName('')
-        setNewIsClient(false)
-        setNewClientId(null)
-        setNewFeeAmount(null)
-        onPartiesUpdate?.()
-      } else {
-        const data = await res.json()
-        setError(data.error || '추가 실패')
-      }
-    } catch (err) {
-      setError('추가 중 오류 발생')
-      console.error(err)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  // 당사자 삭제
-  const handleDeleteParty = async (partyId: string) => {
-    if (!confirm('이 당사자를 삭제하시겠습니까?')) return
-
-    try {
-      const res = await fetch(`/api/admin/cases/${caseId}/parties?partyId=${partyId}`, {
-        method: 'DELETE',
-      })
-
-      if (res.ok) {
-        await fetchParties()
-        onPartiesUpdate?.()
-      } else {
-        const data = await res.json()
-        setError(data.error || '삭제 실패')
-      }
-    } catch (err) {
-      setError('삭제 중 오류 발생')
-      console.error(err)
-    }
-  }
-
-  // 금액 포맷팅
-  const formatAmount = (amount: number | null) => {
-    if (amount === null || amount === undefined) return '-'
-    return new Intl.NumberFormat('ko-KR').format(amount) + '원'
-  }
-
   // 로딩 중
   if (loading) {
     return (
@@ -255,169 +192,100 @@ export default function CasePartiesSection({
   }
 
   // case_parties에 데이터가 없으면 SCOURT 스냅샷 또는 기존 데이터 표시
-  if (parties.length === 0) {
-    // SCOURT 스냅샷 데이터가 있으면 그것을 표시
-    if (scourtParties.length > 0 || scourtRepresentatives.length > 0) {
+  if (realParties.length === 0) {
+    // SCOURT 스냅샷 데이터가 있으면 그것을 표시 (실제 당사자만 필터링)
+    const realScourtParties = scourtParties.filter(p => isRealParty(p.btprDvsNm))
+
+    if (realScourtParties.length > 0) {
       return (
-        <div className="space-y-3">
-          <div className="flex justify-end">
-            <button
-              onClick={() => setShowAddForm(true)}
-              className="text-xs text-sage-600 hover:text-sage-700"
-            >
-              + 추가
-            </button>
-          </div>
-
-          {/* SCOURT 당사자 목록 */}
-          {scourtParties.length > 0 && (
-            <div className="space-y-1">
-              {scourtParties.map((party, idx) => (
-                <div key={`scourt-party-${idx}`} className="flex items-center gap-2 py-1.5 px-2 bg-gray-50 rounded text-sm">
-                  <span className="text-gray-500 w-20 shrink-0">{party.btprDvsNm}</span>
-                  <span className="font-medium">{party.btprNm}</span>
-                  {party.adjdocRchYmd && (
-                    <span className="text-xs text-gray-400">도달 {formatDate(party.adjdocRchYmd)}</span>
-                  )}
-                  {party.indvdCfmtnYmd && (
-                    <span className="text-xs text-orange-500">확정 {formatDate(party.indvdCfmtnYmd)}</span>
-                  )}
-                </div>
+        <>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left w-24">구분</th>
+                <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">성명</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {realScourtParties.map((party, idx) => (
+                <tr key={`scourt-party-${idx}`} className="hover:bg-gray-50">
+                  <td className="px-5 py-3 text-sm text-gray-500">{party.btprDvsNm}</td>
+                  <td className="px-5 py-3 text-sm text-gray-900">{party.btprNm}</td>
+                </tr>
               ))}
-            </div>
-          )}
-
-          {/* SCOURT 대리인 목록 */}
-          {scourtRepresentatives.length > 0 && (
-            <div className="space-y-1">
-              <div className="text-xs text-gray-500 mb-1">대리인</div>
-              {scourtRepresentatives.map((rep, idx) => (
-                <div key={`scourt-rep-${idx}`} className="flex items-center gap-2 py-1 px-2 bg-gray-50 rounded text-sm">
-                  <span className="text-gray-500 text-xs">{rep.agntDvsNm}</span>
-                  <span>{rep.agntNm}</span>
-                  {rep.jdafrCorpNm && (
-                    <span className="text-xs text-gray-400">({rep.jdafrCorpNm})</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* 새 당사자 추가 폼 */}
-          {showAddForm && (
-            <AddPartyForm
-              newPartyType={newPartyType}
-              setNewPartyType={setNewPartyType}
-              newPartyName={newPartyName}
-              setNewPartyName={setNewPartyName}
-              newIsClient={newIsClient}
-              setNewIsClient={setNewIsClient}
-              newClientId={newClientId}
-              setNewClientId={setNewClientId}
-              newFeeAmount={newFeeAmount}
-              setNewFeeAmount={setNewFeeAmount}
-              clients={clients}
-              saving={saving}
-              onSave={handleAddParty}
-              onCancel={() => setShowAddForm(false)}
-            />
-          )}
-
-          {error && (
-            <div className="mt-2 text-xs text-red-500">{error}</div>
-          )}
-        </div>
+            </tbody>
+          </table>
+          {error && <div className="px-5 py-2 text-xs text-red-500">{error}</div>}
+        </>
       )
     }
 
     // SCOURT 데이터도 없으면 기존 client/opponent 표시
+    if (clientName || opponentName) {
+      return (
+        <>
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/50">
+                <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left w-24">구분</th>
+                <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">성명</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {clientName && (
+                <tr className="hover:bg-gray-50">
+                  <td className="px-5 py-3 text-sm text-gray-500">
+                    {clientRole ? PARTY_TYPE_LABELS[clientRole] : partyLabels.plaintiff}
+                  </td>
+                  <td className="px-5 py-3 text-sm">
+                    <span className="font-medium text-gray-900">{clientName}</span>
+                    <span className="ml-1.5 text-xs text-sage-600">(의뢰인)</span>
+                  </td>
+                </tr>
+              )}
+              {opponentName && (
+                <tr className="hover:bg-gray-50">
+                  <td className="px-5 py-3 text-sm text-gray-500">
+                    {clientRole ? PARTY_TYPE_LABELS[getOppositePartyType(clientRole)] : partyLabels.defendant}
+                  </td>
+                  <td className="px-5 py-3 text-sm text-gray-900">{opponentName}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          {error && <div className="px-5 py-2 text-xs text-red-500">{error}</div>}
+        </>
+      )
+    }
+
+    // 데이터 없음
     return (
-      <div className="space-y-3">
-        <div className="flex justify-end">
-          <button
-            onClick={() => setShowAddForm(true)}
-            className="text-xs text-sage-600 hover:text-sage-700"
-          >
-            + 당사자 추가
-          </button>
-        </div>
-
-        {/* 기존 데이터 기반 표시 */}
-        <div className="text-sm space-y-2">
-          {clientName && (
-            <div className="flex items-center gap-2 py-1.5 px-2 bg-gray-50 rounded">
-              <span className="text-gray-500 w-20 shrink-0">
-                {clientRole ? PARTY_TYPE_LABELS[clientRole] : '원고'}
-              </span>
-              <span className="font-medium">{clientName}</span>
-              <span className="text-xs text-sage-600">(의뢰인)</span>
-            </div>
-          )}
-          {opponentName && (
-            <div className="flex items-center gap-2 py-1.5 px-2 bg-gray-50 rounded">
-              <span className="text-gray-500 w-20 shrink-0">
-                {clientRole ? PARTY_TYPE_LABELS[getOppositePartyType(clientRole)] : '피고'}
-              </span>
-              <span>{opponentName}</span>
-            </div>
-          )}
-          {!clientName && !opponentName && (
-            <div className="text-gray-400 text-sm py-2">
-              등록된 당사자 정보가 없습니다.
-            </div>
-          )}
-        </div>
-
-        {/* 새 당사자 추가 폼 */}
-        {showAddForm && (
-          <AddPartyForm
-            newPartyType={newPartyType}
-            setNewPartyType={setNewPartyType}
-            newPartyName={newPartyName}
-            setNewPartyName={setNewPartyName}
-            newIsClient={newIsClient}
-            setNewIsClient={setNewIsClient}
-            newClientId={newClientId}
-            setNewClientId={setNewClientId}
-            newFeeAmount={newFeeAmount}
-            setNewFeeAmount={setNewFeeAmount}
-            clients={clients}
-            saving={saving}
-            onSave={handleAddParty}
-            onCancel={() => setShowAddForm(false)}
-          />
-        )}
-
-        {error && (
-          <div className="mt-2 text-xs text-red-500">{error}</div>
-        )}
+      <div className="text-gray-400 text-sm px-5 py-6 text-center">
+        등록된 당사자 정보가 없습니다.
       </div>
     )
   }
 
-  // 당사자 데이터가 있으면 전체 표시
+  // 당사자 데이터가 있으면 테이블 형식으로 표시
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
-        <button
-          onClick={() => setShowAddForm(true)}
-          className="text-xs text-sage-600 hover:text-sage-700"
-        >
-          + 추가
-        </button>
-      </div>
-
-      {/* 당사자 유형별 표시 */}
-      {Object.entries(partyGroups).map(([label, groupParties]) => (
-        <div key={label}>
-          <div className="text-xs text-gray-500 mb-2">
-            {label} ({groupParties.length}명)
-          </div>
-          <div className="space-y-2">
-            {groupParties.map((party) => (
-              <PartyRow
+    <>
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-gray-100 bg-gray-50/50">
+            <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left w-24">구분</th>
+            <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">성명</th>
+            <th className="px-5 py-2 text-xs font-medium text-gray-500 text-center w-16"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {Object.entries(partyGroups).map(([label, groupParties]) =>
+            groupParties.map((party, idx) => (
+              <PartyTableRow
                 key={party.id}
                 party={party}
+                label={label}
+                showLabel={idx === 0}
+                rowSpan={groupParties.length}
                 clients={clients}
                 isEditing={editingPartyId === party.id}
                 editData={editData}
@@ -436,70 +304,26 @@ export default function CasePartiesSection({
                   setEditingPartyId(null)
                   setEditData(null)
                 }}
-                onDelete={() => handleDeleteParty(party.id)}
                 saving={saving}
-                formatAmount={formatAmount}
               />
-            ))}
-          </div>
-        </div>
-      ))}
-
-      {/* 대리인 정보 */}
-      {representatives.length > 0 && (
-        <div>
-          <div className="text-xs text-gray-500 mb-2">
-            대리인 ({representatives.length}명)
-          </div>
-          <div className="space-y-1">
-            {representatives.map((rep) => (
-              <div key={rep.id} className="flex items-center gap-2 text-sm py-1 px-2 bg-gray-50 rounded">
-                <span className="text-gray-500 text-xs">
-                  {rep.representative_type_label}
-                </span>
-                <span>{rep.representative_name}</span>
-                {rep.law_firm_name && (
-                  <span className="text-gray-400 text-xs">({rep.law_firm_name})</span>
-                )}
-                {rep.is_our_firm && (
-                  <span className="text-xs text-sage-600">(우리사무소)</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 새 당사자 추가 폼 */}
-      {showAddForm && (
-        <AddPartyForm
-          newPartyType={newPartyType}
-          setNewPartyType={setNewPartyType}
-          newPartyName={newPartyName}
-          setNewPartyName={setNewPartyName}
-          newIsClient={newIsClient}
-          setNewIsClient={setNewIsClient}
-          newClientId={newClientId}
-          setNewClientId={setNewClientId}
-          newFeeAmount={newFeeAmount}
-          setNewFeeAmount={setNewFeeAmount}
-          clients={clients}
-          saving={saving}
-          onSave={handleAddParty}
-          onCancel={() => setShowAddForm(false)}
-        />
-      )}
+            ))
+          )}
+        </tbody>
+      </table>
 
       {error && (
-        <div className="mt-2 text-xs text-red-500">{error}</div>
+        <div className="px-5 py-2 text-xs text-red-500">{error}</div>
       )}
-    </div>
+    </>
   )
 }
 
-// 당사자 행 컴포넌트
-function PartyRow({
+// 당사자 테이블 행 컴포넌트
+function PartyTableRow({
   party,
+  label,
+  showLabel,
+  rowSpan,
   clients,
   isEditing,
   editData,
@@ -507,11 +331,12 @@ function PartyRow({
   onEdit,
   onSave,
   onCancel,
-  onDelete,
   saving,
-  formatAmount,
 }: {
   party: CaseParty
+  label: string
+  showLabel: boolean
+  rowSpan: number
   clients: Client[]
   isEditing: boolean
   editData: { party_name: string; is_our_client: boolean; client_id: string | null; fee_allocation_amount: number | null } | null
@@ -519,258 +344,129 @@ function PartyRow({
   onEdit: () => void
   onSave: () => void
   onCancel: () => void
-  onDelete: () => void
   saving: boolean
-  formatAmount: (amount: number | null) => string
 }) {
-  if (isEditing && editData) {
-    return (
-      <div className="flex flex-col gap-2 p-3 bg-sage-50 rounded border border-sage-200">
-        {/* 당사자명 수정 */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 w-16">성명:</label>
-          <input
-            type="text"
-            value={editData.party_name}
-            onChange={(e) => setEditData({ ...editData, party_name: e.target.value })}
-            className="text-sm border border-gray-200 rounded px-2 py-1 flex-1 font-medium"
-          />
-          {party.scourt_synced && (
-            <span className="text-xs text-blue-500">(SCOURT)</span>
-          )}
-        </div>
-        {/* 의뢰인 체크박스 */}
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1 text-sm">
-            <input
-              type="checkbox"
-              checked={editData.is_our_client}
-              onChange={(e) => setEditData({ ...editData, is_our_client: e.target.checked })}
-              className="rounded border-gray-300"
-            />
-            의뢰인으로 설정
-          </label>
-        </div>
-        {editData.is_our_client && (
-          <>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 w-16">의뢰인:</label>
-              <select
-                value={editData.client_id || ''}
-                onChange={(e) => setEditData({ ...editData, client_id: e.target.value || null })}
-                className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
-              >
-                <option value="">선택...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 w-16">수임료:</label>
-              <input
-                type="number"
-                value={editData.fee_allocation_amount || ''}
-                onChange={(e) => setEditData({
-                  ...editData,
-                  fee_allocation_amount: e.target.value ? parseInt(e.target.value) : null
-                })}
-                placeholder="수임료 금액"
-                className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
-              />
-              <span className="text-xs text-gray-400">원</span>
-            </div>
-          </>
-        )}
-        <div className="flex justify-end gap-2 mt-1">
-          <button
-            onClick={onCancel}
-            disabled={saving}
-            className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-          >
-            취소
-          </button>
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="text-xs bg-sage-600 text-white px-3 py-1 rounded hover:bg-sage-700 disabled:opacity-50"
-          >
-            {saving ? '저장 중...' : '저장'}
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   // 의뢰인인 경우 실제 이름 사용, 아니면 SCOURT 이름 사용
   const displayName = party.is_our_client && party.clients?.name
     ? party.clients.name
     : party.party_name
 
+  // 마스킹된 이름 감지 (예: 김OO, 이O수, 박OOO)
+  const isMaskedName = /[가-힣]O{1,3}|O{1,3}[가-힣]/.test(party.party_name)
+
+  // 수정 버튼 표시 조건: 의뢰인 연동 안 됨 OR 마스킹된 이름
+  const showEditButton = !(party.is_our_client && party.client_id) || isMaskedName
+
+  // 수정 버튼 항상 표시 여부 (마스킹된 이름이면 항상 표시)
+  const alwaysShowEdit = isMaskedName || !party.is_our_client
+
+  // 수정 모드일 때는 전체 행을 편집 폼으로 표시
+  if (isEditing && editData) {
+    return (
+      <tr className="bg-sage-50">
+        <td colSpan={3} className="px-5 py-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500 w-16">성명:</label>
+              <input
+                type="text"
+                value={editData.party_name}
+                onChange={(e) => setEditData({ ...editData, party_name: e.target.value })}
+                className="text-sm border border-gray-200 rounded px-2 py-1 flex-1 font-medium"
+              />
+              {party.scourt_synced && (
+                <span className="text-xs text-blue-500">(SCOURT)</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="flex items-center gap-1 text-sm">
+                <input
+                  type="checkbox"
+                  checked={editData.is_our_client}
+                  onChange={(e) => setEditData({ ...editData, is_our_client: e.target.checked })}
+                  className="rounded border-gray-300"
+                />
+                의뢰인으로 설정
+              </label>
+            </div>
+            {editData.is_our_client && (
+              <>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 w-16">의뢰인:</label>
+                  <select
+                    value={editData.client_id || ''}
+                    onChange={(e) => setEditData({ ...editData, client_id: e.target.value || null })}
+                    className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
+                  >
+                    <option value="">선택...</option>
+                    {clients.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-500 w-16">수임료:</label>
+                  <input
+                    type="number"
+                    value={editData.fee_allocation_amount || ''}
+                    onChange={(e) => setEditData({
+                      ...editData,
+                      fee_allocation_amount: e.target.value ? parseInt(e.target.value) : null
+                    })}
+                    placeholder="수임료 금액"
+                    className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
+                  />
+                  <span className="text-xs text-gray-400">원</span>
+                </div>
+              </>
+            )}
+            <div className="flex justify-end gap-2 mt-1">
+              <button onClick={onCancel} disabled={saving} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">취소</button>
+              <button onClick={onSave} disabled={saving} className="text-xs bg-sage-600 text-white px-3 py-1 rounded hover:bg-sage-700 disabled:opacity-50">
+                {saving ? '저장 중...' : '저장'}
+              </button>
+            </div>
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
   return (
-    <div className="flex items-center justify-between py-1.5 px-2 bg-gray-50 rounded group">
-      <div className="flex items-center gap-2 flex-wrap">
-        {/* 당사자명 - 의뢰인이면 실제 이름 표시 */}
+    <tr className="hover:bg-gray-50 group">
+      {/* 구분 - rowSpan으로 그룹 표시 */}
+      {showLabel && (
+        <td
+          className="px-5 py-3 text-sm text-gray-500 align-top border-r border-gray-100"
+          rowSpan={rowSpan}
+        >
+          {label}
+        </td>
+      )}
+      {/* 성명 */}
+      <td className="px-5 py-3 text-sm text-gray-900">
         <span className={party.is_our_client ? 'font-medium' : ''}>
           {displayName}
         </span>
-        {/* 의뢰인 표시 */}
         {party.is_our_client && (
-          <span className="text-xs text-sage-600">(의뢰인)</span>
+          <span className="ml-1.5 text-xs text-sage-600">(의뢰인)</span>
         )}
-        {/* 수임료 - 0이 아닌 경우에만 표시 */}
-        {party.is_our_client && party.fee_allocation_amount !== null && party.fee_allocation_amount > 0 && (
-          <span className="text-xs text-gray-500">
-            {formatAmount(party.fee_allocation_amount)}
-          </span>
-        )}
-        {/* 판결도달일 */}
-        {party.adjdoc_rch_ymd && (
-          <span className="text-xs text-gray-400">
-            도달 {formatDate(party.adjdoc_rch_ymd)}
-          </span>
-        )}
-        {/* 확정일 */}
-        {party.indvd_cfmtn_ymd && (
-          <span className="text-xs text-orange-500">
-            확정 {formatDate(party.indvd_cfmtn_ymd)}
-          </span>
-        )}
-      </div>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={onEdit}
-          className="text-xs text-gray-400 hover:text-gray-600 px-1"
-        >
-          수정
-        </button>
-        {!party.scourt_synced && (
+      </td>
+      {/* 수정 버튼 */}
+      <td className="px-3 py-3 text-center">
+        {showEditButton && (
           <button
-            onClick={onDelete}
-            className="text-xs text-red-400 hover:text-red-600 px-1"
+            onClick={onEdit}
+            className={`text-xs px-2 py-0.5 rounded ${
+              alwaysShowEdit
+                ? 'text-sage-600 hover:text-sage-700 hover:bg-sage-50'
+                : 'text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity'
+            }`}
           >
-            삭제
+            수정
           </button>
         )}
-      </div>
-    </div>
-  )
-}
-
-// 새 당사자 추가 폼 컴포넌트
-function AddPartyForm({
-  newPartyType,
-  setNewPartyType,
-  newPartyName,
-  setNewPartyName,
-  newIsClient,
-  setNewIsClient,
-  newClientId,
-  setNewClientId,
-  newFeeAmount,
-  setNewFeeAmount,
-  clients,
-  saving,
-  onSave,
-  onCancel,
-}: {
-  newPartyType: PartyType
-  setNewPartyType: (type: PartyType) => void
-  newPartyName: string
-  setNewPartyName: (name: string) => void
-  newIsClient: boolean
-  setNewIsClient: (isClient: boolean) => void
-  newClientId: string | null
-  setNewClientId: (id: string | null) => void
-  newFeeAmount: number | null
-  setNewFeeAmount: (amount: number | null) => void
-  clients: Client[]
-  saving: boolean
-  onSave: () => void
-  onCancel: () => void
-}) {
-  return (
-    <div className="mt-3 p-3 border border-sage-200 rounded bg-sage-50">
-      <div className="text-sm font-medium mb-2">새 당사자 추가</div>
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 w-16">유형:</label>
-          <select
-            value={newPartyType}
-            onChange={(e) => setNewPartyType(e.target.value as PartyType)}
-            className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
-          >
-            {Object.entries(PARTY_TYPE_LABELS).map(([type, label]) => (
-              <option key={type} value={type}>{label}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-500 w-16">이름:</label>
-          <input
-            type="text"
-            value={newPartyName}
-            onChange={(e) => setNewPartyName(e.target.value)}
-            placeholder="당사자명"
-            className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <label className="flex items-center gap-1 text-sm">
-            <input
-              type="checkbox"
-              checked={newIsClient}
-              onChange={(e) => setNewIsClient(e.target.checked)}
-              className="rounded border-gray-300"
-            />
-            의뢰인으로 설정
-          </label>
-        </div>
-        {newIsClient && (
-          <>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 w-16">의뢰인:</label>
-              <select
-                value={newClientId || ''}
-                onChange={(e) => setNewClientId(e.target.value || null)}
-                className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
-              >
-                <option value="">선택...</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 w-16">수임료:</label>
-              <input
-                type="number"
-                value={newFeeAmount || ''}
-                onChange={(e) => setNewFeeAmount(e.target.value ? parseInt(e.target.value) : null)}
-                placeholder="수임료 금액"
-                className="text-sm border border-gray-200 rounded px-2 py-1 flex-1"
-              />
-              <span className="text-xs text-gray-400">원</span>
-            </div>
-          </>
-        )}
-      </div>
-      <div className="flex justify-end gap-2 mt-3">
-        <button
-          onClick={onCancel}
-          disabled={saving}
-          className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1"
-        >
-          취소
-        </button>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="text-xs bg-sage-600 text-white px-3 py-1 rounded hover:bg-sage-700 disabled:opacity-50"
-        >
-          {saving ? '추가 중...' : '추가'}
-        </button>
-      </div>
-    </div>
+      </td>
+    </tr>
   )
 }

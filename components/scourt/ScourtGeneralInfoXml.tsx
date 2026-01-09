@@ -15,7 +15,6 @@ import {
   parseGridXml,
   BasicInfoLayout,
   GridLayout,
-  ParsedLayout,
 } from "@/lib/scourt/xml-parser";
 import {
   BasicInfoTable,
@@ -25,8 +24,13 @@ import {
 import {
   CASE_TYPE_XML_MAP,
   ScourtCaseType,
-  getRequiredXmlFiles,
+  detectCaseTypeFromApiResponse,
+  normalizeDataListId,
+  resolveBasicInfoXmlPath,
+  resolveDataListXmlPath,
+  DATA_LIST_XML_CANDIDATES,
 } from "@/lib/scourt/xml-mapping";
+import { extractSubXmlPaths, normalizeDataListPaths } from "@/lib/scourt/xml-utils";
 
 // ============================================================================
 // 타입 정의
@@ -44,64 +48,121 @@ interface ScourtGeneralInfoXmlProps {
   compact?: boolean;
 }
 
+interface DataListEntry {
+  dataKey: string;
+  layoutKey: string;
+}
+
+function getLayoutMatchScore(layout: GridLayout, dataRows: any[]): number {
+  if (!layout?.columns?.length || !Array.isArray(dataRows) || dataRows.length === 0) {
+    return 0;
+  }
+
+  const dataKeys = new Set<string>();
+  dataRows.forEach((row) => {
+    Object.keys(row || {}).forEach((key) => dataKeys.add(key));
+  });
+  const columnIds = layout.columns.map((col) => col.id).filter(Boolean);
+  if (columnIds.length === 0) return 0;
+
+  const matches = columnIds.filter((id) => dataKeys.has(id)).length;
+  return matches / columnIds.length;
+}
+
+async function pickBestCandidateLayout(
+  dataListId: string,
+  dataRows: any[],
+  fetchXml: (xmlPath: string) => Promise<string | null>
+): Promise<GridLayout | null> {
+  if (!Array.isArray(dataRows) || dataRows.length === 0) return null;
+
+  const candidates = DATA_LIST_XML_CANDIDATES[dataListId] || [];
+  if (candidates.length === 0) return null;
+
+  let bestLayout: GridLayout | null = null;
+  let bestScore = 0;
+
+  for (const xmlPath of candidates) {
+    const xmlText = await fetchXml(xmlPath);
+    if (!xmlText) continue;
+    const layout = parseGridXml(xmlText);
+    if (!layout) continue;
+
+    const score = getLayoutMatchScore(layout, dataRows);
+    if (score > bestScore) {
+      bestLayout = layout;
+      bestScore = score;
+    }
+  }
+
+  return bestLayout;
+}
+
 // ============================================================================
 // XML 로드 헬퍼 (DB 캐시 우선, 정적 파일 fallback)
 // ============================================================================
 
 const XML_BASE_PATH = "/scourt-xml";
 
-/**
- * 기본정보 XML에서 하위 XML 경로 동적 추출
- *
- * 지원 패턴:
- * 1. JavaScript .setSrc(): wfScrtyCttLst.setSrc("/ui/ssgo003/SSGO003FA0.xml")
- * 2. XML wframe src: <w2:wframe id="wfRcntDxdyLst" src="SSGO003F32.xml">
- */
-function extractSubXmlPaths(basicInfoXml: string): Record<string, string> {
-  const result: Record<string, string> = {};
+function isInvalidXmlContent(xmlContent: string): boolean {
+  const preview = xmlContent.trim().slice(0, 500).toLowerCase();
+  const hasWebSquareMarkers =
+    /<w2:|<xf:|<xforms:|<w2:dataMap|<dataMap|<w2:wframe/i.test(xmlContent);
 
-  // 패턴 1: JavaScript .setSrc() 호출
-  const jsSrcRegex = /wf(\w+)\.setSrc\([^"']*["']\/ui\/([^"']+)["']/g;
-  let match;
-  while ((match = jsSrcRegex.exec(basicInfoXml)) !== null) {
-    const varName = match[1];
-    const xmlPath = match[2];
-    const dataListId = `dlt_${varName.charAt(0).toLowerCase()}${varName.slice(1)}`;
-    result[dataListId] = xmlPath;
-  }
-
-  // 패턴 2: XML wframe src 속성
-  const wframeRegex = /<w2:wframe\s+([^>]+)>/g;
-  while ((match = wframeRegex.exec(basicInfoXml)) !== null) {
-    const attrs = match[1];
-    const idMatch = attrs.match(/id=["']wf(\w+)["']/);
-    const srcMatch = attrs.match(/src=["']([^"']+)["']/);
-
-    if (idMatch && srcMatch) {
-      const varName = idMatch[1];
-      const xmlFileName = srcMatch[1];
-      const dataListId = `dlt_${varName.charAt(0).toLowerCase()}${varName.slice(1)}`;
-      const xmlPath = xmlFileName.startsWith("ssgo") || xmlFileName.includes("/")
-        ? xmlFileName
-        : `ssgo003/${xmlFileName}`;
-      result[dataListId] = xmlPath;
+  if (!hasWebSquareMarkers) {
+    if (preview.startsWith("<!doctype html") || preview.includes("<html")) {
+      return true;
     }
   }
 
-  return result;
+  return !xmlContent.includes("<?xml") && !hasWebSquareMarkers;
 }
 
-async function fetchXmlWithFallback(xmlPath: string): Promise<string | null> {
+async function fetchXmlWithFallback(
+  xmlPath: string,
+  caseType?: ScourtCaseType
+): Promise<string | null> {
+  const encodedPath = encodeURIComponent(xmlPath);
   // 1. DB 캐시에서 조회 시도
   try {
     const cacheResponse = await fetch(
-      `/api/scourt/xml-cache?path=${encodeURIComponent(xmlPath)}`
+      `/api/scourt/xml-cache?path=${encodedPath}`
     );
+    let shouldRefresh = cacheResponse.status === 404;
     if (cacheResponse.ok) {
       const cacheData = await cacheResponse.json();
       if (cacheData.xml_content) {
-        console.log(`[XML] Cache hit: ${xmlPath}`);
-        return cacheData.xml_content;
+        if (isInvalidXmlContent(cacheData.xml_content)) {
+          console.warn(`[XML] Invalid cached XML, refreshing: ${xmlPath}`);
+          shouldRefresh = true;
+        } else {
+          console.log(`[XML] Cache hit: ${xmlPath}`);
+          return cacheData.xml_content;
+        }
+      }
+    }
+    if (shouldRefresh) {
+      try {
+        const downloadResponse = await fetch("/api/scourt/xml-cache", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ xmlPath, caseType, forceRefresh: true }),
+        });
+
+        if (downloadResponse.ok) {
+          const retryResponse = await fetch(
+            `/api/scourt/xml-cache?path=${encodedPath}`
+          );
+          if (retryResponse.ok) {
+            const retryData = await retryResponse.json();
+            if (retryData.xml_content && !isInvalidXmlContent(retryData.xml_content)) {
+              console.log(`[XML] Cache refreshed: ${xmlPath}`);
+              return retryData.xml_content;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`[XML] Download failed for ${xmlPath}:`, e);
       }
     }
   } catch (e) {
@@ -112,8 +173,12 @@ async function fetchXmlWithFallback(xmlPath: string): Promise<string | null> {
   try {
     const staticResponse = await fetch(`${XML_BASE_PATH}/${xmlPath}`);
     if (staticResponse.ok) {
-      console.log(`[XML] Static file loaded: ${xmlPath}`);
-      return await staticResponse.text();
+      const staticText = await staticResponse.text();
+      if (!isInvalidXmlContent(staticText)) {
+        console.log(`[XML] Static file loaded: ${xmlPath}`);
+        return staticText;
+      }
+      console.warn(`[XML] Invalid static XML: ${xmlPath}`);
     }
   } catch (e) {
     console.warn(`[XML] Static file not found: ${xmlPath}`);
@@ -128,21 +193,78 @@ async function fetchXmlWithFallback(xmlPath: string): Promise<string | null> {
 
 export function ScourtGeneralInfoXml({
   apiData,
-  caseType = "ssgo102",
+  caseType,
   compact = false,
 }: ScourtGeneralInfoXmlProps) {
+  const apiEnvelope = useMemo(() => {
+    if (!apiData) return {} as Record<string, any>;
+    if (typeof apiData === "string") {
+      try {
+        const parsed = JSON.parse(apiData);
+        if (parsed && typeof parsed === "object") {
+          return parsed as Record<string, any>;
+        }
+      } catch (e) {
+        console.warn("[XML] Failed to parse apiData JSON string", e);
+      }
+      return {} as Record<string, any>;
+    }
+    return apiData as Record<string, any>;
+  }, [apiData]);
+
+  const resolvedApiData = useMemo(() => {
+    const dataCandidate = (apiEnvelope as { data?: Record<string, any> }).data;
+    if (dataCandidate && typeof dataCandidate === "object") {
+      return dataCandidate;
+    }
+    const rawCandidate = (apiEnvelope as { raw?: { data?: Record<string, any> } }).raw?.data;
+    if (rawCandidate && typeof rawCandidate === "object") {
+      return rawCandidate;
+    }
+    return apiEnvelope as Record<string, any>;
+  }, [apiEnvelope]);
+
   const [basicInfoLayout, setBasicInfoLayout] = useState<BasicInfoLayout | null>(null);
   const [gridLayouts, setGridLayouts] = useState<Record<string, GridLayout>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // API 응답에서 dlt_* 데이터 리스트 동적 감지
-  const dataLists = useMemo(() => {
-    if (!apiData) return [];
-    return Object.keys(apiData).filter(
-      (key) => key.startsWith("dlt_") && Array.isArray(apiData[key]) && apiData[key].length > 0
+  const resolvedCaseType = useMemo(() => {
+    return detectCaseTypeFromApiResponse(resolvedApiData || {}) || caseType || "ssgo102";
+  }, [resolvedApiData, caseType]);
+
+  const basicInfoData = useMemo(() => {
+    return (
+      resolvedApiData?.dma_csBasCtt ||
+      resolvedApiData?.dma_csBsCtt ||
+      resolvedApiData?.dma_gnrlCtt ||
+      null
     );
-  }, [apiData]);
+  }, [resolvedApiData]);
+
+  // API 응답에서 dlt_* 데이터 리스트 동적 감지 (alias 정규화 포함)
+  const dataListEntries = useMemo<DataListEntry[]>(() => {
+    if (!resolvedApiData) return [];
+    const keys = Object.keys(resolvedApiData).filter(
+      (key) => key.startsWith("dlt_") && Array.isArray(resolvedApiData[key]) && resolvedApiData[key].length > 0
+    );
+
+    if (keys.length === 0) return [];
+
+    const keySet = new Set(keys);
+
+    return keys.reduce<DataListEntry[]>((entries, key) => {
+      const normalizedKey = normalizeDataListId(key);
+
+      // 표준 key가 이미 있으면 alias는 스킵
+      if (normalizedKey !== key && keySet.has(normalizedKey)) {
+        return entries;
+      }
+
+      entries.push({ dataKey: key, layoutKey: normalizedKey });
+      return entries;
+    }, []);
+  }, [resolvedApiData]);
 
   // XML 파일 로드 및 파싱
   useEffect(() => {
@@ -151,53 +273,96 @@ export function ScourtGeneralInfoXml({
       setError(null);
 
       try {
-        const mapping = CASE_TYPE_XML_MAP[caseType];
+        const mapping = CASE_TYPE_XML_MAP[resolvedCaseType];
         if (!mapping) {
-          throw new Error(`Unknown case type: ${caseType}`);
+          throw new Error(`Unknown case type: ${resolvedCaseType}`);
         }
 
-        // 1. 기본정보 XML 로드
-        const basicXmlPath = mapping.basic_info;
+        // 1. 기본정보 XML 로드 (API 응답의 템플릿 ID 우선)
+        const basicXmlPath = resolveBasicInfoXmlPath({
+          caseType: resolvedCaseType,
+          apiResponse: apiEnvelope as Record<string, unknown>,
+        });
         if (!basicXmlPath) {
-          throw new Error(`No basic_info XML mapping for case type: ${caseType}`);
+          throw new Error(`No basic_info XML mapping for case type: ${resolvedCaseType}`);
         }
-        const basicXmlText = await fetchXmlWithFallback(basicXmlPath);
+        const basicXmlText = await fetchXmlWithFallback(basicXmlPath, resolvedCaseType);
 
         // 동적 XML 경로 추출 (기본정보 XML에서 .setSrc() 파싱)
         let dynamicPaths: Record<string, string> = {};
+        const gridLayoutsTemp: Record<string, GridLayout> = {};
+
         if (basicXmlText) {
           const parsed = parseWebSquareXml(basicXmlText);
           setBasicInfoLayout(parsed.basicInfo);
-          dynamicPaths = extractSubXmlPaths(basicXmlText);
+          dynamicPaths = normalizeDataListPaths(extractSubXmlPaths(basicXmlText));
           console.log("[XML Render] Dynamic paths:", Object.keys(dynamicPaths));
+
+          // 기본정보 XML 내 gridView 레이아웃도 활용 (mapping 누락 대비)
+          for (const [gridId, layout] of Object.entries(parsed.grids || {})) {
+            const normalizedId = normalizeDataListId(gridId);
+            gridLayoutsTemp[normalizedId] = {
+              ...layout,
+              dataListId: normalizedId,
+            };
+          }
         }
 
         // 2. 각 dlt_* 데이터 리스트에 대해 해당 XML 로드
-        const gridLayoutsTemp: Record<string, GridLayout> = {};
-
-        for (const dataListId of dataLists) {
+        for (const entry of dataListEntries) {
+          const listData = resolvedApiData[entry.dataKey];
           // 동적 추출 경로 우선, 없으면 하드코딩 매핑 fallback
-          const xmlPath = dynamicPaths[dataListId] || (mapping as Record<string, string>)[dataListId];
-          if (!xmlPath) {
-            console.warn(`[XML] No mapping for data list: ${dataListId}`);
+          const xmlPath = resolveDataListXmlPath({
+            caseType: resolvedCaseType,
+            dataListId: entry.layoutKey,
+            apiData: resolvedApiData,
+            dynamicPaths,
+          });
+          let resolvedLayout: GridLayout | null = null;
+
+          if (xmlPath) {
+            try {
+              const gridXmlText = await fetchXmlWithFallback(xmlPath, resolvedCaseType);
+              if (gridXmlText) {
+                const gridLayout = parseGridXml(gridXmlText);
+                if (gridLayout) {
+                  resolvedLayout = gridLayout;
+                }
+              }
+            } catch (e) {
+              console.warn(`[XML] Grid XML load failed: ${xmlPath}`, e);
+            }
+          }
+
+          const matchScore = resolvedLayout
+            ? getLayoutMatchScore(resolvedLayout, Array.isArray(listData) ? listData : [])
+            : 0;
+
+          if (!resolvedLayout || matchScore < 0.4) {
+            const fallbackLayout = await pickBestCandidateLayout(
+              entry.layoutKey,
+              Array.isArray(listData) ? listData : [],
+              (path) => fetchXmlWithFallback(path, resolvedCaseType)
+            );
+
+            if (fallbackLayout) {
+              resolvedLayout = fallbackLayout;
+            }
+          }
+
+          if (!resolvedLayout) {
+            if (!gridLayoutsTemp[entry.layoutKey]) {
+              console.warn(`[XML] No mapping for data list: ${entry.layoutKey}`);
+            }
             continue;
           }
 
-          try {
-            const gridXmlText = await fetchXmlWithFallback(xmlPath);
-            if (gridXmlText) {
-              const gridLayout = parseGridXml(gridXmlText);
-              if (gridLayout) {
-                // 타이틀이 없으면 dataListId로 대체
-                if (!gridLayout.title) {
-                  gridLayout.title = getDataListTitle(dataListId);
-                }
-                gridLayoutsTemp[dataListId] = gridLayout;
-              }
-            }
-          } catch (e) {
-            console.warn(`[XML] Grid XML load failed: ${xmlPath}`, e);
+          // 타이틀이 없으면 dataListId로 대체
+          if (!resolvedLayout.title) {
+            resolvedLayout.title = getDataListTitle(entry.layoutKey);
           }
+          resolvedLayout.dataListId = entry.layoutKey;
+          gridLayoutsTemp[entry.layoutKey] = resolvedLayout;
         }
 
         setGridLayouts(gridLayoutsTemp);
@@ -210,13 +375,13 @@ export function ScourtGeneralInfoXml({
     }
 
     loadXml();
-  }, [caseType, dataLists]);
+  }, [resolvedCaseType, dataListEntries, resolvedApiData, apiEnvelope]);
 
   // 기본정보 데이터 전처리 (원고/피고명 조합, 종국결과 등)
   // 주의: Hook은 early return 전에 호출되어야 함
   const processedBasicInfo = useMemo(() => {
-    return preprocessBasicInfo(apiData?.dma_csBasCtt || {});
-  }, [apiData?.dma_csBasCtt]);
+    return preprocessBasicInfo(basicInfoData || {});
+  }, [basicInfoData]);
 
   // 로딩 중
   if (loading) {
@@ -238,7 +403,7 @@ export function ScourtGeneralInfoXml({
   }
 
   // 데이터 없음
-  if (!apiData?.dma_csBasCtt) {
+  if (!basicInfoData) {
     return (
       <div className="text-gray-500 text-sm p-4 bg-gray-50 rounded-lg">
         SCOURT 연동 데이터가 없습니다.
@@ -258,16 +423,16 @@ export function ScourtGeneralInfoXml({
       )}
 
       {/* 동적 그리드 렌더링 - API 응답의 모든 dlt_* 리스트 */}
-      {!compact && dataLists.map((dataListId) => {
-        const gridLayout = gridLayouts[dataListId];
-        const gridData = apiData[dataListId];
+      {!compact && dataListEntries.map((entry) => {
+        const gridLayout = gridLayouts[entry.layoutKey];
+        const gridData = resolvedApiData[entry.dataKey];
 
         // 레이아웃이 없으면 fallback 테이블 렌더링
         if (!gridLayout) {
           return (
             <FallbackGridTable
-              key={dataListId}
-              title={getDataListTitle(dataListId)}
+              key={entry.layoutKey}
+              title={getDataListTitle(entry.layoutKey)}
               data={gridData}
             />
           );
@@ -275,7 +440,7 @@ export function ScourtGeneralInfoXml({
 
         return (
           <GridTable
-            key={dataListId}
+            key={entry.layoutKey}
             layout={gridLayout}
             data={gridData}
             className="bg-white rounded-lg border border-gray-200 p-4"
@@ -291,6 +456,7 @@ export function ScourtGeneralInfoXml({
 // ============================================================================
 
 function getDataListTitle(dataListId: string): string {
+  const normalizedId = normalizeDataListId(dataListId);
   const titles: Record<string, string> = {
     dlt_btprtCttLst: "당사자내용",
     dlt_agntCttLst: "대리인내용",
@@ -303,7 +469,7 @@ function getDataListTitle(dataListId: string): string {
     dlt_acsCttLst: "피고인 및 죄명내용",
     dlt_mergeCttLst: "병합사건내용",
   };
-  return titles[dataListId] || dataListId;
+  return titles[normalizedId] || dataListId;
 }
 
 // ============================================================================

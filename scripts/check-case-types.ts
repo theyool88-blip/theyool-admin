@@ -69,11 +69,11 @@ async function main() {
     try {
       const result = await apiClient.searchAndRegisterCase(testCase.params);
 
-      if (result.success && result.detailData?.raw) {
-        const data = result.detailData.raw.data;
+      if (result.success && result.generalData?.raw) {
+        const data = result.generalData.raw.data;
 
         // 사건 카테고리
-        console.log('\n📌 사건 카테고리:', result.detailData.caseCategory || '(없음)');
+        console.log('\n📌 사건 카테고리:', result.generalData.caseCategory || '(없음)');
 
         // 기본정보
         console.log('\n📌 기본정보 (dma_csBasCtt):');

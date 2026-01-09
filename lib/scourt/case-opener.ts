@@ -1,7 +1,7 @@
 /**
- * SCOURT 사건 상세 페이지 열기
+ * SCOURT 사건 페이지(일반내용 탭) 열기
  *
- * Puppeteer를 사용하여 SCOURT에서 사건을 찾아 상세 페이지를 열어줍니다.
+ * Puppeteer를 사용하여 SCOURT에서 사건을 찾아 일반내용 탭 화면을 열어줍니다.
  * 브라우저 창을 닫지 않고 유지하여 사용자가 직접 조회할 수 있게 합니다.
  */
 
@@ -50,9 +50,9 @@ export interface OpenCaseParams {
 }
 
 /**
- * SCOURT에서 사건 상세 페이지 열기
+ * SCOURT에서 사건 페이지(일반내용 탭) 열기
  *
- * encCsNo를 사용해서 직접 상세 정보를 로드합니다.
+ * encCsNo를 사용해서 직접 일반내용 화면을 로드합니다.
  * 저장된 사건 목록에 의존하지 않고, API와 동일한 방식으로 동작합니다.
  */
 export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCaseResult> {
@@ -106,8 +106,8 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
     // 추가 안정화 대기
     await new Promise(r => setTimeout(r, 3000));
 
-    // encCsNo를 사용해서 직접 사건 상세 페이지 로드
-    console.log(`📋 encCsNo로 사건 상세 로드: ${encCsNo.substring(0, 30)}...`);
+    // encCsNo를 사용해서 직접 사건 일반내용 탭 로드
+    console.log(`📋 encCsNo로 사건 일반내용 로드: ${encCsNo.substring(0, 30)}...`);
 
     // 사건번호 파싱 (예: "2025드단5823" → csYear, csDvsNm, csSerial)
     const match = caseNumber.match(/(\d{4})([가-힣]+)(\d+)/);
@@ -234,7 +234,7 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
           // 응답을 화면에 반영
           const w = (window as any).$w;
           if (w) {
-            // 상세 패널 열기 시도
+            // 일반내용 패널 열기 시도
             const detailPanel = w.getComponentById('mf_ssgoTopMainTab_contents_content1_body_wfSsgoDetail');
             if (detailPanel && typeof detailPanel.show === 'function') {
               detailPanel.show();
@@ -250,10 +250,10 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
       console.log(`📋 API 호출 결과: ${JSON.stringify(apiResult)}`);
     }
 
-    // 상세 페이지 로딩 대기
+    // 일반내용 탭 로딩 대기
     await new Promise(r => setTimeout(r, 3000));
 
-    console.log(`✅ SCOURT 사건 상세 페이지 열림: ${caseNumber}`);
+    console.log(`✅ SCOURT 사건 일반내용 탭 열림: ${caseNumber}`);
 
     return { success: true };
 

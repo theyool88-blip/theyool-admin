@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import ClientEditForm from '@/components/ClientEditForm'
 
 export default async function ClientEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -27,12 +28,23 @@ export default async function ClientEditPage({ params }: { params: Promise<{ id:
     redirect('/login')
   }
 
-  // 의뢰인 정보 가져오기
-  const { data: clientData, error: clientError } = await adminClient
+  // 테넌트 컨텍스트 조회
+  const tenantContext = await getCurrentTenantContext()
+  if (!tenantContext) {
+    redirect('/login')
+  }
+
+  // 의뢰인 정보 가져오기 (테넌트 필터 적용)
+  let clientQuery = adminClient
     .from('clients')
     .select('*')
     .eq('id', id)
-    .single()
+
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    clientQuery = clientQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: clientData, error: clientError } = await clientQuery.single()
 
   if (!clientData) {
     console.error('Client not found:', id, clientError)

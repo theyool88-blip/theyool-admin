@@ -123,7 +123,7 @@ async function test() {
         await new Promise(r => setTimeout(r, 5000));
 
         console.log('\n='.repeat(70));
-        console.log('✅ 사건 상세 정보 로드 (캡챠 없이!)');
+        console.log('✅ 사건 일반내용 로드 (캡챠 없이!)');
         console.log('='.repeat(70));
       }
     }

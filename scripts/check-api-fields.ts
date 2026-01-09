@@ -19,8 +19,8 @@ async function main() {
     btprNm: '장태일',
   });
 
-  if (result.success && result.detailData?.raw) {
-    const data = result.detailData.raw.data;
+  if (result.success && result.generalData?.raw) {
+    const data = result.generalData.raw.data;
     console.log('\n=== API 응답 필드 목록 ===');
     console.log(Object.keys(data).join('\n'));
 

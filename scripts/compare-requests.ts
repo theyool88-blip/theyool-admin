@@ -34,7 +34,7 @@ async function compareRequests() {
   });
 
   if (successResult.success) {
-    console.log('   ✅ 성공:', Object.keys(successResult.detailData || {}).length, '필드');
+    console.log('   ✅ 성공:', Object.keys(successResult.generalData || {}).length, '필드');
   } else {
     console.log('   ❌ 실패:', successResult.error);
   }
@@ -54,11 +54,11 @@ async function compareRequests() {
     btprNm: failCase.party,
   });
 
-  if (failResult.success && failResult.detailData && Object.keys(failResult.detailData).length > 0) {
-    console.log('   ✅ 성공:', Object.keys(failResult.detailData).length, '필드');
+  if (failResult.success && failResult.generalData && Object.keys(failResult.generalData).length > 0) {
+    console.log('   ✅ 성공:', Object.keys(failResult.generalData).length, '필드');
   } else if (failResult.encCsNo) {
-    console.log('   ⚠️ encCsNo만 획득, 상세조회 실패');
-    console.log('   에러:', failResult.error || '상세정보 없음');
+    console.log('   ⚠️ encCsNo만 획득, 일반내용 조회 실패');
+    console.log('   에러:', failResult.error || '일반내용 없음');
   } else {
     console.log('   ❌ 실패:', failResult.error);
   }

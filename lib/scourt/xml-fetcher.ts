@@ -7,10 +7,12 @@
 import { createClient } from "@/lib/supabase/server";
 import {
   ScourtCaseType,
-  CASE_TYPE_XML_MAP,
-  DataListId,
   getDataListIdFromXmlPath,
+  getApiDataFromResponse,
+  resolveBasicInfoXmlPath,
+  resolveDataListXmlPath,
 } from "./xml-mapping";
+import { extractSubXmlPaths, normalizeDataListPaths } from "./xml-utils";
 
 // ============================================================================
 // 상수
@@ -21,6 +23,27 @@ const SCOURT_XML_BASE_URL = "https://ssgo.scourt.go.kr/ssgo/ui";
 // User-Agent 헤더 (SCOURT WAF 우회 필수)
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+// WebSquare XML 여부 감지
+function hasWebSquareMarkers(xmlContent: string): boolean {
+  return /<w2:|<xf:|<xforms:|<w2:dataMap|<dataMap|<w2:wframe/i.test(xmlContent);
+}
+
+// HTML 응답 여부 감지 (WAF/오류 페이지 차단용)
+function isHtmlResponse(xmlContent: string, contentType?: string | null): boolean {
+  const normalizedType = (contentType || "").toLowerCase();
+  if (normalizedType.includes("text/html")) return true;
+
+  const preview = xmlContent.trim().slice(0, 500).toLowerCase();
+  if (hasWebSquareMarkers(xmlContent)) return false;
+  return preview.startsWith("<!doctype html") || preview.includes("<html");
+}
+
+// WebSquare XML 여부 감지
+function isWebSquareXml(xmlContent: string): boolean {
+  if (xmlContent.includes("<?xml")) return true;
+  return hasWebSquareMarkers(xmlContent);
+}
 
 // ============================================================================
 // XML 캐시 타입
@@ -60,10 +83,18 @@ export async function downloadXmlFromScourt(xmlPath: string): Promise<string> {
     throw new Error(`Failed to download XML: ${url} (${response.status})`);
   }
 
+  const contentType = response.headers.get("content-type");
   const xmlContent = await response.text();
 
-  // XML 유효성 검사 (기본적인 체크)
-  if (!xmlContent.includes("<?xml") && !xmlContent.includes("<html")) {
+  // HTML 응답 차단 (WAF/에러 페이지)
+  if (isHtmlResponse(xmlContent, contentType)) {
+    throw new Error(
+      `Unexpected HTML response from: ${url} (${contentType || "no content-type"})`
+    );
+  }
+
+  // WebSquare XML 기본 패턴 확인
+  if (!isWebSquareXml(xmlContent)) {
     throw new Error(`Invalid XML content from: ${url}`);
   }
 
@@ -153,8 +184,12 @@ export async function fetchXml(
   // 1. 캐시 확인
   const cached = await getCachedXml(xmlPath);
   if (cached) {
-    console.log(`[XML Cache] Hit: ${xmlPath}`);
-    return cached.xml_content;
+    if (isHtmlResponse(cached.xml_content) || !isWebSquareXml(cached.xml_content)) {
+      console.warn(`[XML Cache] Invalid cached XML, refreshing: ${xmlPath}`);
+    } else {
+      console.log(`[XML Cache] Hit: ${xmlPath}`);
+      return cached.xml_content;
+    }
   }
 
   // 2. 캐시 없음 → SCOURT에서 다운로드
@@ -190,67 +225,6 @@ export async function fetchMultipleXml(
   return results;
 }
 
-// ============================================================================
-// 기본정보 XML에서 하위 XML 경로 동적 추출
-// ============================================================================
-
-/**
- * 기본정보 XML에서 하위 XML 경로 동적 추출
- *
- * 지원 패턴:
- * 1. JavaScript .setSrc(): wfScrtyCttLst.setSrc("/ui/ssgo003/SSGO003FA0.xml")
- *    - 큰따옴표, 작은따옴표 모두 지원
- * 2. XML wframe src: <w2:wframe id="wfRcntDxdyLst" src="SSGO003F32.xml">
- *    - 속성 순서 무관 (id가 먼저든 src가 먼저든)
- *    - 큰따옴표, 작은따옴표 모두 지원
- *
- * @param basicInfoXml 기본정보 XML 내용
- * @returns 데이터 리스트 ID → XML 경로 매핑
- */
-function extractSubXmlPaths(basicInfoXml: string): Record<string, string> {
-  const result: Record<string, string> = {};
-
-  // 패턴 1: JavaScript .setSrc() 호출
-  // 예: wfScrtyCttLst.setSrc("/ui/ssgo003/SSGO003FA0.xml")
-  // 예: wfScrtyCttLst.setSrc('/ui/ssgo003/SSGO003FA0.xml')
-  const jsSrcRegex = /wf(\w+)\.setSrc\([^"']*["']\/ui\/([^"']+)["']/g;
-  let match;
-  while ((match = jsSrcRegex.exec(basicInfoXml)) !== null) {
-    const varName = match[1]; // "ScrtyCttLst"
-    const xmlPath = match[2]; // "ssgo003/SSGO003FA0.xml"
-    const dataListId = `dlt_${varName.charAt(0).toLowerCase()}${varName.slice(1)}`;
-    result[dataListId] = xmlPath;
-  }
-
-  // 패턴 2: XML wframe src 속성 (속성 순서 무관)
-  // 예: <w2:wframe id="wfRcntDxdyLst" src="SSGO003F32.xml">
-  // 예: <w2:wframe src="SSGO003F32.xml" id="wfRcntDxdyLst">
-  // 예: <w2:wframe id='wfRcntDxdyLst' src='SSGO003F32.xml'>
-  const wframeRegex = /<w2:wframe\s+([^>]+)>/g;
-  while ((match = wframeRegex.exec(basicInfoXml)) !== null) {
-    const attrs = match[1];
-
-    // id 속성 추출 (wf로 시작하는 것만)
-    const idMatch = attrs.match(/id=["']wf(\w+)["']/);
-    // src 속성 추출
-    const srcMatch = attrs.match(/src=["']([^"']+)["']/);
-
-    if (idMatch && srcMatch) {
-      const varName = idMatch[1]; // "RcntDxdyLst"
-      const xmlFileName = srcMatch[1]; // "SSGO003F32.xml"
-      const dataListId = `dlt_${varName.charAt(0).toLowerCase()}${varName.slice(1)}`;
-
-      // ssgo003/ 경로 prefix 추가 (상대 경로인 경우)
-      const xmlPath = xmlFileName.startsWith("ssgo") || xmlFileName.includes("/")
-        ? xmlFileName
-        : `ssgo003/${xmlFileName}`;
-      result[dataListId] = xmlPath;
-    }
-  }
-
-  return result;
-}
-
 /**
  * 데이터 존재 여부 확인
  */
@@ -283,8 +257,13 @@ export async function ensureXmlCacheForCase(
   apiResponse: Record<string, unknown>,
   cacheAllOnFirstLink: boolean = true
 ): Promise<void> {
+  const apiData = getApiDataFromResponse(apiResponse);
+
   // 1. 기본정보 XML 경로 확인
-  const basicInfoPath = CASE_TYPE_XML_MAP[caseType]?.basic_info;
+  const basicInfoPath = resolveBasicInfoXmlPath({
+    caseType,
+    apiResponse,
+  });
   if (!basicInfoPath) {
     console.warn(`[XML Cache] No basic_info XML for ${caseType}`);
     return;
@@ -295,7 +274,7 @@ export async function ensureXmlCacheForCase(
   const basicInfoXml = await fetchXml(basicInfoPath, caseType);
 
   // 3. 기본정보 XML에서 하위 XML 경로 동적 추출 (핵심!)
-  const dynamicPaths = extractSubXmlPaths(basicInfoXml);
+  const dynamicPaths = normalizeDataListPaths(extractSubXmlPaths(basicInfoXml));
   console.log(
     `[XML Cache] Dynamic paths extracted:`,
     Object.keys(dynamicPaths)
@@ -311,18 +290,25 @@ export async function ensureXmlCacheForCase(
       requiredXmls.push(xmlPath);
     }
     console.log(`[XML Cache] First link: caching all ${Object.keys(dynamicPaths).length} dynamic paths`);
-  } else {
-    // 갱신: 데이터가 있는 dlt_* 항목만 캐시
-    const dataListKeys = Object.keys(apiResponse).filter(
-      (key) => key.startsWith("dlt_") && hasData(apiResponse[key])
-    );
+  }
 
-    for (const key of dataListKeys) {
-      const xmlPath =
-        dynamicPaths[key] || CASE_TYPE_XML_MAP[caseType]?.[key as DataListId];
-      if (xmlPath) {
-        requiredXmls.push(xmlPath);
-      }
+  // 데이터 기반 경로 보강 (동적 경로 조건 분기 보정)
+  const dataListKeys = Object.keys(apiResponse).filter(
+    (key) => key.startsWith("dlt_") && hasData(apiResponse[key])
+  );
+  const resolvedDataListKeys = dataListKeys.length > 0 ? dataListKeys : Object.keys(apiData).filter(
+    (key) => key.startsWith("dlt_") && hasData(apiData[key])
+  );
+
+  for (const key of resolvedDataListKeys) {
+    const xmlPath = resolveDataListXmlPath({
+      caseType,
+      dataListId: key,
+      apiData,
+      dynamicPaths,
+    });
+    if (xmlPath) {
+      requiredXmls.push(xmlPath);
     }
   }
 
@@ -336,7 +322,7 @@ export async function ensureXmlCacheForCase(
     if (xmlPath === basicInfoPath) continue;
 
     const cached = await getCachedXml(xmlPath);
-    if (!cached) {
+    if (!cached || isHtmlResponse(cached.xml_content) || !isWebSquareXml(cached.xml_content)) {
       missingXmls.push(xmlPath);
     }
   }
@@ -370,7 +356,11 @@ export async function fetchXmlForClient(xmlPath: string): Promise<string> {
     if (response.ok) {
       const data = await response.json();
       if (data.xml_content) {
-        return data.xml_content;
+        if (isHtmlResponse(data.xml_content) || !isWebSquareXml(data.xml_content)) {
+          console.warn(`[XML] Invalid cached XML for ${xmlPath}, falling back`);
+        } else {
+          return data.xml_content;
+        }
       }
     }
   } catch (error) {
@@ -381,7 +371,11 @@ export async function fetchXmlForClient(xmlPath: string): Promise<string> {
   try {
     const staticResponse = await fetch(`/scourt-xml/${xmlPath}`);
     if (staticResponse.ok) {
-      return await staticResponse.text();
+      const staticText = await staticResponse.text();
+      if (isHtmlResponse(staticText) || !isWebSquareXml(staticText)) {
+        throw new Error("Invalid XML content");
+      }
+      return staticText;
     }
   } catch (error) {
     console.warn(`[XML] Static file fallback failed for ${xmlPath}:`, error);

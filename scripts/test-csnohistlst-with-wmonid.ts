@@ -106,7 +106,7 @@ async function main() {
 
   console.log(`새 JSESSIONID: ${jsessionId2?.substring(0, 20)}...`);
 
-  const detailRes = await fetch('https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on', {
+  const generalRes = await fetch('https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on', {
     method: 'POST',
     headers: {
       ...headers,
@@ -126,10 +126,10 @@ async function main() {
     }),
   });
 
-  const detailData = await detailRes.json();
+  const generalData = await generalRes.json();
 
-  if (detailData.errors) {
-    console.log('❌ 실패:', detailData.errors.errorMessage);
+  if (generalData.errors) {
+    console.log('❌ 실패:', generalData.errors.errorMessage);
 
     // 5. 완전히 새 세션 (새 WMONID)에서도 테스트
     console.log('\n[Step 5] 완전 새 세션 (새 WMONID)에서 테스트...');
@@ -141,7 +141,7 @@ async function main() {
 
     console.log(`새 WMONID: ${wmonidMatch3?.[1]}`);
 
-    const detailRes3 = await fetch('https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on', {
+    const generalRes3 = await fetch('https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on', {
       method: 'POST',
       headers: {
         ...headers,
@@ -161,12 +161,12 @@ async function main() {
       }),
     });
 
-    const detailData3 = await detailRes3.json();
-    console.log('결과:', detailData3.errors?.errorMessage || 'SUCCESS');
+    const generalData3 = await generalRes3.json();
+    console.log('결과:', generalData3.errors?.errorMessage || 'SUCCESS');
 
-  } else if (detailData.data) {
+  } else if (generalData.data) {
     console.log('✅ 성공! csNoHistLst encCsNo가 WMONID에 바인딩됨!');
-    console.log('사건명:', detailData.data.dma_csBasCtt?.csNm);
+    console.log('사건명:', generalData.data.dma_csBasCtt?.csNm);
   }
 
   // 결론

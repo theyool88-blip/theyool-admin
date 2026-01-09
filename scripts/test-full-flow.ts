@@ -1,5 +1,5 @@
 /**
- * 전체 흐름 테스트: 검색 → 상세 조회 → 새 세션에서 재접근
+ * 전체 흐름 테스트: 검색 → 일반내용 조회 → 새 세션에서 재접근
  */
 
 import * as dotenv from 'dotenv';
@@ -68,7 +68,7 @@ async function main() {
     return;
   }
 
-  // 3. 새 캡챠로 상세 조회
+  // 3. 새 캡챠로 일반내용 조회
   console.log('\n🖼️ 캡챠 2 획득...');
   captchaRes = await fetch('https://ssgo.scourt.go.kr/ssgo/ssgo10l/getCaptchaInf.on', {
     method: 'POST', headers, body: ''
@@ -80,8 +80,8 @@ async function main() {
   captchaResult = await solver.solveCaptcha(imageBuffer);
   console.log(`캡챠2: ${captchaResult.text}`);
 
-  console.log('\n📋 상세 조회...');
-  const detailRes = await fetch('https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on', {
+  console.log('\n📋 일반내용 조회...');
+  const generalRes = await fetch('https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on', {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -98,21 +98,21 @@ async function main() {
     }),
   });
 
-  const detailData = await detailRes.json();
+  const generalData = await generalRes.json();
 
-  if (detailData.errors) {
-    console.log('상세 조회 실패:', detailData.errors.errorMessage);
-    console.log('전체 응답:', JSON.stringify(detailData, null, 2));
+  if (generalData.errors) {
+    console.log('일반내용 조회 실패:', generalData.errors.errorMessage);
+    console.log('전체 응답:', JSON.stringify(generalData, null, 2));
     return;
   }
 
-  const detailEncCsNo = detailData?.data?.dma_csBasCtt?.encCsNo;
-  console.log(`✅ 상세 조회 성공!`);
-  console.log(`사건명: ${detailData?.data?.dma_csBasCtt?.csNm}`);
-  console.log(`상세 encCsNo (${detailEncCsNo?.length}자): ${detailEncCsNo?.substring(0, 30)}...`);
+  const generalEncCsNo = generalData?.data?.dma_csBasCtt?.encCsNo;
+  console.log(`✅ 일반내용 조회 성공!`);
+  console.log(`사건명: ${generalData?.data?.dma_csBasCtt?.csNm}`);
+  console.log(`일반내용 encCsNo (${generalEncCsNo?.length}자): ${generalEncCsNo?.substring(0, 30)}...`);
 
-  // 4. 새 세션에서 상세 encCsNo로 접근
-  console.log('\n🔄 새 세션에서 상세 encCsNo 테스트...');
+  // 4. 새 세션에서 일반내용 encCsNo로 접근
+  console.log('\n🔄 새 세션에서 일반내용 encCsNo 테스트...');
 
   const init2 = await fetch('https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www');
   const cookie2 = init2.headers.get('set-cookie');
@@ -128,7 +128,7 @@ async function main() {
       dma_search: {
         cortCd: '000302',
         csNo: '',
-        encCsNo: detailEncCsNo,
+        encCsNo: generalEncCsNo,
         csYear: '2024',
         csDvsCd: '150',
         csSerial: '26718',
@@ -143,7 +143,7 @@ async function main() {
   if (testData.errors) {
     console.log('❌ 실패:', testData.errors.errorMessage);
   } else {
-    console.log('✅ 성공! 상세 API의 encCsNo가 재사용 가능!');
+    console.log('✅ 성공! 일반내용 API의 encCsNo가 재사용 가능!');
   }
 }
 

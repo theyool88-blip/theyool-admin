@@ -167,7 +167,7 @@ async function main() {
         await page.screenshot({ path: '/tmp/search-success-final.png', fullPage: true });
         console.log('   스크린샷: /tmp/search-success-final.png');
 
-        // 첫 번째 결과 클릭하여 상세 보기
+        // 첫 번째 결과 클릭하여 일반내용 보기
         console.log('\n5. 첫 번째 결과 클릭...');
         const clicked = await page.evaluate(() => {
           const tbody = document.querySelector('#mf_ssgoTopMainTab_contents_content1_body_csSrchRsltGrid_body_tbody');
@@ -187,8 +187,8 @@ async function main() {
 
         if (clicked) {
           await new Promise((r) => setTimeout(r, 5000));
-          await page.screenshot({ path: '/tmp/case-detail-final.png', fullPage: true });
-          console.log('   상세 스크린샷: /tmp/case-detail-final.png');
+          await page.screenshot({ path: '/tmp/case-general-final.png', fullPage: true });
+          console.log('   일반내용 스크린샷: /tmp/case-general-final.png');
         }
       } else if (pageState.noResult) {
         console.log('   - 검색 결과 없음 (해당 사건 없음)');

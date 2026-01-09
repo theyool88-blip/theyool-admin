@@ -34,8 +34,8 @@ async function collectFields() {
         btprNm: tc.party,
       });
 
-      if (result.success && result.detailData?.raw?.data) {
-        const data = result.detailData.raw.data;
+      if (result.success && result.generalData?.raw?.data) {
+        const data = result.generalData.raw.data;
         const caseInfo = data.dma_csBasCtt || {};
 
         // 값이 있는 필드만 출력

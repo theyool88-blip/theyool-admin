@@ -56,9 +56,9 @@ async function main() {
 
   console.log(`새 JSESSIONID: ${jsessionId?.substring(0, 20)}...`);
 
-  // 각 encCsNo로 상세 조회 테스트
+  // 각 encCsNo로 일반내용 조회 테스트
   console.log('\n' + '='.repeat(60));
-  console.log('📋 각 사건 encCsNo로 상세 조회 테스트');
+  console.log('📋 각 사건 encCsNo로 일반내용 조회 테스트');
   console.log('='.repeat(60));
 
   for (const caseInfo of SAVED_CASES) {
@@ -66,7 +66,7 @@ async function main() {
     console.log(`  encCsNo: ${caseInfo.enc_cs_no.substring(0, 30)}...`);
 
     try {
-      const detailRes = await fetch(
+      const generalRes = await fetch(
         'https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',
         {
           method: 'POST',
@@ -92,13 +92,13 @@ async function main() {
         }
       );
 
-      const detailData = await detailRes.json();
+      const generalData = await generalRes.json();
 
-      if (detailData.errors) {
-        console.log(`  ❌ 실패: ${detailData.errors.errorMessage}`);
-      } else if (detailData.data) {
-        const caseName = detailData.data.dma_csBasCtt?.csNm ||
-                        detailData.data.dma_gnrlCtt?.csNm ||
+      if (generalData.errors) {
+        console.log(`  ❌ 실패: ${generalData.errors.errorMessage}`);
+      } else if (generalData.data) {
+        const caseName = generalData.data.dma_csBasCtt?.csNm ||
+                        generalData.data.dma_gnrlCtt?.csNm ||
                         '사건명 없음';
         console.log(`  ✅ 성공! 사건명: ${caseName}`);
       }

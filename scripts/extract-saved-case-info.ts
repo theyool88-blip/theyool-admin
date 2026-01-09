@@ -123,7 +123,7 @@ async function extractInfo() {
       JSON.stringify(savedCases, null, 2)
     );
 
-    console.log(`\n✅ 상세 정보 저장: temp/saved-case-analysis/saved-cases-info.json\n`);
+    console.log(`\n✅ 일반내용 저장: temp/saved-case-analysis/saved-cases-info.json\n`);
 
     // Network 요청 모니터링 시작
     console.log('\n🌐 이제 저장된 사건을 클릭합니다. Network 요청을 모니터링합니다...\n');

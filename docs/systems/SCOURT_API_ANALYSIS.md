@@ -206,7 +206,7 @@ const res = await fetch('https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www', {
 const jsessionId = res.headers.get('set-cookie').match(/JSESSIONID=([^;]+)/)[1];
 
 // 3. 캡챠 없이 일반내용 조회
-const detail = await getDetail({
+const general = await getCaseGeneral({
   encCsNo: saved.encCsNo,
   captchaAnswer: '',  // 비워도 됨!
 });
@@ -291,7 +291,7 @@ CREATE TABLE scourt_profile_cases (
 | 날짜 | 내용 |
 |------|------|
 | 2025-12-29 | 최초 작성, API 분석 |
-| 2025-12-29 | 상세 API WebSquare5 차단 확인 |
+| 2025-12-29 | 일반내용 API WebSquare5 차단 확인 |
 | 2025-12-31 | **WMONID 바인딩 발견**, 캡챠 없이 일반내용/진행내용 조회 성공 |
 | 2025-12-31 | csNoHistLst 14자 포맷 확정, DB 스키마 추가 |
 | 2026-01-07 | 보호(ssgo10i), 감치(ssgo106) 엔드포인트 추가 |

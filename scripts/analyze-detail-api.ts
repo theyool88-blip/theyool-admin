@@ -1,5 +1,5 @@
 /**
- * 사건 상세 정보 API 분석
+ * 사건 일반내용 API 분석
  * 검색 후 사건 클릭 시 어떤 API가 호출되는지 확인
  */
 
@@ -19,8 +19,8 @@ interface NetworkRequest {
   timestamp: number;
 }
 
-async function analyzeDetailApi() {
-  console.log('🔍 사건 상세 API 분석 시작...\n');
+async function analyzeGeneralApi() {
+  console.log('🔍 사건 일반내용 API 분석 시작...\n');
 
   const browser = await puppeteer.launch({
     headless: false,
@@ -128,7 +128,7 @@ async function analyzeDetailApi() {
     await new Promise((r) => setTimeout(r, 5000));
 
     // 결과 저장
-    const outputDir = path.join(process.cwd(), 'temp', 'detail-api-analysis');
+    const outputDir = path.join(process.cwd(), 'temp', 'general-api-analysis');
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -154,7 +154,7 @@ async function analyzeDetailApi() {
       }
     });
 
-    console.log('\n✅ 결과 저장: temp/detail-api-analysis/');
+    console.log('\n✅ 결과 저장: temp/general-api-analysis/');
 
     // 브라우저 유지
     console.log('\n브라우저를 60초간 열어둡니다...');
@@ -167,7 +167,7 @@ async function analyzeDetailApi() {
   return requests;
 }
 
-analyzeDetailApi()
+analyzeGeneralApi()
   .then(() => {
     console.log('\n✅ 분석 완료');
     process.exit(0);

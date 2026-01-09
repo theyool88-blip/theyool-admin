@@ -36,10 +36,10 @@ async function main() {
 
   console.log(`새 JSESSIONID: ${jsessionId?.substring(0, 20)}...`);
 
-  // 상세 조회 (캡챠 없이)
-  console.log('\n📋 캡챠 없이 상세 조회...');
+  // 일반내용 조회 (캡챠 없이)
+  console.log('\n📋 캡챠 없이 일반내용 조회...');
 
-  const detailResponse = await fetch(
+  const generalResponse = await fetch(
     'https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',
     {
       method: 'POST',
@@ -65,18 +65,18 @@ async function main() {
     }
   );
 
-  const detailData = await detailResponse.json();
+  const generalData = await generalResponse.json();
 
-  if (detailData.errors) {
-    console.log('❌ 실패:', detailData.errors.errorMessage);
-    console.log('응답:', JSON.stringify(detailData, null, 2));
-  } else if (detailData.data) {
+  if (generalData.errors) {
+    console.log('❌ 실패:', generalData.errors.errorMessage);
+    console.log('응답:', JSON.stringify(generalData, null, 2));
+  } else if (generalData.data) {
     console.log('✅ 성공! 브라우저 encCsNo로 캡챠 없이 접근 가능!');
-    console.log('사건명:', detailData.data.dma_csBasCtt?.csNm);
-    console.log('진행상태:', detailData.data.dma_csBasCtt?.prcdStsNm);
+    console.log('사건명:', generalData.data.dma_csBasCtt?.csNm);
+    console.log('진행상태:', generalData.data.dma_csBasCtt?.prcdStsNm);
 
     // 기일 정보
-    const hearings = detailData.data.dlt_trmInfLst || [];
+    const hearings = generalData.data.dlt_trmInfLst || [];
     if (hearings.length > 0) {
       console.log('\n기일 정보:');
       hearings.forEach((h: any, i: number) => {

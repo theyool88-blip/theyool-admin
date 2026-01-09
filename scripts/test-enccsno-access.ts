@@ -42,10 +42,10 @@ async function main() {
   const jsessionId = jsessionMatch[1];
   console.log(`세션: ${jsessionId.substring(0, 20)}...\n`);
 
-  // 3. encCsNo만으로 상세 조회 시도 (캡챠 없이)
-  console.log('📋 encCsNo로 상세 조회 시도 (captchaAnswer 없음)...\n');
+  // 3. encCsNo만으로 일반내용 조회 시도 (캡챠 없이)
+  console.log('📋 encCsNo로 일반내용 조회 시도 (captchaAnswer 없음)...\n');
 
-  const detailRequest = {
+  const generalRequest = {
     dma_search: {
       cortCd: '000302', // 수원가정법원
       csNo: '',
@@ -58,9 +58,9 @@ async function main() {
     },
   };
 
-  console.log('요청:', JSON.stringify(detailRequest, null, 2));
+  console.log('요청:', JSON.stringify(generalRequest, null, 2));
 
-  const detailResponse = await fetch(
+  const generalResponse = await fetch(
     'https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',
     {
       method: 'POST',
@@ -71,20 +71,20 @@ async function main() {
         'Origin': 'https://ssgo.scourt.go.kr',
         'Referer': 'https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www',
       },
-      body: JSON.stringify(detailRequest),
+      body: JSON.stringify(generalRequest),
     }
   );
 
-  const detailData = await detailResponse.json();
+  const generalData = await generalResponse.json();
 
   console.log('\n=== 응답 ===');
-  console.log(JSON.stringify(detailData, null, 2));
+  console.log(JSON.stringify(generalData, null, 2));
 
   // 4. 결과 분석
-  if (detailData.errors) {
-    console.log('\n❌ 실패:', detailData.errors.errorMessage);
-  } else if (detailData.data) {
-    console.log('\n✅ 성공! 캡챠 없이 상세 조회 가능');
+  if (generalData.errors) {
+    console.log('\n❌ 실패:', generalData.errors.errorMessage);
+  } else if (generalData.data) {
+    console.log('\n✅ 성공! 캡챠 없이 일반내용 조회 가능');
   }
 }
 

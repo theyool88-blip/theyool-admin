@@ -17,7 +17,12 @@ import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync';
 import { getCourtCodeByName } from '@/lib/scourt/court-codes';
 import { getCaseCategory } from '@/lib/scourt/party-labels';
 import { ensureXmlCacheForCase } from '@/lib/scourt/xml-fetcher';
-import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber } from '@/lib/scourt/xml-mapping';
+import {
+  detectCaseTypeFromApiResponse,
+  detectCaseTypeFromCaseNumber,
+  detectCaseTypeFromTemplateId,
+  extractTemplateIdFromResponse,
+} from '@/lib/scourt/xml-mapping';
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils';
 
 export async function POST(request: NextRequest) {
@@ -280,9 +285,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ 동기화 조회 완료: 일반내용=${generalData ? 'OK' : 'FAIL'}, 진행=${progressData.length}건`);
 
-    const apiResponseForXml = generalData?.raw?.data || {};
+    const apiResponseForXml = generalData?.raw || generalData?.raw?.data || {};
+    const templateId = extractTemplateIdFromResponse(apiResponseForXml);
+    const caseTypeFromTemplate = templateId ? detectCaseTypeFromTemplateId(templateId) : null;
     const caseTypeFromApi = detectCaseTypeFromApiResponse(apiResponseForXml);
-    const caseType = caseTypeFromApi || detectCaseTypeFromCaseNumber(caseNumber);
+    const caseType = caseTypeFromTemplate || caseTypeFromApi || detectCaseTypeFromCaseNumber(caseNumber);
 
     // XML 캐시 확보
     // - 첫 연동: 모든 동적 추출 경로 캐시 (데이터 유무 무관)
@@ -447,7 +454,7 @@ export async function POST(request: NextRequest) {
     );
     console.log(`📋 심급내용 (원심) ${lowerCourtData.length}건, 연관사건 ${relatedCasesData.length}건 추출`);
 
-    const rawDataForSnapshot = generalData?.raw?.data || existingSnapshot?.raw_data || null;
+    const rawDataForSnapshot = generalData?.raw || existingSnapshot?.raw_data || null;
     const snapshotData = {
       legal_case_id: legalCaseId,
       case_type: caseType,

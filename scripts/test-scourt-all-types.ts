@@ -49,7 +49,7 @@ interface TestResult {
   description: string;
   category: string;
   success: boolean;
-  detail: boolean;
+  general: boolean;
   progress: boolean;
   progressCount?: number;
   error?: string;
@@ -80,19 +80,19 @@ async function runTests() {
       });
 
       if (result.success) {
-        const hasDetail = !!result.detailData?.csNm;
+        const hasGeneral = !!result.generalData?.csNm;
         const hasProgress = (result.progressData?.length || 0) > 0;
         const progressCount = result.progressData?.length || 0;
 
         console.log(`  ✅ 검색 성공`);
-        console.log(`  📋 상세: ${hasDetail ? '✅' : '❌'} ${result.detailData?.csNm || ''}`);
+        console.log(`  📋 일반내용: ${hasGeneral ? '✅' : '❌'} ${result.generalData?.csNm || ''}`);
         console.log(`  📜 진행: ${hasProgress ? '✅' : '❌'} ${progressCount}건`);
 
         results.push({
           description: tc.description,
           category: tc.category,
           success: true,
-          detail: hasDetail,
+          general: hasGeneral,
           progress: hasProgress,
           progressCount,
         });
@@ -102,7 +102,7 @@ async function runTests() {
           description: tc.description,
           category: tc.category,
           success: false,
-          detail: false,
+          general: false,
           progress: false,
           error: result.error,
         });
@@ -113,7 +113,7 @@ async function runTests() {
         description: tc.description,
         category: tc.category,
         success: false,
-        detail: false,
+        general: false,
         progress: false,
         error: String(error),
       });
@@ -129,15 +129,15 @@ async function runTests() {
   console.log('\n' + '='.repeat(70));
   console.log('테스트 결과 요약');
   console.log('='.repeat(70));
-  console.log('| 사건유형                    | 검색 | 상세 | 진행 |');
+  console.log('| 사건유형                    | 검색 | 일반내용 | 진행 |');
   console.log('|----------------------------|------|------|------|');
 
   for (const r of results) {
     const desc = r.description.padEnd(26);
     const search = r.success ? ' ✅ ' : ' ❌ ';
-    const detail = r.detail ? ' ✅ ' : ' ❌ ';
+    const general = r.general ? ' ✅ ' : ' ❌ ';
     const progress = r.progress ? ` ✅ ` : ' ❌ ';
-    console.log(`| ${desc} |${search}|${detail}|${progress}|`);
+    console.log(`| ${desc} |${search}|${general}|${progress}|`);
   }
 
   console.log('='.repeat(70));

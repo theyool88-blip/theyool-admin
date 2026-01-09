@@ -1,10 +1,10 @@
 /**
- * 10개 사건 API로 등록 및 캡챠 없이 상세 조회 테스트
+ * 10개 사건 API로 등록 및 캡챠 없이 일반내용 조회 테스트
  *
  * 1. legal_cases에서 10개 사건 조회
  * 2. 각 사건: 캡챠 해결 → csNoHistLst로 64자 encCsNo 획득
  * 3. DB에 WMONID + encCsNo 저장
- * 4. 저장된 encCsNo로 캡챠 없이 상세 조회 테스트
+ * 4. 저장된 encCsNo로 캡챠 없이 일반내용 조회 테스트
  */
 
 import * as dotenv from 'dotenv';
@@ -281,8 +281,8 @@ async function main() {
     return;
   }
 
-  // 5. 캡챠 없이 상세 조회 테스트
-  console.log('\n[Step 4] 캡챠 없이 상세 조회 테스트...');
+  // 5. 캡챠 없이 일반내용 조회 테스트
+  console.log('\n[Step 4] 캡챠 없이 일반내용 조회 테스트...');
 
   // 새 세션 (같은 WMONID)
   const testInitRes = await fetch(`${SCOURT_BASE_URL}/ssgo/index.on?cortId=www`, {
@@ -306,7 +306,7 @@ async function main() {
     const csYear = caseMatch?.[1] || '2024';
     const csSerial = caseMatch?.[2] || '';
 
-    const detailRes = await fetch(`${SCOURT_BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
+    const generalRes = await fetch(`${SCOURT_BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
       method: 'POST',
       headers: testHeaders,
       body: JSON.stringify({
@@ -323,12 +323,12 @@ async function main() {
       }),
     });
 
-    const detailData = await detailRes.json();
+    const generalData = await generalRes.json();
 
-    if (detailData.errors) {
-      console.log(`  ❌ 실패: ${detailData.errors.errorMessage}`);
-    } else if (detailData.data) {
-      const caseName = detailData.data.dma_csBasCtt?.csNm || '성공';
+    if (generalData.errors) {
+      console.log(`  ❌ 실패: ${generalData.errors.errorMessage}`);
+    } else if (generalData.data) {
+      const caseName = generalData.data.dma_csBasCtt?.csNm || '성공';
       console.log(`  ✅ 성공! 사건명: ${caseName}`);
       successCount++;
     }

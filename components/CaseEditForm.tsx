@@ -322,7 +322,7 @@ export default function CaseEditForm({
 
         setScourtSearchError(null)
         setScourtSearchSuccess(true)
-        console.log(`✅ 연동 완료: 기일 ${result.detailData?.hearings || 0}건, 진행 ${result.detailData?.progress || 0}건`)
+        console.log(`✅ 연동 완료: 기일 ${result.generalData?.hearings || 0}건, 진행 ${result.generalData?.progress || 0}건`)
       } else {
         setScourtSearchError(result.error || '사건을 찾을 수 없습니다.')
       }

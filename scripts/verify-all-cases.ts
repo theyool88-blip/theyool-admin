@@ -66,8 +66,8 @@ async function main() {
         btprNm: tc.party,
       });
 
-      if (result.success && result.detailData?.raw?.data) {
-        const caseInfo = result.detailData.raw.data.dma_csBasCtt || {};
+      if (result.success && result.generalData?.raw?.data) {
+        const caseInfo = result.generalData.raw.data.dma_csBasCtt || {};
         const fields = Object.keys(caseInfo).filter(k => caseInfo[k] !== null && caseInfo[k] !== '');
         const progressCount = result.progressData?.length || 0;
 

@@ -6,15 +6,7 @@ const config: Config = {
     './components/**/*.{js,ts,jsx,tsx,mdx}',
     './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  safelist: [
-    'text-red-500',
-    'text-blue-600',
-    'text-gray-700',
-    'bg-red-500',
-    'bg-blue-500',
-    'hover:bg-red-50',
-    'hover:bg-blue-50',
-  ],
+  // Note: In Tailwind v4, safelist is handled differently (via CSS @source or explicit class usage)
   theme: {
     extend: {
       colors: {

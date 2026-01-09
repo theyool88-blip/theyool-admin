@@ -111,7 +111,7 @@ async function main() {
     const newJsessionMatch = newSetCookie?.match(/JSESSIONID=([^;]+)/);
     const newJsessionId = newJsessionMatch?.[1];
 
-    const detailResponse = await fetch(
+    const generalResponse = await fetch(
       'https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',
       {
         method: 'POST',
@@ -134,11 +134,11 @@ async function main() {
       }
     );
 
-    const detailData = await detailResponse.json();
+    const generalData = await generalResponse.json();
 
-    if (detailData.errors) {
-      console.log('❌ 실패:', detailData.errors.errorMessage);
-    } else if (detailData.data) {
+    if (generalData.errors) {
+      console.log('❌ 실패:', generalData.errors.errorMessage);
+    } else if (generalData.data) {
       console.log('✅ 성공! API로 획득한 encCsNo로 캡챠 없이 접근 가능!');
     }
 

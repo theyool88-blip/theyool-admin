@@ -162,8 +162,8 @@ async function demo() {
 
       await new Promise(r => setTimeout(r, 5000));
 
-      await page.screenshot({ path: path.join(outputDir, '3-case-details.png'), fullPage: true });
-      console.log('📸 스크린샷 저장: 3-case-details.png\n');
+      await page.screenshot({ path: path.join(outputDir, '3-case-general.png'), fullPage: true });
+      console.log('📸 스크린샷 저장: 3-case-general.png\n');
 
       // 캡챠 필요 여부 확인
       const needsCaptcha = await targetFrame.evaluate(() => {
@@ -175,7 +175,7 @@ async function demo() {
       if (needsCaptcha) {
         console.log('❌ 캡챠가 필요합니다 (재검색 방식)');
       } else {
-        console.log('✅ 캡챠 없이 사건 상세 정보 접근 성공!');
+        console.log('✅ 캡챠 없이 사건 일반내용 접근 성공!');
         console.log('   → 저장된 사건은 세션 내에서 캡챠 없이 재접근 가능!');
       }
       console.log('='.repeat(70));
@@ -186,7 +186,7 @@ async function demo() {
     console.log('='.repeat(70));
     console.log('1. 초기 검색: 캡챠 1회 사용 ✅');
     console.log('2. 저장된 목록 보기: 캡챠 불필요 ✅');
-    console.log('3. 사건 상세 보기: 캡챠 불필요 ✅');
+    console.log('3. 사건 일반내용 보기: 캡챠 불필요 ✅');
     console.log('');
     console.log('💡 핵심: 같은 브라우저 세션을 유지하면');
     console.log('   저장된 사건(최대 50건)에 캡챠 없이 접근 가능!');

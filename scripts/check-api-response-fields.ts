@@ -80,7 +80,7 @@ async function main() {
         btprNm: tc.party,
       });
 
-      if (result.success && result.detailData) {
+      if (result.success && result.generalData) {
         // raw 응답 저장
         const fileName = `response_${tc.category}_${tc.type}_${caseNumber}.json`;
         const filePath = path.join(OUTPUT_DIR, fileName);
@@ -94,7 +94,7 @@ async function main() {
           },
           encCsNo: result.encCsNo,
           wmonid: result.wmonid,
-          detailData: result.detailData,
+          generalData: result.generalData,
           progressData: result.progressData,
           raw: result.caseData,
         };
@@ -103,7 +103,7 @@ async function main() {
         console.log(`  저장: ${fileName}`);
 
         // 필드 분석
-        const rawData = result.detailData.raw?.data || {};
+        const rawData = result.generalData.raw?.data || {};
         const fields = Object.keys(rawData);
         console.log(`  필드 수: ${fields.length}`);
         console.log(`  필드 목록: ${fields.join(', ')}`);
@@ -118,10 +118,10 @@ async function main() {
         }
 
         // 기일/진행내용 수
-        console.log(`  기일: ${result.detailData.hearings?.length || 0}건`);
+        console.log(`  기일: ${result.generalData.hearings?.length || 0}건`);
         console.log(`  진행내용: ${result.progressData?.length || 0}건`);
-        console.log(`  당사자: ${result.detailData.parties?.length || 0}명`);
-        console.log(`  대리인: ${result.detailData.representatives?.length || 0}명`);
+        console.log(`  당사자: ${result.generalData.parties?.length || 0}명`);
+        console.log(`  대리인: ${result.generalData.representatives?.length || 0}명`);
 
         results.push({
           caseNumber: `${tc.court} ${caseNumber}`,

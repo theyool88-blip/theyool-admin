@@ -1,5 +1,5 @@
 /**
- * 브라우저와 동일한 헤더로 상세 API 테스트
+ * 브라우저와 동일한 헤더로 일반내용 API 테스트
  */
 
 import * as dotenv from 'dotenv';
@@ -12,7 +12,7 @@ import { getVisionCaptchaSolver } from '../lib/google/vision-captcha-solver';
 const BASE_URL = 'https://ssgo.scourt.go.kr';
 
 async function testWithBrowserHeaders() {
-  console.log('🧪 브라우저 헤더로 상세 API 테스트\n');
+  console.log('🧪 브라우저 헤더로 일반내용 API 테스트\n');
 
   // 1. 세션 획득 - 브라우저와 동일한 User-Agent 사용
   console.log('1️⃣ 세션 획득...');
@@ -126,15 +126,15 @@ async function testWithBrowserHeaders() {
   }
   console.log('✅ 검색 성공! encCsNo:', encCsNo.substring(0, 30) + '...\n');
 
-  // 5. 상세 API - 다양한 방법 시도
-  console.log('5️⃣ 상세 API 테스트...\n');
+  // 5. 일반내용 API - 다양한 방법 시도
+  console.log('5️⃣ 일반내용 API 테스트...\n');
 
   const fullCaptchaAnswer = result.text + captchaToken;
 
   // 테스트: WebSquare 추가 헤더 포함
   console.log('📋 WebSquare 헤더 추가 테스트');
 
-  const detailRes = await fetch(`${BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
+  const generalRes = await fetch(`${BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
     method: 'POST',
     headers: {
       ...commonHeaders,
@@ -157,11 +157,11 @@ async function testWithBrowserHeaders() {
     }),
   });
 
-  const detailData = await detailRes.json();
-  console.log('응답:', JSON.stringify(detailData, null, 2).substring(0, 500));
+  const generalData = await generalRes.json();
+  console.log('응답:', JSON.stringify(generalData, null, 2).substring(0, 500));
 
   // 다른 엔드포인트 시도: 민사/형사 등 다른 유형
-  console.log('\n📋 다른 상세 API 엔드포인트 테스트...');
+  console.log('\n📋 다른 일반내용 API 엔드포인트 테스트...');
 
   const endpoints = [
     '/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',  // 가사

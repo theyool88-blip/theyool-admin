@@ -13,6 +13,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { transformHearings, transformProgress } from '@/lib/scourt/field-transformer';
 import { getScourtApiClient } from '@/lib/scourt/api-client';
 import { scrapeProgress, closeBrowser } from '@/lib/scourt/progress-scraper';
+import { extractRawData } from '@/lib/scourt/dynamic-renderer';
 
 export async function GET(request: NextRequest) {
   try {
@@ -72,6 +73,8 @@ export async function GET(request: NextRequest) {
     const hearingsData = transformHearings(snapshot?.hearings || []);
     const progressData = transformProgress(snapshot?.progress || []);
 
+    const rawData = snapshot?.raw_data || extractRawData(snapshot?.basic_info) || null;
+
     return NextResponse.json({
       success: true,
       hasSnapshot: !!snapshot,
@@ -85,6 +88,7 @@ export async function GET(request: NextRequest) {
         documents: snapshot.documents || [],
         lowerCourt: snapshot.lower_court || [],
         relatedCases: snapshot.related_cases || [],
+        rawData,  // XML 렌더링용 원본 데이터
       } : null,
       updates: updates || [],
       syncStatus: {

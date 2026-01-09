@@ -1,7 +1,7 @@
 /**
  * API로 검색 후 encCsNo 확인
  * - API 검색으로 encCsNo 획득
- * - 이 encCsNo로 캡챠 없이 상세 조회 가능한지 테스트
+ * - 이 encCsNo로 캡챠 없이 일반내용 조회 가능한지 테스트
  */
 
 import * as dotenv from 'dotenv';
@@ -44,7 +44,7 @@ async function main() {
     console.log('encCsNo:', encCsNo);
 
     if (encCsNo) {
-      console.log('\n이제 이 encCsNo로 캡챠 없이 상세 조회를 시도합니다...');
+      console.log('\n이제 이 encCsNo로 캡챠 없이 일반내용 조회를 시도합니다...');
 
       // DB에 저장 (테스트용)
       const { error } = await supabase.from('scourt_profile_cases').upsert(
@@ -65,14 +65,14 @@ async function main() {
         console.log('DB 저장 완료');
       }
 
-      // 새 세션으로 encCsNo만으로 상세 조회 시도
-      console.log('\n=== 새 세션에서 encCsNo로 상세 조회 ===');
+      // 새 세션으로 encCsNo만으로 일반내용 조회 시도
+      console.log('\n=== 새 세션에서 encCsNo로 일반내용 조회 ===');
 
       const newClient = new (await import('../lib/scourt/api-client')).ScourtApiClient();
       await newClient.initSession();
 
-      // captchaAnswer 없이 상세 조회
-      const detailResult = await newClient.getCaseDetail({
+      // captchaAnswer 없이 일반내용 조회
+      const generalResult = await newClient.getCaseGeneral({
         cortCd: '000302', // 수원가정법원 코드
         csYear: '2024',
         csDvsCd: '150',   // 드단 코드
@@ -82,11 +82,11 @@ async function main() {
         captchaAnswer: '', // 빈 캡챠 답
       });
 
-      console.log('상세 조회 결과:', detailResult.success);
-      if (detailResult.success) {
-        console.log('상세 데이터:', JSON.stringify(detailResult.data, null, 2));
+      console.log('일반내용 조회 결과:', generalResult.success);
+      if (generalResult.success) {
+        console.log('일반내용 데이터:', JSON.stringify(generalResult.data, null, 2));
       } else {
-        console.log('에러:', detailResult.error);
+        console.log('에러:', generalResult.error);
       }
     }
 

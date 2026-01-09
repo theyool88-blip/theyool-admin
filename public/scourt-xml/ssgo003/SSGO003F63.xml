@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003F63(당사자내용 목록) 화면 XML
+
+============ ============ ==========================
+ Date         Author       Description
+============ ============ ==========================
+2022.05.12.   최연구       [NELS]최초 생성
+============ ============ ==========================
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="당사자내용 목록" >
+    	<w2:type>DEFAULT</w2:type>
+        <w2:buildDate/>
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <!-- 당사자내용 -->
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_btprtCttLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="btprtSeq" name="당사자순위" dataType="text"></w2:column>
+                        <w2:column id="btprtDvsCd" name="당사자구분코드" dataType="text"></w2:column>
+                        <w2:column id="btprtDvsNm" name="당사자구분코드명" dataType="text"></w2:column>
+                        <w2:column id="btprtNm" name="당사자명" dataType="text"></w2:column>
+                        <w2:column id="rprsvNm" name="대표자명" dataType="text"></w2:column>
+                        <w2:column id="dcsnstDlvrYmd" name="결정문송달일자" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>
+            </w2:dataCollection>
+            <w2:workflowCollection>
+            </w2:workflowCollection>
+        </xf:model>
+         <script type="text/javascript" lazy="false"><![CDATA[/**
+ * 화면 pageload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */ 
+scwin.onpageload = function() {
+    var dlt_param   = com.data.getParameter() || ssgo.getParameter();
+    var comTaskTypCd = "";
+    
+    dlt_btprtCttLst.removeAll();
+    dlt_btprtCttLst.setJSON(dlt_param);
+    
+    // 당사자 수가 설정값을 초과할 경우 안내문구 표시
+    txt_lstMsg.hide();
+
+    if(ssgo.getProperties("clt.ssgo.btprt.page.size") <= dlt_btprtCttLst.getTotalRow() ) {
+        let csDvsCd = $p.parent().dma_search.get("csDvsCd");
+        comTaskTypCd = ssgo.getProperties("ctt.csDvsCd." + csDvsCd);
+
+        if(comTaskTypCd == scglblo.TASK.CV
+         ||comTaskTypCd == scglblo.TASK.HJ
+         ||comTaskTypCd == scglblo.TASK.ET 
+         ||comTaskTypCd == scglblo.TASK.GJ 
+         ||comTaskTypCd == scglblo.TASK.HP){ // 민사, 항고재항고, 기타사건, 기타집행, 회생파산
+            txt_lstMsg.show();
+        } else {
+            txt_lstMsg.hide();
+        }
+    }
+
+    // 그리드 사이즈조정시 캔버스뒤로 숨는 오류처리
+    ssgo.setGrdResizeAddEvt(grd_btprtCttLst);  
+
+};
+
+/**
+ * 화면 pageunload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageunload = function() {
+};
+
+	]]></script>
+	<style type="text/css"><![CDATA[
+			
+		 ]]></style>
+    </head>
+   <body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+
+
+   	<w2:span class="con_stit ic pt10" id="" label="당사자내용" style=""></w2:span>
+   	<w2:gridView adaptive="" adaptiveThreshold="" autoFit="none" autoFitMinWidth="" captionTitle="당사자내용 그리드" class="grid" contextMenu=""
+   		dataList="data:dlt_btprtCttLst" id="grd_btprtCttLst" readOnly="true" style="height:110px;" visibleRowNum="all" noResultMessage="조회된 내용이 없습니다." titleFormatter="ssgo.setGrdTitle">
+   		<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+   		<w2:header id="header1" style="">
+   			<w2:row id="row1" style="">
+   				<w2:column displayMode="label" id="column19" inputType="text" style="height:20px;" value="구분" width="30"></w2:column>
+   				<w2:column displayMode="label" id="column20" inputType="text" style="height:20px" value="이름" width="60"></w2:column>
+   				<w2:column displayMode="label" id="column15" inputType="text" style="height:20px;" value="결정문송달일" width="30"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody id="gBody1" style="">
+   			<w2:row id="row2" style="">
+   				<w2:column displayMode="label" excelCellType="" id="btprtDvsNm" inputType="text" style=""></w2:column>
+   				<w2:column displayMode="label" id="btprtNm" inputType="text" style="height:20px" value="" textAlign="left"></w2:column>
+   				<w2:column displayMode="label" id="dcsnstDlvrYmd" inputType="text" style="" displayFormat="####.##.##"></w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+   	<w2:textbox class="txt_exl " escape="false" id="txt_lstMsg" label="&lt;p&gt;※ 해당사건의 당사자수가 많아 검색이 제한됩니다. 해당법원으로 문의하시기 바랍니다.&lt;/p&gt;"
+   		style=";visibility:;">
+   	</w2:textbox>
+   </body>
+</html>

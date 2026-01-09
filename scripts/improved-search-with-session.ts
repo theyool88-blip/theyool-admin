@@ -290,17 +290,17 @@ class CourtCaseSearcher {
 
     await new Promise(r => setTimeout(r, 5000));
 
-    // 사건 상세 정보 확인
-    const hasDetails = await targetFrame.evaluate(() => {
-      const detailsTable = document.querySelector('.tbl_type01');
-      return !!detailsTable;
+    // 사건 일반내용 확인
+    const hasGeneral = await targetFrame.evaluate(() => {
+      const generalTable = document.querySelector('.tbl_type01');
+      return !!generalTable;
     });
 
-    if (hasDetails) {
-      console.log('✅ 사건 상세 정보 로드 성공! (캡챠 입력 없이!)\n');
+    if (hasGeneral) {
+      console.log('✅ 사건 일반내용 로드 성공! (캡챠 입력 없이!)\n');
       return true;
     } else {
-      console.log('⚠️  사건 상세 정보를 찾을 수 없습니다\n');
+      console.log('⚠️  사건 일반내용을 찾을 수 없습니다\n');
       return false;
     }
   }
@@ -367,7 +367,7 @@ async function main() {
 
     // 3단계: 저장된 사건 클릭 (캡챠 불필요!)
     const clickSuccess = await searcher.clickSavedCase(0);
-    await searcher.takeScreenshot('3-case-details.png');
+    await searcher.takeScreenshot('3-case-general.png');
 
     if (clickSuccess) {
       console.log('='.repeat(70));
@@ -375,7 +375,7 @@ async function main() {
       console.log('='.repeat(70));
       console.log('✅ 초기 검색: 캡챠 1회 사용');
       console.log('✅ 저장된 목록 접근: 캡챠 불필요');
-      console.log('✅ 사건 상세 보기: 캡챠 불필요');
+      console.log('✅ 사건 일반내용 보기: 캡챠 불필요');
       console.log('='.repeat(70));
     }
 

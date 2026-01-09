@@ -117,7 +117,7 @@ async function test() {
       await new Promise(r => setTimeout(r, 5000));
 
       console.log('\n='.repeat(70));
-      console.log('✅ 성공: 캡챠 없이 사건 상세 정보 접근!');
+      console.log('✅ 성공: 캡챠 없이 사건 일반내용 접근!');
       console.log('='.repeat(70));
     }
 
@@ -125,7 +125,7 @@ async function test() {
     console.log('='.repeat(70));
     console.log('1. 초기 검색: 캡챠 1회 사용 ✅');
     console.log('2. 저장된 목록 보기: 캡챠 불필요 ✅');
-    console.log('3. 사건 상세 보기: 캡챠 불필요 ✅');
+    console.log('3. 사건 일반내용 보기: 캡챠 불필요 ✅');
     console.log('='.repeat(70));
 
     console.log('\n⏰ 브라우저를 3분간 열어둡니다. 자유롭게 확인하세요...\n');

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import CaseDetail from '@/components/CaseDetail'
 
 export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,15 +34,27 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     redirect('/login')
   }
 
-  // 사건 상세 정보 가져오기
-  const { data: caseData, error: caseError } = await adminClient
+  // 테넌트 컨텍스트 조회
+  const tenantContext = await getCurrentTenantContext()
+  if (!tenantContext) {
+    redirect('/login')
+  }
+
+  // 사건 상세 정보 가져오기 (테넌트 필터 적용)
+  let caseQuery = adminClient
     .from('legal_cases')
     .select(`
       *,
       client:clients(*)
     `)
     .eq('id', id)
-    .single()
+
+  // 슈퍼 어드민이 아니면 테넌트 필터 적용
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    caseQuery = caseQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: caseData, error: caseError } = await caseQuery.single()
 
   if (!caseData) {
     console.error('Case not found:', id, caseError)

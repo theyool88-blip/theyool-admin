@@ -6,7 +6,7 @@
  *
  * 테스트 순서:
  * 1. API로 사건 검색 → WMONID + encCsNo 획득
- * 2. 새 세션(같은 WMONID)에서 캡챠 없이 상세 조회
+ * 2. 새 세션(같은 WMONID)에서 캡챠 없이 일반내용 조회
  * 3. 완전히 새 세션(다른 WMONID)에서 실패 확인
  */
 
@@ -43,13 +43,13 @@ async function main() {
   console.log(`  encCsNo: ${result.encCsNo?.substring(0, 40)}...`);
   console.log(`  encCsNo 길이: ${result.encCsNo?.length}자`);
 
-  // Step 2: 새 세션(같은 WMONID)에서 캡챠 없이 상세 조회
+  // Step 2: 새 세션(같은 WMONID)에서 캡챠 없이 일반내용 조회
   console.log('\n' + '='.repeat(60));
-  console.log('[Step 2] 같은 WMONID로 새 세션에서 상세 조회...');
+  console.log('[Step 2] 같은 WMONID로 새 세션에서 일반내용 조회...');
   console.log('='.repeat(60));
 
   const client2 = new ScourtApiClient();
-  const detailResult = await client2.getCaseDetailWithStoredEncCsNo(
+  const generalResult = await client2.getCaseGeneralWithStoredEncCsNo(
     result.wmonid!,
     result.encCsNo!,
     {
@@ -60,20 +60,20 @@ async function main() {
     }
   );
 
-  if (detailResult.success) {
-    console.log('\n✅ 캡챠 없이 상세 조회 성공!');
-    console.log(`  사건명: ${detailResult.data?.csNm}`);
-    console.log(`  진행상태: ${detailResult.data?.prcdStsNm}`);
+  if (generalResult.success) {
+    console.log('\n✅ 캡챠 없이 일반내용 조회 성공!');
+    console.log(`  사건명: ${generalResult.data?.csNm}`);
+    console.log(`  진행상태: ${generalResult.data?.prcdStsNm}`);
 
     // 기일 정보
-    if (detailResult.data?.hearings?.length) {
+    if (generalResult.data?.hearings?.length) {
       console.log('  기일:');
-      detailResult.data.hearings.forEach((h, i) => {
+      generalResult.data.hearings.forEach((h, i) => {
         console.log(`    ${i + 1}. ${h.trmDt} ${h.trmNm} (${h.trmPntNm})`);
       });
     }
   } else {
-    console.log('\n❌ 상세 조회 실패:', detailResult.error);
+    console.log('\n❌ 일반내용 조회 실패:', generalResult.error);
   }
 
   // Step 3: 완전히 새 세션(다른 WMONID)에서 실패 확인
@@ -89,7 +89,7 @@ async function main() {
   console.log(`  기존 WMONID: ${result.wmonid}`);
 
   // 기존 encCsNo로 접근 시도 (다른 WMONID이므로 실패해야 함)
-  const failResult = await client3.getCaseDetail({
+  const failResult = await client3.getCaseGeneral({
     cortCd: '000302',
     csYear: '2024',
     csDvsCd: '150',

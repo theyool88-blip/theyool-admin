@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import ClientsList from '@/components/ClientsList'
 import AdminHeader from '@/components/AdminHeader'
 
@@ -27,17 +28,33 @@ export default async function ClientsPage() {
     redirect('/login')
   }
 
-  // 의뢰인 데이터 가져오기
-  const { data: clientsData } = await adminClient
+  // 테넌트 컨텍스트 조회
+  const tenantContext = await getCurrentTenantContext()
+  if (!tenantContext) {
+    redirect('/login')
+  }
+
+  // 의뢰인 데이터 가져오기 (테넌트 필터 적용)
+  let clientsQuery = adminClient
     .from('clients')
     .select('*')
-    .order('created_at', { ascending: false })
 
-  // 모든 사건 데이터를 한 번에 가져오기
-  const { data: allCases } = await adminClient
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    clientsQuery = clientsQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: clientsData } = await clientsQuery.order('created_at', { ascending: false })
+
+  // 모든 사건 데이터를 한 번에 가져오기 (테넌트 필터 적용)
+  let casesQuery = adminClient
     .from('legal_cases')
     .select('id, case_name, client_id, retainer_fee, calculated_success_fee, total_received, created_at')
-    .order('created_at', { ascending: false })
+
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    casesQuery = casesQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: allCases } = await casesQuery.order('created_at', { ascending: false })
 
   type ClientCaseSummary = {
     id: string

@@ -1,5 +1,5 @@
 /**
- * API 검색 + 상세 조회 테스트
+ * API 검색 + 일반내용 조회 테스트
  */
 
 import * as dotenv from 'dotenv';
@@ -8,7 +8,7 @@ dotenv.config({ path: '.env.local' });
 import { getScourtApiClient } from '../lib/scourt/api-client';
 
 async function main() {
-  console.log('=== API 검색 + 상세 조회 테스트 ===\n');
+  console.log('=== API 검색 + 일반내용 조회 테스트 ===\n');
 
   const client = getScourtApiClient();
 
@@ -23,8 +23,8 @@ async function main() {
   console.log('검색 파라미터:', params);
 
   try {
-    // searchAndGetDetail 메서드 사용
-    const result = await client.searchAndGetDetail(params);
+    // searchAndGetGeneral 메서드 사용
+    const result = await client.searchAndGetGeneral(params);
 
     console.log('\n=== 검색 결과 ===');
     console.log('성공:', result.searchResult.success);
@@ -34,19 +34,19 @@ async function main() {
       console.log('암호화된 사건번호:', result.searchResult.encCsNo);
     }
 
-    if (result.detailResult) {
-      console.log('\n=== 상세 정보 ===');
-      console.log('성공:', result.detailResult.success);
+    if (result.generalResult) {
+      console.log('\n=== 일반내용 ===');
+      console.log('성공:', result.generalResult.success);
 
-      if (result.detailResult.success && result.detailResult.data) {
-        const detail = result.detailResult.data;
-        console.log('사건번호:', detail.csNo);
-        console.log('법원:', detail.cortNm);
-        console.log('사건명:', detail.csNm);
-        console.log('당사자:', detail.parties);
-        console.log('기일:', detail.hearings);
-      } else if (result.detailResult.error) {
-        console.log('상세 조회 에러:', result.detailResult.error);
+      if (result.generalResult.success && result.generalResult.data) {
+        const general = result.generalResult.data;
+        console.log('사건번호:', general.csNo);
+        console.log('법원:', general.cortNm);
+        console.log('사건명:', general.csNm);
+        console.log('당사자:', general.parties);
+        console.log('기일:', general.hearings);
+      } else if (result.generalResult.error) {
+        console.log('일반내용 조회 에러:', result.generalResult.error);
       }
     }
 

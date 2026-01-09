@@ -1,6 +1,6 @@
 /**
  * API 호출 비교 디버깅
- * 성공/실패 케이스의 상세 API 요청/응답 비교
+ * 성공/실패 케이스의 일반내용 API 요청/응답 비교
  */
 
 const BASE_URL = 'https://www.scourt.go.kr';
@@ -94,13 +94,13 @@ async function searchCase(session: { wmonid: string; jsessionId: string }, param
   };
 }
 
-// 상세 API 호출 (다양한 엔드포인트 테스트)
-async function testDetailEndpoints(
+// 일반내용 API 호출 (다양한 엔드포인트 테스트)
+async function testGeneralEndpoints(
   session: { wmonid: string; jsessionId: string },
   searchResult: { encCsNo: string; cortCd: string; csNo: string; csDvsCd: string },
   params: { csYr: string; csDvsCd: string; csSerial: string; btprNm: string }
 ) {
-  console.log('\n=== 상세조회 엔드포인트 테스트 ===');
+  console.log('\n=== 일반내용 조회 엔드포인트 테스트 ===');
 
   const endpoints = [
     { name: 'ssgo101 (민사)', path: '/ssgo/ssgo101/selectHmpgCvlcsCsGnrlCtt.on' },
@@ -198,7 +198,7 @@ async function main() {
 
     if (searchResult) {
       await new Promise(resolve => setTimeout(resolve, 1000));
-      await testDetailEndpoints(session, searchResult, tc);
+      await testGeneralEndpoints(session, searchResult, tc);
     }
 
     // 테스트 간격

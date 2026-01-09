@@ -165,7 +165,7 @@ async function main() {
         console.log('   스크린샷 저장: /tmp/search-success.png');
 
         // 첫 번째 결과 클릭
-        console.log('\n5. 첫 번째 결과 클릭하여 상세 조회...');
+        console.log('\n5. 첫 번째 결과 클릭하여 일반내용 조회...');
         const clicked = await page.evaluate((selector) => {
           const tbody = document.querySelector(selector);
           if (!tbody) return false;
@@ -185,8 +185,8 @@ async function main() {
 
         if (clicked) {
           await new Promise((r) => setTimeout(r, 5000));
-          await page.screenshot({ path: '/tmp/case-detail.png', fullPage: true });
-          console.log('   상세 페이지 스크린샷: /tmp/case-detail.png');
+          await page.screenshot({ path: '/tmp/case-general.png', fullPage: true });
+          console.log('   일반내용 탭 화면 스크린샷: /tmp/case-general.png');
         }
 
         break;

@@ -1,5 +1,5 @@
 /**
- * 대법원 사건 상세 조회 - 팝업 방식 테스트
+ * 대법원 사건 일반내용 조회 - 팝업 방식 테스트
  * 사건 클릭 시 새 창(팝업)이 열리므로 해당 창에서 데이터 수집
  */
 
@@ -11,8 +11,8 @@ dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
 import { getVisionCaptchaSolver } from '../lib/google/vision-captcha-solver';
 
-async function testPopupDetail() {
-  console.log('🔍 팝업 방식 상세 조회 테스트\n');
+async function testPopupGeneral() {
+  console.log('🔍 팝업 방식 일반내용 조회 테스트\n');
 
   const browser = await puppeteer.launch({
     headless: false,
@@ -150,7 +150,7 @@ async function testPopupDetail() {
       });
     });
 
-    // 사건 클릭 (더블클릭으로 상세 페이지 열기)
+    // 사건 클릭 (더블클릭으로 일반내용 탭 화면 열기)
     await targetFrame.evaluate(() => {
       const tbody = document.querySelector('#mf_ssgoTopMainTab_contents_content1_body_csSrchRsltGrid_body_tbody');
       const firstRow = tbody?.querySelector('tr') as HTMLElement;
@@ -196,10 +196,10 @@ async function testPopupDetail() {
 
       // 스크린샷 저장
       await popupPage.screenshot({
-        path: path.join(process.cwd(), 'temp', 'popup-detail.png'),
+        path: path.join(process.cwd(), 'temp', 'popup-general.png'),
         fullPage: true,
       });
-      console.log('\n  📸 스크린샷 저장: temp/popup-detail.png');
+      console.log('\n  📸 스크린샷 저장: temp/popup-general.png');
 
     } else {
       console.log('\n⚠️ 팝업이 열리지 않음. 다른 방식 시도...');
@@ -224,7 +224,7 @@ async function testPopupDetail() {
   }
 }
 
-testPopupDetail()
+testPopupGeneral()
   .then(() => {
     console.log('\n✅ 테스트 완료');
     process.exit(0);

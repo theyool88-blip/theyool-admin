@@ -1,5 +1,5 @@
 /**
- * 상세 API 다양한 요청 방식 테스트
+ * 일반내용 API 다양한 요청 방식 테스트
  * 어떤 조합이 작동하는지 확인
  */
 
@@ -12,8 +12,8 @@ import { getVisionCaptchaSolver } from '../lib/google/vision-captcha-solver';
 
 const BASE_URL = 'https://ssgo.scourt.go.kr';
 
-async function testDetailVariants() {
-  console.log('🧪 상세 API 다양한 요청 방식 테스트\n');
+async function testGeneralVariants() {
+  console.log('🧪 일반내용 API 다양한 요청 방식 테스트\n');
 
   // 1. 세션 획득
   console.log('1️⃣ 세션 획득...');
@@ -93,8 +93,8 @@ async function testDetailVariants() {
   }
   console.log('✅ 검색 성공! encCsNo:', encCsNo.substring(0, 30) + '...\n');
 
-  // 5. 상세 API 테스트 - 다양한 조합
-  console.log('5️⃣ 상세 API 테스트...\n');
+  // 5. 일반내용 API 테스트 - 다양한 조합
+  console.log('5️⃣ 일반내용 API 테스트...\n');
 
   const fullCaptchaAnswer = result.text + captchaToken;
 
@@ -214,4 +214,4 @@ async function testDetailVariants() {
   console.log('\n✅ 테스트 완료');
 }
 
-testDetailVariants().catch(console.error);
+testGeneralVariants().catch(console.error);

@@ -162,7 +162,7 @@ https://www.googleapis.com/auth/calendar
 
 ```typescript
 // app/api/admin/scourt/sync/route.ts
-const hearingsForSync = detailData.hearings.map(h => ({
+const hearingsForSync = generalData.hearings.map(h => ({
   date: h.trmDt || '',
   time: h.trmHm || '',
   type: h.trmNm || '',

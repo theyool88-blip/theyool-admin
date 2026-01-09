@@ -6,6 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import fs from "node:fs/promises";
+import path from "node:path";
 import {
   getCachedXml,
   fetchXml,
@@ -33,6 +35,23 @@ export async function GET(request: NextRequest) {
     const cached = await getCachedXml(xmlPath);
 
     if (!cached) {
+      if (!xmlPath.startsWith("/") && !xmlPath.includes("..")) {
+        try {
+          const publicPath = path.join(process.cwd(), "public", "scourt-xml", xmlPath);
+          const xmlContent = await fs.readFile(publicPath, "utf8");
+          return NextResponse.json({
+            xml_path: xmlPath,
+            xml_content: xmlContent,
+            case_type: null,
+            data_list_id: null,
+            cached_at: null,
+            from_static: true,
+          });
+        } catch (readError) {
+          console.warn(`Static XML not found: ${xmlPath}`, readError);
+        }
+      }
+
       return NextResponse.json(
         { error: "XML not found in cache", xml_path: xmlPath },
         { status: 404 }

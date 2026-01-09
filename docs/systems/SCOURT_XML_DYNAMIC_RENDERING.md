@@ -35,6 +35,20 @@ SCOURT(대법원 나의사건검색) 데이터를 XML 정의 기반으로 동적
 
 ## 처리 흐름
 
+### 기본정보 XML 선택 (우선순위)
+
+1. **API 응답 템플릿 ID** (`scrnId`, `pgmId`, `screenId`, `programId`)  
+2. **caseType (API 응답 기반)**  
+3. **사건번호 패턴 fallback**
+
+```typescript
+// lib/scourt/xml-mapping.ts
+const templateId = extractTemplateIdFromResponse(apiResponse)
+const basicInfoPath = resolveBasicInfoXmlPath({ caseType, apiResponse, templateId })
+```
+
+> 템플릿 ID가 있으면 **사건유형 매핑보다 우선**합니다.
+
 ### 1단계: 기본정보 XML에서 하위 XML 경로 추출
 
 **SCOURT 기본정보 XML (예: SSGO105F01.xml):**
@@ -141,7 +155,7 @@ public/scourt-xml/           # 정적 fallback XML
 
 | 시점 | 동작 |
 |------|------|
-| 첫 연동 | 기본정보 XML에서 추출한 **모든** 하위 XML 캐시 |
+| 첫 연동 | 템플릿 ID/사건유형으로 선택한 기본정보 XML에서 추출한 **모든** 하위 XML 캐시 |
 | 갱신 | 데이터가 있는 dlt_* 항목 중 미캐시된 것만 다운로드 |
 
 ```typescript
@@ -155,14 +169,15 @@ export async function ensureXmlCacheForCase(
 
 ## 사건유형 감지
 
-**`detectCaseTypeFromCaseNumber()` 함수:**
+**우선순위:** 템플릿 ID → API 응답 → 사건번호 패턴
 
 | 사건번호 패턴 | 사건유형 | XML 경로 |
 |--------------|---------|----------|
 | 가단, 가합, 나, 다 | ssgo101 (민사) | ssgo101/SSGO101F01.xml |
 | 드단, 드합, 느, 브 | ssgo102 (가사) | ssgo102/SSGO102F01.xml |
-| 하단, 하면, 개회 | ssgo105 (도산) | ssgo105/SSGO105F01.xml |
-| 카, 타, 아 | ssgo105 (신청) | ssgo105/SSGO105F01.xml |
+| 하단, 하면, 개회 | ssgo107 (회생/파산) | ssgo107/SSGO107F01.xml |
+| 구, 구단, 구합, 누, 두, 루 | ssgo101 (행정 본안) | ssgo101/SSGO101F01.xml |
+| 카, 타, 아 | ssgo105 (신청/보전) | ssgo105/SSGO105F01.xml |
 | 고단, 고합, 노, 도 | ssgo10g (형사) | ssgo10g/SSGO10GF01.xml |
 
 ## 데이터 리스트 ID
@@ -198,3 +213,17 @@ export async function ensureXmlCacheForCase(
 
 - [SCOURT 통합 시스템](./SCOURT_INTEGRATION.md)
 - [SCOURT API 분석](./SCOURT_API_ANALYSIS.md)
+
+## 최근 변경 사항 (2026-01)
+
+1. **기본정보 XML 선택 우선순위 추가**  
+   - 템플릿 ID(`scrnId`/`pgmId`)가 있으면 그 경로를 우선 사용
+2. **raw_data 저장 구조 변경**  
+   - `raw.data`가 아니라 **전체 응답(raw)**을 저장하여 템플릿 ID 보존
+3. **행정 사건 caseType 보정**  
+   - 행정 본안은 `ssgo101`, 행정신청(아 계열)은 `ssgo105`
+4. **형사 기본정보 파생값 처리 강화**  
+   - `txt_ultmtDvsNm`, `txt_aplPrpndCtt` 등 JS 계산값을 전처리로 재현
+5. **검증 스크립트 추가**  
+   - `scripts/verify-scourt-xml-case-type.ts`  
+   - `SCOURT_VERIFY_BASE_URL`로 로컬 API 기준 검증 가능

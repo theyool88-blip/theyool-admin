@@ -1,5 +1,5 @@
 /**
- * 저장된 사건의 상세 정보 조회 (raw API 응답 확인)
+ * 저장된 사건의 일반내용 조회 (raw API 응답 확인)
  */
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
@@ -32,11 +32,11 @@ async function main() {
     return;
   }
 
-  // 상세 조회 시도
-  console.log('\n=== 상세 조회 시도 ===');
+  // 일반내용 조회 시도
+  console.log('\n=== 일반내용 조회 시도 ===');
   const apiClient = getScourtApiClient();
 
-  const result = await apiClient.getCaseDetailWithStoredEncCsNo(
+  const result = await apiClient.getCaseGeneralWithStoredEncCsNo(
     caseData.scourt_wmonid,
     caseData.enc_cs_no,
     {
@@ -48,7 +48,7 @@ async function main() {
   );
 
   if (result.success && result.data) {
-    console.log('\n✅ 상세 조회 성공!');
+    console.log('\n✅ 일반내용 조회 성공!');
 
     // raw 응답의 모든 필드 출력
     const raw = result.data.raw?.data;
@@ -77,7 +77,7 @@ async function main() {
       }
     }
   } else {
-    console.log('\n❌ 상세 조회 실패:', result.error);
+    console.log('\n❌ 일반내용 조회 실패:', result.error);
   }
 }
 

@@ -129,8 +129,8 @@ async function searchCase(browser: any, testCase: TestCase) {
     console.log(`\n📊 결과: ${hasResults}건`);
 
     if (hasResults > 0) {
-      // 결과가 있으면 상세 분석
-      console.log('✅ 결과 발견! 상세 분석 중...\n');
+      // 결과가 있으면 일반내용 분석
+      console.log('✅ 결과 발견! 일반내용 분석 중...\n');
 
       // 결과 행의 HTML 구조 추출
       const resultStructure = await targetFrame.evaluate(() => {

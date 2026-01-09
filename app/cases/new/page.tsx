@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import NewCaseForm from '@/components/NewCaseForm'
 
 interface PageProps {
@@ -36,11 +37,22 @@ export default async function NewCasePage({ searchParams }: PageProps) {
     redirect('/login')
   }
 
-  // 의뢰인 목록 가져오기 (사건 등록 시 선택할 수 있도록)
-  const { data: clients } = await adminClient
+  // 테넌트 컨텍스트 조회
+  const tenantContext = await getCurrentTenantContext()
+  if (!tenantContext) {
+    redirect('/login')
+  }
+
+  // 의뢰인 목록 가져오기 (사건 등록 시 선택할 수 있도록) - 테넌트 필터 적용
+  let clientsQuery = adminClient
     .from('clients')
     .select('id, name, phone, email')
-    .order('created_at', { ascending: false })
+
+  if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+    clientsQuery = clientsQuery.eq('tenant_id', tenantContext.tenantId)
+  }
+
+  const { data: clients } = await clientsQuery.order('created_at', { ascending: false })
 
   return (
     <NewCaseForm

@@ -147,9 +147,9 @@ export default function NewCaseForm({ clients, initialCaseNumber, initialCourtNa
           const result = await response.json()
 
           if (result.success && result.caseInfo) {
-            // 상세 정보 가져오기 (client_role 감지용)
+            // 일반내용 가져오기 (client_role 감지용)
             try {
-              const detailRes = await fetch('/api/admin/scourt/detail', {
+              const generalRes = await fetch('/api/admin/scourt/detail', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -158,10 +158,10 @@ export default function NewCaseForm({ clients, initialCaseNumber, initialCourtNa
                 })
               })
 
-              const detailResult = await detailRes.json()
+              const generalResult = await generalRes.json()
 
-              if (detailResult.success && detailResult.detail) {
-                const detail = detailResult.detail
+              if (generalResult.success && generalResult.general) {
+                const general = generalResult.general
 
                 // 의뢰인 이름으로 원고/피고 감지 (clientId로 의뢰인 조회)
                 let detectedRole: 'plaintiff' | 'defendant' | '' = ''
@@ -170,15 +170,15 @@ export default function NewCaseForm({ clients, initialCaseNumber, initialCourtNa
 
                 if (clientName) {
                   // 의뢰인 이름으로 역할 감지
-                  const isPlaintiff = detail.plaintiffs?.some((p: string) => p.includes(clientName))
-                  const isDefendant = detail.defendants?.some((d: string) => d.includes(clientName))
+                  const isPlaintiff = general.plaintiffs?.some((p: string) => p.includes(clientName))
+                  const isDefendant = general.defendants?.some((d: string) => d.includes(clientName))
 
                   if (isPlaintiff) detectedRole = 'plaintiff'
                   else if (isDefendant) detectedRole = 'defendant'
                 } else {
                   // 의뢰인 정보 없으면 partyName으로 시도
-                  const isPlaintiff = detail.plaintiffs?.some((p: string) => p.includes(initialPartyName))
-                  const isDefendant = detail.defendants?.some((d: string) => d.includes(initialPartyName))
+                  const isPlaintiff = general.plaintiffs?.some((p: string) => p.includes(initialPartyName))
+                  const isDefendant = general.defendants?.some((d: string) => d.includes(initialPartyName))
 
                   if (isPlaintiff) detectedRole = 'plaintiff'
                   else if (isDefendant) detectedRole = 'defendant'
@@ -187,21 +187,21 @@ export default function NewCaseForm({ clients, initialCaseNumber, initialCourtNa
                 setFormData(prev => ({
                   ...prev,
                   case_name: result.caseInfo.caseName || prev.case_name,
-                  judge_name: detail.judge || result.caseInfo.judgeName || prev.judge_name,
-                  court_name: detail.court || prev.court_name,
+                  judge_name: general.judge || result.caseInfo.judgeName || prev.judge_name,
+                  court_name: general.court || prev.court_name,
                   client_role: detectedRole || prev.client_role
                 }))
               } else {
-                // 상세 정보 실패 시 기본 정보만 설정
+                // 일반내용 실패 시 기본 정보만 설정
                 setFormData(prev => ({
                   ...prev,
                   case_name: result.caseInfo.caseName || prev.case_name,
                   judge_name: result.caseInfo.judgeName || prev.judge_name,
                 }))
               }
-            } catch (detailErr) {
-              console.error('상세 정보 조회 실패:', detailErr)
-              // 상세 정보 실패해도 기본 정보는 설정
+            } catch (generalErr) {
+              console.error('일반내용 조회 실패:', generalErr)
+              // 일반내용 실패해도 기본 정보는 설정
               setFormData(prev => ({
                 ...prev,
                 case_name: result.caseInfo.caseName || prev.case_name,
@@ -271,7 +271,7 @@ export default function NewCaseForm({ clients, initialCaseNumber, initialCourtNa
       const result = await response.json()
 
       if (result.success && result.caseInfo) {
-        const detailRes = await fetch('/api/admin/scourt/detail', {
+        const generalRes = await fetch('/api/admin/scourt/detail', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -280,22 +280,22 @@ export default function NewCaseForm({ clients, initialCaseNumber, initialCourtNa
           })
         })
 
-        const detailResult = await detailRes.json()
+        const generalResult = await generalRes.json()
 
-        if (detailResult.success && detailResult.detail) {
-          const detail = detailResult.detail
+        if (generalResult.success && generalResult.general) {
+          const general = generalResult.general
 
           let detectedRole: 'plaintiff' | 'defendant' | '' = ''
-          const isPlaintiff = detail.plaintiffs?.some((p: string) => p.includes(partyName))
-          const isDefendant = detail.defendants?.some((d: string) => d.includes(partyName))
+          const isPlaintiff = general.plaintiffs?.some((p: string) => p.includes(partyName))
+          const isDefendant = general.defendants?.some((d: string) => d.includes(partyName))
 
           if (isPlaintiff) detectedRole = 'plaintiff'
           else if (isDefendant) detectedRole = 'defendant'
 
           setFormData(prev => ({
             ...prev,
-            court_name: detail.court || prev.court_name,
-            judge_name: detail.judge || prev.judge_name,
+            court_name: general.court || prev.court_name,
+            judge_name: general.judge || prev.judge_name,
             client_role: detectedRole || prev.client_role
           }))
           setScourtSearchSuccess(true)

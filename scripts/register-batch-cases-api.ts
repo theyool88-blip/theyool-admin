@@ -169,8 +169,8 @@ async function main() {
     console.log(`  ${i + 1}. ${item.encCsNo?.substring(0, 30)}... (${item.encCsNo?.length}자)`);
   });
 
-  // 4. 새 세션에서 캡챠 없이 상세 조회 테스트
-  console.log('\n[4] 새 세션에서 캡챠 없이 상세 조회...');
+  // 4. 새 세션에서 캡챠 없이 일반내용 조회 테스트
+  console.log('\n[4] 새 세션에서 캡챠 없이 일반내용 조회...');
 
   const testInitRes = await fetch(`${SCOURT_BASE_URL}/ssgo/index.on?cortId=www`, {
     headers: { 'Cookie': `WMONID=${wmonid}` },
@@ -196,7 +196,7 @@ async function main() {
   console.log(`  법원코드: ${courtCode}`);
   console.log(`  encCsNo: ${testEncCsNo.substring(0, 30)}...`);
 
-  const detailRes = await fetch(`${SCOURT_BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
+  const generalRes = await fetch(`${SCOURT_BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
     method: 'POST',
     headers: {
       ...headers,
@@ -216,12 +216,12 @@ async function main() {
     }),
   });
 
-  const detailData = await detailRes.json();
+  const generalData = await generalRes.json();
 
-  if (detailData.errors) {
-    console.log(`  ❌ 실패: ${detailData.errors.errorMessage}`);
-  } else if (detailData.data) {
-    console.log(`  ✅ 성공! 사건명: ${detailData.data.dma_csBasCtt?.csNm}`);
+  if (generalData.errors) {
+    console.log(`  ❌ 실패: ${generalData.errors.errorMessage}`);
+  } else if (generalData.data) {
+    console.log(`  ✅ 성공! 사건명: ${generalData.data.dma_csBasCtt?.csNm}`);
   }
 
   console.log('\n' + '='.repeat(60));

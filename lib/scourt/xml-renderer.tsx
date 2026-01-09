@@ -425,6 +425,34 @@ export function ScourtGeneralInfoRenderer({
 // 데이터 전처리
 // ============================================================================
 
+const APL_PRPND_CODE_LABELS: Record<string, string> = {
+  '01': '검사상소',
+  '02': '피고인상소',
+  '03': '변호인상소',
+  '04': '대리인상소',
+  '05': '보조인상소',
+  '06': '증인상소',
+  '07': '감정인상소',
+  '08': '통역인상소',
+  '09': '번역인상소',
+  '10': '청구인상소',
+  '11': '피의자상소',
+  '12': '배상신청인상소',
+  '13': '직권상소',
+  '14': '쌍방상소',
+  '99': '기타상소',
+};
+
+const CRIMINAL_SECOND_INSTANCE_CODES = new Set(['079', '115', '080', '118']);
+
+function formatYmd(value?: string): string {
+  if (!value) return '';
+  if (/^\d{8}$/.test(value)) {
+    return `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}`;
+  }
+  return value;
+}
+
 /**
  * 기본정보 데이터 전처리
  *
@@ -475,8 +503,9 @@ export function preprocessBasicInfo(data: Record<string, any>): Record<string, a
   if (data.cfupMarkNm && !jdbnText.includes(`(${data.cfupMarkNm})`)) {
     jdbnText += `(${data.cfupMarkNm})`;
   }
-  if (data.csPrsrvYn !== 'Y' && data.jdbnTelno) {
-    jdbnText += ` (전화:${data.jdbnTelno})`;
+  const jdbnPhone = data.jdbnTphnGdncCtt || data.jdbnTelno;
+  if (data.csPrsrvYn !== 'Y' && jdbnPhone) {
+    jdbnText += ` (전화:${jdbnPhone})`;
   }
   processed.jdbnNm = jdbnText;  // 원래 필드 덮어쓰기
   processed.jdbnNmDisplay = jdbnText;
@@ -507,6 +536,51 @@ export function preprocessBasicInfo(data: Record<string, any>): Record<string, a
     processed.ultmtDvsNm = ultmtDisplay;  // txt_csUltmtDvsNm → ultmtDvsNm
     processed.csUltmtDvsNm = ultmtDisplay;  // 직접 참조도 지원
     processed.csUltmtDisplay = ultmtDisplay;
+  }
+
+  // 형사 종국결과 - SSGO10GF01 JS 로직 재현
+  if (!processed.ultmtDvsNm && (data.crmcsUltmtDvsNm || data.btprtUltmtYmd)) {
+    const btprtUltmtYmd = data.btprtUltmtYmd;
+    let showResult = false;
+    if (btprtUltmtYmd && /^\d{8}$/.test(btprtUltmtYmd)) {
+      const now = new Date();
+      const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+      showResult = parseInt(btprtUltmtYmd, 10) <= parseInt(today, 10);
+    }
+    processed.ultmtDvsNm = showResult ? (data.crmcsUltmtDvsNm || '') : '';
+  }
+
+  // 형사 상소제기내용 - SSGO10GF01 JS 로직 재현
+  if (!processed.aplPrpndCtt) {
+    const csDvsCd = typeof data.csDvsCd === 'number' ? String(data.csDvsCd) : data.csDvsCd || '';
+    const isSecondInstance = CRIMINAL_SECOND_INSTANCE_CODES.has(csDvsCd);
+    let aplPrpndCtt = '';
+    let code = '';
+
+    if (!isSecondInstance && data.apelCrmcsLwstRltnrDvsCd) {
+      const dateText = formatYmd(data.acsApelPrpndYmd);
+      aplPrpndCtt = dateText ? `${dateText} ` : '';
+      code = data.apelCrmcsLwstRltnrDvsCd;
+    } else if (isSecondInstance && data.applCrmcsLwstRltnrDvsCd) {
+      const dateText = formatYmd(data.acsApplPrpndYmd);
+      aplPrpndCtt = dateText ? `${dateText} ` : '';
+      code = data.applCrmcsLwstRltnrDvsCd;
+    }
+
+    if (code) {
+      aplPrpndCtt += APL_PRPND_CODE_LABELS[code] || '';
+    }
+
+    if (data.aplPrpndRsltYmd && data.aplPrpndRsltCd) {
+      const dateText = formatYmd(data.aplPrpndRsltYmd);
+      const resultText = data.aplPrpndRsltNm || '';
+      const suffix = `${dateText ? `${dateText} ` : ''}${resultText}`.trim();
+      if (suffix) {
+        aplPrpndCtt += aplPrpndCtt ? ` / ${suffix}` : suffix;
+      }
+    }
+
+    processed.aplPrpndCtt = aplPrpndCtt;
   }
 
   // 보존/폐기 텍스트 - txt_prsvCtt가 참조

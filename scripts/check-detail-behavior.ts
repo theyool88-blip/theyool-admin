@@ -13,7 +13,7 @@ dotenv.config({ path: path.join(__dirname, '../.env.local') });
 
 import { getVisionCaptchaSolver } from '../lib/google/vision-captcha-solver';
 
-async function checkDetailBehavior() {
+async function checkGeneralBehavior() {
   console.log('🔍 사건 클릭 시 동작 확인\n');
 
   const browser = await puppeteer.launch({
@@ -169,7 +169,7 @@ async function checkDetailBehavior() {
     console.log('\n📋 검색 결과:', resultInfo);
 
     // 스크린샷 저장
-    const outputDir = path.join(process.cwd(), 'temp', 'detail-behavior');
+    const outputDir = path.join(process.cwd(), 'temp', 'general-behavior');
     if (!fs.existsSync(outputDir)) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
@@ -234,20 +234,20 @@ async function checkDetailBehavior() {
     const currentContent = await targetFrame!.evaluate(() => {
       // 탭 메뉴가 있는지
       const tabs = document.querySelectorAll('[class*="tab"], [id*="tab"]');
-      // 상세 정보 영역이 있는지
-      const detailArea = document.querySelector('[id*="detail"], [id*="gnrl"], [class*="detail"]');
+      // 일반내용 영역이 있는지
+      const generalArea = document.querySelector('[id*="detail"], [id*="gnrl"], [class*="detail"]');
 
       return {
         tabCount: tabs.length,
-        hasDetailArea: !!detailArea,
+        hasGeneralArea: !!generalArea,
         bodyText: document.body?.innerText?.substring(0, 500),
       };
     });
     console.log('\n  현재 페이지 상태:');
     console.log(`    탭 수: ${currentContent.tabCount}`);
-    console.log(`    상세 영역: ${currentContent.hasDetailArea}`);
+    console.log(`    일반내용 영역: ${currentContent.hasGeneralArea}`);
 
-    console.log('\n✅ 스크린샷 저장: temp/detail-behavior/');
+    console.log('\n✅ 스크린샷 저장: temp/general-behavior/');
     console.log('\n브라우저를 90초간 열어둡니다. 수동으로 확인해주세요...');
     await new Promise((r) => setTimeout(r, 90000));
 
@@ -256,7 +256,7 @@ async function checkDetailBehavior() {
   }
 }
 
-checkDetailBehavior()
+checkGeneralBehavior()
   .then(() => {
     console.log('\n✅ 완료');
     process.exit(0);

@@ -101,10 +101,10 @@ async function main() {
   console.log(`새 JSESSIONID: ${testJsession?.substring(0, 20)}...`);
   console.log(`WMONID 유지: ${testWmonid ? '새로 발급됨: ' + testWmonid : '유지됨 (OK)'}`);
 
-  // 5. 캡챠 없이 상세 조회
-  console.log('\n[5] 캡챠 없이 상세 조회...');
+  // 5. 캡챠 없이 일반내용 조회
+  console.log('\n[5] 캡챠 없이 일반내용 조회...');
 
-  const detailRes = await fetch(`${SCOURT_BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
+  const generalRes = await fetch(`${SCOURT_BASE_URL}/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on`, {
     method: 'POST',
     headers: {
       ...headers,
@@ -124,14 +124,14 @@ async function main() {
     }),
   });
 
-  const detailData = await detailRes.json();
+  const generalData = await generalRes.json();
 
-  if (detailData.errors) {
-    console.log('❌ 실패:', detailData.errors.errorMessage);
-    console.log('\n전체 응답:', JSON.stringify(detailData, null, 2));
-  } else if (detailData.data) {
+  if (generalData.errors) {
+    console.log('❌ 실패:', generalData.errors.errorMessage);
+    console.log('\n전체 응답:', JSON.stringify(generalData, null, 2));
+  } else if (generalData.data) {
     console.log('✅ 성공!');
-    console.log('사건명:', detailData.data.dma_csBasCtt?.csNm);
+    console.log('사건명:', generalData.data.dma_csBasCtt?.csNm);
   }
 
   console.log('\n' + '='.repeat(60));

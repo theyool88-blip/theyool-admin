@@ -24,10 +24,10 @@ async function main() {
   console.log('검색 파라미터:', params);
 
   try {
-    const result = await client.searchAndGetDetail(params);
+    const result = await client.searchAndGetGeneral(params);
 
-    if (result.detailResult?.success) {
-      const rawData = result.detailResult.data?.raw?.data;
+    if (result.generalResult?.success) {
+      const rawData = result.generalResult.data?.raw?.data;
 
       if (rawData) {
         console.log('\n=== dma_csBasCtt (기본정보) 모든 필드 ===\n');
@@ -67,7 +67,7 @@ async function main() {
         console.log(Object.keys(rawData).join(', '));
       }
     } else {
-      console.log('상세 조회 실패:', result.detailResult?.error);
+      console.log('일반내용 조회 실패:', result.generalResult?.error);
     }
 
   } catch (error) {

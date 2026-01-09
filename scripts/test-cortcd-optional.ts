@@ -1,5 +1,5 @@
 /**
- * 상세 API에서 cortCd가 필수인지 테스트
+ * 일반내용 API에서 cortCd가 필수인지 테스트
  * - 잘못된 cortCd로 호출해도 encCsNo가 있으면 동작하는지 확인
  */
 import { getScourtApiClient } from '../lib/scourt/api-client';
@@ -35,7 +35,7 @@ async function main() {
   const baseUrl = 'https://ssgo.scourt.go.kr';
   const endpoint = '/ssgo/ssgo10g/selectHmpgCrmcsPbtrlCsGnrlCtt.on';
 
-  // 2. 다양한 cortCd로 상세 조회 테스트
+  // 2. 다양한 cortCd로 일반내용 조회 테스트
   const testCases = [
     { name: '올바른 코드 (000283)', cortCd: '000283' },
     { name: '잘못된 코드 (000305)', cortCd: '000305' },

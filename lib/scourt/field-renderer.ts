@@ -57,6 +57,7 @@ export const API_FIELD_LABELS: Record<string, string> = {
 
   // 금액
   stmpAtchAmt: '인지액',
+  stmpRfndAmt: '인지환급액',
   clmntVsml: '원고소가',
   acsdVsml: '피고소가',
   csClmAmt: '청구금액',
@@ -115,6 +116,12 @@ export const API_FIELD_LABELS: Record<string, string> = {
   scrtyKndCd: '담보종류',
   dlvrblFlag: '송달가능여부',
 
+  // 송달/결과
+  dlvrCrtYmd: '송달증명일',
+  lastDcsnstDlvrYmd: '최종결정송달일',
+  entrsRsltTypNm: '결과유형',
+  apalPrpndRsltNm: '상소결과',
+
   // 기타 상태 플래그
   amtYn: '금액유무',
   csMrgTypCd: '병합유형코드',
@@ -160,9 +167,17 @@ export const FIELD_LABELS: Record<string, string> = {
   청구인: '청구인',
   제3채무자: '제3채무자',
   압류채권자: '압류채권자',
-  // 보호사건 전용
-  조사관명: '조사관명',
+  // 보호사건 전용 - 가정보호 (동버)
+  행위자: '행위자',
   행위자명: '행위자명',
+  피해아동: '피해아동',
+  피해아동명: '피해아동명',
+  보조인: '보조인',
+  보조인명: '보조인명',
+  // 보호사건 전용 - 소년보호 (푸)
+  조사관: '조사관',
+  조사관명: '조사관명',
+  보호소년: '보호소년',
   보호소년명: '보호소년명',
   // 회생/파산 전용
   회생위원: '회생위원',
@@ -246,6 +261,117 @@ export const LIST_FIELD_LABELS: Record<string, string> = {
 };
 
 /**
+ * SCOURT API dlt_* 테이블명 → 한글 라벨 매핑
+ * API 응답의 dlt_* 키를 UI 섹션 제목으로 변환
+ */
+export const DLT_TABLE_LABELS: Record<string, string> = {
+  dlt_btprtCttLst: '당사자',
+  dlt_agntCttLst: '대리인',
+  dlt_rcntDxdyLst: '최근기일',
+  dlt_rcntSbmsnDocmtLst: '최근제출서류',
+  dlt_reltCsLst: '관련사건',
+  dlt_inscrtDtsLst: '심급내용',
+  dlt_crctnOrdLst: '보정명령',
+  dlt_scrtyCttLst: '담보내용',
+  dlt_gurdnCttLst: '후견인',
+  dlt_lwstRltnrCttLst: '소송관계인',
+  dlt_aplntCttLst: '항소인',
+};
+
+/**
+ * dlt_* 테이블 컬럼명 → 한글 라벨 매핑
+ */
+export const DLT_COLUMN_LABELS: Record<string, string> = {
+  // 당사자 테이블 (dlt_btprtCttLst)
+  btprtStndngNm: '구분',
+  btprtDvsNm: '유형',
+  btprtNm: '이름',
+  btprtRnk: '순번',
+  btprtTelno: '전화번호',
+  btprtFaxno: '팩스',
+  btprtEmlAddr: '이메일',
+  csUltmtDvsNm: '종국결과',
+  csUltmtYmd: '종국일',
+  dcsnstDlvrYmd: '결정송달일',
+  ultmtDvsNm: '종국결과',
+  dlvrMthdCd: '송달방법',
+  aplntStndngCd: '항소인지위',
+  btprtPrsnlDvsCd: '개인법인구분',
+  jdcpcAtnTypCd: '소송참가유형',
+  prtcpnDvsCd: '참가인구분',
+
+  // 대리인 테이블 (dlt_agntCttLst)
+  btprtRltnCtt: '당사자관계',
+  agntDvsNm: '대리인유형',
+  agntNm: '대리인',
+  jdafrCorpNm: '법무법인',
+  agntTelno: '전화번호',
+  agntFaxno: '팩스',
+  agntEmlAddr: '이메일',
+  chargLwyrNm: '담당변호사',
+  agntIdxNm: '대리인번호',
+  agntSeq: '순번',
+  allBtprtAgntSeniYn: '전체대리여부',
+  seniKndCd: '수임종류',
+
+  // 기일 테이블 (dlt_rcntDxdyLst)
+  dxdyYmd: '기일',
+  dxdyHm: '시간',
+  dxdyKndNm: '종류',
+  dxdyPlcNm: '장소',
+  dxdyRsltNm: '결과',
+  vdeoJdcpcMeansCd: '영상재판',
+  dxdyKndCd: '종류코드',
+  dxdyRsltCd: '결과코드',
+
+  // 제출서류 테이블 (dlt_rcntSbmsnDocmtLst)
+  ofdocRcptYmd: '접수일',
+  content1: '제출자구분',
+  content2: '제출자',
+  content3: '서류명',
+
+  // 관련사건 테이블 (dlt_reltCsLst)
+  reltCsCortNm: '법원',
+  reltCsDvsNm: '관련구분',
+  reltCsNo: '사건번호(내부)',
+  reltCsCortCd: '법원코드',
+  reltCsDvsCd: '관련구분코드',
+  comTaskTypCd: '공통업무유형',
+  isLink: '링크여부',
+
+  // 심급내용 테이블 (dlt_inscrtDtsLst)
+  cortNm: '법원',
+  cortCd: '법원코드',
+  userCsNo: '사건번호',
+  csNo: '사건번호(내부)',
+  encCsNo: '암호화사건번호',
+  ultmtYmd: '종국일',
+  inscrtCsUltmtDvsCd: '심급종국코드',
+  inscrtReltCortCd: '심급관련법원코드',
+  inscrtReltCsNo: '심급관련사건번호',
+  inscrtReltCsUltmtYmd: '심급관련종국일',
+
+  // 보정명령 테이블 (dlt_crctnOrdLst)
+  crctnOrdYmd: '보정명령일',
+  crctnRsnNm: '보정사유',
+  crctnRsnCd: '보정사유코드',
+};
+
+/**
+ * dlt_* 테이블별 표시할 컬럼 및 순서
+ * 정의되지 않은 테이블은 모든 *Nm 컬럼 자동 표시
+ */
+export const DLT_TABLE_COLUMNS: Record<string, string[]> = {
+  dlt_btprtCttLst: ['btprtStndngNm', 'btprtNm', 'csUltmtDvsNm', 'csUltmtYmd', 'dcsnstDlvrYmd'],
+  dlt_agntCttLst: ['btprtRltnCtt', 'agntNm', 'jdafrCorpNm', 'chargLwyrNm'],
+  dlt_rcntDxdyLst: ['dxdyYmd', 'dxdyHm', 'dxdyKndNm', 'dxdyPlcNm', 'dxdyRsltNm'],
+  dlt_rcntSbmsnDocmtLst: ['ofdocRcptYmd', 'content1', 'content2', 'content3'],
+  dlt_reltCsLst: ['reltCsCortNm', 'userCsNo', 'reltCsDvsNm'],
+  dlt_inscrtDtsLst: ['cortNm', 'userCsNo', 'ultmtDvsNm', 'ultmtYmd'],
+  dlt_crctnOrdLst: ['crctnOrdYmd', 'crctnRsnNm'],
+};
+
+/**
  * LIST 아이템 내부 필드 라벨
  */
 export const LIST_ITEM_LABELS: Record<string, string> = {
@@ -291,6 +417,138 @@ const EXCLUDED_FIELDS = new Set([
   'prsctrAdjdCrtcpSndYmd', // 검찰 판결등본 송부일
   'stmpRfndAmt',       // 인지 환급액 (보통 0)
 ]);
+
+/**
+ * ============================================================================
+ * 규칙 기반 라벨 생성 시스템
+ * ============================================================================
+ *
+ * API 응답 필드명 규칙:
+ * - *Nm, *Ctt → 표시할 값 (이름, 내용)
+ * - *Cd → 코드 (숨김)
+ * - *Ymd → 날짜 (포맷팅)
+ * - *Amt → 금액 (포맷팅)
+ * - *Yn, *Flag → 플래그 (숨김)
+ * - *Org → 원본값 (숨김)
+ *
+ * 라벨 생성: camelCase 파싱 + 약어 사전 → 한글 라벨
+ */
+
+// 필드명 약어 → 한글 사전 (최소한만 유지)
+const ABBR_DICT: Record<string, string> = {
+  // 법원/재판
+  cort: '법원', jdbn: '재판부', lwst: '심급',
+  // 사건
+  cs: '사건', rcpt: '접수', ultmt: '종국', cfmtn: '확정',
+  // 당사자
+  btprt: '당사자', clmnt: '원고', acsd: '피고',
+  ptnr: '채권자', rqstr: '채무자', aplcnt: '신청인', rspndn: '상대방',
+  grnsh: '피압류자', rprs: '대표', agnt: '대리인', thrd: '제3',
+  // 문서/절차
+  docmt: '서류', dxdy: '기일', sbmsn: '제출', dcsnst: '결정',
+  adjdoc: '판결문', apl: '상소', crctn: '보정', scrty: '담보',
+  dlvr: '송달', rch: '도달', snd: '송부', rcrd: '기록',
+  // 일반
+  nm: '', ctt: '', dvs: '구분', rslt: '결과', knd: '종류',
+  plc: '장소', telno: '전화', faxno: '팩스', addr: '주소',
+  ymd: '일', amt: '액', cnt: '수', typ: '유형',
+  hm: '시간', rjctn: '각하', prpnd: '제기',
+  // 형사
+  crmcs: '형사', prstr: '검사', thrst: '형량',
+  // 회생
+  rhbl: '회생', cmsnr: '위원', crdtr: '채권자', ddln: '마감',
+  // 가사
+  prwc: '관계인', gurd: '후견', prsrv: '보존',
+  // 기타
+  stmp: '인지', vsml: '소가', clm: '청구', relt: '관련',
+  inscrt: '불복', entrs: '결과', mrg: '병합', tkp: '수리',
+  user: '사용자', last: '최종', prwl: '관계인',
+  dbtr: '채무자', apal: '상소', ofdoc: '문서',
+};
+
+// suffix 패턴 → suffix 제거 후 한글 suffix
+const SUFFIX_LABELS: Record<string, string> = {
+  Nm: '',      // 이름 → suffix 제거
+  Ctt: '',     // 내용 → suffix 제거
+  Ymd: '일',   // 일자
+  Amt: '액',   // 금액
+  Cnt: '수',   // 개수
+  Telno: '전화',
+  Faxno: '팩스',
+  Lst: '',     // 리스트
+};
+
+/**
+ * camelCase 필드명을 단어 배열로 분리
+ * 예: csRcptYmd → ['cs', 'Rcpt', 'Ymd']
+ */
+function splitCamelCase(str: string): string[] {
+  return str.split(/(?=[A-Z])/).filter(Boolean);
+}
+
+/**
+ * 필드명에서 한글 라벨 자동 생성
+ * 규칙 우선 → 기존 매핑 fallback
+ */
+export function generateFieldLabel(key: string): string {
+  // 1. 규칙 기반 먼저 시도
+  const parts = splitCamelCase(key);
+  if (parts.length > 0) {
+    const koreanParts: string[] = [];
+    for (const part of parts) {
+      const lower = part.toLowerCase();
+
+      // suffix 패턴 체크
+      if (SUFFIX_LABELS[part] !== undefined) {
+        if (SUFFIX_LABELS[part]) {
+          koreanParts.push(SUFFIX_LABELS[part]);
+        }
+        continue;
+      }
+
+      // 약어 사전 체크
+      if (ABBR_DICT[lower]) {
+        koreanParts.push(ABBR_DICT[lower]);
+      }
+    }
+
+    const result = koreanParts.filter(Boolean).join('');
+    if (result) {
+      return result;  // 규칙으로 생성 성공
+    }
+  }
+
+  // 2. 규칙 실패 시 기존 매핑 fallback
+  if (API_FIELD_LABELS[key]) {
+    return API_FIELD_LABELS[key];
+  }
+
+  // 3. 둘 다 실패 시 원본 키
+  return key;
+}
+
+/**
+ * 테이블 키에서 한글 라벨 자동 생성
+ * 규칙 우선 → 기존 매핑 fallback
+ * 예: dlt_btprtCttLst → 당사자
+ */
+export function generateTableLabel(tableKey: string): string {
+  // 1. dlt_ prefix와 Lst suffix 제거
+  const cleaned = tableKey.replace(/^dlt_/, '').replace(/Lst$/, '');
+
+  // 2. 규칙 기반 먼저 시도
+  const ruleLabel = generateFieldLabel(cleaned);
+  if (ruleLabel && ruleLabel !== cleaned) {
+    return ruleLabel;
+  }
+
+  // 3. 규칙 실패 시 기존 매핑 fallback
+  if (DLT_TABLE_LABELS[tableKey]) {
+    return DLT_TABLE_LABELS[tableKey];
+  }
+
+  return tableKey;
+}
 
 export interface VisibleField {
   key: string;
@@ -356,6 +614,9 @@ export function formatDateValue(value: string): string {
  * @param data - basicInfo 객체
  * @returns 표시할 필드 배열
  */
+// 값이 없어도 항상 표시할 필드 (빈 값 허용)
+const ALWAYS_SHOW_FIELDS = new Set(['종국결과', 'endRslt', 'csUltmtDvsNm']);
+
 export function getVisibleFields(data: Record<string, any>): VisibleField[] {
   if (!data || typeof data !== 'object') return [];
 
@@ -367,15 +628,20 @@ export function getVisibleFields(data: Record<string, any>): VisibleField[] {
       if (key.endsWith('List') || Array.isArray(value)) return false;
       // 객체는 별도 처리 (parties, representatives 등)
       if (typeof value === 'object' && value !== null) return false;
+      // 항상 표시할 필드는 값 체크 스킵
+      if (ALWAYS_SHOW_FIELDS.has(key)) return true;
       // 유효한 값만
       return isValidValue(value);
     })
     .map(([key, value]) => {
       const isDate = isDateField(key);
+      // 빈 값 처리: 항상 표시 필드는 빈 문자열 대신 '-' 표시
+      const isEmpty = value === null || value === undefined || value === '';
+      const displayValue = isEmpty ? '-' : (isDate ? formatDateValue(String(value)) : value);
       return {
         key,
         label: FIELD_LABELS[key] || key,
-        value: isDate ? formatDateValue(String(value)) : value,
+        value: displayValue,
         isDate,
       };
     });
@@ -501,4 +767,296 @@ export function sortFields(fields: VisibleField[]): VisibleField[] {
     // 둘 다 없으면 알파벳 순
     return a.key.localeCompare(b.key);
   });
+}
+
+// ============================================================================
+// SCOURT API 동적 렌더링 (일반내용 100% 재현)
+// ============================================================================
+
+/**
+ * 필드가 코드 필드인지 확인 (표시 제외 대상)
+ * *Cd로 끝나는 필드는 내부 코드이므로 표시하지 않음
+ */
+function isCodeField(key: string): boolean {
+  // 예외: 일부 Cd 필드는 표시해야 함
+  const showCodeFields = new Set(['cortCd']); // 법원코드는 참고용으로 유용
+  if (showCodeFields.has(key)) return false;
+  return key.endsWith('Cd');
+}
+
+/**
+ * 필드가 날짜 필드인지 확인
+ */
+function isApiDateField(key: string): boolean {
+  return key.endsWith('Ymd') || key.endsWith('Day');
+}
+
+/**
+ * 필드가 시간 필드인지 확인
+ */
+function isTimeField(key: string): boolean {
+  return key.endsWith('Hm') || key.endsWith('Time');
+}
+
+/**
+ * 필드가 금액 필드인지 확인
+ */
+function isAmountField(key: string): boolean {
+  return key.endsWith('Amt') || key.endsWith('Vsml');
+}
+
+/**
+ * HHMM 형식 시간을 HH:MM으로 변환
+ */
+export function formatTimeValue(value: string): string {
+  if (!value || typeof value !== 'string') return value;
+  if (/^\d{4}$/.test(value)) {
+    return `${value.slice(0, 2)}:${value.slice(2, 4)}`;
+  }
+  return value;
+}
+
+/**
+ * 금액을 포맷팅 (천 단위 콤마)
+ */
+export function formatAmountValue(value: number | string): string {
+  if (value === null || value === undefined || value === '') return '-';
+  const num = typeof value === 'string' ? parseInt(value, 10) : value;
+  if (isNaN(num)) return String(value);
+  return num.toLocaleString('ko-KR') + '원';
+}
+
+/**
+ * API 응답 값을 포맷팅
+ */
+export function formatApiValue(key: string, value: any): string {
+  if (value === null || value === undefined || value === '') return '';
+
+  if (isApiDateField(key)) {
+    return formatDateValue(String(value));
+  }
+  if (isTimeField(key)) {
+    return formatTimeValue(String(value));
+  }
+  if (isAmountField(key)) {
+    return formatAmountValue(value);
+  }
+
+  return String(value);
+}
+
+export interface ScourtSection {
+  type: 'keyValue' | 'table';
+  key: string;
+  title: string;
+  data: any;
+}
+
+export interface ParsedApiResponse {
+  basicInfo: Record<string, any>;  // dma_csBasCtt
+  tables: Array<{
+    key: string;
+    title: string;
+    columns: string[];
+    columnLabels: string[];
+    rows: any[];
+  }>;
+}
+
+/**
+ * SCOURT API 응답에서 dma_csBasCtt 필드 파싱
+ * 표시할 필드만 추출하고 코드 필드는 제외
+ */
+export function parseBasicInfo(dmaData: Record<string, any>): VisibleField[] {
+  if (!dmaData || typeof dmaData !== 'object') return [];
+
+  const fields: VisibleField[] = [];
+
+  for (const [key, value] of Object.entries(dmaData)) {
+    // 코드 필드 제외
+    if (isCodeField(key)) continue;
+    // 빈 값 제외 (단, 종국결과 등 일부 필드는 유지)
+    if (!isValidValue(value) && !ALWAYS_SHOW_FIELDS.has(key)) continue;
+    // 내부 메타데이터 제외
+    if (EXCLUDED_FIELDS.has(key)) continue;
+
+    const formattedValue = formatApiValue(key, value);
+    if (!formattedValue && !ALWAYS_SHOW_FIELDS.has(key)) continue;
+
+    fields.push({
+      key,
+      label: generateFieldLabel(key),
+      value: formattedValue || '-',
+      isDate: isApiDateField(key),
+    });
+  }
+
+  return sortFields(fields);
+}
+
+/**
+ * SCOURT API 응답에서 dlt_* 테이블 파싱
+ */
+export function parseDltTable(
+  tableKey: string,
+  tableData: any[]
+): {
+  key: string;
+  title: string;
+  columns: string[];
+  columnLabels: string[];
+  rows: any[];
+} | null {
+  if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
+    return null;
+  }
+
+  const title = generateTableLabel(tableKey);
+
+  // 정의된 컬럼 사용, 없으면 *Nm 컬럼 자동 추출
+  let columns = DLT_TABLE_COLUMNS[tableKey];
+  if (!columns) {
+    // 첫 번째 행에서 *Nm으로 끝나는 컬럼 추출
+    const firstRow = tableData[0];
+    columns = Object.keys(firstRow).filter(k =>
+      k.endsWith('Nm') || k.endsWith('Ctt') || k === 'userCsNo'
+    );
+  }
+
+  // 실제 데이터에 있는 컬럼만 필터링
+  const firstRow = tableData[0];
+  const availableColumns = columns.filter(col => col in firstRow);
+
+  if (availableColumns.length === 0) return null;
+
+  const columnLabels = availableColumns.map(col =>
+    DLT_COLUMN_LABELS[col] || generateFieldLabel(col)
+  );
+
+  // 행 데이터 포맷팅
+  const rows = tableData.map(row => {
+    const formattedRow: Record<string, string> = {};
+    for (const col of availableColumns) {
+      const value = row[col];
+      formattedRow[col] = formatApiValue(col, value);
+    }
+    return formattedRow;
+  });
+
+  return {
+    key: tableKey,
+    title,
+    columns: availableColumns,
+    columnLabels,
+    rows,
+  };
+}
+
+/**
+ * SCOURT API 전체 응답 파싱
+ * generalData.raw.data 구조에서 dma_csBasCtt와 dlt_* 추출
+ */
+export function parseFullApiResponse(apiData: Record<string, any>): ParsedApiResponse {
+  const result: ParsedApiResponse = {
+    basicInfo: {},
+    tables: [],
+  };
+
+  if (!apiData || typeof apiData !== 'object') return result;
+
+  // dma_csBasCtt 파싱
+  if (apiData.dma_csBasCtt) {
+    result.basicInfo = apiData.dma_csBasCtt;
+  }
+
+  // dlt_* 테이블 순서 정의
+  const tableOrder = [
+    'dlt_btprtCttLst',      // 당사자
+    'dlt_agntCttLst',       // 대리인
+    'dlt_rcntDxdyLst',      // 최근기일
+    'dlt_rcntSbmsnDocmtLst', // 제출서류
+    'dlt_inscrtDtsLst',     // 심급내용
+    'dlt_reltCsLst',        // 관련사건
+    'dlt_crctnOrdLst',      // 보정명령
+    'dlt_scrtyCttLst',      // 담보내용
+    'dlt_gurdnCttLst',      // 후견인
+    'dlt_lwstRltnrCttLst',  // 소송관계인
+    'dlt_aplntCttLst',      // 항소인
+  ];
+
+  // 정의된 순서대로 테이블 파싱
+  for (const tableKey of tableOrder) {
+    if (apiData[tableKey]) {
+      const parsed = parseDltTable(tableKey, apiData[tableKey]);
+      if (parsed) {
+        result.tables.push(parsed);
+      }
+    }
+  }
+
+  // 정의되지 않은 dlt_* 테이블도 추가
+  for (const [key, value] of Object.entries(apiData)) {
+    if (key.startsWith('dlt_') && !tableOrder.includes(key) && Array.isArray(value) && value.length > 0) {
+      const parsed = parseDltTable(key, value);
+      if (parsed) {
+        result.tables.push(parsed);
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 저장된 응답 데이터에서 raw API 데이터 추출
+ * 다양한 저장 형식 지원
+ *
+ * 지원하는 형식:
+ * 1. savedData.generalData.raw.data - scourt_case_snapshots.basic_info에서 가져온 데이터
+ * 2. savedData.detailData.raw.data - 레거시 저장 형식
+ * 3. savedData.raw.data - scourt_snapshot API 응답
+ * 4. savedData.data.dma_csBasCtt - 직접 API 응답
+ * 5. savedData.dma_csBasCtt - 직접 dma_csBasCtt 포함
+ * 6. savedData.basicInfo.generalData.raw.data - snapshot API 응답 형식
+ * 7. savedData.basicInfo.detailData.raw.data - 레거시 snapshot API 응답 형식
+ */
+export function extractRawApiData(savedData: any): Record<string, any> | null {
+  if (!savedData) return null;
+
+  // snapshot API 응답에서 basicInfo.generalData.raw.data 형식
+  if (savedData.basicInfo?.generalData?.raw?.data) {
+    return savedData.basicInfo.generalData.raw.data;
+  }
+
+  // snapshot API 응답에서 basicInfo.detailData.raw.data 형식 (레거시)
+  if (savedData.basicInfo?.detailData?.raw?.data) {
+    return savedData.basicInfo.detailData.raw.data;
+  }
+
+  // generalData.raw.data 형식 (scourt_snapshot basic_info)
+  if (savedData.generalData?.raw?.data) {
+    return savedData.generalData.raw.data;
+  }
+
+  // detailData.raw.data 형식 (레거시)
+  if (savedData.detailData?.raw?.data) {
+    return savedData.detailData.raw.data;
+  }
+
+  // raw.data 형식
+  if (savedData.raw?.data) {
+    return savedData.raw.data;
+  }
+
+  // data 형식
+  if (savedData.data?.dma_csBasCtt) {
+    return savedData.data;
+  }
+
+  // 직접 dma_csBasCtt 포함
+  if (savedData.dma_csBasCtt) {
+    return savedData;
+  }
+
+  return null;
 }

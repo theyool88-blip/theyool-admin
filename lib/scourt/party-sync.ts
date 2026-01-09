@@ -4,7 +4,7 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
-import type { CaseDetailData } from "./api-client";
+import type { CaseGeneralData } from "./api-client";
 import type {
   CaseParty,
   CaseRepresentative,
@@ -17,8 +17,8 @@ import { mapScourtPartyType, getPartyTypeLabel } from "@/types/case-party";
 export interface PartySyncParams {
   legalCaseId: string;
   tenantId: string;
-  parties: CaseDetailData["parties"];
-  representatives: CaseDetailData["representatives"];
+  parties: CaseGeneralData["parties"];
+  representatives: CaseGeneralData["representatives"];
 }
 
 export interface PartySyncResult {
@@ -47,14 +47,14 @@ export async function syncPartiesFromScourt(
         const party = parties[i];
         const partyType = mapScourtPartyType(party.btprDvsNm);
 
-        // SCOURT 이름에서 번호 제거 (예: "1. 조OO" → "조OO")
-        const partyNameClean = party.btprNm.replace(/^\d+\.\s*/, "").trim();
+        // 당사자명: SCOURT 원본 그대로 저장 (번호 포함)
+        const partyName = party.btprNm.trim();
 
         const { error } = await supabase.from("case_parties").upsert(
           {
             tenant_id: tenantId,
             case_id: legalCaseId,
-            party_name: partyNameClean,
+            party_name: partyName,
             party_type: partyType,
             party_type_label: party.btprDvsNm,
             party_order: i + 1,
@@ -141,18 +141,42 @@ export async function syncPartiesFromScourtServer(
   let representativesUpserted = 0;
 
   try {
-    // 0. 기존 마이그레이션 당사자 조회 (scourt_synced = false)
-    const { data: existingMigrationParties } = await supabase
+    // 0. 기존 당사자 조회 (마이그레이션 + SCOURT 모두)
+    const { data: existingParties } = await supabase
       .from("case_parties")
-      .select("id, party_name, party_type, is_our_client, client_id, fee_allocation_amount")
-      .eq("case_id", legalCaseId)
-      .eq("scourt_synced", false);
+      .select("id, party_name, party_type, party_type_label, is_our_client, client_id, fee_allocation_amount, scourt_synced")
+      .eq("case_id", legalCaseId);
+
+    // 마이그레이션 당사자만 필터
+    const existingMigrationParties = existingParties?.filter((p: any) => !p.scourt_synced) || [];
+    // 기존 SCOURT 당사자
+    const existingScourtParties = existingParties?.filter((p: any) => p.scourt_synced) || [];
+
+    // SCOURT 갱신 시, 기존 SCOURT 당사자 중 의뢰인 정보가 없는 것은 삭제 (깨끗하게 재동기화)
+    if (parties && parties.length > 0 && existingScourtParties.length > 0) {
+      for (const existingParty of existingScourtParties) {
+        // 의뢰인 정보가 없으면 삭제
+        if (!existingParty.is_our_client) {
+          await supabase
+            .from("case_parties")
+            .delete()
+            .eq("id", existingParty.id);
+          console.log(`  🗑️ 기존 SCOURT 당사자 삭제 (재동기화): ${existingParty.party_name}`);
+        }
+      }
+    }
 
     // 1. 당사자 동기화
     if (parties && parties.length > 0) {
+      console.log(`👥 SCOURT 당사자 원본 데이터 (${parties.length}명):`);
+      parties.forEach((p: any, idx: number) => {
+        console.log(`  [${idx}] btprNm: "${p.btprNm}", btprDvsNm: "${p.btprDvsNm}"`);
+      });
+
       for (let i = 0; i < parties.length; i++) {
         const party = parties[i];
         const partyType = mapScourtPartyType(party.btprDvsNm);
+        console.log(`  → 저장 예정: "${party.btprNm}" (${party.btprDvsNm}) → party_type: ${partyType}, party_type_label: ${party.btprDvsNm}`);
 
         // 기존 마이그레이션 데이터에서 의뢰인 정보 찾기
         // 조건: 이름 첫 글자가 같으면 동일 인물로 간주 (party_type은 SCOURT가 정확하므로 비교하지 않음)
@@ -194,15 +218,15 @@ export async function syncPartiesFromScourtServer(
           console.log(`  🗑️ 마이그레이션 당사자 삭제: ${migrationPartyToDelete}`);
         }
 
-        // SCOURT 이름에서 번호 제거 (예: "1. 조OO" → "조OO")
-        const partyNameClean = party.btprNm.replace(/^\d+\.\s*/, "").trim();
+        // 당사자명: SCOURT 원본 그대로 저장 (번호 포함 - 2명 이상일 때 구분용)
+        const partyName = party.btprNm.trim();
 
         // SCOURT 당사자 upsert (의뢰인 정보 포함)
         const { error } = await supabase.from("case_parties").upsert(
           {
             tenant_id: tenantId,
             case_id: legalCaseId,
-            party_name: partyNameClean,
+            party_name: partyName,
             party_type: partyType,
             party_type_label: party.btprDvsNm,
             party_order: i + 1,

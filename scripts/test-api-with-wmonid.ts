@@ -112,7 +112,7 @@ async function main() {
 
   console.log(`새 JSESSIONID: ${jsessionId2?.substring(0, 20)}...\n`);
 
-  // 5. 새 세션에서 encCsNo로 상세 조회 (WMONID 포함)
+  // 5. 새 세션에서 encCsNo로 일반내용 조회 (WMONID 포함)
   console.log('📋 세션2에서 encCsNo 접근 (WMONID 포함)...');
 
   const headers2 = {
@@ -123,7 +123,7 @@ async function main() {
     'Referer': 'https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www',
   };
 
-  const detailResponse = await fetch(
+  const generalResponse = await fetch(
     'https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',
     {
       method: 'POST',
@@ -143,13 +143,13 @@ async function main() {
     }
   );
 
-  const detailData = await detailResponse.json();
+  const generalData = await generalResponse.json();
 
-  if (detailData.errors) {
-    console.log('❌ WMONID 포함해도 실패:', detailData.errors.errorMessage);
-  } else if (detailData.data) {
+  if (generalData.errors) {
+    console.log('❌ WMONID 포함해도 실패:', generalData.errors.errorMessage);
+  } else if (generalData.data) {
     console.log('✅ 성공! WMONID가 핵심!');
-    console.log('사건명:', detailData.data.dma_csBasCtt?.csNm);
+    console.log('사건명:', generalData.data.dma_csBasCtt?.csNm);
   }
 
   // 6. 완전히 새로운 세션 (WMONID 없이)
@@ -168,7 +168,7 @@ async function main() {
     'Referer': 'https://ssgo.scourt.go.kr/ssgo/index.on?cortId=www',
   };
 
-  const detailResponse3 = await fetch(
+  const generalResponse3 = await fetch(
     'https://ssgo.scourt.go.kr/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',
     {
       method: 'POST',
@@ -188,11 +188,11 @@ async function main() {
     }
   );
 
-  const detailData3 = await detailResponse3.json();
+  const generalData3 = await generalResponse3.json();
 
-  if (detailData3.errors) {
-    console.log('❌ WMONID 없으면 실패:', detailData3.errors.errorMessage);
-  } else if (detailData3.data) {
+  if (generalData3.errors) {
+    console.log('❌ WMONID 없으면 실패:', generalData3.errors.errorMessage);
+  } else if (generalData3.data) {
     console.log('✅ WMONID 없어도 성공 (다른 요인)');
   }
 }

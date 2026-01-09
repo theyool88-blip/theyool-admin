@@ -1,6 +1,6 @@
 /**
  * 대법원 API 전체 플로우 테스트
- * 검색 + 상세 정보 조회
+ * 검색 + 일반내용 조회
  */
 
 import * as dotenv from 'dotenv';
@@ -30,8 +30,8 @@ async function testFullFlow() {
   console.log(`  당사자: ${testCase.btprNm}`);
   console.log('');
 
-  // 검색 + 상세 조회 실행
-  const result = await client.searchAndGetDetail(testCase);
+  // 검색 + 일반내용 조회 실행
+  const result = await client.searchAndGetGeneral(testCase);
 
   console.log('\n' + '='.repeat(60));
   console.log('📊 결과');
@@ -53,31 +53,31 @@ async function testFullFlow() {
     console.log(`  ❌ 검색 실패: ${result.searchResult.error}`);
   }
 
-  // 상세 조회 결과
-  console.log('\n[상세 조회 결과]');
-  if (result.detailResult) {
-    if (result.detailResult.success) {
-      console.log('  ✅ 상세 조회 성공');
+  // 일반내용 조회 결과
+  console.log('\n[일반내용 조회 결과]');
+  if (result.generalResult) {
+    if (result.generalResult.success) {
+      console.log('  ✅ 일반내용 조회 성공');
 
-      const detail = result.detailResult.data;
-      if (detail) {
+      const general = result.generalResult.data;
+      if (general) {
         console.log('\n  기본 정보:');
-        console.log(`    사건번호: ${detail.csNo || '(없음)'}`);
-        console.log(`    사건유형: ${detail.csDvsNm || '(없음)'}`);
-        console.log(`    법원: ${detail.cortNm || '(없음)'}`);
-        console.log(`    사건명: ${detail.csNm || '(없음)'}`);
-        console.log(`    진행상태: ${detail.prcdStsNm || '(없음)'}`);
+        console.log(`    사건번호: ${general.csNo || '(없음)'}`);
+        console.log(`    사건유형: ${general.csDvsNm || '(없음)'}`);
+        console.log(`    법원: ${general.cortNm || '(없음)'}`);
+        console.log(`    사건명: ${general.csNm || '(없음)'}`);
+        console.log(`    진행상태: ${general.prcdStsNm || '(없음)'}`);
 
-        if (detail.parties && detail.parties.length > 0) {
+        if (general.parties && general.parties.length > 0) {
           console.log('\n  당사자 정보:');
-          detail.parties.forEach((p, i) => {
+          general.parties.forEach((p, i) => {
             console.log(`    ${i + 1}. ${p.btprDvsNm}: ${p.btprNm}`);
           });
         }
 
-        if (detail.hearings && detail.hearings.length > 0) {
+        if (general.hearings && general.hearings.length > 0) {
           console.log('\n  기일 정보:');
-          detail.hearings.forEach((h, i) => {
+          general.hearings.forEach((h, i) => {
             console.log(`    ${i + 1}. ${h.trmDt} - ${h.trmNm} (${h.trmPntNm})`);
             if (h.rslt) console.log(`       결과: ${h.rslt}`);
           });
@@ -85,15 +85,15 @@ async function testFullFlow() {
 
         // 원본 응답 키 출력
         console.log('\n  원본 응답 키:');
-        if (detail.raw?.data) {
-          console.log(`    ${Object.keys(detail.raw.data).join(', ')}`);
+        if (general.raw?.data) {
+          console.log(`    ${Object.keys(general.raw.data).join(', ')}`);
         }
       }
     } else {
-      console.log(`  ❌ 상세 조회 실패: ${result.detailResult.error}`);
+      console.log(`  ❌ 일반내용 조회 실패: ${result.generalResult.error}`);
     }
   } else {
-    console.log('  ⚠️ 상세 조회가 실행되지 않았습니다.');
+    console.log('  ⚠️ 일반내용 조회가 실행되지 않았습니다.');
   }
 
   // 전체 응답 저장

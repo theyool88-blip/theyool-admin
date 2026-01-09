@@ -54,7 +54,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   // 의뢰인의 사건 목록 가져오기 (재무 정보 포함) - 테넌트 필터 적용
   let casesQuery = adminClient
     .from('legal_cases')
-    .select('id, contract_number, case_name, status, office, contract_date, case_type, retainer_fee, calculated_success_fee, total_received')
+    .select('id, contract_number, case_name, status, contract_date, case_type, retainer_fee, calculated_success_fee, total_received')
     .eq('client_id', id)
 
   if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {

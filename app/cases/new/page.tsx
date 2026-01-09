@@ -10,6 +10,7 @@ interface PageProps {
     courtName?: string
     clientId?: string
     partyName?: string  // 대법원 연동용 당사자명
+    sourceCaseId?: string
   }>
 }
 
@@ -53,6 +54,23 @@ export default async function NewCasePage({ searchParams }: PageProps) {
   }
 
   const { data: clients } = await clientsQuery.order('created_at', { ascending: false })
+  let sourceCase: { client_role?: 'plaintiff' | 'defendant' | null; opponent_name?: string | null } | null = null
+
+  if (params.sourceCaseId) {
+    let sourceCaseQuery = adminClient
+      .from('legal_cases')
+      .select('client_role, opponent_name')
+      .eq('id', params.sourceCaseId)
+
+    if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
+      sourceCaseQuery = sourceCaseQuery.eq('tenant_id', tenantContext.tenantId)
+    }
+
+    const { data: sourceCaseData, error: sourceCaseError } = await sourceCaseQuery.single()
+    if (!sourceCaseError && sourceCaseData) {
+      sourceCase = sourceCaseData
+    }
+  }
 
   return (
     <NewCaseForm
@@ -61,6 +79,9 @@ export default async function NewCasePage({ searchParams }: PageProps) {
       initialCourtName={params.courtName}
       initialClientId={params.clientId}
       initialPartyName={params.partyName}
+      sourceCaseId={params.sourceCaseId}
+      initialClientRole={sourceCase?.client_role || null}
+      initialOpponentName={sourceCase?.opponent_name || null}
     />
   )
 }

@@ -51,8 +51,9 @@ export function normalizeCaseNumber(caseNumber: string): string {
  */
 export function parseCaseNumber(caseNumber: string): ParsedCaseNumber {
   const normalized = normalizeCaseNumber(caseNumber);
-  const pattern = /^(\d{4})([가-힣]+)(\d+)$/;
-  const match = normalized.match(pattern);
+  const strictPattern = /^(\d{4})([가-힣]+)(\d+)$/;
+  const loosePattern = /(\d{4})([가-힣]+)(\d+)/;
+  const match = normalized.match(strictPattern) || normalized.match(loosePattern);
 
   if (!match) {
     return {
@@ -67,7 +68,7 @@ export function parseCaseNumber(caseNumber: string): ParsedCaseNumber {
 
   return {
     original: caseNumber,
-    normalized,
+    normalized: match[0],
     year: match[1],
     caseType: match[2],
     serial: match[3],

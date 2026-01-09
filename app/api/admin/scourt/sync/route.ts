@@ -118,6 +118,7 @@ export async function POST(request: NextRequest) {
 
     let generalData: any = null;
     let progressData: any[] = [];
+    let progressFetched = false;
     let newEncCsNo: string | undefined;
     let newWmonid: string | undefined;
 
@@ -151,6 +152,7 @@ export async function POST(request: NextRequest) {
 
       generalData = searchResult.generalData;
       progressData = searchResult.progressData || [];
+      progressFetched = Array.isArray(searchResult.progressData);
       newEncCsNo = searchResult.encCsNo;
       newWmonid = searchResult.wmonid;
 
@@ -234,12 +236,14 @@ export async function POST(request: NextRequest) {
               csSerial,
               encCsNo: storedEncCsNo,
             });
-            if (progressResult.success && progressResult.progress) {
-              progressData = progressResult.progress;
+            if (progressResult.success) {
+              progressData = progressResult.progress || [];
+              progressFetched = true;
             }
           } catch (progressError) {
             console.warn('⚠️ 진행내용 조회 실패:', progressError);
             progressData = [];
+            progressFetched = false;
           }
         } else {
           // 실패 시 새로 검색
@@ -268,6 +272,7 @@ export async function POST(request: NextRequest) {
 
           generalData = searchResult.generalData;
           progressData = searchResult.progressData || [];
+          progressFetched = Array.isArray(searchResult.progressData);
 
           // 새 encCsNo/WMONID 저장
           if (searchResult.encCsNo && searchResult.wmonid) {
@@ -309,7 +314,7 @@ export async function POST(request: NextRequest) {
     const rawDocs = generalData?.raw?.data?.dlt_rcntSbmsnDocmtLst || [];
     const documentsData = rawDocs.map((d: { ofdocRcptYmd?: string; content1?: string; content2?: string; content3?: string }) => ({
       ofdocRcptYmd: d.ofdocRcptYmd || '',
-      content: d.content2 || d.content3 || '',
+      content: d.content2 || d.content3 || d.content1 || '',
       submitter: d.content1 || '',  // 제출자 (원고/피고/신청인 등) - 알림 기능용
     }));
     console.log(`📄 제출서류 ${documentsData.length}건 추출`)
@@ -334,11 +339,19 @@ export async function POST(request: NextRequest) {
     // 6. 스냅샷 저장 (upsert)
     const { data: existingSnapshot } = await supabase
       .from('scourt_case_snapshots')
-      .select('id, raw_data')
+      .select('id, raw_data, progress')
       .eq('legal_case_id', legalCaseId)
       .order('scraped_at', { ascending: false })
       .limit(1)
       .single();
+
+    const progressForSnapshot = progressFetched
+      ? progressData
+      : (
+          (Array.isArray(generalData?.progress) && generalData.progress.length > 0)
+            ? generalData.progress
+            : (existingSnapshot?.progress || [])
+        );
 
     // 사건 카테고리 결정 (당사자 라벨용)
     const caseCategoryForLabel = getCaseCategory(caseNumber);
@@ -460,7 +473,7 @@ export async function POST(request: NextRequest) {
       case_type: caseType,
       basic_info: basicInfoWithParties,
       hearings: generalData?.hearings || [],
-      progress: progressData,  // 기일 + 제출서류 합성
+      progress: progressForSnapshot,  // 진행내용 (실패 시 기존/일반내용 fallback)
       documents: documentsData,  // 제출서류 원본
       lower_court: lowerCourtData,  // 심급내용 (원심 사건 정보)
       related_cases: relatedCasesData,  // 연관사건 (반소, 항소심, 본안 등)

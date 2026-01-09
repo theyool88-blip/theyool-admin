@@ -11,7 +11,6 @@ interface LegalCase {
   contract_number: string | null
   case_name: string
   status: '진행중' | '종결'
-  office: string | null
   contract_date: string | null
   case_type: string | null
   retainer_fee: number | null
@@ -93,14 +92,6 @@ export default function ClientDetail({ clientData }: { clientData: Client }) {
       : 'bg-gray-100 text-gray-600'
   }
 
-  const getOfficeBadge = (office: string) => {
-    switch (office) {
-      case '평택': return 'bg-blue-50 text-blue-700'
-      case '천안': return 'bg-purple-50 text-purple-700'
-      case '소송구조': return 'bg-amber-50 text-amber-700'
-      default: return 'bg-gray-50 text-gray-700'
-    }
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -227,11 +218,6 @@ export default function ClientDetail({ clientData }: { clientData: Client }) {
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      {legalCase.office && (
-                        <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${getOfficeBadge(legalCase.office)}`}>
-                          {legalCase.office}
-                        </span>
-                      )}
                       <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${getStatusBadge(legalCase.status)}`}>
                         {legalCase.status}
                       </span>

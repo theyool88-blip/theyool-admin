@@ -96,6 +96,7 @@ export const POST = withTenant(async (request, { tenant }) => {
     const body = await request.json() as {
       case_name?: string
       case_type?: string
+      contract_number?: string // 관리번호
       client_id?: string
       new_client?: {
         name?: string
@@ -103,6 +104,7 @@ export const POST = withTenant(async (request, { tenant }) => {
         email?: string
         birth_date?: string
         address?: string
+        bank_account?: string // 의뢰인 계좌번호
       }
       assigned_to?: string
       status?: string
@@ -114,12 +116,15 @@ export const POST = withTenant(async (request, { tenant }) => {
       court_name?: string
       judge_name?: string
       client_role?: 'plaintiff' | 'defendant'
+      opponent_name?: string
+      source_case_id?: string
     }
 
-    // Validate required fields
-    if (!body.case_name || !body.case_type) {
+    // case_name과 case_type은 자동 생성되므로 필수 아님
+    // 단, 최소한 case_name은 있어야 함 (프론트엔드에서 자동 생성)
+    if (!body.case_name) {
       return NextResponse.json(
-        { error: 'Missing required fields: case_name, case_type' },
+        { error: 'Missing required field: case_name' },
         { status: 400 }
       )
     }
@@ -133,6 +138,56 @@ export const POST = withTenant(async (request, { tenant }) => {
     }
 
     const adminClient = createAdminClient()
+    let sourceCase: { client_role?: 'plaintiff' | 'defendant' | null; opponent_name?: string | null } | null = null
+    let sourcePartyOverrides: Array<{
+      party_name: string
+      party_type: string
+      party_type_label: string | null
+      party_order: number | null
+      is_our_client: boolean
+      fee_allocation_amount: number | null
+      success_fee_terms: string | null
+      notes: string | null
+    }> = []
+
+    if (body.source_case_id) {
+      let sourceCaseQuery = adminClient
+        .from('legal_cases')
+        .select('client_role, opponent_name')
+        .eq('id', body.source_case_id)
+
+      if (!tenant.isSuperAdmin && tenant.tenantId) {
+        sourceCaseQuery = sourceCaseQuery.eq('tenant_id', tenant.tenantId)
+      }
+
+      const { data: sourceCaseData, error: sourceCaseError } = await sourceCaseQuery.single()
+
+      if (sourceCaseError || !sourceCaseData) {
+        return NextResponse.json(
+          { error: '원본 사건을 찾을 수 없습니다' },
+          { status: 404 }
+        )
+      }
+
+      sourceCase = sourceCaseData
+
+      const { data: sourcePartiesData, error: sourcePartiesError } = await adminClient
+        .from('case_parties')
+        .select('party_name, party_type, party_type_label, party_order, is_our_client, fee_allocation_amount, success_fee_terms, notes')
+        .eq('case_id', body.source_case_id)
+        .eq('manual_override', true)
+        .order('party_order', { ascending: true })
+
+      if (sourcePartiesError) {
+        console.error('Error fetching source case parties:', sourcePartiesError)
+        return NextResponse.json(
+          { error: `Failed to fetch source case parties: ${sourcePartiesError.message}` },
+          { status: 500 }
+        )
+      }
+
+      sourcePartyOverrides = sourcePartiesData || []
+    }
 
     let clientId = body.client_id
 
@@ -152,7 +207,8 @@ export const POST = withTenant(async (request, { tenant }) => {
           phone: body.new_client.phone,
           email: body.new_client.email || null,
           birth_date: body.new_client.birth_date || null,
-          address: body.new_client.address || null
+          address: body.new_client.address || null,
+          bank_account: body.new_client.bank_account || null
         }, tenant)])
         .select()
         .single()
@@ -168,13 +224,17 @@ export const POST = withTenant(async (request, { tenant }) => {
       clientId = newClient.id
     }
 
+    const resolvedClientRole = body.client_role ?? sourceCase?.client_role ?? null
+    const resolvedOpponentName = body.opponent_name ?? sourceCase?.opponent_name ?? null
+
     // Create the case (테넌트 ID 포함)
     const { data: newCase, error } = await adminClient
       .from('legal_cases')
       .insert([withTenantId({
         case_name: body.case_name,
         client_id: clientId,
-        case_type: body.case_type,
+        case_type: body.case_type || '기타',
+        contract_number: body.contract_number || null,
         assigned_to: body.assigned_to || null,
         status: body.status || '진행중',
         contract_date: body.contract_date || new Date().toISOString().split('T')[0],
@@ -184,7 +244,8 @@ export const POST = withTenant(async (request, { tenant }) => {
         court_case_number: body.court_case_number || null,
         court_name: body.court_name || null,
         judge_name: body.judge_name || null,
-        client_role: body.client_role || null
+        client_role: resolvedClientRole,
+        opponent_name: resolvedOpponentName
       }, tenant)])
       .select()
       .single()
@@ -195,6 +256,43 @@ export const POST = withTenant(async (request, { tenant }) => {
         { error: `Failed to create case: ${error.message}` },
         { status: 500 }
       )
+    }
+
+    if (sourcePartyOverrides.length > 0) {
+      const seenKeys = new Set<string>()
+      const partyInsertPayload = sourcePartyOverrides.reduce((acc, party, idx) => {
+        const partyName = (party.party_name || '').trim()
+        if (!partyName || !party.party_type) return acc
+        const key = `${party.party_type}:${partyName}`
+        if (seenKeys.has(key)) return acc
+        seenKeys.add(key)
+
+        acc.push(withTenantId({
+          case_id: newCase.id,
+          party_name: partyName,
+          party_type: party.party_type,
+          party_type_label: party.party_type_label || null,
+          party_order: party.party_order ?? idx + 1,
+          is_our_client: party.is_our_client,
+          client_id: party.is_our_client ? clientId : null,
+          fee_allocation_amount: party.fee_allocation_amount || null,
+          success_fee_terms: party.success_fee_terms || null,
+          notes: party.notes || null,
+          scourt_synced: false,
+          manual_override: true
+        }, tenant))
+        return acc
+      }, [] as Array<Record<string, unknown>>)
+
+      if (partyInsertPayload.length > 0) {
+        const { error: partyInsertError } = await adminClient
+          .from('case_parties')
+          .insert(partyInsertPayload)
+
+        if (partyInsertError) {
+          console.error('Error copying case parties:', partyInsertError)
+        }
+      }
     }
 
     return NextResponse.json({

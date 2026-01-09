@@ -122,6 +122,7 @@ export async function POST(
         fee_allocation_amount: body.fee_allocation_amount || null,
         notes: body.notes || null,
         scourt_synced: false,
+        manual_override: true,
       })
       .select()
       .single();
@@ -146,7 +147,9 @@ export async function POST(
 
 /**
  * PATCH /api/admin/cases/[id]/parties
- * 당사자 정보 수정 (partyId는 body에 포함)
+ * 당사자 또는 대리인 정보 수정
+ * - partyId: 당사자 수정
+ * - representativeId: 대리인 수정
  */
 export async function PATCH(
   request: NextRequest,
@@ -160,22 +163,62 @@ export async function PATCH(
 
     const { id: caseId } = await params;
     const body = await request.json();
-    const { partyId, ...updateData } = body;
+    const { partyId, representativeId, ...updateData } = body;
 
+    const adminClient = createAdminClient();
+
+    // 대리인 수정
+    if (representativeId) {
+      const representativeUpdate: Record<string, unknown> = {
+        manual_override: true,
+      };
+
+      if (Object.prototype.hasOwnProperty.call(updateData, "representative_name")) {
+        representativeUpdate.representative_name = updateData.representative_name;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, "is_our_firm")) {
+        representativeUpdate.is_our_firm = updateData.is_our_firm;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, "law_firm_name")) {
+        representativeUpdate.law_firm_name = updateData.law_firm_name;
+      }
+      if (Object.prototype.hasOwnProperty.call(updateData, "representative_type_label")) {
+        representativeUpdate.representative_type_label = updateData.representative_type_label;
+      }
+
+      const { data, error } = await adminClient
+        .from("case_representatives")
+        .update(representativeUpdate)
+        .eq("id", representativeId)
+        .eq("case_id", caseId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("대리인 수정 오류:", error);
+        return NextResponse.json(
+          { error: `대리인 수정 실패: ${error.message}` },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ success: true, data });
+    }
+
+    // 당사자 수정
     if (!partyId) {
       return NextResponse.json(
-        { error: "partyId is required" },
+        { error: "partyId or representativeId is required" },
         { status: 400 }
       );
     }
-
-    const adminClient = createAdminClient();
 
     // 당사자 업데이트
     const { data, error } = await adminClient
       .from("case_parties")
       .update({
         ...updateData,
+        manual_override: true,
         updated_at: new Date().toISOString(),
       })
       .eq("id", partyId)
@@ -189,6 +232,23 @@ export async function PATCH(
         { error: `당사자 수정 실패: ${error.message}` },
         { status: 500 }
       );
+    }
+
+    // 의뢰인으로 설정된 경우 legal_cases.client_id 및 client_role 동기화
+    if (updateData.is_our_client && updateData.client_id) {
+      const { error: caseUpdateError } = await adminClient
+        .from("legal_cases")
+        .update({
+          client_id: updateData.client_id,
+          client_role: data.party_type, // 당사자 타입 (plaintiff/defendant)
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", caseId);
+
+      if (caseUpdateError) {
+        console.error("legal_cases 동기화 오류:", caseUpdateError);
+        // 실패해도 당사자 업데이트는 성공으로 처리
+      }
     }
 
     return NextResponse.json({ success: true, data });

@@ -39,8 +39,30 @@ export async function syncPartiesFromScourt(
 
   let partiesUpserted = 0;
   let representativesUpserted = 0;
+  const manualPartyKeys = new Set<string>();
+  const manualRepresentativeKeys = new Set<string>();
 
   try {
+    const { data: manualParties } = await supabase
+      .from("case_parties")
+      .select("party_type, party_name")
+      .eq("case_id", legalCaseId)
+      .eq("manual_override", true);
+
+    (manualParties || []).forEach((party: any) => {
+      manualPartyKeys.add(`${party.party_type}:${party.party_name}`);
+    });
+
+    const { data: manualRepresentatives } = await supabase
+      .from("case_representatives")
+      .select("representative_type_label, representative_name")
+      .eq("case_id", legalCaseId)
+      .eq("manual_override", true);
+
+    (manualRepresentatives || []).forEach((rep: any) => {
+      manualRepresentativeKeys.add(`${rep.representative_type_label || ""}:${rep.representative_name}`);
+    });
+
     // 1. 당사자 동기화
     if (parties && parties.length > 0) {
       for (let i = 0; i < parties.length; i++) {
@@ -49,6 +71,11 @@ export async function syncPartiesFromScourt(
 
         // 당사자명: SCOURT 원본 그대로 저장 (번호 포함)
         const partyName = party.btprNm.trim();
+        const manualKey = `${partyType}:${partyName}`;
+
+        if (manualPartyKeys.has(manualKey)) {
+          continue;
+        }
 
         const { error } = await supabase.from("case_parties").upsert(
           {
@@ -81,6 +108,11 @@ export async function syncPartiesFromScourt(
     // 2. 대리인 동기화
     if (representatives && representatives.length > 0) {
       for (const rep of representatives) {
+        const repKey = `${rep.agntDvsNm || ""}:${rep.agntNm}`;
+        if (manualRepresentativeKeys.has(repKey)) {
+          continue;
+        }
+
         const { error } = await supabase.from("case_representatives").upsert(
           {
             tenant_id: tenantId,
@@ -139,18 +171,29 @@ export async function syncPartiesFromScourtServer(
 
   let partiesUpserted = 0;
   let representativesUpserted = 0;
+  const manualPartyKeys = new Set<string>();
+  const manualPartyIndexes = new Set<number>();
+  const manualRepresentativeKeys = new Set<string>();
 
   try {
     // 0. 기존 당사자 조회 (마이그레이션 + SCOURT 모두)
     const { data: existingParties } = await supabase
       .from("case_parties")
-      .select("id, party_name, party_type, party_type_label, is_our_client, client_id, fee_allocation_amount, scourt_synced")
+      .select("id, party_name, party_type, party_type_label, is_our_client, client_id, fee_allocation_amount, scourt_synced, scourt_party_index, manual_override")
       .eq("case_id", legalCaseId);
 
     // 마이그레이션 당사자만 필터
-    const existingMigrationParties = existingParties?.filter((p: any) => !p.scourt_synced) || [];
+    const existingMigrationParties = existingParties?.filter((p: any) => !p.scourt_synced && !p.manual_override) || [];
     // 기존 SCOURT 당사자
-    const existingScourtParties = existingParties?.filter((p: any) => p.scourt_synced) || [];
+    const existingScourtParties = existingParties?.filter((p: any) => p.scourt_synced && !p.manual_override) || [];
+    const existingManualParties = existingParties?.filter((p: any) => p.manual_override) || [];
+
+    existingManualParties.forEach((party: any) => {
+      manualPartyKeys.add(`${party.party_type}:${party.party_name}`);
+      if (party.scourt_party_index !== null && party.scourt_party_index !== undefined) {
+        manualPartyIndexes.add(party.scourt_party_index);
+      }
+    });
 
     // SCOURT 갱신 시, 기존 SCOURT 당사자 중 의뢰인 정보가 없는 것은 삭제 (깨끗하게 재동기화)
     if (parties && parties.length > 0 && existingScourtParties.length > 0) {
@@ -220,6 +263,12 @@ export async function syncPartiesFromScourtServer(
 
         // 당사자명: SCOURT 원본 그대로 저장 (번호 포함 - 2명 이상일 때 구분용)
         const partyName = party.btprNm.trim();
+        const manualKey = `${partyType}:${partyName}`;
+
+        if (manualPartyIndexes.has(i) || manualPartyKeys.has(manualKey)) {
+          console.log(`  ✋ 수동 수정 보존: ${partyName} (${party.btprDvsNm})`);
+          continue;
+        }
 
         // SCOURT 당사자 upsert (의뢰인 정보 포함)
         const { error } = await supabase.from("case_parties").upsert(
@@ -264,6 +313,9 @@ export async function syncPartiesFromScourtServer(
         });
 
         for (const migParty of existingMigrationParties) {
+          if (migParty.manual_override) {
+            continue;
+          }
           const migFirstChar = migParty.party_name.charAt(0);
           // SCOURT 당사자 중 첫글자가 같은 것이 있으면 이미 처리됨
           // 없으면 잘못된/중복된 마이그레이션 데이터이므로 삭제
@@ -312,9 +364,25 @@ export async function syncPartiesFromScourtServer(
       }
     }
 
+    const { data: existingRepresentatives } = await supabase
+      .from("case_representatives")
+      .select("representative_type_label, representative_name, manual_override")
+      .eq("case_id", legalCaseId);
+
+    (existingRepresentatives || []).forEach((rep: any) => {
+      if (!rep.manual_override) return;
+      manualRepresentativeKeys.add(`${rep.representative_type_label || ""}:${rep.representative_name}`);
+    });
+
     // 2. 대리인 동기화
     if (representatives && representatives.length > 0) {
       for (const rep of representatives) {
+        const repKey = `${rep.agntDvsNm || ""}:${rep.agntNm}`;
+        if (manualRepresentativeKeys.has(repKey)) {
+          console.log(`  ✋ 수동 수정 대리인 보존: ${rep.agntNm} (${rep.agntDvsNm})`);
+          continue;
+        }
+
         const { error } = await supabase.from("case_representatives").upsert(
           {
             tenant_id: tenantId,

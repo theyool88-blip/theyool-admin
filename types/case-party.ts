@@ -84,14 +84,16 @@ export interface CaseParty {
   client_id: string | null;
   is_our_client: boolean;
 
-  // 수임료 배분 (금액 기준)
-  fee_allocation_amount: number | null;
+  // 수임료
+  fee_allocation_amount: number | null;  // 착수금 (원)
+  success_fee_terms: string | null;      // 성공보수 약정내용
 
   // SCOURT 연동
   scourt_synced: boolean;
   scourt_party_index: number | null;
   adjdoc_rch_ymd: string | null;   // 판결도달일
   indvd_cfmtn_ymd: string | null;  // 확정일
+  manual_override: boolean;
 
   notes: string | null;
   created_at: string;
@@ -119,6 +121,7 @@ export interface CaseRepresentative {
   is_our_firm: boolean;
 
   scourt_synced: boolean;
+  manual_override: boolean;
   created_at: string;
 }
 
@@ -131,7 +134,8 @@ export interface CreateCasePartyRequest {
   party_order?: number;
   client_id?: string | null;
   is_our_client?: boolean;
-  fee_allocation_amount?: number | null;
+  fee_allocation_amount?: number | null;  // 착수금 (원)
+  success_fee_terms?: string | null;      // 성공보수 약정내용
   notes?: string;
 }
 
@@ -143,7 +147,8 @@ export interface UpdateCasePartyRequest {
   party_order?: number;
   client_id?: string | null;
   is_our_client?: boolean;
-  fee_allocation_amount?: number | null;
+  fee_allocation_amount?: number | null;  // 착수금 (원)
+  success_fee_terms?: string | null;      // 성공보수 약정내용
   notes?: string;
 }
 

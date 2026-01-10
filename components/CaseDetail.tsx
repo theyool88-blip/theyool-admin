@@ -8,14 +8,9 @@ import { createClient } from '@/lib/supabase/client'
 import type { CourtHearing, CaseDeadline } from '@/types/court-hearing'
 import {
   HEARING_TYPE_LABELS,
-  HEARING_STATUS_LABELS,
   DEADLINE_TYPE_LABELS,
-  DEADLINE_STATUS_LABELS,
-  formatDaysUntil,
   HearingType,
-  HearingStatus,
   DeadlineType,
-  DeadlineStatus
 } from '@/types/court-hearing'
 import UnifiedScheduleModal from './UnifiedScheduleModal'
 import AdminHeader from './AdminHeader'
@@ -30,7 +25,7 @@ import { getPartyLabels as getPartyLabelsFromSchema, getCaseCategory } from '@/l
 import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
 import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber, type ScourtCaseType } from '@/lib/scourt/xml-mapping'
 import { normalizeCaseNumber } from '@/lib/scourt/case-number-utils'
-import { normalizePartyLabel } from '@/types/case-party'
+import { isMaskedPartyName, normalizePartyLabel } from '@/types/case-party'
 
 interface Client {
   id: string
@@ -142,7 +137,7 @@ interface ScourtSnapshot {
   documents: { date: string; content: string; submitter?: string }[]
   lowerCourt: { courtName?: string; court?: string; caseNo: string; result?: string; resultDate?: string; linkedCaseId?: string | null }[]
   relatedCases: { caseNo: string; caseName?: string; relation?: string; linkedCaseId?: string | null }[]
-  rawData?: Record<string, any>  // XML 렌더링용 원본 API 데이터
+  rawData?: Record<string, unknown>  // XML 렌더링용 원본 API 데이터
 }
 
 interface ScourtSyncStatus {
@@ -169,9 +164,34 @@ interface UnifiedScheduleItem {
 // 탭 타입 정의
 type TabType = 'notice' | 'general' | 'progress'
 
+const PLAINTIFF_SIDE_TYPES = new Set(['plaintiff', 'creditor', 'applicant', 'actor', 'juvenile', 'accused'])
+const DEFENDANT_SIDE_TYPES = new Set(['defendant', 'debtor', 'respondent', 'third_debtor'])
+const PLAINTIFF_SIDE_LABELS = new Set([
+  '원고',
+  '채권자',
+  '신청인',
+  '행위자',
+  '보호소년',
+  '피고인',
+  '피고인명',
+  '항소인',
+  '상고인',
+  '청구인',
+].map(label => normalizePartyLabel(label)))
+const DEFENDANT_SIDE_LABELS = new Set([
+  '피고',
+  '채무자',
+  '피신청인',
+  '제3채무자',
+  '피항소인',
+  '피상고인',
+  '상대방',
+  '피청구인',
+].map(label => normalizePartyLabel(label)))
+
 export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
-  const [unifiedSchedules, setUnifiedSchedules] = useState<UnifiedScheduleItem[]>([])
-  const [loading, setLoading] = useState(false)
+  const [_unifiedSchedules, setUnifiedSchedules] = useState<UnifiedScheduleItem[]>([])
+  const [_loading, setLoading] = useState(false)
   const [showScheduleModal, setShowScheduleModal] = useState(false)
   const [selectedHearing, setSelectedHearing] = useState<CourtHearing | null>(null)
   const [showHearingModal, setShowHearingModal] = useState(false)
@@ -184,7 +204,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [scourtSyncStatus, setScourtSyncStatus] = useState<ScourtSyncStatus | null>(null)
   const [scourtLoading, setScourtLoading] = useState(false)
   const [scourtSyncing, setScourtSyncing] = useState(false)
-  const [scourtOpening, setScourtOpening] = useState(false)
+  const [_scourtOpening, setScourtOpening] = useState(false)
   const [showProgressDetail, setShowProgressDetail] = useState(false)
 
   // 탭 상태 - Apple 스타일 Segmented Control
@@ -200,10 +220,26 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [linkPartyName, setLinkPartyName] = useState('')
   const [showCourtDropdown, setShowCourtDropdown] = useState(false)
 
+  // 심급/관련사건 연동 상태 (사건번호별 로딩 상태)
+  const [linkingCases, setLinkingCases] = useState<Set<string>>(new Set())
+  const [isLinkingAll, setIsLinkingAll] = useState(false)
+
   // 법원 필터링
-  const filteredCourts = COURTS.filter(c =>
-    c.name.includes(linkCourtName)
-  ).slice(0, 10)
+  const filteredCourts = COURTS
+    .filter(c => {
+      const query = linkCourtName.trim()
+      if (!query) return true
+      const abbrev = getCourtAbbrev(c.name)
+      return c.name.includes(query) || abbrev.includes(query)
+    })
+    .reduce((acc, court) => {
+      const abbrev = getCourtAbbrev(court.name)
+      if (acc.seen.has(abbrev)) return acc
+      acc.seen.add(abbrev)
+      acc.items.push(court)
+      return acc
+    }, { items: [] as typeof COURTS, seen: new Set<string>() })
+    .items.slice(0, 10)
 
   // 나의사건 연동 상태
   const isLinked = !!caseData.enc_cs_no || scourtSyncStatus?.isLinked
@@ -235,14 +271,14 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }[]>([])
 
   // 변호사 목록 (출석변호사 선택용)
-  const [tenantMembers, setTenantMembers] = useState<{
+  const [_tenantMembers, setTenantMembers] = useState<{
     id: string
     display_name: string
     role: string
   }[]>([])
 
   // 출석변호사 변경 중인 기일 ID
-  const [editingLawyerHearingId, setEditingLawyerHearingId] = useState<string | null>(null)
+  const [_editingLawyerHearingId, setEditingLawyerHearingId] = useState<string | null>(null)
 
   // 알림 관련 상태
   const [caseNotices, setCaseNotices] = useState<CaseNotice[]>([])
@@ -309,6 +345,111 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     }
   }, [caseData.id])
 
+  // 심급/관련사건 연동 핸들러
+  const handleLinkRelatedCase = useCallback(async (caseInfo: {
+    caseNo: string;
+    courtName: string;
+    relationType: string;
+    encCsNo?: string;
+  }, showAlert = true): Promise<boolean> => {
+    if (!caseInfo.caseNo) {
+      if (showAlert) alert('사건번호가 없습니다')
+      return false
+    }
+
+    // 해당 사건번호를 로딩 상태에 추가
+    setLinkingCases(prev => new Set(prev).add(caseInfo.caseNo))
+    try {
+      // 1. 기존 사건 검색 (정확한 사건번호 매칭)
+      const searchRes = await fetch(
+        `/api/admin/cases/search?q=${encodeURIComponent(caseInfo.caseNo)}&limit=10`
+      )
+      const searchData = await searchRes.json()
+      // 정확히 일치하는 사건번호 찾기
+      const existingCase = (searchData.data || []).find(
+        (c: { id?: string; court_case_number?: string }) => c.court_case_number === caseInfo.caseNo
+      )
+
+      // 2. link-related API 호출
+      const res = await fetch('/api/admin/scourt/link-related', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceCaseId: caseData.id,
+          relatedCaseInfo: {
+            caseNumber: caseInfo.caseNo,
+            courtName: caseInfo.courtName,
+            relationType: caseInfo.relationType,
+            encCsNo: caseInfo.encCsNo,
+          },
+          action: existingCase ? 'link_existing' : 'create',
+          existingCaseId: existingCase?.id,
+          clientId: caseData.client_id,
+        }),
+      })
+      const data = await res.json()
+
+      if (data.success) {
+        if (showAlert) alert(data.message)
+        return true
+      } else {
+        if (showAlert) alert(data.error || '연동 실패')
+        return false
+      }
+    } catch (error) {
+      console.error('연동 오류:', error)
+      if (showAlert) alert('연동 중 오류가 발생했습니다')
+      return false
+    } finally {
+      // 해당 사건번호를 로딩 상태에서 제거
+      setLinkingCases(prev => {
+        const next = new Set(prev)
+        next.delete(caseInfo.caseNo)
+        return next
+      })
+    }
+  }, [caseData.id, caseData.client_id])
+
+  // 모두 연결 핸들러
+  const handleLinkAllRelatedCases = useCallback(async (cases: Array<{
+    caseNo: string;
+    courtName: string;
+    relationType: string;
+    encCsNo?: string;
+  }>) => {
+    if (cases.length === 0) {
+      alert('연결할 사건이 없습니다')
+      return
+    }
+
+    if (!confirm(`${cases.length}개의 사건을 모두 연결하시겠습니까?`)) {
+      return
+    }
+
+    setIsLinkingAll(true)
+    let successCount = 0
+    let failCount = 0
+
+    for (const caseInfo of cases) {
+      const success = await handleLinkRelatedCase(caseInfo, false)
+      if (success) {
+        successCount++
+      } else {
+        failCount++
+      }
+    }
+
+    setIsLinkingAll(false)
+    router.refresh()
+    fetchScourtSnapshot()
+
+    if (failCount === 0) {
+      alert(`${successCount}개 사건 연결 완료`)
+    } else {
+      alert(`연결 완료: ${successCount}개, 실패: ${failCount}개`)
+    }
+  }, [handleLinkRelatedCase, router, fetchScourtSnapshot])
+
   // 일반 탭에서 당사자 이름 수정 시작
   const handlePartyEditFromGeneral = useCallback((partyId: string, partyLabel: string, currentName: string) => {
     // 번호 prefix 제거하고 편집 가능한 부분만 추출
@@ -370,7 +511,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }, [supabase])
 
   // 출석변호사 변경
-  const updateAttendingLawyer = async (hearingId: string, lawyerId: string | null) => {
+  const _updateAttendingLawyer = async (hearingId: string, lawyerId: string | null) => {
     try {
       const { error } = await supabase
         .from('court_hearings')
@@ -390,9 +531,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 대법원 연동 모달 열기
   const openLinkModal = () => {
-    setLinkCourtName(caseData.court_name || '')
+    setLinkCourtName(getCourtAbbrev(caseData.court_name || ''))
     setLinkCaseNumber(caseData.court_case_number || '')
-    setLinkPartyName(caseData.client?.name || '')
+    setLinkPartyName(preferredPartyName)
     setShowLinkModal(true)
   }
 
@@ -409,7 +550,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     // 갱신 시에는 기존 데이터 사용
     const courtName = params?.courtName || caseData.court_name
     const caseNumber = params?.caseNumber || caseData.court_case_number
-    const partyName = params?.partyName || caseData.client?.name || ''
+    const partyName = params?.partyName || preferredPartyName || ''
 
     if (!courtName || !caseNumber) {
       openLinkModal()
@@ -478,7 +619,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }
 
   // SCOURT 사건 일반내용 탭 열기 (Puppeteer)
-  const handleOpenScourtCase = async () => {
+  const _handleOpenScourtCase = async () => {
     if (!caseData.court_case_number) {
       alert('사건번호가 없습니다.')
       return
@@ -790,50 +931,35 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   // 삭제되지 않은 알림만 필터링
   const filteredNotices = caseNotices.filter(n => !dismissedNoticeIds.has(n.id))
 
-  // 당사자 섹션 표시 조건: 의뢰인과 상대방(의뢰인 반대편) 모두 있으면 숨김
+  // 당사자 섹션 표시 조건: 의뢰인과 상대방 모두 마스킹 해제된 이름이 있으면 숨김
   const shouldShowPartiesSection = useMemo(() => {
     const parties = caseParties || []
 
-    const plaintiffSideTypes = ['plaintiff', 'creditor', 'applicant', 'actor', 'juvenile', 'accused']
-    const defendantSideTypes = ['defendant', 'debtor', 'respondent', 'third_debtor']
-    const plaintiffSideLabels = ['원고', '채권자', '신청인', '행위자', '보호소년', '피고인', '항소인', '상고인', '청구인']
-    const defendantSideLabels = ['피고', '채무자', '피신청인', '제3채무자', '피항소인', '피상고인', '상대방', '피청구인']
+    // 원고측/피고측 구분 헬퍼
+    const isPlaintiffSide = (p: typeof parties[0]) =>
+      PLAINTIFF_SIDE_TYPES.has(p.party_type) ||
+      PLAINTIFF_SIDE_LABELS.has(normalizePartyLabel(p.party_type_label))
 
-    // 의뢰인 찾기
-    const clientParty = parties.find(p => p.is_our_client)
-    if (!clientParty) return true // 의뢰인 없으면 표시
+    const isDefendantSide = (p: typeof parties[0]) =>
+      DEFENDANT_SIDE_TYPES.has(p.party_type) ||
+      DEFENDANT_SIDE_LABELS.has(normalizePartyLabel(p.party_type_label))
 
-    // 의뢰인이 어느 측인지 확인
-    const isClientPlaintiffSide = plaintiffSideTypes.includes(clientParty.party_type) ||
-      plaintiffSideLabels.some(label => clientParty.party_type_label?.includes(label))
-    const isClientDefendantSide = defendantSideTypes.includes(clientParty.party_type) ||
-      defendantSideLabels.some(label => clientParty.party_type_label?.includes(label))
+    // 마스킹 해제된 이름인지 확인 (번호 제거 후 체크)
+    const hasUnmaskedName = (p: typeof parties[0]) => !isMaskedPartyName(p.party_name)
 
-    // 상대방 확인 (의뢰인 반대편)
-    let hasOpponent = false
-    if (isClientPlaintiffSide) {
-      // 의뢰인이 원고측이면 피고측이 상대방
-      hasOpponent = parties.some(p =>
-        !p.is_our_client && (
-          defendantSideTypes.includes(p.party_type) ||
-          defendantSideLabels.some(label => p.party_type_label?.includes(label))
-        )
-      )
-    } else if (isClientDefendantSide) {
-      // 의뢰인이 피고측이면 원고측이 상대방
-      hasOpponent = parties.some(p =>
-        !p.is_our_client && (
-          plaintiffSideTypes.includes(p.party_type) ||
-          plaintiffSideLabels.some(label => p.party_type_label?.includes(label))
-        )
-      )
+    // 원고측에서 마스킹 해제된 당사자 찾기
+    const unmaskedPlaintiffSide = parties.find(p => isPlaintiffSide(p) && hasUnmaskedName(p))
+
+    // 피고측에서 마스킹 해제된 당사자 찾기
+    const unmaskedDefendantSide = parties.find(p => isDefendantSide(p) && hasUnmaskedName(p))
+
+    // 양측 모두 마스킹 해제된 당사자가 있으면 숨김 (false)
+    if (unmaskedPlaintiffSide && unmaskedDefendantSide) {
+      return false
     }
 
-    // 마스킹된 이름 확인
-    const hasMaskedParty = parties.some(p => /[가-힣]O{1,3}|O{1,3}[가-힣]/.test(p.party_name))
-
-    // 의뢰인과 상대방 모두 있고 마스킹 없으면 숨김 (false)
-    return hasMaskedParty || !hasOpponent
+    // 그 외에는 표시
+    return true
   }, [caseParties])
 
   const formatCurrency = (amount: number | null) => {
@@ -857,7 +983,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     return `${year}.${month}.${day}`
   }
 
-  const formatDateTime = (datetime: string) => {
+  const _formatDateTime = (datetime: string) => {
     const d = new Date(datetime)
     const year = String(d.getFullYear()).slice(2)
     const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -893,7 +1019,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   // basicInfo 필드 조회 헬퍼 (한글/API 필드명 모두 지원)
   const getBasicInfo = (koreanKey: string, apiKey?: string): string | number | undefined => {
     if (!scourtSnapshot?.basicInfo) return undefined
-    const info = scourtSnapshot.basicInfo as Record<string, any>
+    const info = scourtSnapshot.basicInfo as Record<string, unknown>
     return info[koreanKey] || (apiKey ? info[apiKey] : undefined)
   }
 
@@ -918,9 +1044,28 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     return linkMap
   }, [caseData.case_relations])
 
-  const manualPartyOverrides = useMemo(() => {
-    return caseParties.filter((party) => party.manual_override)
+  // 마스킹이 해제된 모든 당사자 (SCOURT 라벨 기반으로 일반탭에 적용)
+  const unmaskedPartyOverrides = useMemo(() => {
+    return caseParties.filter((party) => {
+      return !isMaskedPartyName(party.party_name)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [caseParties])
+
+  const preferredPartyName = useMemo(() => {
+    const normalizePartyName = (name: string) => name.replace(/^\d+\.\s*/, '').trim()
+    const unmaskedParties = caseParties.filter(party => !isMaskedPartyName(party.party_name))
+    const preferredParty = unmaskedParties.find(party => party.is_our_client) || unmaskedParties[0]
+
+    if (preferredParty) {
+      const rawName = preferredParty.clients?.name || preferredParty.party_name
+      return normalizePartyName(rawName)
+    }
+
+    if (caseData.client?.name) return normalizePartyName(caseData.client.name)
+    if (caseData.opponent_name) return normalizePartyName(caseData.opponent_name)
+    return ''
+  }, [caseParties, caseData.client?.name, caseData.opponent_name])
 
   const manualRepresentativeOverrides = useMemo(() => {
     return caseRepresentatives.filter((rep) => rep.manual_override)
@@ -997,14 +1142,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       const scourtFirstChar = cleanedScourtName.charAt(0)
 
       // parties 배열에서 매칭되는 당사자 수 확인
-      const partiesArr = (scourtSnapshot?.basicInfo as any)?.parties || []
-      const matchingParties = partiesArr.filter((p: any) => {
+      interface PartyItem { btprNm?: string }
+      const basicInfo = scourtSnapshot?.basicInfo as { parties?: PartyItem[] } | undefined
+      const partiesArr = basicInfo?.parties || []
+      const matchingParties = partiesArr.filter((p: PartyItem) => {
         const cleaned = (p.btprNm || '').replace(/^\d+\.\s*/, '').trim()
-        return cleaned.charAt(0) === clientFirstChar && cleaned.includes('O')
+        return cleaned.charAt(0) === clientFirstChar && isMaskedPartyName(cleaned)
       })
 
       // 유일하게 매칭되는 경우에만 의뢰인으로 표시
-      if (matchingParties.length === 1 && clientFirstChar === scourtFirstChar && cleanedScourtName.includes('O')) {
+      if (matchingParties.length === 1 && clientFirstChar === scourtFirstChar && isMaskedPartyName(cleanedScourtName)) {
         return { name: caseData.client.name, isClient: true }
       }
     }
@@ -1028,7 +1175,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }
 
   // 당사자 정보에서 "의뢰인 v 상대방" 문자열 생성
-  const getPartyVsString = useCallback(() => {
+  const _getPartyVsString = useCallback(() => {
     if (caseParties.length === 0) {
       // 당사자 정보 없으면 기존 데이터 사용
       const clientName = caseData.client?.name || '의뢰인'
@@ -1060,7 +1207,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, '')
 
       // 표준 당사자 라벨 목록 (2026.01.07 보호사건/형사사건 추가)
-      const standardLabels = [
+      const _standardLabels = [
         '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
         '항소인', '피항소인', '상고인', '피상고인',
         // 보호사건
@@ -1102,9 +1249,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       ]
       // 소송관계인은 히어로에서 제외 (피해아동, 보조인, 피해자, 조사관 등)
 
-      const plaintiffLabels = ['원고', '채권자', '신청인', '항소인', '상고인', '항고인']
-      const defendantLabels = ['피고', '채무자', '피신청인', '피항소인', '피상고인', '상대방', '행위자', '보호소년', '피고인', '피고인명']
-
       caseParties
         // 히어로에 표시할 당사자만 필터링 (소송관계인 제외)
         .filter(p => {
@@ -1116,26 +1260,18 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                  ['plaintiff', 'defendant', 'creditor', 'debtor', 'applicant', 'respondent', 'actor', 'juvenile', 'accused', 'third_debtor'].includes(p.party_type || '')
         })
         .forEach(p => {
-          // 사건유형 기반으로 당사자 라벨 결정
+          // SCOURT 라벨(party_type_label)을 그대로 사용 (일반탭과 동일)
           const rawLabel = p.party_type_label || ''
-          const normalizedLabel = normalizePartyLabel(rawLabel)
+          const _normalizedLabel = normalizePartyLabel(rawLabel)
           let label: string
 
-          // 보호사건/형사사건 특수 라벨은 원래 라벨 그대로 유지
-          if (['행위자', '보호소년', '피고인', '피고인명'].includes(normalizedLabel)) {
+          // party_type_label이 있으면 그대로 사용 (SCOURT 원본 라벨 우선)
+          if (rawLabel) {
             label = rawLabel
           }
-          // rawLabel이 원고측 라벨이면 → 사건유형에 맞는 원고측 라벨 사용
-          else if (plaintiffLabels.includes(normalizedLabel) || p.party_type === 'plaintiff') {
-            label = partyLabels.plaintiff || rawLabel || '원고'
-          }
-          // rawLabel이 피고측 라벨이면 → 사건유형에 맞는 피고측 라벨 사용
-          else if (defendantLabels.includes(normalizedLabel) || p.party_type === 'defendant') {
-            label = partyLabels.defendant || rawLabel || '피고'
-          }
-          // 기타
+          // party_type_label이 없으면 party_type 기반 fallback
           else {
-            label = rawLabel || PARTY_TYPE_LABEL_MAP[p.party_type || 'plaintiff'] || '기타'
+            label = PARTY_TYPE_LABEL_MAP[p.party_type || 'plaintiff'] || '기타'
           }
 
           if (!labelGroups.has(label)) {
@@ -1240,42 +1376,73 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     }
 
     // SCOURT 스냅샷 기반 fallback
-    const partiesArray = (scourtSnapshot?.basicInfo as any)?.parties || []
-    const findPartyByType = (types: string[]) => {
-      const found = partiesArray.find((p: any) =>
+    interface ScourtParty { btprDvsNm?: string; btprNm?: string }
+    const partiesBasicInfo = scourtSnapshot?.basicInfo as { parties?: ScourtParty[] } | undefined
+    const partiesArray = partiesBasicInfo?.parties || []
+    const plaintiffSideLabels = ['원고', '채권자', '신청인', '항고인', '항소인', '상고인']
+    const defendantSideLabels = ['피고', '채무자', '피신청인', '상대방', '피항고인', '피항소인', '피상고인']
+
+    // SCOURT 스냅샷에서 당사자 찾기 (라벨과 이름 함께 반환)
+    const findPartyByType = (types: string[]): { label: string; name: string } | null => {
+      const found = partiesArray.find((p: ScourtParty) =>
         types.some(t => p.btprDvsNm?.includes(t))
       )
-      return found?.btprNm || ''
+      if (found) {
+        return { label: found.btprDvsNm || '', name: found.btprNm || '' }
+      }
+      return null
     }
 
-    const getPlaintiffName = () => {
+    const getPlaintiffInfo = (): { label: string; name: string } => {
+      // SCOURT 스냅샷에서 원고측 당사자 찾기
+      const fromParties = findPartyByType(plaintiffSideLabels)
+      if (fromParties?.name) {
+        return { label: fromParties.label, name: fromParties.name }
+      }
+      // basicInfo fallback
       const fromBasicInfo =
         getBasicInfo('채권자', 'crdtNm') ||
         getBasicInfo('신청인', 'aplcNm') ||
         getBasicInfo('원고', 'aplNm')
-      if (fromBasicInfo) return fromBasicInfo
-      const fromParties = findPartyByType(['채권자', '신청인', '원고', '항고인'])
-      if (fromParties) return fromParties
-      return partiesArray[0]?.btprNm || '-'
+      if (fromBasicInfo) {
+        return { label: partyLabels.plaintiff, name: String(fromBasicInfo) }
+      }
+      // 첫 번째 당사자 fallback
+      if (partiesArray[0]) {
+        return { label: partiesArray[0].btprDvsNm || partyLabels.plaintiff, name: partiesArray[0].btprNm || '-' }
+      }
+      return { label: partyLabels.plaintiff, name: '-' }
     }
 
-    const getDefendantName = () => {
+    const getDefendantInfo = (): { label: string; name: string } => {
+      // SCOURT 스냅샷에서 피고측 당사자 찾기
+      const fromParties = findPartyByType(defendantSideLabels)
+      if (fromParties?.name) {
+        return { label: fromParties.label, name: fromParties.name }
+      }
+      // basicInfo fallback
       const fromBasicInfo =
         getBasicInfo('채무자', 'dbtNm') ||
         getBasicInfo('피신청인', 'rspNm') ||
         getBasicInfo('피고', 'rspNm')
-      if (fromBasicInfo) return fromBasicInfo
-      const fromParties = findPartyByType(['채무자', '피신청인', '피고', '상대방', '피항고인'])
-      if (fromParties) return fromParties
-      return partiesArray[1]?.btprNm || '-'
+      if (fromBasicInfo) {
+        return { label: partyLabels.defendant, name: String(fromBasicInfo) }
+      }
+      // 두 번째 당사자 fallback
+      if (partiesArray[1]) {
+        return { label: partiesArray[1].btprDvsNm || partyLabels.defendant, name: partiesArray[1].btprNm || '-' }
+      }
+      return { label: partyLabels.defendant, name: '-' }
     }
 
-    const plaintiffInfo = getPartyName('plaintiff', String(getPlaintiffName()))
-    const defendantInfo = getPartyName('defendant', String(getDefendantName()))
+    const plaintiffData = getPlaintiffInfo()
+    const defendantData = getDefendantInfo()
+    const plaintiffInfo = getPartyName('plaintiff', plaintiffData.name)
+    const defendantInfo = getPartyName('defendant', defendantData.name)
 
     const parties = [
-      { role: 'plaintiff', label: partyLabels.plaintiff, info: plaintiffInfo },
-      { role: 'defendant', label: partyLabels.defendant, info: defendantInfo }
+      { role: 'plaintiff', label: plaintiffData.label, info: plaintiffInfo },
+      { role: 'defendant', label: defendantData.label, info: defendantInfo }
     ]
 
     parties.sort((a, b) => {
@@ -1528,8 +1695,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   .map(r => r.related_case?.court_case_number)
                   .filter(Boolean)
               )
-              const filteredLowerCourt = (scourtSnapshot?.lowerCourt || []).filter(
-                (item: any) => {
+              interface LowerCourtItem { linkedCaseId?: string; caseNo?: string; courtName?: string; court?: string; encCsNo?: string; result?: string; resultDate?: string }
+              const filteredLowerCourt = ((scourtSnapshot?.lowerCourt || []) as LowerCourtItem[]).filter(
+                (item: LowerCourtItem) => {
                   // 이미 연동됨 → 제외
                   if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
                   if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
@@ -1539,11 +1707,32 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 }
               )
 
+              // 미연동 심급사건 목록 (모두연결용)
+              const unlinkdLowerCourt = filteredLowerCourt.filter((item: LowerCourtItem) => !item.linkedCaseId)
+
               return filteredLowerCourt.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 flex items-center gap-2">
-                    <div className="w-1 h-4 bg-sage-500 rounded-full" />
-                    <h3 className="text-sm font-semibold text-gray-900">심급</h3>
+                  <div className="px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-sage-500 rounded-full" />
+                      <h3 className="text-sm font-semibold text-gray-900">심급</h3>
+                    </div>
+                    {unlinkdLowerCourt.length > 1 && (
+                      <button
+                        onClick={() => handleLinkAllRelatedCases(
+                          unlinkdLowerCourt.map((item: LowerCourtItem) => ({
+                            caseNo: item.caseNo || '',
+                            courtName: item.courtName || item.court || '',
+                            relationType: '하심사건',
+                            encCsNo: item.encCsNo,
+                          }))
+                        )}
+                        disabled={isLinkingAll || linkingCases.size > 0}
+                        className="text-xs px-3 py-1 bg-sage-600 text-white hover:bg-sage-700 rounded transition-colors disabled:opacity-50"
+                      >
+                        {isLinkingAll ? '연동 중...' : `모두연결 (${unlinkdLowerCourt.length})`}
+                      </button>
+                    )}
                   </div>
                   <table className="w-full border-t border-gray-200">
                     <thead>
@@ -1554,7 +1743,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredLowerCourt.map((item: any, idx: number) => (
+                      {filteredLowerCourt.map((item: LowerCourtItem, idx: number) => (
                         <tr key={`lower-${idx}`} className="hover:bg-gray-50">
                           <td className="px-5 py-3 text-sm text-gray-700">{item.courtName || item.court || '-'}</td>
                           <td className="px-5 py-3 text-sm">
@@ -1573,20 +1762,21 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                               <div className="flex items-center gap-2">
                                 <span className="text-gray-900">{item.caseNo || '-'}</span>
                                 <button
-                                  onClick={() => {
-                                    const partyName = caseData.opponent_name || caseData.client?.name || ''
-                                    const clientId = caseData.client_id || ''
-                                    const relationType = '하심사건'
-                                    const relationEncCsNo = item.encCsNo || ''
-                                    router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || '')}&courtName=${encodeURIComponent(item.courtName || item.court || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}&sourceCaseId=${encodeURIComponent(caseData.id)}&relationType=${encodeURIComponent(relationType)}&relationEncCsNo=${encodeURIComponent(relationEncCsNo)}`)
-                                  }}
-                                  className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
+                                  onClick={() => handleLinkRelatedCase({
+                                    caseNo: item.caseNo || '',
+                                    courtName: item.courtName || item.court || '',
+                                    relationType: '하심사건',
+                                    encCsNo: item.encCsNo,
+                                  })}
+                                  disabled={linkingCases.has(item.caseNo || '') || isLinkingAll}
+                                  className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors disabled:opacity-50"
                                 >
-                                  등록
+                                  {linkingCases.has(item.caseNo || '') ? '연동 중...' : '등록'}
                                 </button>
                                 <button
-                                  onClick={() => handleDismissRelatedCase(item.caseNo, 'lower_court')}
-                                  className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded transition-colors"
+                                  onClick={() => handleDismissRelatedCase(item.caseNo || '', 'lower_court')}
+                                  disabled={isLinkingAll}
+                                  className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
                                 >
                                   연동안함
                                 </button>
@@ -1613,8 +1803,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   .map(r => r.related_case?.court_case_number)
                   .filter(Boolean)
               )
-              const filteredRelatedCases = (scourtSnapshot?.relatedCases || []).filter(
-                (item: any) => {
+              interface RelatedCaseItem { linkedCaseId?: string; caseNo?: string; case_number?: string; caseName?: string; court_name?: string; relation?: string; relation_type?: string; encCsNo?: string }
+              const filteredRelatedCases = ((scourtSnapshot?.relatedCases || []) as RelatedCaseItem[]).filter(
+                (item: RelatedCaseItem) => {
                   // 이미 연동됨 → 제외
                   if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
                   if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
@@ -1625,11 +1816,32 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 }
               )
 
+              // 미연동 관련사건 목록 (모두연결용)
+              const unlinkedRelatedCases = filteredRelatedCases.filter((item: RelatedCaseItem) => !item.linkedCaseId)
+
               return filteredRelatedCases.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 flex items-center gap-2">
-                    <div className="w-1 h-4 bg-sage-500 rounded-full" />
-                    <h3 className="text-sm font-semibold text-gray-900">관련사건</h3>
+                  <div className="px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-1 h-4 bg-sage-500 rounded-full" />
+                      <h3 className="text-sm font-semibold text-gray-900">관련사건</h3>
+                    </div>
+                    {unlinkedRelatedCases.length > 1 && (
+                      <button
+                        onClick={() => handleLinkAllRelatedCases(
+                          unlinkedRelatedCases.map((item: RelatedCaseItem) => ({
+                            caseNo: item.caseNo || item.case_number || '',
+                            courtName: item.caseName || item.court_name || '',
+                            relationType: item.relation || item.relation_type || '관련사건',
+                            encCsNo: item.encCsNo,
+                          }))
+                        )}
+                        disabled={isLinkingAll || linkingCases.size > 0}
+                        className="text-xs px-3 py-1 bg-sage-600 text-white hover:bg-sage-700 rounded transition-colors disabled:opacity-50"
+                      >
+                        {isLinkingAll ? '연동 중...' : `모두연결 (${unlinkedRelatedCases.length})`}
+                      </button>
+                    )}
                   </div>
                   <table className="w-full border-t border-gray-200">
                     <thead>
@@ -1640,7 +1852,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredRelatedCases.map((item: any, idx: number) => (
+                      {filteredRelatedCases.map((item: RelatedCaseItem, idx: number) => (
                         <tr key={`related-${idx}`} className="hover:bg-gray-50">
                           <td className="px-5 py-3 text-sm text-sage-600 font-medium">{item.relation || item.relation_type || '관련사건'}</td>
                           <td className="px-5 py-3 text-sm text-gray-700">{item.caseName || item.court_name || '-'}</td>
@@ -1660,20 +1872,21 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                 <div className="flex items-center gap-2">
                                   <span className="text-gray-900">{item.caseNo || item.case_number || '-'}</span>
                                   <button
-                                    onClick={() => {
-                                      const partyName = caseData.opponent_name || caseData.client?.name || ''
-                                      const clientId = caseData.client_id || ''
-                                      const relationType = item.relation || item.relation_type || '관련사건'
-                                      const relationEncCsNo = item.encCsNo || ''
-                                      router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || item.case_number || '')}&courtName=${encodeURIComponent(item.caseName || item.court_name || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}&sourceCaseId=${encodeURIComponent(caseData.id)}&relationType=${encodeURIComponent(relationType)}&relationEncCsNo=${encodeURIComponent(relationEncCsNo)}`)
-                                    }}
-                                    className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
+                                    onClick={() => handleLinkRelatedCase({
+                                      caseNo: item.caseNo || item.case_number || '',
+                                      courtName: item.caseName || item.court_name || '',
+                                      relationType: item.relation || item.relation_type || '관련사건',
+                                      encCsNo: item.encCsNo,
+                                    })}
+                                    disabled={linkingCases.has(item.caseNo || item.case_number || '') || isLinkingAll}
+                                    className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors disabled:opacity-50"
                                   >
-                                    등록
+                                    {linkingCases.has(item.caseNo || item.case_number || '') ? '연동 중...' : '등록'}
                                   </button>
                                   <button
-                                    onClick={() => handleDismissRelatedCase(item.caseNo || item.case_number, 'related_case')}
-                                    className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded transition-colors"
+                                    onClick={() => handleDismissRelatedCase(item.caseNo || item.case_number || '', 'related_case')}
+                                    disabled={isLinkingAll}
+                                    className="text-xs px-2 py-0.5 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded transition-colors disabled:opacity-50"
                                   >
                                     연동안함
                                   </button>
@@ -1707,7 +1920,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                     fetchCaseParties()
                     router.refresh()
                   }}
-                  scourtParties={(scourtSnapshot?.basicInfo as any)?.parties || []}
+                  scourtParties={(scourtSnapshot?.basicInfo as Record<string, unknown> | undefined)?.parties as Array<{ btprtNm?: string; btprtDvsNm?: string; btprtStndngNm?: string }> || []}
                 />
                 </div>
               </div>
@@ -1827,7 +2040,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 clientName={caseData.client?.name}
                 opponentName={caseData.opponent_name}
                 clientRole={caseData.client_role}
-                partyOverrides={manualPartyOverrides}
+                partyOverrides={unmaskedPartyOverrides}
                 representativeOverrides={manualRepresentativeOverrides}
                 relatedCaseLinks={relatedCaseLinks}
                 onPartyEdit={handlePartyEditFromGeneral}
@@ -2129,11 +2342,11 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                         key={c.code}
                         className="px-3 py-2 text-sm cursor-pointer hover:bg-sage-50 text-gray-900"
                         onMouseDown={() => {
-                          setLinkCourtName(c.name)
+                          setLinkCourtName(getCourtAbbrev(c.name))
                           setShowCourtDropdown(false)
                         }}
                       >
-                        {c.name}
+                        {getCourtAbbrev(c.name)}
                       </div>
                     ))}
                   </div>

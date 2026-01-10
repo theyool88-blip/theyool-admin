@@ -36,7 +36,7 @@ import {
 import { extractSubXmlPaths, normalizeDataListPaths } from "@/lib/scourt/xml-utils";
 import { getPartyLabels as getPartyLabelsFromSchema } from "@/lib/scourt/party-labels";
 import { normalizeCaseNumber } from "@/lib/scourt/case-number-utils";
-import { normalizePartyLabel, PARTY_TYPE_LABELS } from "@/types/case-party";
+import { isMaskedPartyName, normalizePartyLabel, PARTY_TYPE_LABELS } from "@/types/case-party";
 
 // ============================================================================
 // 타입 정의
@@ -55,8 +55,8 @@ interface CasePartyInfo {
 interface ScourtGeneralInfoXmlProps {
   /** API 응답 데이터 (dma_csBasCtt, dlt_* 포함) */
   apiData: {
-    dma_csBasCtt?: Record<string, any>;
-    [key: string]: any;
+    dma_csBasCtt?: Record<string, unknown>;
+    [key: string]: unknown;
   };
   /** 사건 유형 코드 (ssgo102, ssgo101, ssgo10g, ssgo106) */
   caseType?: ScourtCaseType;
@@ -87,7 +87,7 @@ interface DataListEntry {
   layoutKey: string;
 }
 
-function getLayoutMatchScore(layout: GridLayout, dataRows: any[]): number {
+function getLayoutMatchScore(layout: GridLayout, dataRows: Record<string, unknown>[]): number {
   if (!layout?.columns?.length || !Array.isArray(dataRows) || dataRows.length === 0) {
     return 0;
   }
@@ -105,7 +105,7 @@ function getLayoutMatchScore(layout: GridLayout, dataRows: any[]): number {
 
 async function pickBestCandidateLayout(
   dataListId: string,
-  dataRows: any[],
+  dataRows: Record<string, unknown>[],
   fetchXml: (xmlPath: string) => Promise<string | null>
 ): Promise<GridLayout | null> {
   if (!Array.isArray(dataRows) || dataRows.length === 0) return null;
@@ -214,7 +214,7 @@ async function fetchXmlWithFallback(
       }
       console.warn(`[XML] Invalid static XML: ${xmlPath}`);
     }
-  } catch (e) {
+  } catch (_e) {
     console.warn(`[XML] Static file not found: ${xmlPath}`);
   }
 
@@ -549,14 +549,14 @@ function applyPartyNameByLabel(
   return true;
 }
 
-function applyIndexedName(originalValue: any, name: string): string {
+function applyIndexedName(originalValue: unknown, name: string): string {
   if (typeof originalValue !== "string") return name;
   const match = originalValue.match(/^(\d+\.\s*)/);
   if (!match) return name;
   return `${match[1]}${name}`;
 }
 
-function updatePartyRowName(row: Record<string, any>, name: string): Record<string, any> {
+function updatePartyRowName(row: Record<string, unknown>, name: string): Record<string, unknown> {
   let updated = false;
   const next = { ...row };
 
@@ -594,10 +594,10 @@ function getPartyRowLabel(row: Record<string, any>): string {
 }
 
 function updatePartyListRows(
-  list: any[] | undefined,
+  list: Record<string, unknown>[] | undefined,
   label: string,
   name: string
-): any[] | undefined {
+): Record<string, unknown>[] | undefined {
   if (!Array.isArray(list) || !label || !name) return list;
   const normalizedTarget = normalizePartyLabel(label);
   if (!normalizedTarget) return list;
@@ -633,11 +633,11 @@ function updatePartyListRows(
 }
 
 function updatePartyListRowsWithNames(
-  list: any[],
+  list: Record<string, unknown>[],
   label: string,
   names: string[],
   displayLabel?: string
-): { list: any[]; updated: boolean } {
+): { list: Record<string, unknown>[]; updated: boolean } {
   if (!Array.isArray(list) || !label) return { list, updated: false };
   const normalizedTarget = normalizePartyLabel(label);
   if (!normalizedTarget) return { list, updated: false };
@@ -698,9 +698,9 @@ function updatePartyListRowsWithNames(
 }
 
 function applyPartyOverridesToList(
-  list: any[] | undefined,
+  list: Record<string, unknown>[] | undefined,
   groups: PartyOverrideGroup[]
-): { list: any[] | undefined; updated: boolean } {
+): { list: Record<string, unknown>[] | undefined; updated: boolean } {
   if (!groups || groups.length === 0) return { list, updated: false };
   // 원래 리스트가 없거나 비어있으면 새 데이터를 추가하지 않음
   // (피고인 및 죄명내용 등 형사 전용 섹션이 가사 사건에 생성되는 것 방지)
@@ -759,11 +759,11 @@ function updateRepresentativeRowName(row: Record<string, any>, name: string): Re
 }
 
 function updateRepresentativeListRowsWithNames(
-  list: any[],
+  list: Record<string, unknown>[],
   label: string,
   displayLabel: string,
   names: string[]
-): { list: any[]; updated: boolean } {
+): { list: Record<string, unknown>[]; updated: boolean } {
   if (!Array.isArray(list) || !label) return { list, updated: false };
   const normalizedTarget = normalizePartyLabel(label);
   if (!normalizedTarget) return { list, updated: false };
@@ -815,9 +815,9 @@ function updateRepresentativeListRowsWithNames(
 }
 
 function applyRepresentativeOverridesToList(
-  list: any[] | undefined,
+  list: Record<string, unknown>[] | undefined,
   groups: RepresentativeOverrideGroup[]
-): { list: any[] | undefined; updated: boolean } {
+): { list: Record<string, unknown>[] | undefined; updated: boolean } {
   if (!groups || groups.length === 0) return { list, updated: false };
 
   let next = Array.isArray(list) ? [...list] : [];
@@ -983,8 +983,9 @@ export function ScourtGeneralInfoXml({
 
     const next = { ...basicInfoData };
     let updated = false;
-    const appliedLabels = new Set<string>();
 
+    // partyOverrides가 있으면 SCOURT 라벨 기반으로만 적용 (clientRole 추론 사용 안함)
+    // partyOverrides는 마스킹 해제된 모든 당사자를 포함하므로 이것만으로 충분
     partyOverrideGroups.forEach((group) => {
       if (group.names.length === 0) return;
       const name = group.names[0];
@@ -1000,11 +1001,11 @@ export function ScourtGeneralInfoXml({
           updated = true;
         }
       }
-
-      appliedLabels.add(group.label);
     });
 
-    if (effectiveClientRole && (normalizedClientName || normalizedOpponentName)) {
+    // partyOverrides가 없는 경우에만 clientRole 기반 fallback 사용
+    // (레거시 호환성 - 마스킹 해제된 당사자가 없는 경우)
+    if (partyOverrideGroups.length === 0 && effectiveClientRole && (normalizedClientName || normalizedOpponentName)) {
       const clientSide = effectiveClientRole;
       const opponentSide = clientSide === "plaintiff" ? "defendant" : "plaintiff";
 
@@ -1012,11 +1013,8 @@ export function ScourtGeneralInfoXml({
         const label = clientSide === "plaintiff"
           ? partyLabels.plaintiffLabel
           : partyLabels.defendantLabel;
-        const normalizedLabel = normalizePartyLabel(label);
-        if (!normalizedLabel || !appliedLabels.has(normalizedLabel)) {
-          if (applyPartyNameOverride(next, clientSide, normalizedClientName, label)) {
-            updated = true;
-          }
+        if (applyPartyNameOverride(next, clientSide, normalizedClientName, label)) {
+          updated = true;
         }
       }
 
@@ -1024,11 +1022,8 @@ export function ScourtGeneralInfoXml({
         const label = opponentSide === "plaintiff"
           ? partyLabels.plaintiffLabel
           : partyLabels.defendantLabel;
-        const normalizedLabel = normalizePartyLabel(label);
-        if (!normalizedLabel || !appliedLabels.has(normalizedLabel)) {
-          if (applyPartyNameOverride(next, opponentSide, normalizedOpponentName, label)) {
-            updated = true;
-          }
+        if (applyPartyNameOverride(next, opponentSide, normalizedOpponentName, label)) {
+          updated = true;
         }
       }
     }
@@ -1055,8 +1050,7 @@ export function ScourtGeneralInfoXml({
       updated = true;
     }
 
-    const partyOverrideLabels = new Set(partyOverrideGroups.map((group) => group.label));
-
+    // partyOverrides가 있으면 SCOURT 라벨 기반으로만 적용
     if (partyOverrideGroups.length > 0) {
       const partiesResult = applyPartyOverridesToList(
         next.dlt_btprtCttLst,
@@ -1077,7 +1071,9 @@ export function ScourtGeneralInfoXml({
       }
     }
 
-    if ((normalizedClientName || normalizedOpponentName) && effectiveClientRole) {
+    // partyOverrides가 없는 경우에만 clientRole 기반 fallback 사용
+    // (레거시 호환성 - 마스킹 해제된 당사자가 없는 경우)
+    if (partyOverrideGroups.length === 0 && (normalizedClientName || normalizedOpponentName) && effectiveClientRole) {
       const clientSide = effectiveClientRole;
       const opponentSide = clientSide === "plaintiff" ? "defendant" : "plaintiff";
       const clientLabel = clientSide === "plaintiff"
@@ -1086,10 +1082,8 @@ export function ScourtGeneralInfoXml({
       const opponentLabel = opponentSide === "plaintiff"
         ? partyLabels.plaintiffLabel
         : partyLabels.defendantLabel;
-      const normalizedClientLabel = normalizePartyLabel(clientLabel);
-      const normalizedOpponentLabel = normalizePartyLabel(opponentLabel);
 
-      if (normalizedClientName && clientLabel && !partyOverrideLabels.has(normalizedClientLabel)) {
+      if (normalizedClientName && clientLabel) {
         const updatedParties = updatePartyListRows(
           next.dlt_btprtCttLst,
           clientLabel,
@@ -1110,7 +1104,7 @@ export function ScourtGeneralInfoXml({
         }
       }
 
-      if (normalizedOpponentName && opponentLabel && !partyOverrideLabels.has(normalizedOpponentLabel)) {
+      if (normalizedOpponentName && opponentLabel) {
         const updatedParties = updatePartyListRows(
           next.dlt_btprtCttLst,
           opponentLabel,
@@ -1383,12 +1377,6 @@ export function ScourtGeneralInfoXml({
 // 마스킹된 이름 감지 및 당사자 매칭
 // ============================================================================
 
-const MASKED_NAME_REGEX = /[가-힣]O{1,3}|O{1,3}[가-힣]/;
-
-function isMaskedPartyName(name: string): boolean {
-  return MASKED_NAME_REGEX.test(name);
-}
-
 function normalizePartyName(name: string): string {
   return name.replace(/^\d+\.\s*/, '').trim();
 }
@@ -1461,7 +1449,7 @@ function getDataListTitle(dataListId: string): string {
 
 interface FallbackGridTableProps {
   title: string;
-  data: any[];
+  data: Record<string, unknown>[];
   dataListId?: string;
   caseLinkMap?: Record<string, string>;
   /** 당사자 수정 콜백 (partyId, partyLabel, currentName) */
@@ -1534,8 +1522,8 @@ function FallbackGridTable({
           <tbody>
             {data.map((row, rowIndex) => {
               // 당사자 테이블: 매칭된 당사자 및 마스킹 여부 확인
-              const partyName = row.btprtNm || row.btprtNmOrg || '';
-              const partyLabel = row.btprtDvsNm || row.btprtStndngNm || row.btprtDvsCdNm || '';
+              const partyName = String(row.btprtNm || row.btprtNmOrg || '');
+              const partyLabel = String(row.btprtDvsNm || row.btprtStndngNm || row.btprtDvsCdNm || '');
               const matchedParty = showEditButtons ? findMatchingParty(row, rowIndex, caseParties) : null;
               const canEdit = matchedParty && isMaskedPartyName(partyName);
 
@@ -1587,7 +1575,7 @@ function FallbackGridTable({
   );
 }
 
-function formatCellValue(value: any): string {
+function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") {
     // 날짜 포맷 (YYYYMMDD -> YYYY.MM.DD)

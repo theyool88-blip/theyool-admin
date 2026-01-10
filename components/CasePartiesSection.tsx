@@ -6,7 +6,7 @@ import type {
   CaseRepresentative,
   PartyType,
 } from '@/types/case-party'
-import { PARTY_TYPE_LABELS, getOppositePartyType, normalizePartyLabel } from '@/types/case-party'
+import { PARTY_TYPE_LABELS, getOppositePartyType, isMaskedPartyName, normalizePartyLabel } from '@/types/case-party'
 import { getPartyLabels } from '@/lib/scourt/party-labels'
 
 interface Client {
@@ -24,22 +24,16 @@ interface ScourtSnapshotParty {
   indvdCfmtnYmd?: string
 }
 
-// 실제 당사자 유형 (사건본인, 제3자 제외)
+// 실제 당사자 유형 (사건본인, 제3자 등 비의뢰인 유형 제외)
 const REAL_PARTY_LABELS = [
   '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
   '항소인', '피항소인', '상고인', '피상고인', '항고인', '상대방',
-  '청구인', '피청구인', '소송수계인', '사건본인'
+  '청구인', '피청구인', '소송수계인'
 ]
 
 function isRealParty(label: string): boolean {
   const normalized = normalizePartyLabel(label)
   return REAL_PARTY_LABELS.some(l => normalized.includes(l))
-}
-
-const MASKED_NAME_REGEX = /[가-힣]O{1,3}|O{1,3}[가-힣]/
-
-function isMaskedPartyName(name: string): boolean {
-  return MASKED_NAME_REGEX.test(name)
 }
 
 function normalizePartyName(name: string): string {
@@ -83,7 +77,7 @@ interface CasePartiesSectionProps {
 export default function CasePartiesSection({
   caseId,
   courtCaseNumber,
-  clientId,
+  clientId: _clientId,
   clientName,
   clientRole,
   opponentName,
@@ -638,7 +632,7 @@ function PartyTableRow({
   const alwaysShowEdit = isMaskedName || !party.is_our_client
 
   // 이름 파싱 (prefix 보호)
-  const parsedName = parsePartyName(editData?.party_name || party.party_name)
+  const _parsedName = parsePartyName(editData?.party_name || party.party_name)
 
   // 수정 모드일 때는 전체 행을 편집 폼으로 표시
   if (isEditing && editData) {

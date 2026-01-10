@@ -4,15 +4,62 @@
  */
 
 import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CaseGeneralData } from "./api-client";
 import type {
   CaseParty,
   CaseRepresentative,
   PartyType,
-  ScourtParty,
-  ScourtRepresentative,
 } from "@/types/case-party";
-import { mapScourtPartyType, getPartyTypeLabel } from "@/types/case-party";
+import { mapScourtPartyType } from "@/types/case-party";
+
+// 의뢰인 정보를 이전하면 안 되는 당사자 유형 (사건본인, 제3자 등)
+const NON_CLIENT_PARTY_LABELS = [
+  '사건본인',
+  '제3자',
+  '제3채무자',
+  '참가인',
+  '보조참가인',
+  '증인',
+  '감정인',
+];
+
+/**
+ * 비의뢰인 유형인지 확인 (사건본인, 제3자 등)
+ */
+function isNonClientPartyLabel(label: string): boolean {
+  if (!label) return false;
+  return NON_CLIENT_PARTY_LABELS.some(l => label.includes(l));
+}
+
+// 원고측 party_type
+const PLAINTIFF_SIDE_TYPES: PartyType[] = ['plaintiff', 'creditor', 'applicant'];
+// 피고측 party_type
+const DEFENDANT_SIDE_TYPES: PartyType[] = ['defendant', 'debtor', 'respondent'];
+
+/**
+ * 두 party_type이 호환되는지 확인
+ * - 같은 타입이면 호환
+ * - 같은 측(원고측/피고측)이면 호환
+ * - related(사건본인, 제3자 등)는 어떤 의뢰인과도 매칭하지 않음
+ */
+function isCompatiblePartyType(migType: PartyType, scourtType: PartyType): boolean {
+  // 같은 타입이면 호환
+  if (migType === scourtType) return true;
+
+  // related는 어떤 유형과도 매칭하지 않음
+  if (migType === 'related' || scourtType === 'related') return false;
+
+  // 같은 측끼리만 호환
+  if (PLAINTIFF_SIDE_TYPES.includes(migType) && PLAINTIFF_SIDE_TYPES.includes(scourtType)) {
+    return true;
+  }
+  if (DEFENDANT_SIDE_TYPES.includes(migType) && DEFENDANT_SIDE_TYPES.includes(scourtType)) {
+    return true;
+  }
+
+  return false;
+}
 
 export interface PartySyncParams {
   legalCaseId: string;
@@ -49,7 +96,8 @@ export async function syncPartiesFromScourt(
       .eq("case_id", legalCaseId)
       .eq("manual_override", true);
 
-    (manualParties || []).forEach((party: any) => {
+    interface PartyRecord { party_type: string; party_name: string; }
+    (manualParties || []).forEach((party: PartyRecord) => {
       manualPartyKeys.add(`${party.party_type}:${party.party_name}`);
     });
 
@@ -59,7 +107,8 @@ export async function syncPartiesFromScourt(
       .eq("case_id", legalCaseId)
       .eq("manual_override", true);
 
-    (manualRepresentatives || []).forEach((rep: any) => {
+    interface RepresentativeRecord { representative_type_label?: string; representative_name: string; }
+    (manualRepresentatives || []).forEach((rep: RepresentativeRecord) => {
       manualRepresentativeKeys.add(`${rep.representative_type_label || ""}:${rep.representative_name}`);
     });
 
@@ -164,7 +213,7 @@ export async function syncPartiesFromScourt(
  * - 의뢰인 정보는 SCOURT 레코드로 이전 후 기존 레코드 삭제
  */
 export async function syncPartiesFromScourtServer(
-  supabase: any,
+  supabase: SupabaseClient,
   params: PartySyncParams
 ): Promise<PartySyncResult> {
   const { legalCaseId, tenantId, parties, representatives } = params;
@@ -183,12 +232,24 @@ export async function syncPartiesFromScourtServer(
       .eq("case_id", legalCaseId);
 
     // 마이그레이션 당사자만 필터
-    const existingMigrationParties = existingParties?.filter((p: any) => !p.scourt_synced && !p.manual_override) || [];
+    interface ExistingParty {
+      id: string;
+      party_name: string;
+      party_type: string;
+      party_type_label?: string;
+      is_our_client?: boolean;
+      client_id?: string | null;
+      fee_allocation_amount?: number | null;
+      scourt_synced?: boolean;
+      scourt_party_index?: number | null;
+      manual_override?: boolean;
+    }
+    const existingMigrationParties = existingParties?.filter((p: ExistingParty) => !p.scourt_synced && !p.manual_override) || [];
     // 기존 SCOURT 당사자
-    const existingScourtParties = existingParties?.filter((p: any) => p.scourt_synced && !p.manual_override) || [];
-    const existingManualParties = existingParties?.filter((p: any) => p.manual_override) || [];
+    const existingScourtParties = existingParties?.filter((p: ExistingParty) => p.scourt_synced && !p.manual_override) || [];
+    const existingManualParties = existingParties?.filter((p: ExistingParty) => p.manual_override) || [];
 
-    existingManualParties.forEach((party: any) => {
+    existingManualParties.forEach((party: ExistingParty) => {
       manualPartyKeys.add(`${party.party_type}:${party.party_name}`);
       if (party.scourt_party_index !== null && party.scourt_party_index !== undefined) {
         manualPartyIndexes.add(party.scourt_party_index);
@@ -212,7 +273,7 @@ export async function syncPartiesFromScourtServer(
     // 1. 당사자 동기화
     if (parties && parties.length > 0) {
       console.log(`👥 SCOURT 당사자 원본 데이터 (${parties.length}명):`);
-      parties.forEach((p: any, idx: number) => {
+      parties.forEach((p, idx: number) => {
         console.log(`  [${idx}] btprNm: "${p.btprNm}", btprDvsNm: "${p.btprDvsNm}"`);
       });
 
@@ -222,33 +283,45 @@ export async function syncPartiesFromScourtServer(
         console.log(`  → 저장 예정: "${party.btprNm}" (${party.btprDvsNm}) → party_type: ${partyType}, party_type_label: ${party.btprDvsNm}`);
 
         // 기존 마이그레이션 데이터에서 의뢰인 정보 찾기
-        // 조건: 이름 첫 글자가 같으면 동일 인물로 간주 (party_type은 SCOURT가 정확하므로 비교하지 않음)
+        // 조건: 이름 첫 글자가 같고, party_type이 호환되어야 함
+        // 사건본인, 제3자 등 비의뢰인 유형에는 의뢰인 정보를 이전하지 않음
         let clientInfo: { is_our_client: boolean; client_id: string | null; fee_allocation_amount: number | null } | null = null;
         let migrationPartyToDelete: string | null = null;
 
-        if (existingMigrationParties && existingMigrationParties.length > 0) {
+        // 비의뢰인 유형(사건본인, 제3자 등)이면 의뢰인 정보 이전 불가
+        const isNonClientType = isNonClientPartyLabel(party.btprDvsNm);
+        if (isNonClientType) {
+          console.log(`  ⏭️ 비의뢰인 유형 (${party.btprDvsNm}): 의뢰인 정보 이전 제외`);
+        }
+
+        if (existingMigrationParties && existingMigrationParties.length > 0 && !isNonClientType) {
           // SCOURT 이름에서 번호 제거 (예: "1. 정OO" -> "정OO")
           const scourtNameClean = party.btprNm.replace(/^\d+\.\s*/, "").trim();
           const scourtFirstChar = scourtNameClean.charAt(0);
 
           for (const migParty of existingMigrationParties) {
-            // 이름 첫 글자가 같으면 동일 인물로 간주
-            // (party_type은 마이그레이션 데이터가 틀릴 수 있으므로 비교하지 않음)
+            // 이름 첫 글자 비교
             const migFirstChar = migParty.party_name.charAt(0);
-            if (migFirstChar === scourtFirstChar) {
-              // 의뢰인 정보가 있으면 이전
-              if (migParty.is_our_client) {
-                clientInfo = {
-                  is_our_client: migParty.is_our_client,
-                  client_id: migParty.client_id,
-                  fee_allocation_amount: migParty.fee_allocation_amount,
-                };
-                console.log(`  🔄 의뢰인 매칭: ${migParty.party_name}(${migParty.party_type}) → ${party.btprNm}(${party.btprDvsNm})`);
-              }
-              migrationPartyToDelete = migParty.id;
-              console.log(`  🔄 마이그레이션 당사자 매칭: ${migParty.party_name} → ${party.btprNm}`);
-              break;
+            if (migFirstChar !== scourtFirstChar) continue;
+
+            // party_type 호환성 검사 (원고↔원고, 피고↔피고 계열끼리만 매칭)
+            if (!isCompatiblePartyType(migParty.party_type, partyType)) {
+              console.log(`  ⏭️ party_type 불일치: ${migParty.party_name}(${migParty.party_type}) vs ${party.btprNm}(${partyType})`);
+              continue;
             }
+
+            // 의뢰인 정보가 있으면 이전
+            if (migParty.is_our_client) {
+              clientInfo = {
+                is_our_client: migParty.is_our_client,
+                client_id: migParty.client_id,
+                fee_allocation_amount: migParty.fee_allocation_amount,
+              };
+              console.log(`  🔄 의뢰인 매칭: ${migParty.party_name}(${migParty.party_type}) → ${party.btprNm}(${party.btprDvsNm})`);
+            }
+            migrationPartyToDelete = migParty.id;
+            console.log(`  🔄 마이그레이션 당사자 매칭: ${migParty.party_name} → ${party.btprNm}`);
+            break;
           }
         }
 
@@ -322,6 +395,7 @@ export async function syncPartiesFromScourtServer(
           const alreadyMatched = scourtFirstChars.includes(migFirstChar);
           if (!alreadyMatched) {
             // 의뢰인 정보가 있으면 가장 유사한 SCOURT 당사자에게 이전 시도
+            // 단, 비의뢰인 유형(사건본인, 제3자 등)에는 이전하지 않음
             if (migParty.is_our_client && migParty.client_id) {
               // client 테이블에서 이름 조회
               const { data: clientData } = await supabase
@@ -332,23 +406,37 @@ export async function syncPartiesFromScourtServer(
 
               if (clientData?.name) {
                 const clientFirstChar = clientData.name.charAt(0);
-                // SCOURT 당사자 중 첫글자가 같은 것 찾기
+                // SCOURT 당사자 중 첫글자가 같고 party_type이 호환되는 것 찾기
                 for (let i = 0; i < parties.length; i++) {
-                  const scourtClean = parties[i].btprNm.replace(/^\d+\.\s*/, "").trim();
-                  if (scourtClean.charAt(0) === clientFirstChar) {
-                    // 해당 SCOURT 당사자에게 의뢰인 정보 이전
-                    await supabase
-                      .from("case_parties")
-                      .update({
-                        is_our_client: true,
-                        client_id: migParty.client_id,
-                        fee_allocation_amount: migParty.fee_allocation_amount,
-                      })
-                      .eq("case_id", legalCaseId)
-                      .eq("party_name", parties[i].btprNm);
-                    console.log(`  🔄 의뢰인 정보 이전: ${clientData.name} → ${parties[i].btprNm}`);
-                    break;
+                  // 비의뢰인 유형이면 스킵
+                  if (isNonClientPartyLabel(parties[i].btprDvsNm)) {
+                    continue;
                   }
+
+                  const scourtClean = parties[i].btprNm.replace(/^\d+\.\s*/, "").trim();
+                  if (scourtClean.charAt(0) !== clientFirstChar) {
+                    continue;
+                  }
+
+                  // party_type 호환성도 확인
+                  const scourtPartyType = mapScourtPartyType(parties[i].btprDvsNm);
+                  if (!isCompatiblePartyType(migParty.party_type, scourtPartyType)) {
+                    console.log(`  ⏭️ 의뢰인 이전 불가 (party_type 불일치): ${migParty.party_type} vs ${scourtPartyType}`);
+                    continue;
+                  }
+
+                  // 해당 SCOURT 당사자에게 의뢰인 정보 이전
+                  await supabase
+                    .from("case_parties")
+                    .update({
+                      is_our_client: true,
+                      client_id: migParty.client_id,
+                      fee_allocation_amount: migParty.fee_allocation_amount,
+                    })
+                    .eq("case_id", legalCaseId)
+                    .eq("party_name", parties[i].btprNm);
+                  console.log(`  🔄 의뢰인 정보 이전: ${clientData.name} → ${parties[i].btprNm}`);
+                  break;
                 }
               }
             }
@@ -369,7 +457,8 @@ export async function syncPartiesFromScourtServer(
       .select("representative_type_label, representative_name, manual_override")
       .eq("case_id", legalCaseId);
 
-    (existingRepresentatives || []).forEach((rep: any) => {
+    interface ExistingRep { representative_type_label?: string; representative_name: string; manual_override?: boolean; }
+    (existingRepresentatives || []).forEach((rep: ExistingRep) => {
       if (!rep.manual_override) return;
       manualRepresentativeKeys.add(`${rep.representative_type_label || ""}:${rep.representative_name}`);
     });
@@ -431,7 +520,7 @@ export async function syncPartiesFromScourtServer(
  * 사건의 당사자 목록 조회
  */
 export async function getCaseParties(
-  supabase: any,
+  supabase: SupabaseClient,
   caseId: string
 ): Promise<{
   parties: CaseParty[];
@@ -477,7 +566,7 @@ export async function getCaseParties(
  * 의뢰인 당사자만 조회 (is_our_client = true)
  */
 export async function getClientParties(
-  supabase: any,
+  supabase: SupabaseClient,
   caseId: string
 ): Promise<CaseParty[]> {
   const { data, error } = await supabase
@@ -509,7 +598,7 @@ export async function getClientParties(
  * 당사자 의뢰인 상태 업데이트
  */
 export async function updatePartyClientStatus(
-  supabase: any,
+  supabase: SupabaseClient,
   partyId: string,
   isOurClient: boolean,
   clientId: string | null,

@@ -133,6 +133,7 @@ export const COURT_CODES: Record<string, string> = {
   '수원가정법원 평택지원': '000305',
   '수원고등법원': '000800',
   '수원지방법원': '000250',
+  '수원지방법원 평택지원': '000253',
   '순창군법원': '523979',
   '아산시법원': '283877',
   '안산지원': '250826',
@@ -330,6 +331,71 @@ export function getCourtCodeByName(courtName: string): string | undefined {
   }
 
   return undefined;
+}
+
+/**
+ * 사건유형(caseCategory)을 고려한 법원코드 조회
+ *
+ * 축약형 입력 + 사건유형으로 올바른 법원코드 반환
+ * 예: "평택지원" + family → "평택가정" → 000305
+ *     "평택지원" + civil → "평택지원" → 000253
+ */
+export function getCourtCodeByNameAndCategory(
+  courtName: string,
+  caseCategory?: string
+): string | undefined {
+  // 1. 가사(family) 사건인데 지방법원명이면 가정법원으로 변환
+  if (caseCategory === 'family') {
+    // "OO지방법원 XX지원" → "OO가정법원 XX지원"으로 변환 시도 (풀네임 먼저)
+    const fullNameMatch = courtName.match(/^(.+)지방법원\s+(.+)지원$/);
+    if (fullNameMatch) {
+      const familyFullName = `${fullNameMatch[1]}가정법원 ${fullNameMatch[2]}지원`;
+      const familyCode = getCourtCodeByName(familyFullName);
+      if (familyCode) {
+        console.log(`📍 가사사건 법원코드 변환: "${courtName}" → "${familyFullName}" → ${familyCode}`);
+        return familyCode;
+      }
+    }
+
+    // "XX지원" → "XX가정"으로 변환 시도 (축약형 - 공백 없는 단순 지원명만)
+    const branchMatch = courtName.match(/^([^\s]+)지원$/);
+    if (branchMatch) {
+      const familyAbbrev = `${branchMatch[1]}가정`;
+      const familyCode = getCourtCodeByName(familyAbbrev);
+      if (familyCode) {
+        console.log(`📍 가사사건 법원코드 변환: "${courtName}" → "${familyAbbrev}" → ${familyCode}`);
+        return familyCode;
+      }
+    }
+  }
+
+  // 2. 민사/형사 사건인데 가정법원명이면 지방법원으로 변환
+  if (caseCategory === 'civil' || caseCategory === 'criminal') {
+    // "OO가정법원 XX지원" → "OO지방법원 XX지원"으로 변환 시도 (풀네임 먼저)
+    const fullNameMatch = courtName.match(/^(.+)가정법원\s+(.+)지원$/);
+    if (fullNameMatch) {
+      const civilFullName = `${fullNameMatch[1]}지방법원 ${fullNameMatch[2]}지원`;
+      const civilCode = getCourtCodeByName(civilFullName);
+      if (civilCode) {
+        console.log(`📍 민사사건 법원코드 변환: "${courtName}" → "${civilFullName}" → ${civilCode}`);
+        return civilCode;
+      }
+    }
+
+    // "XX가정" → "XX지원"으로 변환 시도 (축약형)
+    const familyMatch = courtName.match(/^([^\s]+)가정$/);
+    if (familyMatch) {
+      const civilAbbrev = `${familyMatch[1]}지원`;
+      const civilCode = getCourtCodeByName(civilAbbrev);
+      if (civilCode) {
+        console.log(`📍 민사사건 법원코드 변환: "${courtName}" → "${civilAbbrev}" → ${civilCode}`);
+        return civilCode;
+      }
+    }
+  }
+
+  // 3. 기본 조회 (변환 없이)
+  return getCourtCodeByName(courtName);
 }
 
 /**

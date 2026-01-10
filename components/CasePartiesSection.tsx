@@ -143,8 +143,9 @@ export default function CasePartiesSection({
     try {
       const res = await fetch('/api/admin/clients')
       const data = await res.json()
-      if (Array.isArray(data)) {
-        setClients(data)
+      // API 응답 형식: { clients: [...], count: number }
+      if (data.clients && Array.isArray(data.clients)) {
+        setClients(data.clients)
       }
     } catch (err) {
       console.error('의뢰인 목록 조회 실패:', err)
@@ -600,11 +601,12 @@ function PartyTableRow({
         }),
       })
       const data = await res.json()
-      if (res.ok && data.id) {
+      // API 응답 형식: { success: true, data: { id: ..., name: ... } }
+      if (res.ok && data.success && data.data?.id) {
         // 새 의뢰인 선택
         setEditData({
           ...editData!,
-          client_id: data.id,
+          client_id: data.data.id,
         })
         onClientCreated()
         setIsCreatingClient(false)

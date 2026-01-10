@@ -24,7 +24,7 @@
 
 import { getVisionCaptchaSolver } from '../google/vision-captcha-solver';
 import { solveCaptchaWithModel, isModelAvailable, shouldUseVisionAPI } from './captcha-solver';
-import { COURT_CODES, getCourtCodeByName } from './court-codes';
+import { COURT_CODES, getCourtCodeByName, getCourtCodeByNameAndCategory } from './court-codes';
 import { CASE_TYPE_CODES, getCaseTypeCodeByName, getCaseCategoryByTypeName } from './case-type-codes';
 import { getCaseLevel } from './case-relations';
 
@@ -1481,24 +1481,33 @@ export class ScourtApiClient {
    * - 대전지방법원 천안지원: 000283 (민사/형사)
    * - 대전가정법원 천안지원: 000294 (가사)
    */
-  private getCourtCode(cortNm: string, _caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
+  private getCourtCode(cortNm: string, caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
     // 숫자 코드면 그대로 반환
     if (/^\d+$/.test(cortNm)) {
       return cortNm;
     }
 
-    // 1. 정확한 매칭
+    // 1. 사건유형을 고려한 조회 (축약형 + 카테고리)
+    //    예: "평택지원" + family → "평택가정" → 000305
+    if (caseCategory) {
+      const categoryCode = getCourtCodeByNameAndCategory(cortNm, caseCategory);
+      if (categoryCode) {
+        return categoryCode;
+      }
+    }
+
+    // 2. 정확한 매칭
     if (COURT_CODES[cortNm]) {
       return COURT_CODES[cortNm];
     }
 
-    // 2. 부분 매칭 시도 (예: "평택지원" -> 정확한 법원명)
+    // 3. 부분 매칭 시도 (예: "평택지원" -> 정확한 법원명)
     const code = getCourtCodeByName(cortNm);
     if (code) {
       return code;
     }
 
-    // 3. 매칭 실패 시 원본 반환 (검색 API가 한글명을 처리하므로)
+    // 4. 매칭 실패 시 원본 반환 (검색 API가 한글명을 처리하므로)
     console.warn(`⚠️ 법원코드를 찾을 수 없음: "${cortNm}" - 원본 사용`);
     return cortNm;
   }

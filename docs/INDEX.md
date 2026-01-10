@@ -1,6 +1,6 @@
 # 문서 인덱스
 
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-10
 
 법무법인 더율 관리자 시스템 (theyool-admin) 문서 목록입니다.
 
@@ -21,6 +21,7 @@
 | [CLIENT_PORTAL.md](systems/CLIENT_PORTAL.md) | 의뢰인 포털 미리보기 API |
 | [SCOURT_API_ANALYSIS.md](systems/SCOURT_API_ANALYSIS.md) | 대법원 나의사건검색 API 분석 |
 | [SCOURT_INTEGRATION.md](systems/SCOURT_INTEGRATION.md) | SCOURT 통합 시스템 (동기화, 필드매핑) |
+| [SCOURT_SYNC_SYSTEM.md](systems/SCOURT_SYNC_SYSTEM.md) | SCOURT 사건 갱신 시스템 (진행/일반 분리) |
 | [CAPTCHA_MODEL.md](systems/CAPTCHA_MODEL.md) | 캡차 인식 ML 모델 |
 
 ---

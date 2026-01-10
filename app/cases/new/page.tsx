@@ -11,6 +11,8 @@ interface PageProps {
     clientId?: string
     partyName?: string  // 대법원 연동용 당사자명
     sourceCaseId?: string
+    relationType?: string
+    relationEncCsNo?: string
   }>
 }
 
@@ -82,6 +84,8 @@ export default async function NewCasePage({ searchParams }: PageProps) {
       sourceCaseId={params.sourceCaseId}
       initialClientRole={sourceCase?.client_role || null}
       initialOpponentName={sourceCase?.opponent_name || null}
+      sourceRelationType={params.relationType}
+      sourceRelationEncCsNo={params.relationEncCsNo}
     />
   )
 }

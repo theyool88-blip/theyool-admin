@@ -173,10 +173,10 @@ export default function CasePartiesSection({
       for (const scourt of scourtCandidates) {
         if (matchedScourtIds.has(scourt.id)) continue
         const scourtLabel = normalizePartyLabel(scourt.party_type_label || PARTY_TYPE_LABELS[scourt.party_type] || '')
-        const labelMatches =
-          scourtLabel === manualLabel ||
-          scourtLabel === '사건본인' ||
-          manualLabel === '사건본인'
+        // 사건본인은 사건본인끼리만 매칭 (다른 당사자 유형과 매칭 방지)
+        if (scourtLabel === '사건본인' && manualLabel !== '사건본인') continue
+        if (manualLabel === '사건본인' && scourtLabel !== '사건본인') continue
+        const labelMatches = scourtLabel === manualLabel
         if (!labelMatches) continue
         const scourtName = normalizePartyName(scourt.party_name)
         if (!scourtName) continue
@@ -619,9 +619,13 @@ function PartyTableRow({
       setCreatingClient(false)
     }
   }
-  // 의뢰인인 경우 실제 이름 사용, 아니면 SCOURT 이름 사용
+  // 번호 prefix 추출 (예: "1. " 또는 "1.")
+  const numberPrefixMatch = party.party_name.match(/^(\d+\.\s*)/)
+  const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
+
+  // 의뢰인인 경우 번호 prefix 보존하면서 실제 이름 사용, 아니면 SCOURT 이름 사용
   const displayName = party.is_our_client && party.clients?.name
-    ? party.clients.name
+    ? `${numberPrefix}${party.clients.name}`
     : party.party_name
 
   // 마스킹된 이름 감지 (예: 김OO, 이O수, 박OOO)

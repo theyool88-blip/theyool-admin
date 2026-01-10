@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -10,8 +10,7 @@ import {
   CASE_TYPE_OPTIONS,
   CASE_TYPE_GROUPS,
   getGroupedCaseTypes,
-  getCaseTypeAuto,
-  isApplicationCaseType
+  getCaseTypeAuto
 } from '@/lib/constants/case-types'
 
 interface Client {
@@ -73,6 +72,94 @@ interface Profile {
   role: string
 }
 
+interface UploadedFile {
+  id: string
+  file_name: string
+  file_path: string
+  file_size: number | null
+  file_type: string | null
+  publicUrl: string
+}
+
+// 섹션 헤더 컴포넌트
+function SectionHeader({
+  number,
+  title,
+  subtitle,
+  optional = false,
+}: {
+  number: number
+  title: string
+  subtitle?: string
+  optional?: boolean
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-sage-100 flex items-center justify-center">
+        <span className="text-sm font-semibold text-sage-700">{number}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+          {optional && (
+            <span className="px-2 py-0.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-full">
+              선택
+            </span>
+          )}
+        </div>
+        {subtitle && (
+          <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// 입력 필드 컴포넌트
+function FormField({
+  label,
+  required = false,
+  children,
+  hint
+}: {
+  label: string
+  required?: boolean
+  children: React.ReactNode
+  hint?: string
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+        {label}
+        {required && <span className="text-coral-600 ml-0.5">*</span>}
+      </label>
+      {children}
+      {hint && (
+        <p className="mt-1 text-xs text-gray-500">{hint}</p>
+      )}
+    </div>
+  )
+}
+
+// 파일 크기 포맷
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)}KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
+}
+
+// 금액 포맷 (천단위 콤마)
+function formatMoney(value: number | null | undefined): string {
+  if (value === null || value === undefined || value === 0) return ''
+  return value.toLocaleString('ko-KR')
+}
+
+// 콤마 제거 후 숫자 파싱
+function parseMoney(value: string): number {
+  const num = parseInt(value.replace(/,/g, ''), 10)
+  return isNaN(num) ? 0 : num
+}
+
 export default function CaseEditForm({
   profile,
   caseData,
@@ -86,6 +173,7 @@ export default function CaseEditForm({
 }) {
   const router = useRouter()
   const supabase = createClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
     contract_number: caseData.contract_number || '',
@@ -117,7 +205,7 @@ export default function CaseEditForm({
   // 대법원 검색 관련 상태
   const [scourtSearching, setScourtSearching] = useState(false)
   const [scourtSearchError, setScourtSearchError] = useState<string | null>(null)
-  const [scourtSearchPartyName, setScourtSearchPartyName] = useState('')  // 당사자이름 검색용
+  const [scourtSearchPartyName, setScourtSearchPartyName] = useState('')
 
   // 법원 선택 드롭다운
   const [showCourtDropdown, setShowCourtDropdown] = useState(false)
@@ -126,21 +214,15 @@ export default function CaseEditForm({
   ).slice(0, 15)
 
   // 대법원 검색 성공 여부
-  const [scourtSearchSuccess, setScourtSearchSuccess] = useState(false)
-  // 법원명 수정 알림
-  const [courtNameCorrected, setCourtNameCorrected] = useState<{original: string, corrected: string} | null>(null)
+  const [scourtSearchSuccess, setScourtSearchSuccess] = useState(!!caseData.enc_cs_no)
 
   // 그룹별 사건 유형 옵션 (메모이제이션)
   const groupedCaseTypes = useMemo(() => getGroupedCaseTypes(), [])
 
-  // 사건종류가 신청사건인지 확인 (보전처분, 가사신청 포함)
-  const isApplicationCase = isApplicationCaseType(formData.case_type, formData.court_case_number)
-
-  // 사건번호 또는 사건명 변경 시 자동분류
-  const handleAutoClassify = (caseNumber: string, caseName: string) => {
-    const autoType = getCaseTypeAuto(caseNumber, caseName)
+  // 사건번호 변경 시 자동분류
+  const handleAutoClassify = (caseNumber: string) => {
+    const autoType = getCaseTypeAuto(caseNumber, '')
     if (autoType && !formData.case_type) {
-      // 사건유형이 비어있을 때만 자동분류 적용
       setFormData(prev => ({ ...prev, case_type: autoType }))
     }
   }
@@ -157,6 +239,10 @@ export default function CaseEditForm({
   })
   const [saving, setSaving] = useState(false)
 
+  // 계약서 파일 관련 상태
+  const [contractFiles, setContractFiles] = useState<UploadedFile[]>([])
+  const [isUploading, setIsUploading] = useState(false)
+
   useEffect(() => {
     const fetchClients = async () => {
       try {
@@ -165,8 +251,6 @@ export default function CaseEditForm({
 
         if (result.clients) {
           setAllClients(result.clients)
-        } else if (result.error) {
-          console.error('의뢰인 목록 로드 실패:', result.error)
         }
       } catch (error) {
         console.error('의뢰인 목록 로드 실패:', error)
@@ -184,21 +268,29 @@ export default function CaseEditForm({
         }
       })
       .catch(err => console.error('담당자 목록 조회 실패:', err))
-  }, [])
 
-  // 대법원 사건 검색 (사건번호, 법원, 당사자이름 3개 입력 필요)
+    // 계약서 파일 목록 불러오기
+    fetch(`/api/admin/cases/${caseData.id}/contracts`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setContractFiles(data.contracts || [])
+        }
+      })
+      .catch(err => console.error('계약서 목록 조회 실패:', err))
+  }, [caseData.id])
+
+  // 대법원 사건 검색
   const handleScourtSearch = async () => {
     const caseNumber = formData.court_case_number.trim()
     const courtName = formData.court_name.trim()
     const partyName = scourtSearchPartyName.trim()
 
-    // 3개 필드 모두 입력 필요
     if (!caseNumber || !courtName || !partyName) {
       setScourtSearchError('사건번호, 법원, 당사자이름을 모두 입력해주세요.')
       return
     }
 
-    // 사건번호 파싱 (법원명 포함 가능: "수원가정법원 2024드단12345" 또는 "2024드단12345")
     const caseNumberOnly = caseNumber.replace(/^[가-힣\s]+(?=\d)/, '').trim()
     const caseNumberPattern = /^(\d{4})([가-힣]+)(\d+)$/
     const match = caseNumberOnly.match(caseNumberPattern)
@@ -223,78 +315,13 @@ export default function CaseEditForm({
           caseSerial,
           courtName,
           partyName,
-          legalCaseId: caseData.id  // 스냅샷 저장용
+          legalCaseId: caseData.id
         })
       })
 
       const result = await response.json()
 
-      // 에러 타입별 처리
-      if (result.errorType === 'COURT_MISMATCH') {
-        // 법원명이 완전히 잘못됨 - 에러 표시
-        setScourtSearchError(`${result.error}`)
-        return
-      }
-
-      if (result.errorType === 'COURT_CORRECTION_NEEDED') {
-        // 법원명 수정 필요 - 사용자 확인 요청
-        const confirmed = window.confirm(
-          `입력한 법원: ${result.enteredCourt}\n` +
-          `실제 법원: ${result.suggestedCourt}\n\n` +
-          `"${result.suggestedCourt}"으로 수정하시겠습니까?`
-        )
-
-        if (confirmed) {
-          // 수정 확인 후 재요청
-          setScourtSearching(true)
-          const retryResponse = await fetch('/api/admin/scourt/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              caseYear,
-              caseType,
-              caseSerial,
-              courtName: result.suggestedCourt,  // 수정된 법원명
-              partyName,
-              legalCaseId: caseData.id,
-              confirmCourtCorrection: true  // 수정 확인 플래그
-            })
-          })
-          const retryResult = await retryResponse.json()
-
-          if (retryResult.success) {
-            // 수정된 법원명으로 폼 업데이트
-            setFormData(prev => ({
-              ...prev,
-              court_name: result.suggestedCourt,
-              client_role: retryResult.caseInfo.clientRole || prev.client_role,
-              enc_cs_no: retryResult.caseInfo.encCsNo || prev.enc_cs_no,
-            }))
-            setCourtNameCorrected({
-              original: result.enteredCourt,
-              corrected: result.suggestedCourt
-            })
-            setScourtSearchError(null)
-            setScourtSearchSuccess(true)
-          } else {
-            setScourtSearchError(retryResult.error || '사건 등록에 실패했습니다.')
-          }
-        } else {
-          setScourtSearchError('법원명을 확인 후 다시 검색해주세요.')
-        }
-        return
-      }
-
       if (result.success && result.caseInfo) {
-        // 검색 성공 - 법원명 자동 수정 알림
-        if (result.courtNameCorrected) {
-          setCourtNameCorrected(result.courtNameCorrected)
-          console.log(`법원명 자동 수정: ${result.courtNameCorrected.original} → ${result.courtNameCorrected.corrected}`)
-        } else {
-          setCourtNameCorrected(null)
-        }
-
-        // 폼 데이터 업데이트
         setFormData(prev => ({
           ...prev,
           court_name: result.caseInfo.courtName || prev.court_name,
@@ -304,7 +331,6 @@ export default function CaseEditForm({
 
         setScourtSearchError(null)
         setScourtSearchSuccess(true)
-        console.log(`✅ 연동 완료: 기일 ${result.generalData?.hearings || 0}건, 진행 ${result.generalData?.progress || 0}건`)
       } else {
         setScourtSearchError(result.error || '사건을 찾을 수 없습니다.')
       }
@@ -316,10 +342,56 @@ export default function CaseEditForm({
     }
   }
 
+  // 파일 업로드 핸들러
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    setIsUploading(true)
+
+    for (const file of Array.from(files)) {
+      try {
+        const formDataUpload = new FormData()
+        formDataUpload.append('file', file)
+        formDataUpload.append('legalCaseId', caseData.id)
+
+        const res = await fetch('/api/admin/contracts/upload', {
+          method: 'POST',
+          body: formDataUpload
+        })
+
+        const result = await res.json()
+        if (result.success) {
+          setContractFiles(prev => [...prev, result.data])
+        } else {
+          console.error('파일 업로드 실패:', result.error)
+          alert(result.error || '파일 업로드에 실패했습니다.')
+        }
+      } catch (err) {
+        console.error('파일 업로드 오류:', err)
+      }
+    }
+
+    setIsUploading(false)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // 파일 삭제 핸들러
+  const handleFileDelete = async (fileId: string, filePath: string) => {
+    try {
+      await fetch(`/api/admin/contracts/upload?id=${fileId}`, {
+        method: 'DELETE'
+      })
+      setContractFiles(prev => prev.filter(f => f.id !== fileId))
+    } catch (err) {
+      console.error('파일 삭제 오류:', err)
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // 의뢰인 필수 검증
     if (!formData.client_id) {
       alert('의뢰인을 선택해주세요.')
       return
@@ -345,7 +417,6 @@ export default function CaseEditForm({
           court_case_number: formData.court_case_number || null,
           court_name: formData.court_name || null,
           case_type: formData.case_type || null,
-          application_type: isApplicationCase ? (formData.application_type || null) : null,
           judge_name: formData.judge_name || null,
           notes: formData.notes || null,
           onedrive_folder_url: formData.onedrive_folder_url || null,
@@ -408,7 +479,7 @@ export default function CaseEditForm({
   }
 
   const handleDeleteRelation = async (relationId: string) => {
-    if (!confirm('이 관련 사건을 삭제하시겠습니까? (양방향 모두 삭제됩니다)')) return
+    if (!confirm('이 관련 사건을 삭제하시겠습니까?')) return
 
     try {
       const { data: relation } = await supabase
@@ -419,267 +490,120 @@ export default function CaseEditForm({
 
       if (!relation) throw new Error('관계를 찾을 수 없습니다')
 
-      const { error: error1 } = await supabase
-        .from('case_relations')
-        .delete()
-        .eq('id', relationId)
-
-      if (error1) throw error1
-
-      const { error: error2 } = await supabase
-        .from('case_relations')
-        .delete()
+      await supabase.from('case_relations').delete().eq('id', relationId)
+      await supabase.from('case_relations').delete()
         .eq('case_id', relation.related_case_id)
         .eq('related_case_id', relation.case_id)
 
-      if (error2) throw error2
-
       setRelations(relations.filter(r => r.id !== relationId))
-      alert('양방향 관계가 모두 삭제되었습니다')
     } catch (error) {
       console.error('삭제 실패:', error)
       alert('삭제에 실패했습니다')
     }
   }
 
-  const formatCurrency = (amount: number) => {
-    return `${amount.toLocaleString()}원`
-  }
+  const inputClassName = "w-full h-11 px-4 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors"
+  const selectClassName = "w-full h-11 px-4 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors appearance-none cursor-pointer"
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="사건 수정" subtitle={caseData.case_name} />
+    <div className="min-h-screen bg-gradient-to-b from-sage-50/50 to-white">
+      <AdminHeader title="사건 수정" />
 
-      <div className="max-w-4xl mx-auto pt-20 pb-8 px-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Basic Info */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">기본 정보</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">계약번호</label>
-                <input
-                  type="text"
-                  value={formData.contract_number}
-                  onChange={(e) => setFormData({...formData, contract_number: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">계약일</label>
-                <input
-                  type="date"
-                  value={formData.contract_date}
-                  onChange={(e) => setFormData({...formData, contract_date: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                  style={{ colorScheme: 'light' }}
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">
-                  의뢰인 *
-                  {formData.client_role && (
-                    <span className={`ml-2 px-1.5 py-0.5 text-xs font-semibold rounded ${
-                      formData.client_role === 'plaintiff'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {formData.client_role === 'plaintiff' ? '원고' : '피고'}
+      <div className="max-w-2xl mx-auto pt-20 pb-12 px-4">
+        {/* 뒤로가기 */}
+        <div className="mb-6">
+          <Link
+            href={`/cases/${caseData.id}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white rounded-full shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            사건 상세
+          </Link>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* ========== 섹션 1: 대법원 사건 연동 ========== */}
+          <div className={`rounded-2xl border overflow-hidden transition-all ${
+            scourtSearchSuccess
+              ? 'bg-sage-50 border-sage-300'
+              : 'bg-white border-sage-200 shadow-sm'
+          }`}>
+            <div className="p-5 border-b border-sage-100">
+              <SectionHeader
+                number={1}
+                title="대법원 사건 연동"
+                subtitle="연동 시 법원, 원고/피고 정보가 자동으로 입력됩니다"
+                optional
+              />
+            </div>
+
+            <div className="p-5">
+              {scourtSearchSuccess ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sage-700">
+                    <svg className="w-5 h-5 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium">
+                      {formData.court_case_number} / {getCourtAbbrev(formData.court_name)}
+                      {formData.client_role && ` (${formData.client_role === 'plaintiff' ? '원고' : '피고'})`}
                     </span>
-                  )}
-                </label>
-                <select
-                  value={formData.client_id}
-                  onChange={(e) => setFormData({...formData, client_id: e.target.value})}
-                  required
-                  disabled={loadingClients}
-                  className={`w-full px-3 py-2 text-sm border rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500 ${
-                    !formData.client_id ? 'border-red-300 bg-red-50' : 'border-gray-200'
-                  }`}
-                >
-                  <option value="">의뢰인 선택 (필수)</option>
-                  {allClients.map(client => (
-                    <option key={client.id} value={client.id}>
-                      {client.name} {client.phone ? `(${client.phone})` : ''}
-                    </option>
-                  ))}
-                </select>
-                {!formData.client_id && (
-                  <p className="text-xs text-red-500 mt-1">의뢰인을 선택해주세요</p>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">사건명 *</label>
-                <input
-                  type="text"
-                  value={formData.case_name}
-                  onChange={(e) => {
-                    const newCaseName = e.target.value
-                    setFormData({...formData, case_name: newCaseName})
-                    // 사건유형이 비어있을 때 자동분류 시도
-                    if (!formData.case_type) {
-                      handleAutoClassify(formData.court_case_number, newCaseName)
-                    }
-                  }}
-                  required
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">의뢰인 역할</label>
-                <select
-                  value={formData.client_role}
-                  onChange={(e) => setFormData({...formData, client_role: e.target.value as 'plaintiff' | 'defendant' | ''})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                >
-                  <option value="">선택하세요</option>
-                  <option value="plaintiff">원고</option>
-                  <option value="defendant">피고</option>
-                </select>
-                <p className="text-xs text-gray-400 mt-1">대법원 검색 시 자동 판별됩니다</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">상대방 이름</label>
-                <input
-                  type="text"
-                  value={formData.opponent_name}
-                  onChange={(e) => setFormData({...formData, opponent_name: e.target.value})}
-                  placeholder="예: 김철수"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-                <p className="text-xs text-gray-400 mt-1">사건 상세에서 실명으로 표시됩니다</p>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">상태</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                >
-                  <option value="진행중">진행중</option>
-                  <option value="종결">종결</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">담당 변호사</label>
-                <select
-                  value={formData.assigned_to}
-                  onChange={(e) => setFormData({...formData, assigned_to: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                >
-                  <option value="">선택하세요</option>
-                  {lawyerMembers.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.display_name || '이름 없음'}
-                      {member.role === 'owner' && ' (대표)'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {/* 대법원 검색 섹션 */}
-              <div className={`md:col-span-2 p-4 rounded-lg border ${scourtSearchSuccess ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'}`}>
-                {scourtSearchSuccess ? (
-                  // 검색 성공 시 결과 표시
-                  <>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-green-800 flex items-center gap-2">
-                        <span className="text-green-600">✓</span> 대법원 사건 연동 완료
-                      </h3>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setScourtSearchSuccess(false)
-                          setScourtSearchError(null)
-                          setCourtNameCorrected(null)
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScourtSearchSuccess(false)
+                      setScourtSearchError(null)
+                    }}
+                    className="text-sm text-sage-600 hover:text-sage-700 font-medium"
+                  >
+                    다시 검색하기
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FormField label="사건번호">
+                      <input
+                        type="text"
+                        value={formData.court_case_number}
+                        onChange={(e) => {
+                          const newCaseNumber = e.target.value
+                          setFormData({ ...formData, court_case_number: newCaseNumber })
+                          if (!formData.case_type) {
+                            handleAutoClassify(newCaseNumber)
+                          }
                         }}
-                        className="px-3 py-1 text-xs font-medium text-green-700 border border-green-300 rounded hover:bg-green-100"
-                      >
-                        다시 검색
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
-                      <div>
-                        <span className="text-green-700 text-xs">사건번호</span>
-                        <p className="font-medium text-green-900">{formData.court_case_number}</p>
-                      </div>
-                      <div>
-                        <span className="text-green-700 text-xs">법원</span>
-                        <p className="font-medium text-green-900">{getCourtAbbrev(formData.court_name)}</p>
-                      </div>
-                      {formData.client_role && (
-                        <div>
-                          <span className="text-green-700 text-xs">의뢰인 지위</span>
-                          <p className="font-medium text-green-900">{formData.client_role === 'plaintiff' ? '원고' : '피고'}</p>
-                        </div>
-                      )}
-                    </div>
-                    <p className="mt-2 text-xs text-green-700">
-                      나의사건검색에 등록되어 기일/송달 정보가 자동 동기화됩니다.
-                    </p>
-                    {/* 법원명 수정 알림 */}
-                    {courtNameCorrected && (
-                      <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs">
-                        <span className="text-yellow-700 font-medium">ℹ️ 법원명이 수정되었습니다:</span>
-                        <span className="text-yellow-900 ml-1">
-                          {getCourtAbbrev(courtNameCorrected.original)} → {getCourtAbbrev(courtNameCorrected.corrected)}
-                        </span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  // 검색 폼
-                  <>
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-sm font-semibold text-blue-900">대법원 사건 검색</h3>
-                      <button
-                        type="button"
-                        onClick={handleScourtSearch}
-                        disabled={scourtSearching}
-                        className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                      >
-                        {scourtSearching ? '검색중...' : '검색'}
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium text-blue-700 mb-1">사건번호 *</label>
-                        <input
-                          type="text"
-                          value={formData.court_case_number}
-                          onChange={(e) => {
-                            const newCaseNumber = e.target.value
-                            setFormData({...formData, court_case_number: newCaseNumber})
-                            // 사건유형이 비어있을 때 자동분류 시도
-                            if (!formData.case_type) {
-                              handleAutoClassify(newCaseNumber, formData.case_name)
-                            }
-                          }}
-                          placeholder="2024드단12345"
-                          className="w-full px-3 py-2 text-sm border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                        />
-                      </div>
+                        placeholder="2024드단12345"
+                        className={inputClassName}
+                      />
+                    </FormField>
+
+                    <FormField label="법원">
                       <div className="relative">
-                        <label className="block text-xs font-medium text-blue-700 mb-1">법원 *</label>
                         <input
                           type="text"
                           value={formData.court_name}
                           onChange={(e) => {
-                            setFormData({...formData, court_name: e.target.value})
+                            setFormData({ ...formData, court_name: e.target.value })
                             setShowCourtDropdown(true)
                           }}
                           onFocus={() => setShowCourtDropdown(true)}
                           onBlur={() => setTimeout(() => setShowCourtDropdown(false), 150)}
-                          placeholder="검색 또는 선택..."
-                          className="w-full px-3 py-2 text-sm border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                          placeholder="법원 검색..."
+                          className={inputClassName}
                         />
                         {showCourtDropdown && filteredCourts.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                          <div className="absolute z-50 w-full mt-1 bg-white border border-sage-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                             {filteredCourts.map(c => (
                               <div
                                 key={c.code}
-                                className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50 text-gray-900"
+                                className="px-4 py-3 text-sm cursor-pointer hover:bg-sage-50 text-gray-900 border-b border-sage-50 last:border-b-0"
                                 onMouseDown={() => {
-                                  setFormData({...formData, court_name: c.name})
+                                  setFormData({ ...formData, court_name: c.name })
                                   setShowCourtDropdown(false)
                                 }}
                               >
@@ -689,252 +613,438 @@ export default function CaseEditForm({
                           </div>
                         )}
                       </div>
-                      <div>
-                        <label className="block text-xs font-medium text-blue-700 mb-1">당사자이름 *</label>
-                        <input
-                          type="text"
-                          value={scourtSearchPartyName}
-                          onChange={(e) => setScourtSearchPartyName(e.target.value)}
-                          placeholder="의뢰인 또는 상대방 이름"
-                          className="w-full px-3 py-2 text-sm border border-blue-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                        />
-                      </div>
+                    </FormField>
+
+                    <FormField label="당사자이름">
+                      <input
+                        type="text"
+                        value={scourtSearchPartyName}
+                        onChange={(e) => setScourtSearchPartyName(e.target.value)}
+                        placeholder="의뢰인 이름"
+                        className={inputClassName}
+                      />
+                    </FormField>
+                  </div>
+
+                  {scourtSearchError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                      <p className="text-sm text-red-600">{scourtSearchError}</p>
                     </div>
-                    {scourtSearchError && (
-                      <p className="mt-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-                        ⚠️ {scourtSearchError}
-                      </p>
-                    )}
-                    <p className="mt-2 text-xs text-blue-600">
-                      검색 성공 시 법원, 판사, 원고/피고 정보가 자동으로 입력됩니다.
-                    </p>
-                  </>
-                )}
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">담당 판사</label>
-                <input
-                  type="text"
-                  value={formData.judge_name}
-                  onChange={(e) => setFormData({...formData, judge_name: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">사건종류</label>
-                <select
-                  value={formData.case_type}
-                  onChange={(e) => setFormData({...formData, case_type: e.target.value})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                >
-                  <option value="">선택하세요</option>
-                  {CASE_TYPE_GROUPS.map(group => (
-                    <optgroup key={group} label={group}>
-                      {groupedCaseTypes[group]?.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-                {formData.case_type && !CASE_TYPE_OPTIONS.find(o => o.value === formData.case_type) && (
-                  <p className="text-xs text-gray-400 mt-1">직접 입력: {formData.case_type}</p>
-                )}
-              </div>
-            </div>
-          </div>
+                  )}
 
-          {/* Fee Info */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">수임료 정보</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">착수금 (원)</label>
-                <input
-                  type="number"
-                  value={formData.retainer_fee}
-                  onChange={(e) => setFormData({...formData, retainer_fee: Number(e.target.value)})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">입금액 (원)</label>
-                <input
-                  type="number"
-                  value={formData.total_received}
-                  onChange={(e) => setFormData({...formData, total_received: Number(e.target.value)})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-gray-500 mb-1">성공보수 약정</label>
-                <input
-                  type="text"
-                  value={formData.success_fee_agreement}
-                  onChange={(e) => setFormData({...formData, success_fee_agreement: e.target.value})}
-                  placeholder="예: 위자료 인정액의 5%"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">발생 성공보수 (원)</label>
-                <input
-                  type="number"
-                  value={formData.calculated_success_fee}
-                  onChange={(e) => setFormData({...formData, calculated_success_fee: Number(e.target.value)})}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">미수금</label>
-                <input
-                  type="text"
-                  value={formatCurrency((formData.retainer_fee || 0) + (formData.calculated_success_fee || 0) - (formData.total_received || 0))}
-                  disabled
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-gray-50 text-gray-600"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-4">메모</h2>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({...formData, notes: e.target.value})}
-              rows={4}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-            />
-          </div>
-
-          {/* Google Drive Folder Link */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <h2 className="text-sm font-semibold text-gray-900 mb-2">소송 서류 폴더 (의뢰인 포털용)</h2>
-            <p className="text-xs text-gray-500 mb-3">
-              Google Drive 공유 폴더 링크를 입력하세요. 의뢰인 포털에서 서류를 확인할 수 있습니다.
-            </p>
-            <input
-              type="url"
-              value={formData.onedrive_folder_url}
-              onChange={(e) => setFormData({...formData, onedrive_folder_url: e.target.value})}
-              placeholder="https://drive.google.com/drive/folders/..."
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-            />
-            {formData.onedrive_folder_url && (
-              <div className="mt-2">
-                <a
-                  href={formData.onedrive_folder_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-sage-600 hover:text-sage-700 underline"
-                >
-                  링크 열어보기 →
-                </a>
-              </div>
-            )}
-          </div>
-
-          {/* Related Cases */}
-          <div className="bg-white rounded-lg border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-900">관련 사건</h2>
-              <button
-                type="button"
-                onClick={() => setShowAddRelation(!showAddRelation)}
-                className="px-3 py-1 text-xs font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
-              >
-                + 추가
-              </button>
-            </div>
-
-            {showAddRelation && (
-              <div className="mb-4 p-3 border border-gray-200 rounded bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">사건 선택</label>
-                    <select
-                      value={newRelation.related_case_id}
-                      onChange={(e) => setNewRelation({...newRelation, related_case_id: e.target.value})}
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white focus:outline-none focus:ring-1 focus:ring-sage-500"
-                    >
-                      <option value="">선택하세요</option>
-                      {allCases.map(c => (
-                        <option key={c.id} value={c.id}>
-                          {c.case_name} {c.contract_number ? `(${c.contract_number})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">관계 유형</label>
-                    <input
-                      type="text"
-                      value={newRelation.relation_type}
-                      onChange={(e) => setNewRelation({...newRelation, relation_type: e.target.value})}
-                      placeholder="예: 항소, 상고, 관련사건"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded focus:outline-none focus:ring-1 focus:ring-sage-500"
-                    />
-                  </div>
-                  <div className="flex items-end">
-                    <button
-                      type="button"
-                      onClick={handleAddRelation}
-                      className="w-full px-3 py-2 text-sm font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
-                    >
-                      추가하기
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              {relations.map((relation) => (
-                <div key={relation.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                  <div className="flex items-center gap-2">
-                    {relation.relation_type && (
-                      <span className="px-1.5 py-0.5 text-xs font-medium bg-blue-50 text-blue-700 rounded">
-                        {relation.relation_type}
-                      </span>
-                    )}
-                    <span className="text-sm text-gray-900">
-                      {relation.related_case?.case_name || '사건명 없음'}
-                    </span>
-                    {relation.related_case?.contract_number && (
-                      <span className="text-xs text-gray-400">
-                        ({relation.related_case.contract_number})
-                      </span>
-                    )}
-                  </div>
                   <button
                     type="button"
-                    onClick={() => handleDeleteRelation(relation.id)}
-                    className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                    onClick={handleScourtSearch}
+                    disabled={scourtSearching}
+                    className="w-full sm:w-auto px-6 py-2.5 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
-                    삭제
+                    {scourtSearching ? '검색 중...' : '대법원 연동하기'}
                   </button>
                 </div>
-              ))}
-              {relations.length === 0 && (
-                <p className="text-center text-gray-400 text-sm py-6">관련 사건이 없습니다</p>
               )}
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2">
+          {/* ========== 섹션 2: 당사자 정보 ========== */}
+          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-sage-100">
+              <SectionHeader
+                number={2}
+                title="당사자 정보"
+                subtitle="의뢰인과 상대방 정보"
+              />
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="의뢰인" required>
+                  <div className="relative">
+                    <select
+                      value={formData.client_id}
+                      onChange={(e) => setFormData({ ...formData, client_id: e.target.value })}
+                      required
+                      disabled={loadingClients}
+                      className={selectClassName}
+                    >
+                      <option value="">의뢰인을 선택하세요</option>
+                      {allClients.map(client => (
+                        <option key={client.id} value={client.id}>
+                          {client.name} {client.phone ? `(${client.phone})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </FormField>
+
+                <FormField label="의뢰인 역할">
+                  <div className="relative">
+                    <select
+                      value={formData.client_role}
+                      onChange={(e) => setFormData({ ...formData, client_role: e.target.value as 'plaintiff' | 'defendant' | '' })}
+                      className={selectClassName}
+                    >
+                      <option value="">선택하세요</option>
+                      <option value="plaintiff">원고</option>
+                      <option value="defendant">피고</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </FormField>
+              </div>
+
+              <FormField label="상대방 이름" hint="분쟁 상대방이 있는 경우에만 입력하세요">
+                <input
+                  type="text"
+                  value={formData.opponent_name}
+                  onChange={(e) => setFormData({ ...formData, opponent_name: e.target.value })}
+                  className={inputClassName}
+                  placeholder="상대방 이름 (선택)"
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* ========== 섹션 3: 계약 정보 ========== */}
+          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-sage-100">
+              <SectionHeader
+                number={3}
+                title="계약 정보"
+                subtitle="계약 및 수임 관련 정보"
+              />
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField label="사건명" required>
+                  <input
+                    type="text"
+                    value={formData.case_name}
+                    onChange={(e) => setFormData({ ...formData, case_name: e.target.value })}
+                    required
+                    className={inputClassName}
+                    placeholder="이혼, 양육권 등"
+                  />
+                </FormField>
+
+                <FormField label="관리번호" hint="사건 관리용 번호">
+                  <input
+                    type="text"
+                    value={formData.contract_number}
+                    onChange={(e) => setFormData({ ...formData, contract_number: e.target.value })}
+                    className={inputClassName}
+                    placeholder="예: 2024-001"
+                  />
+                </FormField>
+
+                <FormField label="담당 변호사">
+                  <div className="relative">
+                    <select
+                      value={formData.assigned_to}
+                      onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
+                      className={selectClassName}
+                    >
+                      <option value="">선택하세요</option>
+                      {lawyerMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.display_name || '이름 없음'}
+                          {member.role === 'owner' && ' (대표)'}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </FormField>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField label="계약일">
+                  <input
+                    type="date"
+                    value={formData.contract_date}
+                    onChange={(e) => setFormData({ ...formData, contract_date: e.target.value })}
+                    className={inputClassName}
+                    style={{ colorScheme: 'light' }}
+                  />
+                </FormField>
+
+                <FormField label="상태">
+                  <div className="relative">
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className={selectClassName}
+                    >
+                      <option value="진행중">진행중</option>
+                      <option value="종결">종결</option>
+                    </select>
+                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </div>
+                  </div>
+                </FormField>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField label="착수금 (원)">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatMoney(formData.retainer_fee)}
+                    onChange={(e) => setFormData({ ...formData, retainer_fee: parseMoney(e.target.value) })}
+                    className={inputClassName}
+                    placeholder="0"
+                  />
+                </FormField>
+
+                <FormField label="성공보수 약정">
+                  <input
+                    type="text"
+                    value={formData.success_fee_agreement}
+                    onChange={(e) => setFormData({ ...formData, success_fee_agreement: e.target.value })}
+                    className={inputClassName}
+                    placeholder="예: 인정액의 5%"
+                  />
+                </FormField>
+
+                <FormField label="발생 성공보수 (원)">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={formatMoney(formData.calculated_success_fee)}
+                    onChange={(e) => setFormData({ ...formData, calculated_success_fee: parseMoney(e.target.value) })}
+                    className={inputClassName}
+                    placeholder="0"
+                  />
+                </FormField>
+              </div>
+
+              {/* 계약서 업로드 */}
+              <div className="pt-4 border-t border-sage-100">
+                <FormField label="계약서" hint="PDF, 이미지, Word 파일 (최대 10MB)">
+                  <div
+                    className="border-2 border-dashed border-sage-200 rounded-lg p-6 text-center hover:border-sage-400 transition-colors cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault()
+                      e.currentTarget.classList.add('border-sage-400', 'bg-sage-50')
+                    }}
+                    onDragLeave={(e) => {
+                      e.currentTarget.classList.remove('border-sage-400', 'bg-sage-50')
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      e.currentTarget.classList.remove('border-sage-400', 'bg-sage-50')
+                      handleFileUpload(e.dataTransfer.files)
+                    }}
+                  >
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      multiple
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx"
+                      className="hidden"
+                      onChange={(e) => handleFileUpload(e.target.files)}
+                    />
+                    {isUploading ? (
+                      <div className="flex items-center justify-center gap-2 text-sage-600">
+                        <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        업로드 중...
+                      </div>
+                    ) : (
+                      <>
+                        <svg className="mx-auto w-10 h-10 text-sage-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p className="text-sm text-gray-600">
+                          파일을 드래그하거나 클릭하여 업로드
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </FormField>
+
+                {/* 업로드된 파일 목록 */}
+                {contractFiles.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {contractFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-3 bg-sage-50 rounded-lg">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <svg className="w-5 h-5 text-sage-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-sm text-gray-700 truncate">{file.file_name}</span>
+                          {file.file_size && (
+                            <span className="text-xs text-gray-500">({formatFileSize(file.file_size)})</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <a
+                            href={file.publicUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2 py-1 text-xs font-medium text-sage-600 hover:text-sage-700"
+                          >
+                            다운로드
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleFileDelete(file.id, file.file_path)}
+                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <FormField label="메모">
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  rows={2}
+                  className="w-full px-4 py-3 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors resize-none"
+                  placeholder="추가 메모 사항"
+                />
+              </FormField>
+            </div>
+          </div>
+
+          {/* ========== 섹션 4: 관련 사건 ========== */}
+          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-sage-100">
+              <div className="flex items-center justify-between">
+                <SectionHeader
+                  number={4}
+                  title="관련 사건"
+                  optional
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAddRelation(!showAddRelation)}
+                  className="px-3 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-lg hover:bg-sage-100 transition-colors"
+                >
+                  + 추가
+                </button>
+              </div>
+            </div>
+
+            <div className="p-5">
+              {showAddRelation && (
+                <div className="mb-4 p-4 border border-sage-100 rounded-xl bg-sage-50/50">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <FormField label="사건 선택">
+                      <select
+                        value={newRelation.related_case_id}
+                        onChange={(e) => setNewRelation({ ...newRelation, related_case_id: e.target.value })}
+                        className={selectClassName}
+                      >
+                        <option value="">선택하세요</option>
+                        {allCases.filter(c => c.id !== caseData.id).map(c => (
+                          <option key={c.id} value={c.id}>
+                            {c.case_name} {c.contract_number ? `(${c.contract_number})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                    <FormField label="관계 유형">
+                      <input
+                        type="text"
+                        value={newRelation.relation_type}
+                        onChange={(e) => setNewRelation({ ...newRelation, relation_type: e.target.value })}
+                        placeholder="예: 항소, 상고"
+                        className={inputClassName}
+                      />
+                    </FormField>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        onClick={handleAddRelation}
+                        className="w-full h-11 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors"
+                      >
+                        추가하기
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {relations.map((relation) => (
+                  <div key={relation.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      {relation.relation_type && (
+                        <span className="px-2 py-0.5 text-xs font-medium bg-sage-100 text-sage-700 rounded">
+                          {relation.relation_type}
+                        </span>
+                      )}
+                      <span className="text-sm text-gray-900">
+                        {relation.related_case?.case_name || '사건명 없음'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRelation(relation.id)}
+                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))}
+                {relations.length === 0 && (
+                  <p className="text-center text-gray-400 text-sm py-6">관련 사건이 없습니다</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ========== 하단 버튼 ========== */}
+          <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4">
             <Link
               href={`/cases/${caseData.id}`}
-              className="px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors"
+              className="w-full sm:w-auto px-6 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-center"
             >
               취소
             </Link>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded hover:bg-sage-700 disabled:opacity-50 transition-colors"
+              className="w-full sm:w-auto px-8 py-3 text-sm font-medium text-white bg-sage-600 rounded-xl hover:bg-sage-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
             >
-              {saving ? '저장 중...' : '저장'}
+              {saving ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  저장 중...
+                </span>
+              ) : (
+                '저장'
+              )}
             </button>
           </div>
         </form>

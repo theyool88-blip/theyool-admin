@@ -50,9 +50,13 @@ export const POST = withTenant(async (request, { tenant }) => {
     // 파일명 생성 (중복 방지를 위해 타임스탬프 추가)
     const timestamp = Date.now();
     const ext = file.name.split('.').pop() || 'pdf';
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9가-힣._-]/g, '_');
+    // Supabase Storage는 한글 경로를 지원하지 않으므로 ASCII만 허용
+    const sanitizedName = file.name
+      .replace(/\.[^.]+$/, '') // 확장자 제거
+      .replace(/[^a-zA-Z0-9]/g, '_') // 영숫자 외 모두 언더스코어로
+      .substring(0, 50); // 길이 제한
     const caseFolder = legalCaseId || 'pending';
-    const fileName = `${tenant.tenantId}/${caseFolder}/${timestamp}_${sanitizedName}`;
+    const fileName = `${tenant.tenantId}/${caseFolder}/${timestamp}_${sanitizedName}.${ext}`;
 
     // 파일 업로드
     const arrayBuffer = await file.arrayBuffer();
@@ -66,7 +70,7 @@ export const POST = withTenant(async (request, { tenant }) => {
     if (uploadError) {
       console.error('Contract upload error:', uploadError);
       return NextResponse.json(
-        { success: false, error: '파일 업로드에 실패했습니다.' },
+        { success: false, error: `파일 업로드 실패: ${uploadError.message}` },
         { status: 500 }
       );
     }
@@ -105,10 +109,10 @@ export const POST = withTenant(async (request, { tenant }) => {
       success: true,
       data: {
         id: contractRecord?.id || null,
-        fileName: file.name,
-        filePath: fileName,
-        fileSize: file.size,
-        fileType: file.type,
+        file_name: file.name,
+        file_path: fileName,
+        file_size: file.size,
+        file_type: file.type,
         publicUrl,
       },
     });

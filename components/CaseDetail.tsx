@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import type { CourtHearing, CaseDeadline } from '@/types/court-hearing'
 import {
@@ -247,6 +248,25 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [caseNotices, setCaseNotices] = useState<CaseNotice[]>([])
   const [dismissedNoticeIds, setDismissedNoticeIds] = useState<Set<string>>(new Set())
   const [dismissedRelatedCases, setDismissedRelatedCases] = useState<Set<string>>(new Set())
+
+  // 계약서 파일 관련 상태
+  const [contractFiles, setContractFiles] = useState<{
+    id: string
+    file_name: string
+    file_path: string
+    file_size: number | null
+    file_type: string | null
+    publicUrl: string
+  }[]>([])
+
+  // 일반 탭 당사자 이름 수정 모달 상태
+  const [editingPartyFromGeneral, setEditingPartyFromGeneral] = useState<{
+    partyId: string
+    partyLabel: string
+    partyName: string
+  } | null>(null)
+  const [editPartyNameInput, setEditPartyNameInput] = useState('')
+  const [savingPartyFromGeneral, setSavingPartyFromGeneral] = useState(false)
   const [allHearings, setAllHearings] = useState<CourtHearing[]>([])
   const [caseDeadlines, setCaseDeadlines] = useState<CaseDeadline[]>([])
   const [caseHearings, setCaseHearings] = useState<CourtHearing[]>([])
@@ -288,6 +308,50 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       console.error('당사자 조회 실패:', error)
     }
   }, [caseData.id])
+
+  // 일반 탭에서 당사자 이름 수정 시작
+  const handlePartyEditFromGeneral = useCallback((partyId: string, partyLabel: string, currentName: string) => {
+    // 번호 prefix 제거하고 편집 가능한 부분만 추출
+    const nameWithoutNumber = currentName.replace(/^\d+\.\s*/, '')
+    setEditingPartyFromGeneral({ partyId, partyLabel, partyName: currentName })
+    setEditPartyNameInput(nameWithoutNumber)
+  }, [])
+
+  // 일반 탭 당사자 이름 저장
+  const handleSavePartyFromGeneral = useCallback(async () => {
+    if (!editingPartyFromGeneral || !editPartyNameInput.trim()) return
+
+    setSavingPartyFromGeneral(true)
+    try {
+      // 기존 party_name에서 번호 prefix 추출
+      const numberPrefixMatch = editingPartyFromGeneral.partyName.match(/^(\d+\.\s*)/)
+      const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
+      const newPartyName = `${numberPrefix}${editPartyNameInput.trim()}`
+
+      const res = await fetch(`/api/admin/cases/${caseData.id}/parties`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partyId: editingPartyFromGeneral.partyId,
+          party_name: newPartyName,
+        }),
+      })
+
+      if (res.ok) {
+        await fetchCaseParties()
+        setEditingPartyFromGeneral(null)
+        setEditPartyNameInput('')
+        router.refresh()
+      } else {
+        const data = await res.json()
+        console.error('당사자 수정 실패:', data.error)
+      }
+    } catch (err) {
+      console.error('당사자 수정 중 오류:', err)
+    } finally {
+      setSavingPartyFromGeneral(false)
+    }
+  }, [editingPartyFromGeneral, editPartyNameInput, caseData.id, fetchCaseParties, router])
 
   // 변호사 목록 조회 (출석변호사 선택용)
   const fetchTenantMembers = useCallback(async () => {
@@ -670,6 +734,22 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     setCaseNotices(notices)
   }, [caseData.id, caseData.court_name, caseData.client_role, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
 
+  // 계약서 파일 조회
+  useEffect(() => {
+    const fetchContractFiles = async () => {
+      try {
+        const res = await fetch(`/api/admin/cases/${caseData.id}/contracts`)
+        const data = await res.json()
+        if (data.success) {
+          setContractFiles(data.contracts || [])
+        }
+      } catch (error) {
+        console.error('Failed to fetch contract files:', error)
+      }
+    }
+    fetchContractFiles()
+  }, [caseData.id])
+
   // 알림 삭제 핸들러
   const handleDismissNotice = async (notice: CaseNotice) => {
     try {
@@ -710,7 +790,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   // 삭제되지 않은 알림만 필터링
   const filteredNotices = caseNotices.filter(n => !dismissedNoticeIds.has(n.id))
 
-  // 당사자 섹션 표시 조건: 원고/피고/의뢰인 중 하나라도 없으면 표시
+  // 당사자 섹션 표시 조건: 의뢰인과 상대방(의뢰인 반대편) 모두 있으면 숨김
   const shouldShowPartiesSection = useMemo(() => {
     const parties = caseParties || []
 
@@ -719,21 +799,41 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     const plaintiffSideLabels = ['원고', '채권자', '신청인', '행위자', '보호소년', '피고인', '항소인', '상고인', '청구인']
     const defendantSideLabels = ['피고', '채무자', '피신청인', '제3채무자', '피항소인', '피상고인', '상대방', '피청구인']
 
-    const hasPlaintiff = parties.some(p =>
-      plaintiffSideTypes.includes(p.party_type) ||
-      plaintiffSideLabels.some(label => p.party_type_label?.includes(label))
-    )
+    // 의뢰인 찾기
+    const clientParty = parties.find(p => p.is_our_client)
+    if (!clientParty) return true // 의뢰인 없으면 표시
 
-    const hasDefendant = parties.some(p =>
-      defendantSideTypes.includes(p.party_type) ||
-      defendantSideLabels.some(label => p.party_type_label?.includes(label))
-    )
+    // 의뢰인이 어느 측인지 확인
+    const isClientPlaintiffSide = plaintiffSideTypes.includes(clientParty.party_type) ||
+      plaintiffSideLabels.some(label => clientParty.party_type_label?.includes(label))
+    const isClientDefendantSide = defendantSideTypes.includes(clientParty.party_type) ||
+      defendantSideLabels.some(label => clientParty.party_type_label?.includes(label))
 
-    const hasClient = parties.some(p => p.is_our_client)
+    // 상대방 확인 (의뢰인 반대편)
+    let hasOpponent = false
+    if (isClientPlaintiffSide) {
+      // 의뢰인이 원고측이면 피고측이 상대방
+      hasOpponent = parties.some(p =>
+        !p.is_our_client && (
+          defendantSideTypes.includes(p.party_type) ||
+          defendantSideLabels.some(label => p.party_type_label?.includes(label))
+        )
+      )
+    } else if (isClientDefendantSide) {
+      // 의뢰인이 피고측이면 원고측이 상대방
+      hasOpponent = parties.some(p =>
+        !p.is_our_client && (
+          plaintiffSideTypes.includes(p.party_type) ||
+          plaintiffSideLabels.some(label => p.party_type_label?.includes(label))
+        )
+      )
+    }
+
+    // 마스킹된 이름 확인
     const hasMaskedParty = parties.some(p => /[가-힣]O{1,3}|O{1,3}[가-힣]/.test(p.party_name))
 
-    // 모든 조건 충족 시 숨김 (false 반환)
-    return hasMaskedParty || !(hasPlaintiff && hasDefendant && hasClient)
+    // 의뢰인과 상대방 모두 있고 마스킹 없으면 숨김 (false)
+    return hasMaskedParty || !hasOpponent
   }, [caseParties])
 
   const formatCurrency = (amount: number | null) => {
@@ -917,10 +1017,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 사건 상태 결정 (SCOURT 데이터 기반)
   const getCaseStatusInfo = () => {
-    // 확정일은 별도 뱃지로 날짜와 함께 표시 (여기서는 제외)
-    // 종국결과가 있으면 "판결선고"
+    // 종국결과가 있으면 null 반환 (결과 배지가 별도로 표시되므로 "선고" 불필요)
     if (getBasicInfo('종국결과', 'endRslt') || caseData.case_result) {
-      return { label: '선고', style: 'bg-amber-50 text-amber-700' }
+      return null
     }
     // 기본 상태
     return caseData.status === '진행중'
@@ -1078,12 +1177,27 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
                 의뢰인 {group.label}
               </span>
-              <span className="text-sm font-semibold text-gray-900">
-                {group.name}
-                {group.otherCount > 0 && (
-                  <span className="font-normal text-gray-500 ml-1">외 {group.otherCount}</span>
-                )}
-              </span>
+              {caseData.client_id ? (
+                <Link
+                  href={`/clients/${caseData.client_id}`}
+                  className="text-sm font-semibold text-gray-900 hover:text-sage-600 hover:underline"
+                >
+                  {group.name}
+                  {caseData.client?.phone && (
+                    <span className="ml-2 font-normal text-gray-500">{caseData.client.phone}</span>
+                  )}
+                  {group.otherCount > 0 && (
+                    <span className="font-normal text-gray-500 ml-1">외 {group.otherCount}</span>
+                  )}
+                </Link>
+              ) : (
+                <span className="text-sm font-semibold text-gray-900">
+                  {group.name}
+                  {group.otherCount > 0 && (
+                    <span className="font-normal text-gray-500 ml-1">외 {group.otherCount}</span>
+                  )}
+                </span>
+              )}
             </>
           ) : (
             <>
@@ -1177,9 +1291,21 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
               의뢰인 {party.label}
             </span>
-            <span className="text-sm font-semibold text-gray-900">
-              {party.info.name}
-            </span>
+            {caseData.client_id ? (
+              <Link
+                href={`/clients/${caseData.client_id}`}
+                className="text-sm font-semibold text-gray-900 hover:text-sage-600 hover:underline"
+              >
+                {party.info.name}
+                {caseData.client?.phone && (
+                  <span className="ml-2 font-normal text-gray-500">{caseData.client.phone}</span>
+                )}
+              </Link>
+            ) : (
+              <span className="text-sm font-semibold text-gray-900">
+                {party.info.name}
+              </span>
+            )}
           </>
         ) : (
           <>
@@ -1207,6 +1333,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             )}
             {(() => {
               const statusInfo = getCaseStatusInfo()
+              if (!statusInfo) return null
               return (
                 <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${statusInfo.style}`}>
                   {statusInfo.label}
@@ -1414,12 +1541,13 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
               return filteredLowerCourt.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-5 py-3 border-b border-gray-100">
+                  <div className="px-4 py-3 flex items-center gap-2">
+                    <div className="w-1 h-4 bg-sage-500 rounded-full" />
                     <h3 className="text-sm font-semibold text-gray-900">심급</h3>
                   </div>
-                  <table className="w-full">
+                  <table className="w-full border-t border-gray-200">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <tr className="border-b border-gray-100 bg-gray-50">
                         <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">법원</th>
                         <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">사건번호</th>
                         <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">결과</th>
@@ -1448,7 +1576,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                   onClick={() => {
                                     const partyName = caseData.opponent_name || caseData.client?.name || ''
                                     const clientId = caseData.client_id || ''
-                                    router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || '')}&courtName=${encodeURIComponent(item.courtName || item.court || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}&sourceCaseId=${encodeURIComponent(caseData.id)}`)
+                                    const relationType = '하심사건'
+                                    const relationEncCsNo = item.encCsNo || ''
+                                    router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || '')}&courtName=${encodeURIComponent(item.courtName || item.court || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}&sourceCaseId=${encodeURIComponent(caseData.id)}&relationType=${encodeURIComponent(relationType)}&relationEncCsNo=${encodeURIComponent(relationEncCsNo)}`)
                                   }}
                                   className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
                                 >
@@ -1497,12 +1627,13 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
               return filteredRelatedCases.length > 0 && (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-5 py-3 border-b border-gray-100">
+                  <div className="px-4 py-3 flex items-center gap-2">
+                    <div className="w-1 h-4 bg-sage-500 rounded-full" />
                     <h3 className="text-sm font-semibold text-gray-900">관련사건</h3>
                   </div>
-                  <table className="w-full">
+                  <table className="w-full border-t border-gray-200">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <tr className="border-b border-gray-100 bg-gray-50">
                         <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left w-24">구분</th>
                         <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">법원</th>
                         <th className="px-5 py-2 text-xs font-medium text-gray-500 text-left">사건번호</th>
@@ -1532,7 +1663,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                     onClick={() => {
                                       const partyName = caseData.opponent_name || caseData.client?.name || ''
                                       const clientId = caseData.client_id || ''
-                                      router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || item.case_number || '')}&courtName=${encodeURIComponent(item.caseName || item.court_name || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}&sourceCaseId=${encodeURIComponent(caseData.id)}`)
+                                      const relationType = item.relation || item.relation_type || '관련사건'
+                                      const relationEncCsNo = item.encCsNo || ''
+                                      router.push(`/cases/new?caseNumber=${encodeURIComponent(item.caseNo || item.case_number || '')}&courtName=${encodeURIComponent(item.caseName || item.court_name || '')}&partyName=${encodeURIComponent(partyName)}&clientId=${encodeURIComponent(clientId)}&sourceCaseId=${encodeURIComponent(caseData.id)}&relationType=${encodeURIComponent(relationType)}&relationEncCsNo=${encodeURIComponent(relationEncCsNo)}`)
                                     }}
                                     className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 hover:bg-sage-200 rounded transition-colors"
                                   >
@@ -1558,9 +1691,11 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             {/* 당사자 - 원고/피고/의뢰인 중 하나라도 없으면 표시 */}
             {shouldShowPartiesSection && (
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-5 py-3 border-b border-gray-100">
+                <div className="px-4 py-3 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-sage-500 rounded-full" />
                   <h3 className="text-sm font-semibold text-gray-900">당사자</h3>
                 </div>
+                <div className="border-t border-gray-200">
                 <CasePartiesSection
                   caseId={caseData.id}
                   courtCaseNumber={caseData.court_case_number}
@@ -1574,83 +1709,93 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   }}
                   scourtParties={(scourtSnapshot?.basicInfo as any)?.parties || []}
                 />
+                </div>
               </div>
             )}
 
             {/* 계약 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-900">계약</h3>
-              </div>
-              <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <span className="text-xs text-gray-500 block mb-0.5">계약번호</span>
-                  <span className="text-sm text-gray-900">{caseData.contract_number || '-'}</span>
+              {/* 헤더 */}
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-1 h-4 bg-sage-500 rounded-full" />
+                  <h3 className="text-sm font-semibold text-gray-900">계약</h3>
+                  <span className="text-xs text-gray-500">({caseData.contract_number || '관리번호 없음'})</span>
                 </div>
-                <div>
-                  <span className="text-xs text-gray-500 block mb-0.5">계약일</span>
-                  <span className="text-sm text-gray-900">{formatDate(caseData.contract_date)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500 block mb-0.5">사건종류</span>
-                  <span className="text-sm text-gray-900">{caseData.case_type || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500 block mb-0.5">의뢰인</span>
-                  <button
-                    className="text-sm text-sage-600 hover:text-sage-700 font-medium"
-                    onClick={() => caseData.client && router.push(`/clients/${caseData.client_id}`)}
-                  >
-                    {caseData.client?.name || '-'}
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-sage-600 hover:bg-sage-700 rounded-lg"
+                >
+                  입금 관리
+                </button>
               </div>
 
-              {/* 수임료 */}
-              <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
-                <h4 className="text-xs font-medium text-gray-500">수임료</h4>
-              </div>
-              <div className="px-5 py-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <span className="text-xs text-gray-500 block mb-0.5">착수금</span>
-                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.retainer_fee)}</span>
+              {/* 테이블 */}
+              <div className="border-t border-gray-200 text-sm">
+                <div className="grid grid-cols-4 border-b border-gray-100">
+                  <div className="px-4 py-2 bg-gray-50 text-gray-500 text-xs">계약일</div>
+                  <div className="px-4 py-2">{formatDate(caseData.contract_date)}</div>
+                  <div className="px-4 py-2 bg-gray-50 text-gray-500 text-xs">의뢰인</div>
+                  <div className="px-4 py-2">
+                    <button className="text-sage-600 hover:underline" onClick={() => caseData.client && router.push(`/clients/${caseData.client_id}`)}>
+                      {caseData.client?.name || '-'}
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-xs text-gray-500 block mb-0.5">성공보수</span>
-                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(caseData.calculated_success_fee)}</span>
+                <div className="grid grid-cols-4 border-b border-gray-100">
+                  <div className="px-4 py-2 bg-gray-50 text-gray-500 text-xs">착수금</div>
+                  <div className="px-4 py-2 font-medium">{formatCurrency(caseData.retainer_fee)}</div>
+                  <div className="px-4 py-2 bg-gray-50 text-gray-500 text-xs">성공보수</div>
+                  <div className="px-4 py-2 font-medium">{formatCurrency(caseData.calculated_success_fee)}</div>
                 </div>
-                <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowPaymentModal(true)}
-                    className="text-xs text-gray-500 hover:text-sage-600 block mb-0.5"
-                  >
-                    입금액 &rsaquo;
-                  </button>
-                  <span className="text-sm text-gray-900 font-medium">{formatCurrency(paymentTotal ?? caseData.total_received)}</span>
-                </div>
-                <div>
-                  <span className="text-xs text-gray-500 block mb-0.5">미수금</span>
-                  <span className={`text-sm font-semibold ${calculateOutstandingBalance() > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                <div className="grid grid-cols-4 border-b border-gray-100">
+                  <div className="px-4 py-2 bg-gray-50 text-gray-500 text-xs">입금액</div>
+                  <div className="px-4 py-2 font-medium">{formatCurrency(paymentTotal ?? caseData.total_received)}</div>
+                  <div className={`px-4 py-2 text-gray-500 text-xs ${calculateOutstandingBalance() > 0 ? 'bg-coral-50' : 'bg-gray-50'}`}>미수금</div>
+                  <div className={`px-4 py-2 font-medium ${calculateOutstandingBalance() > 0 ? 'bg-coral-50 text-coral-600' : ''}`}>
                     {formatCurrency(calculateOutstandingBalance())}
-                  </span>
+                  </div>
                 </div>
+                {caseData.success_fee_agreement && (
+                  <div className="grid grid-cols-4 border-b border-gray-100">
+                    <div className="px-4 py-2 bg-gray-50 text-gray-500 text-xs">성공보수약정</div>
+                    <div className="px-4 py-2 col-span-3">{caseData.success_fee_agreement}</div>
+                  </div>
+                )}
+                {contractFiles.length > 0 && (
+                  <div className="grid grid-cols-4">
+                    <div className="px-4 py-2 bg-gray-50 text-gray-500 text-xs">계약서</div>
+                    <div className="px-4 py-2 col-span-3 space-y-1">
+                      {contractFiles.map((file) => (
+                        <a
+                          key={file.id}
+                          href={file.publicUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-sage-600 hover:underline"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                          </svg>
+                          {file.file_name}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* 성공보수 약정 */}
-              {caseData.success_fee_agreement && (
-                <div className="px-5 py-3 border-t border-gray-100">
-                  <span className="text-xs text-gray-500 block mb-1">성공보수 약정</span>
-                  <p className="text-sm text-gray-700">{caseData.success_fee_agreement}</p>
-                </div>
-              )}
             </div>
 
             {/* 메모 */}
             {caseData.notes && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">메모</h3>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{caseData.notes}</p>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 flex items-center gap-2">
+                  <div className="w-1 h-4 bg-sage-500 rounded-full" />
+                  <h3 className="text-sm font-semibold text-gray-900">메모</h3>
+                </div>
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{caseData.notes}</p>
+                </div>
               </div>
             )}
           </div>
@@ -1685,6 +1830,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 partyOverrides={manualPartyOverrides}
                 representativeOverrides={manualRepresentativeOverrides}
                 relatedCaseLinks={relatedCaseLinks}
+                onPartyEdit={handlePartyEditFromGeneral}
+                caseParties={caseParties}
               />
             )}
           </div>
@@ -2031,6 +2178,70 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   </svg>
                 )}
                 {scourtSyncing ? '연동 중...' : '연동하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 일반 탭 당사자 이름 수정 모달 */}
+      {editingPartyFromGeneral && (
+        <div className="fixed inset-0 z-[20050] flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white w-full max-w-md rounded-2xl border border-gray-200 overflow-hidden shadow-xl">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-gray-900">당사자 이름 수정</h3>
+              <button
+                onClick={() => {
+                  setEditingPartyFromGeneral(null)
+                  setEditPartyNameInput('')
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {editingPartyFromGeneral.partyLabel}
+                </label>
+                <p className="text-xs text-gray-500 mb-2">
+                  현재: {editingPartyFromGeneral.partyName}
+                </p>
+                <input
+                  type="text"
+                  value={editPartyNameInput}
+                  onChange={(e) => setEditPartyNameInput(e.target.value)}
+                  placeholder="실제 이름을 입력하세요"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  setEditingPartyFromGeneral(null)
+                  setEditPartyNameInput('')
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={handleSavePartyFromGeneral}
+                disabled={savingPartyFromGeneral || !editPartyNameInput.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-xl hover:bg-sage-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+              >
+                {savingPartyFromGeneral && (
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {savingPartyFromGeneral ? '저장 중...' : '저장'}
               </button>
             </div>
           </div>

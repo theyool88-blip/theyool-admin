@@ -4,7 +4,7 @@
 
 브라우저(Puppeteer) 없이 직접 REST API 호출로 사건 검색 및 일반내용/진행내용 조회가 가능함을 확인함.
 
-**핵심 발견 (2025-12-31):**
+**핵심 발견 (2025-12-31, 2026-01-10 업데이트):**
 - `encCsNo`는 **WMONID**에 바인딩됨 (JSESSIONID 아님)
 - `csNoHistLst` 파라미터로 64자 encCsNo 획득 가능
 - 64자 encCsNo + 동일 WMONID = **캡챠 없이 일반내용/진행내용 조회 가능**
@@ -14,7 +14,7 @@
 ## 핵심 개념
 
 ### WMONID
-- 대법원 서버가 발급하는 2년짜리 영구 쿠키
+- 대법원 서버가 발급하는 Expires 기준 장기 쿠키 (현재 관측 1년)
 - encCsNo가 이 값에 바인딩됨
 - 사용자별로 발급하여 관리해야 함
 
@@ -43,7 +43,7 @@ https://ssgo.scourt.go.kr
 GET /ssgo/index.on?cortId=www
 
 Response Headers:
-  Set-Cookie: WMONID=xxx; Expires=2년후; Path=/
+  Set-Cookie: WMONID=xxx; Expires=1년후; Path=/
   Set-Cookie: JSESSIONID=xxx; Path=/
 ```
 
@@ -223,7 +223,7 @@ CREATE TABLE scourt_user_wmonid (
   user_id UUID REFERENCES auth.users(id),
   wmonid VARCHAR(20) NOT NULL,
   issued_at TIMESTAMPTZ NOT NULL,
-  expires_at TIMESTAMPTZ NOT NULL,  -- issued_at + 2년
+  expires_at TIMESTAMPTZ NOT NULL,  -- Set-Cookie Expires 기준 (현재 관측 1년)
   status VARCHAR(20) DEFAULT 'active',  -- active, expiring, expired
   case_count INTEGER DEFAULT 0
 );

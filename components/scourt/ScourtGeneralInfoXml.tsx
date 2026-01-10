@@ -42,6 +42,16 @@ import { normalizePartyLabel, PARTY_TYPE_LABELS } from "@/types/case-party";
 // 타입 정의
 // ============================================================================
 
+/** 당사자 정보 (DB) */
+interface CasePartyInfo {
+  id: string;
+  party_name: string;
+  party_type: string;
+  party_type_label?: string | null;
+  scourt_party_index?: number | null;
+  is_our_client?: boolean;
+}
+
 interface ScourtGeneralInfoXmlProps {
   /** API 응답 데이터 (dma_csBasCtt, dlt_* 포함) */
   apiData: {
@@ -66,6 +76,10 @@ interface ScourtGeneralInfoXmlProps {
   relatedCaseLinks?: Record<string, string>;
   /** 컴팩트 모드 (기본정보만 표시) */
   compact?: boolean;
+  /** 당사자 수정 콜백 (partyId, partyLabel, currentName) */
+  onPartyEdit?: (partyId: string, partyLabel: string, currentName: string) => void;
+  /** DB 당사자 목록 (수정 시 ID 매칭용) */
+  caseParties?: CasePartyInfo[];
 }
 
 interface DataListEntry {
@@ -371,8 +385,10 @@ function buildPartyOverrideGroups(parties?: PartyOverride[]): PartyOverrideGroup
         const bOrder = b.party_order ?? 9999;
         return aOrder - bOrder;
       });
+      // party_name에서 번호 prefix 제거 (예: "1. 김정아" → "김정아")
+      // applyIndexedName에서 XML 원본의 번호를 사용하므로 중복 방지
       const names = sorted
-        .map((party) => party.party_name.trim())
+        .map((party) => party.party_name.trim().replace(/^\d+\.\s*/, ''))
         .filter((name) => name);
       return { ...group, overrides: sorted, names };
     })
@@ -686,8 +702,11 @@ function applyPartyOverridesToList(
   groups: PartyOverrideGroup[]
 ): { list: any[] | undefined; updated: boolean } {
   if (!groups || groups.length === 0) return { list, updated: false };
+  // 원래 리스트가 없거나 비어있으면 새 데이터를 추가하지 않음
+  // (피고인 및 죄명내용 등 형사 전용 섹션이 가사 사건에 생성되는 것 방지)
+  if (!Array.isArray(list) || list.length === 0) return { list, updated: false };
 
-  let next = Array.isArray(list) ? [...list] : [];
+  let next = [...list];
   let updated = false;
 
   groups.forEach((group) => {
@@ -702,10 +721,6 @@ function applyPartyOverridesToList(
       updated = true;
     }
   });
-
-  if (!Array.isArray(list) && next.length > 0) {
-    updated = true;
-  }
 
   return { list: updated ? next : list, updated };
 }
@@ -866,6 +881,8 @@ export function ScourtGeneralInfoXml({
   representativeOverrides,
   relatedCaseLinks,
   compact = false,
+  onPartyEdit,
+  caseParties,
 }: ScourtGeneralInfoXmlProps) {
   const apiEnvelope = useMemo(() => {
     if (!apiData) return {} as Record<string, any>;
@@ -1331,6 +1348,8 @@ export function ScourtGeneralInfoXml({
       {!compact && dataListEntries.map((entry) => {
         const gridLayout = gridLayouts[entry.layoutKey];
         const gridData = (effectiveApiData || resolvedApiData)[entry.dataKey];
+        const normalizedLayoutKey = normalizeDataListId(entry.layoutKey);
+        const isPartyTable = normalizedLayoutKey === "dlt_btprtCttLst" || normalizedLayoutKey === "dlt_acsCttLst";
 
         // 레이아웃이 없으면 fallback 테이블 렌더링
         if (!gridLayout) {
@@ -1341,6 +1360,8 @@ export function ScourtGeneralInfoXml({
               data={gridData}
               dataListId={entry.layoutKey}
               caseLinkMap={relatedCaseLinks}
+              onPartyEdit={isPartyTable ? onPartyEdit : undefined}
+              caseParties={isPartyTable ? caseParties : undefined}
             />
           );
         }
@@ -1356,6 +1377,59 @@ export function ScourtGeneralInfoXml({
       })}
     </div>
   );
+}
+
+// ============================================================================
+// 마스킹된 이름 감지 및 당사자 매칭
+// ============================================================================
+
+const MASKED_NAME_REGEX = /[가-힣]O{1,3}|O{1,3}[가-힣]/;
+
+function isMaskedPartyName(name: string): boolean {
+  return MASKED_NAME_REGEX.test(name);
+}
+
+function normalizePartyName(name: string): string {
+  return name.replace(/^\d+\.\s*/, '').trim();
+}
+
+/**
+ * XML 당사자 행과 DB 당사자를 매칭
+ */
+function findMatchingParty(
+  row: Record<string, any>,
+  rowIndex: number,
+  caseParties?: CasePartyInfo[]
+): CasePartyInfo | null {
+  if (!caseParties || caseParties.length === 0) return null;
+
+  // XML 행에서 당사자 라벨과 이름 추출
+  const rowLabel = normalizePartyLabel(
+    row.btprtDvsNm || row.btprtStndngNm || row.btprtDvsCdNm || ''
+  );
+  const rowName = normalizePartyName(
+    row.btprtNm || row.btprtNmOrg || ''
+  );
+  const rowFirstChar = rowName.charAt(0);
+
+  // 1. scourt_party_index로 매칭 (가장 정확)
+  const byIndex = caseParties.find(p => p.scourt_party_index === rowIndex);
+  if (byIndex) return byIndex;
+
+  // 2. 라벨 + 이름 첫글자로 매칭
+  for (const party of caseParties) {
+    const partyLabel = normalizePartyLabel(
+      party.party_type_label || PARTY_TYPE_LABELS[party.party_type as keyof typeof PARTY_TYPE_LABELS] || ''
+    );
+    const partyName = normalizePartyName(party.party_name);
+    const partyFirstChar = partyName.charAt(0);
+
+    if (rowLabel === partyLabel && rowFirstChar === partyFirstChar) {
+      return party;
+    }
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -1390,9 +1464,20 @@ interface FallbackGridTableProps {
   data: any[];
   dataListId?: string;
   caseLinkMap?: Record<string, string>;
+  /** 당사자 수정 콜백 (partyId, partyLabel, currentName) */
+  onPartyEdit?: (partyId: string, partyLabel: string, currentName: string) => void;
+  /** DB 당사자 목록 (수정 시 ID 매칭용) */
+  caseParties?: CasePartyInfo[];
 }
 
-function FallbackGridTable({ title, data, dataListId, caseLinkMap }: FallbackGridTableProps) {
+function FallbackGridTable({
+  title,
+  data,
+  dataListId,
+  caseLinkMap,
+  onPartyEdit,
+  caseParties,
+}: FallbackGridTableProps) {
   if (!data || data.length === 0) return null;
 
   // 첫 번째 행에서 컬럼 추출
@@ -1417,6 +1502,10 @@ function FallbackGridTable({ title, data, dataListId, caseLinkMap }: FallbackGri
     caseLinkMap &&
     Object.keys(caseLinkMap).length > 0;
 
+  // 당사자 테이블인지 확인 (수정 버튼 표시용)
+  const isPartyTable = normalizedId === "dlt_btprtCttLst" || normalizedId === "dlt_acsCttLst";
+  const showEditButtons = isPartyTable && onPartyEdit && caseParties && caseParties.length > 0;
+
   return (
     <div>
       <h3 className="text-base md:text-lg font-semibold mb-3 flex items-center gap-2">
@@ -1435,34 +1524,62 @@ function FallbackGridTable({ title, data, dataListId, caseLinkMap }: FallbackGri
                   {DLT_COLUMN_LABELS[col] || col}
                 </th>
               ))}
+              {showEditButtons && (
+                <th className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 text-center w-16">
+                  수정
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
-            {data.map((row, rowIndex) => (
-              <tr key={rowIndex} className="border-b border-gray-100 hover:bg-gray-50">
-                {columns.map((col, colIndex) => {
-                  const displayValue = formatCellValue(row[col]);
-                  const caseLink = enableCaseLinks
-                    ? getFallbackCaseLink(displayValue, caseLinkMap)
-                    : null;
+            {data.map((row, rowIndex) => {
+              // 당사자 테이블: 매칭된 당사자 및 마스킹 여부 확인
+              const partyName = row.btprtNm || row.btprtNmOrg || '';
+              const partyLabel = row.btprtDvsNm || row.btprtStndngNm || row.btprtDvsCdNm || '';
+              const matchedParty = showEditButtons ? findMatchingParty(row, rowIndex, caseParties) : null;
+              const canEdit = matchedParty && isMaskedPartyName(partyName);
 
-                  return (
-                    <td
-                      key={colIndex}
-                      className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900"
-                    >
-                      {caseLink ? (
-                        <a href={caseLink} className="text-sage-700 hover:underline">
-                          {displayValue}
-                        </a>
-                      ) : (
-                        displayValue
+              return (
+                <tr key={rowIndex} className="border-b border-gray-100 hover:bg-gray-50">
+                  {columns.map((col, colIndex) => {
+                    const displayValue = formatCellValue(row[col]);
+                    const caseLink = enableCaseLinks
+                      ? getFallbackCaseLink(displayValue, caseLinkMap)
+                      : null;
+
+                    return (
+                      <td
+                        key={colIndex}
+                        className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900"
+                      >
+                        {caseLink ? (
+                          <a href={caseLink} className="text-sage-700 hover:underline">
+                            {displayValue}
+                          </a>
+                        ) : (
+                          displayValue
+                        )}
+                      </td>
+                    );
+                  })}
+                  {showEditButtons && (
+                    <td className="px-2 md:px-3 py-1.5 md:py-2 text-center">
+                      {canEdit && matchedParty && (
+                        <button
+                          onClick={() => onPartyEdit(matchedParty.id, partyLabel, partyName)}
+                          className="text-sage-600 hover:text-sage-800 text-xs"
+                          title="이름 수정"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
                       )}
                     </td>
-                  );
-                })}
-              </tr>
-            ))}
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

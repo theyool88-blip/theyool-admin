@@ -29,6 +29,7 @@ import {
   shouldUpdateMainCase,
   inferCaseLevelFromType,
 } from '@/lib/scourt/case-relations';
+import { parseCaseNumber } from '@/lib/scourt/case-number-utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -224,27 +225,50 @@ export async function POST(request: NextRequest) {
             .eq('id', legalCaseId)
             .single();
           const tenantId = currentCase?.tenant_id;
+          const buildCaseNumberPattern = (caseNo: string) => {
+            const parsed = parseCaseNumber(caseNo);
+            if (parsed.valid) {
+              return `%${parsed.year}%${parsed.caseType}%${parsed.serial}%`;
+            }
+            if (parsed.normalized) {
+              return `%${parsed.normalized}%`;
+            }
+            return null;
+          };
+
+          const findExistingCase = async (caseNo?: string) => {
+            if (!caseNo || !tenantId) return null;
+            const pattern = buildCaseNumberPattern(caseNo);
+            if (!pattern) return null;
+
+            const { data, error } = await supabase
+              .from('legal_cases')
+              .select('id, case_level, court_case_number, main_case_id')
+              .eq('tenant_id', tenantId)
+              .ilike('court_case_number', pattern)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (error) {
+              console.error('관련 사건 매칭 실패:', error);
+              return null;
+            }
+
+            return data || null;
+          };
 
           // 연관사건 정보 가공 (UI 필드명에 맞춤: caseNo, caseName, relation)
           // linkedCaseId: 시스템 내 사건이 있으면 해당 사건 ID
           const relatedCasesData = await Promise.all(
             (result.generalData.relatedCases || []).map(async rc => {
-              let linkedCaseId = null;
-              if (rc.userCsNo && tenantId) {
-                const { data: linkedCase } = await supabase
-                  .from('legal_cases')
-                  .select('id')
-                  .eq('tenant_id', tenantId)
-                  .ilike('court_case_number', `%${rc.userCsNo}%`)
-                  .single();
-                linkedCaseId = linkedCase?.id || null;
-              }
+              const linkedCase = await findExistingCase(rc.userCsNo);
               return {
                 caseNo: rc.userCsNo,           // 사건번호
                 caseName: rc.reltCsCortNm,     // 법원명
                 relation: rc.reltCsDvsNm,      // 관계유형 (반소, 항소심, 본안사건 등)
                 encCsNo: rc.encCsNo || null,   // 암호화 사건번호 (일반내용/진행내용 조회용)
-                linkedCaseId,                  // 시스템 내 사건 ID
+                linkedCaseId: linkedCase?.id || null,                  // 시스템 내 사건 ID
               };
             })
           );
@@ -253,23 +277,14 @@ export async function POST(request: NextRequest) {
           // linkedCaseId: 시스템 내 사건이 있으면 해당 사건 ID
           const lowerCourtData = await Promise.all(
             (result.generalData.lowerCourtCases || []).map(async lc => {
-              let linkedCaseId = null;
-              if (lc.userCsNo && tenantId) {
-                const { data: linkedCase } = await supabase
-                  .from('legal_cases')
-                  .select('id')
-                  .eq('tenant_id', tenantId)
-                  .ilike('court_case_number', `%${lc.userCsNo}%`)
-                  .single();
-                linkedCaseId = linkedCase?.id || null;
-              }
+              const linkedCase = await findExistingCase(lc.userCsNo);
               return {
                 caseNo: lc.userCsNo,           // 사건번호 (예: 2024드단23848)
                 courtName: lc.cortNm,          // 법원명 (예: 수원가정법원 평택지원)
                 result: lc.ultmtDvsNm,         // 결과 (예: 원고패, 청구인용)
                 resultDate: lc.ultmtYmd,       // 종국일 (YYYYMMDD)
                 encCsNo: lc.encCsNo || null,   // 암호화 사건번호 (일반내용/진행내용 조회용)
-                linkedCaseId,                  // 시스템 내 사건 ID
+                linkedCaseId: linkedCase?.id || null,                  // 시스템 내 사건 ID
               };
             })
           );
@@ -310,12 +325,7 @@ export async function POST(request: NextRequest) {
               if (currentCase?.tenant_id) {
                 for (const relatedCase of relatedCasesData) {
                   // 시스템에 이미 존재하는 사건인지 확인 (court_case_number로 매칭)
-                  const { data: existingCase } = await supabase
-                    .from('legal_cases')
-                    .select('id, case_level, court_case_number, main_case_id')
-                    .eq('tenant_id', currentCase.tenant_id)
-                    .ilike('court_case_number', `%${relatedCase.caseNo}%`)
-                    .single();
+                  const existingCase = await findExistingCase(relatedCase.caseNo);
 
                   if (existingCase) {
                     console.log(`  ✅ 연관사건 발견: ${relatedCase.caseNo} → ID: ${existingCase.id}`);
@@ -412,12 +422,7 @@ export async function POST(request: NextRequest) {
               if (currentCaseForLower?.tenant_id) {
                 for (const lowerCase of lowerCourtData) {
                   // 시스템에 이미 존재하는 사건인지 확인 (court_case_number로 매칭)
-                  const { data: existingLowerCase } = await supabase
-                    .from('legal_cases')
-                    .select('id, case_level, court_case_number, main_case_id')
-                    .eq('tenant_id', currentCaseForLower.tenant_id)
-                    .ilike('court_case_number', `%${lowerCase.caseNo}%`)
-                    .single();
+                  const existingLowerCase = await findExistingCase(lowerCase.caseNo);
 
                   if (existingLowerCase) {
                     console.log(`  ✅ 원심사건 발견: ${lowerCase.caseNo} → ID: ${existingLowerCase.id}`);
@@ -431,14 +436,16 @@ export async function POST(request: NextRequest) {
 
                     if (!existingLowerRelation) {
                       // case_relations에 자동 연결 (현재 사건 → 원심: 하심사건 관계)
+                      const relationType = '하심사건';
+                      const direction = determineRelationDirection(relationType);
                       const { error: lowerRelationError } = await supabase
                         .from('case_relations')
                         .insert({
                           case_id: legalCaseId,
                           related_case_id: existingLowerCase.id,
-                          relation_type: '하심사건',  // SCOURT 라벨
+                          relation_type: relationType,  // SCOURT 라벨
                           relation_type_code: 'appeal',  // 항소 관계
-                          direction: 'child',  // 현재 사건이 상위심급 (부모)
+                          direction,
                           auto_detected: true,
                           detected_at: new Date().toISOString(),
                           scourt_enc_cs_no: lowerCase.encCsNo,

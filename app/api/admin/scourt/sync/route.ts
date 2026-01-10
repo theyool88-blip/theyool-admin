@@ -17,6 +17,7 @@ import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync';
 import { getCourtCodeByName } from '@/lib/scourt/court-codes';
 import { getCaseCategory } from '@/lib/scourt/party-labels';
 import { ensureXmlCacheForCase } from '@/lib/scourt/xml-fetcher';
+import { SCOURT_RELATION_MAP, determineRelationDirection } from '@/lib/scourt/case-relations';
 import {
   detectCaseTypeFromApiResponse,
   detectCaseTypeFromCaseNumber,
@@ -417,27 +418,50 @@ export async function POST(request: NextRequest) {
 
     // 시스템 내 사건 연결을 위해 tenant_id 조회
     const tenantId = legalCase.tenant_id;
+    const buildCaseNumberPattern = (caseNo: string) => {
+      const parsed = parseCaseNumber(caseNo);
+      if (parsed.valid) {
+        return `%${parsed.year}%${parsed.caseType}%${parsed.serial}%`;
+      }
+      if (parsed.normalized) {
+        return `%${parsed.normalized}%`;
+      }
+      return null;
+    };
+
+    const findCaseByNumber = async (caseNo?: string) => {
+      if (!caseNo || !tenantId) return null;
+      const pattern = buildCaseNumberPattern(caseNo);
+      if (!pattern) return null;
+
+      const { data, error } = await supabase
+        .from('legal_cases')
+        .select('id, case_level, court_case_number, main_case_id')
+        .eq('tenant_id', tenantId)
+        .ilike('court_case_number', pattern)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        console.error('관련 사건 매칭 실패:', error);
+        return null;
+      }
+
+      return data || null;
+    };
 
     // 연관사건 정보 가공 (UI 필드명에 맞춤: caseNo, caseName, relation)
     // linkedCaseId: 시스템 내 사건이 있으면 해당 사건 ID
     const relatedCasesData = await Promise.all(
       (generalData?.relatedCases || []).map(async (rc: { userCsNo?: string; reltCsCortNm?: string; reltCsDvsNm?: string; encCsNo?: string }) => {
-        let linkedCaseId = null;
-        if (rc.userCsNo && tenantId) {
-          const { data: linkedCase } = await supabase
-            .from('legal_cases')
-            .select('id')
-            .eq('tenant_id', tenantId)
-            .ilike('court_case_number', `%${rc.userCsNo}%`)
-            .single();
-          linkedCaseId = linkedCase?.id || null;
-        }
+        const linkedCase = await findCaseByNumber(rc.userCsNo);
         return {
           caseNo: rc.userCsNo,
           caseName: rc.reltCsCortNm,
           relation: rc.reltCsDvsNm,
           encCsNo: rc.encCsNo || null,
-          linkedCaseId,
+          linkedCaseId: linkedCase?.id || null,
         };
       })
     );
@@ -445,23 +469,14 @@ export async function POST(request: NextRequest) {
     // 심급내용/원심 사건 정보 가공 (UI 필드명에 맞춤)
     const lowerCourtData = await Promise.all(
       (generalData?.lowerCourtCases || []).map(async (lc: { userCsNo?: string; cortNm?: string; ultmtDvsNm?: string; ultmtYmd?: string; encCsNo?: string }) => {
-        let linkedCaseId = null;
-        if (lc.userCsNo && tenantId) {
-          const { data: linkedCase } = await supabase
-            .from('legal_cases')
-            .select('id')
-            .eq('tenant_id', tenantId)
-            .ilike('court_case_number', `%${lc.userCsNo}%`)
-            .single();
-          linkedCaseId = linkedCase?.id || null;
-        }
+        const linkedCase = await findCaseByNumber(lc.userCsNo);
         return {
           caseNo: lc.userCsNo,
           courtName: lc.cortNm,
           result: lc.ultmtDvsNm,
           resultDate: lc.ultmtYmd,
           encCsNo: lc.encCsNo || null,
-          linkedCaseId,
+          linkedCaseId: linkedCase?.id || null,
         };
       })
     );
@@ -563,13 +578,7 @@ export async function POST(request: NextRequest) {
 
       if (currentCase?.tenant_id) {
         for (const lowerCase of lowerCourtData) {
-          // 시스템에 이미 존재하는 사건인지 확인 (court_case_number로 매칭)
-          const { data: existingLowerCase } = await supabase
-            .from('legal_cases')
-            .select('id, case_level, court_case_number, main_case_id')
-            .eq('tenant_id', currentCase.tenant_id)
-            .ilike('court_case_number', `%${lowerCase.caseNo}%`)
-            .single();
+          const existingLowerCase = await findCaseByNumber(lowerCase.caseNo);
 
           if (existingLowerCase) {
             console.log(`  ✅ 원심사건 발견: ${lowerCase.caseNo} → ID: ${existingLowerCase.id}`);
@@ -583,14 +592,17 @@ export async function POST(request: NextRequest) {
 
             if (!existingRelation) {
               // case_relations에 자동 연결 (현재 사건 → 원심: 하심사건 관계)
+              const relationType = '하심사건';
+              const relationTypeCode = SCOURT_RELATION_MAP[relationType] || 'appeal';
+              const direction = determineRelationDirection(relationType);
               const { error: relationError } = await supabase
                 .from('case_relations')
                 .insert({
                   case_id: legalCaseId,
                   related_case_id: existingLowerCase.id,
-                  relation_type: '하심사건',
-                  relation_type_code: 'appeal',
-                  direction: 'child',
+                  relation_type: relationType,
+                  relation_type_code: relationTypeCode,
+                  direction,
                   auto_detected: true,
                   detected_at: new Date().toISOString(),
                   scourt_enc_cs_no: lowerCase.encCsNo,
@@ -625,48 +637,51 @@ export async function POST(request: NextRequest) {
       console.log(`🔗 관련사건 ${relatedCasesData.length}건 발견, 자동 연결 시도...`);
 
       for (const relatedCase of relatedCasesData) {
-        // linkedCaseId가 이미 조회된 경우 사용
-        if (relatedCase.linkedCaseId) {
-          console.log(`  ✅ 관련사건 발견: ${relatedCase.caseNo} → ID: ${relatedCase.linkedCaseId}`);
+        const linkedCaseId = relatedCase.linkedCaseId || (await findCaseByNumber(relatedCase.caseNo))?.id;
+        if (linkedCaseId) {
+          console.log(`  ✅ 관련사건 발견: ${relatedCase.caseNo} → ID: ${linkedCaseId}`);
 
           // 이미 연결되어 있는지 확인
           const { data: existingRelation } = await supabase
             .from('case_relations')
             .select('id')
-            .or(`and(case_id.eq.${legalCaseId},related_case_id.eq.${relatedCase.linkedCaseId}),and(case_id.eq.${relatedCase.linkedCaseId},related_case_id.eq.${legalCaseId})`)
+            .or(`and(case_id.eq.${legalCaseId},related_case_id.eq.${linkedCaseId}),and(case_id.eq.${linkedCaseId},related_case_id.eq.${legalCaseId})`)
             .single();
 
           if (!existingRelation) {
             // case_relations에 자동 연결
+            const relationType = relatedCase.relation || '관련사건';
+            const relationTypeCode = SCOURT_RELATION_MAP[relationType] || 'related';
+            const direction = determineRelationDirection(relationType);
             const { error: relationError } = await supabase
               .from('case_relations')
               .insert({
                 case_id: legalCaseId,
-                related_case_id: relatedCase.linkedCaseId,
-                relation_type: relatedCase.relation || '관련사건',
-                relation_type_code: 'related',
-                direction: 'sibling',
+                related_case_id: linkedCaseId,
+                relation_type: relationType,
+                relation_type_code: relationTypeCode,
+                direction,
                 auto_detected: true,
                 detected_at: new Date().toISOString(),
                 scourt_enc_cs_no: relatedCase.encCsNo,
               });
 
             if (!relationError) {
-              console.log(`  📎 관련사건 case_relations 자동 등록: ${relatedCase.relation || '관련사건'}`);
+              console.log(`  📎 관련사건 case_relations 자동 등록: ${relationType}`);
 
               // 본소/반소 주사건 결정: 본소가 주사건
               if (relatedCase.relation === '반소') {
                 // 현재 사건이 반소 → 관련 사건(본소)이 주사건
-                console.log(`  👑 본소가 주사건: ${relatedCase.linkedCaseId}`);
+                console.log(`  👑 본소가 주사건: ${linkedCaseId}`);
                 await supabase
                   .from('legal_cases')
-                  .update({ main_case_id: relatedCase.linkedCaseId })
+                  .update({ main_case_id: linkedCaseId })
                   .eq('id', legalCaseId);
                 // 본소도 자기 자신을 주사건으로
                 await supabase
                   .from('legal_cases')
-                  .update({ main_case_id: relatedCase.linkedCaseId })
-                  .eq('id', relatedCase.linkedCaseId);
+                  .update({ main_case_id: linkedCaseId })
+                  .eq('id', linkedCaseId);
               } else if (relatedCase.relation === '본소') {
                 // 현재 사건이 본소 → 현재 사건이 주사건
                 console.log(`  👑 현재 사건(본소)이 주사건: ${legalCaseId}`);
@@ -678,7 +693,7 @@ export async function POST(request: NextRequest) {
                 await supabase
                   .from('legal_cases')
                   .update({ main_case_id: legalCaseId })
-                  .eq('id', relatedCase.linkedCaseId);
+                  .eq('id', linkedCaseId);
               }
             }
           } else {

@@ -244,16 +244,40 @@ export async function ensureXmlCacheForCase(
 - [SCOURT 통합 시스템](./SCOURT_INTEGRATION.md)
 - [SCOURT API 분석](./SCOURT_API_ANALYSIS.md)
 
+## 반응형 UI
+
+### 모바일 최적화
+
+일반 탭의 테이블 컴포넌트는 모바일에서 글자 크기가 자동 축소됩니다.
+
+| 요소 | 모바일 (<768px) | 데스크톱 (≥768px) |
+|------|----------------|-------------------|
+| 제목 (h3) | `text-base` (16px) | `text-lg` (18px) |
+| 셀 텍스트 | `text-xs` (12px) | `text-sm` (14px) |
+| 셀 패딩 | `px-2 py-1.5` | `px-3 py-2` |
+
+**적용 컴포넌트:**
+- `BasicInfoTable` (기본내용)
+- `GridTable` (당사자, 대리인, 기일 등)
+- `FallbackGridTable` (XML 없을 때)
+
+**가로 스크롤:**
+- 테이블이 화면을 넘어가면 `overflow-x-auto`로 가로 스크롤 활성화
+- 부모 섹션의 `overflow-hidden` 제거로 드롭다운 정상 표시
+
 ## 최근 변경 사항 (2026-01)
 
-1. **기본정보 XML 선택 우선순위 추가**  
+1. **모바일 글자 크기 최적화**
+   - 768px 미만에서 테이블 글자 크기 축소 (`text-xs md:text-sm`)
+   - 패딩도 모바일에서 축소 (`px-2 md:px-3`)
+2. **기본정보 XML 선택 우선순위 추가**
    - 템플릿 ID(`scrnId`/`pgmId`)가 있으면 그 경로를 우선 사용
-2. **raw_data 저장 구조 변경**  
+3. **raw_data 저장 구조 변경**
    - `raw.data`가 아니라 **전체 응답(raw)**을 저장하여 템플릿 ID 보존
-3. **행정 사건 caseType 보정**  
+4. **행정 사건 caseType 보정**
    - 행정 본안은 `ssgo101`, 행정신청(아 계열)은 `ssgo105`
-4. **형사 기본정보 파생값 처리 강화**  
+5. **형사 기본정보 파생값 처리 강화**
    - `txt_ultmtDvsNm`, `txt_aplPrpndCtt` 등 JS 계산값을 전처리로 재현
-5. **검증 스크립트 추가**  
-   - `scripts/verify-scourt-xml-case-type.ts`  
+6. **검증 스크립트 추가**
+   - `scripts/verify-scourt-xml-case-type.ts`
    - `SCOURT_VERIFY_BASE_URL`로 로컬 API 기준 검증 가능

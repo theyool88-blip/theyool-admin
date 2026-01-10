@@ -22,6 +22,7 @@
 | [SCOURT_API_ANALYSIS.md](systems/SCOURT_API_ANALYSIS.md) | 대법원 나의사건검색 API 분석 |
 | [SCOURT_INTEGRATION.md](systems/SCOURT_INTEGRATION.md) | SCOURT 통합 시스템 (동기화, 필드매핑) |
 | [SCOURT_SYNC_SYSTEM.md](systems/SCOURT_SYNC_SYSTEM.md) | SCOURT 사건 갱신 시스템 (진행/일반 분리) |
+| [CLIENT_PARTY_SYNC_SYSTEM.md](systems/CLIENT_PARTY_SYNC_SYSTEM.md) | 의뢰인/당사자 이름 동기화 시스템 |
 | [CAPTCHA_MODEL.md](systems/CAPTCHA_MODEL.md) | 캡차 인식 ML 모델 |
 
 ---
@@ -94,6 +95,7 @@ archived/
 | `tenant_integrations` | 테넌트별 외부 서비스 연동 |
 | `clients` | 의뢰인 |
 | `legal_cases` | 사건 |
+| `case_parties` | 사건 당사자 (의뢰인/상대방) |
 | `payments` | 입금 |
 | `expenses` | 지출 |
 | `consultations` | 상담 |

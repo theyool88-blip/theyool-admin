@@ -1,13 +1,14 @@
 /**
  * 사건 알림 감지 로직
  *
- * 6가지 알림 카테고리:
+ * 7가지 알림 카테고리:
  * 1. 다음기일 안내
  * 2. 기한 관리
  * 3. 준비서면 제출 알람
  * 4. 서류 송달 문제
  * 5. 증거신청 회신 미수령
  * 6. 기일 충돌 경고
+ * 7. 의뢰인 역할 확인
  */
 
 import type { CaseNotice, NoticeAction } from '@/types/case-notice'
@@ -42,6 +43,9 @@ export interface NoticeDetectorParams {
   scourtDocuments?: ScourtDocument[]
   scourtProgress?: ScourtProgress[]
   clientPartyType?: 'plaintiff' | 'defendant' | null
+  clientRoleStatus?: 'provisional' | 'confirmed' | null  // 의뢰인 역할 상태
+  clientName?: string | null      // 의뢰인 이름 (역할 확인 알림용)
+  opponentName?: string | null    // 상대방 이름 (역할 확인 알림용)
 }
 
 /**
@@ -49,6 +53,10 @@ export interface NoticeDetectorParams {
  */
 export function detectCaseNotices(params: NoticeDetectorParams): CaseNotice[] {
   const notices: CaseNotice[] = []
+
+  // 7. 의뢰인 역할 확인 (가장 먼저 표시)
+  const roleConfirmNotice = detectClientRoleConfirm(params)
+  if (roleConfirmNotice) notices.push(roleConfirmNotice)
 
   // 1. 다음기일 안내
   const nextHearingNotice = detectNextHearing(params.hearings)
@@ -473,6 +481,39 @@ function detectScheduleConflicts(
   }
 
   return notices
+}
+
+// ============================================================================
+// 7. 의뢰인 역할 확인
+// ============================================================================
+
+function detectClientRoleConfirm(params: NoticeDetectorParams): CaseNotice | null {
+  // 이미 확정된 경우 스킵
+  if (params.clientRoleStatus === 'confirmed') return null
+
+  // provisional 상태일 때만 알림 표시
+  const currentRole = params.clientPartyType || 'plaintiff'
+  const roleLabel = currentRole === 'plaintiff' ? '원고측' : '피고측'
+
+  // 의뢰인/상대방 이름
+  const clientName = params.clientName || '의뢰인'
+  const opponentName = params.opponentName || '상대방'
+
+  return {
+    id: `client_role_confirm_${params.caseId}`,
+    category: 'client_role_confirm',
+    title: '의뢰인 역할 확인 필요',
+    description: `현재 ${clientName}님이 "${roleLabel}"으로 임시 지정되어 있습니다. (상대방: ${opponentName})`,
+    actions: [
+      { label: '원고측 확정', type: 'confirm_plaintiff' },
+      { label: '피고측으로 변경', type: 'confirm_defendant' },
+    ],
+    metadata: {
+      currentRole,
+      clientName,
+      opponentName,
+    },
+  }
 }
 
 // ============================================================================

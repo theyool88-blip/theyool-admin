@@ -259,6 +259,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     manual_override?: boolean
     client_id: string | null
     clients?: { id: string; name: string } | null
+    scourt_party_index?: number | null
   }[]>([])
 
   const [caseRepresentatives, setCaseRepresentatives] = useState<{
@@ -870,10 +871,15 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       // SCOURT 데이터 추가
       scourtProgress: scourtSnapshot?.progress || [],
       scourtDocuments: scourtDocuments,
-      clientPartyType: caseData.client_role || null
+      clientPartyType: caseData.client_role || null,
+      // 의뢰인 역할 확인용
+      clientRoleStatus: (caseData as { client_role_status?: 'provisional' | 'confirmed' }).client_role_status || null,
+      clientName: caseData.client?.name || null,
+      opponentName: caseData.opponent_name || null,
     })
     setCaseNotices(notices)
-  }, [caseData.id, caseData.court_name, caseData.client_role, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [caseData.id, caseData.court_name, caseData.client_role, (caseData as { client_role_status?: string }).client_role_status, caseData.client?.name, caseData.opponent_name, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
 
   // 계약서 파일 조회
   useEffect(() => {
@@ -906,6 +912,39 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     } catch (error) {
       console.error('Failed to dismiss notice:', error)
     }
+  }
+
+  // 알림 액션 핸들러 (역할 확정 등)
+  const handleNoticeAction = async (notice: CaseNotice, actionType: string) => {
+    // 의뢰인 역할 확정 처리
+    if (actionType === 'confirm_plaintiff' || actionType === 'confirm_defendant') {
+      const newRole = actionType === 'confirm_plaintiff' ? 'plaintiff' : 'defendant'
+
+      try {
+        const res = await fetch(`/api/admin/cases/${caseData.id}/client-role`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            client_role: newRole,
+            status: 'confirmed'
+          })
+        })
+
+        const data = await res.json()
+        if (data.success) {
+          // 페이지 새로고침으로 업데이트된 데이터 반영
+          router.refresh()
+        } else {
+          console.error('Failed to confirm client role:', data.error)
+        }
+      } catch (error) {
+        console.error('Failed to confirm client role:', error)
+      }
+      return
+    }
+
+    // 기일 충돌 등 다른 액션은 여기서 처리
+    console.log('Notice action:', notice.id, actionType)
   }
 
   // 관련사건 연동안함 핸들러
@@ -1020,7 +1059,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const getBasicInfo = (koreanKey: string, apiKey?: string): string | number | undefined => {
     if (!scourtSnapshot?.basicInfo) return undefined
     const info = scourtSnapshot.basicInfo as Record<string, unknown>
-    return info[koreanKey] || (apiKey ? info[apiKey] : undefined)
+    const value = info[koreanKey] || (apiKey ? info[apiKey] : undefined)
+    if (typeof value === 'string' || typeof value === 'number') return value
+    return undefined
   }
 
   // 사건 카테고리에 따른 당사자 라벨 결정 (스키마 기반)
@@ -1045,12 +1086,73 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }, [caseData.case_relations])
 
   // 마스킹이 해제된 모든 당사자 (SCOURT 라벨 기반으로 일반탭에 적용)
+  // 중요: case_parties의 party_type_label이 오래된 값일 수 있으므로
+  // scourtSnapshot.basicInfo의 titRprsPtnr/titRprsRqstr (실제 라벨)을 사용해야 함
   const unmaskedPartyOverrides = useMemo(() => {
-    return caseParties.filter((party) => {
+    const unmaskedParties = caseParties.filter((party) => {
       return !isMaskedPartyName(party.party_name)
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseParties])
+
+    // scourtSnapshot.basicInfo에서 실제 라벨 가져오기
+    // titRprsPtnr: 원고측 라벨 (예: "신청인", "원고", "채권자")
+    // titRprsRqstr: 피고측 라벨 (예: "피신청인", "피고", "채무자")
+    interface BasicInfoWithLabels {
+      titRprsPtnr?: string
+      titRprsRqstr?: string
+    }
+    const basicInfo = scourtSnapshot?.basicInfo as BasicInfoWithLabels | undefined
+    const plaintiffLabel = basicInfo?.titRprsPtnr?.trim() || ''
+    const defendantLabel = basicInfo?.titRprsRqstr?.trim() || ''
+
+    // scourtSnapshot 라벨이 없으면 그대로 반환
+    if (!plaintiffLabel && !defendantLabel) {
+      return unmaskedParties
+    }
+
+    // side 분류용 라벨 목록
+    const PLAINTIFF_SIDE_LABELS = ['원고', '채권자', '신청인', '항고인', '항소인', '상고인', '행위자']
+    const DEFENDANT_SIDE_LABELS = ['피고', '채무자', '피신청인', '상대방', '피항고인', '피항소인', '피상고인', '보호소년', '피고인', '제3채무자']
+
+    // party_type 필드로 side 결정
+    const PLAINTIFF_SIDE_TYPES = ['plaintiff', 'creditor', 'applicant']
+    const DEFENDANT_SIDE_TYPES = ['defendant', 'debtor', 'respondent']
+
+    const getSideFromParty = (party: typeof caseParties[0]): 'plaintiff' | 'defendant' | null => {
+      // 1. party_type_label에서 시도
+      const normalized = normalizePartyLabel(party.party_type_label || '')
+      if (PLAINTIFF_SIDE_LABELS.includes(normalized)) return 'plaintiff'
+      if (DEFENDANT_SIDE_LABELS.includes(normalized)) return 'defendant'
+
+      // 2. party_type에서 시도
+      const partyType = party.party_type?.toLowerCase() || ''
+      if (PLAINTIFF_SIDE_TYPES.includes(partyType)) return 'plaintiff'
+      if (DEFENDANT_SIDE_TYPES.includes(partyType)) return 'defendant'
+
+      // 3. is_our_client로 의뢰인측 추론 (plaintiffLabel이 있으면 해당 측으로)
+      if (party.is_our_client && plaintiffLabel) {
+        // plaintiffLabel이 있으면 의뢰인을 원고측으로 가정 (대부분의 경우)
+        return 'plaintiff'
+      }
+
+      return null
+    }
+
+    // case_parties에 SCOURT 라벨 적용
+    return unmaskedParties.map(party => {
+      const partySide = getSideFromParty(party)
+      if (!partySide) return party
+
+      // side에 맞는 SCOURT 라벨 사용
+      const correctLabel = partySide === 'plaintiff' ? plaintiffLabel : defendantLabel
+      if (!correctLabel) return party
+
+      // SCOURT 라벨로 업데이트
+      return {
+        ...party,
+        party_type_label: correctLabel // SCOURT 원본 라벨 사용
+      }
+    })
+  }, [caseParties, scourtSnapshot])
 
   const preferredPartyName = useMemo(() => {
     const normalizePartyName = (name: string) => name.replace(/^\d+\.\s*/, '').trim()
@@ -1195,28 +1297,237 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }, [caseParties, caseData.client?.name, caseData.opponent_name])
 
   // 당사자 정보 렌더링 (간소화)
+  // 우선순위: scourtSnapshot.basicInfo.parties (실시간) > case_parties (DB) > 기존 fallback
   const renderPartyInfo = () => {
     const partyLabels = getPartyLabels()
 
-    // case_parties 데이터가 있으면 사용
+    // 번호 접두사 제거 함수 (예: "1. 정OO" -> "정OO")
+    const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, '')
+
+    // 히어로 영역에 표시할 당사자 라벨만 필터링
+    const heroPartyLabels = [
+      '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
+      '항소인', '피항소인', '상고인', '피상고인', '항고인', '상대방',
+      '행위자', '보호소년',  // 보호사건 당사자
+      '피고인', '피고인명',  // 형사사건 당사자
+      '제3채무자'
+    ]
+
+    // 1. scourtSnapshot에서 당사자 정보 추출
+    //    rawData.dlt_btprtCttLst: 원본 당사자 목록 (btprDvsNm/btprtStndngNm이 실제 라벨)
+    //    basicInfo.titRprsPtnr/titRprsRqstr: 대표 라벨 (신청인/피신청인 등)
+    interface RawPartyItem {
+      btprDvsNm?: string      // 당사자 유형 (basicInfo.parties)
+      btprtDvsNm?: string     // 당사자 유형 (rawData.data.dlt_btprtCttLst)
+      btprtStndngNm?: string  // 당사자 구분 (대안 필드)
+      btprNm?: string         // 이름 (basicInfo.parties)
+      btprtNm?: string        // 이름 (rawData.data.dlt_btprtCttLst)
+    }
+    interface BasicInfoWithLabelsAndParties {
+      parties?: RawPartyItem[]
+      titRprsPtnr?: string
+      titRprsRqstr?: string
+    }
+    interface RawDataWithParties {
+      data?: {
+        dlt_btprtCttLst?: RawPartyItem[]
+      }
+      dlt_btprtCttLst?: RawPartyItem[]
+    }
+    const scourtBasicInfo = scourtSnapshot?.basicInfo as BasicInfoWithLabelsAndParties | undefined
+    const scourtRawData = scourtSnapshot?.rawData as RawDataWithParties | undefined
+
+    // 원본 당사자 목록: rawData.data에서 먼저 시도, 없으면 rawData 직접, 없으면 basicInfo.parties 사용
+    const rawParties = scourtRawData?.data?.dlt_btprtCttLst || scourtRawData?.dlt_btprtCttLst || scourtBasicInfo?.parties || []
+
+    // SCOURT API에서 제공하는 실제 라벨 사용 (절대값)
+    const actualPlaintiffLabel = scourtBasicInfo?.titRprsPtnr?.trim() || ''
+    const actualDefendantLabel = scourtBasicInfo?.titRprsRqstr?.trim() || ''
+
+    // 원고측/피고측 분류
+    const PLAINTIFF_LABELS = ['원고', '채권자', '신청인', '항고인', '항소인', '상고인', '행위자']
+    const DEFENDANT_LABELS = ['피고', '채무자', '피신청인', '상대방', '피항고인', '피항소인', '피상고인', '보호소년', '피고인', '피고인명', '제3채무자']
+
+    const getSideFromLabel = (label: string): 'plaintiff' | 'defendant' | null => {
+      const normalized = normalizePartyLabel(label)
+      if (PLAINTIFF_LABELS.includes(normalized)) return 'plaintiff'
+      if (DEFENDANT_LABELS.includes(normalized)) return 'defendant'
+      return null
+    }
+
+    if (rawParties.length > 0) {
+      const labelGroups = new Map<string, { name: string; isClient: boolean; clientName?: string }[]>()
+
+      // case_parties를 측(side) 기준으로 분류
+      const plaintiffSideParties = caseParties.filter(cp => {
+        const labelSide = getSideFromLabel(cp.party_type_label || '')
+        const typeSide = ['plaintiff', 'creditor', 'applicant'].includes(cp.party_type) ? 'plaintiff' : null
+        return labelSide === 'plaintiff' || typeSide === 'plaintiff'
+      })
+      const defendantSideParties = caseParties.filter(cp => {
+        const labelSide = getSideFromLabel(cp.party_type_label || '')
+        const typeSide = ['defendant', 'debtor', 'respondent'].includes(cp.party_type) ? 'defendant' : null
+        return labelSide === 'defendant' || typeSide === 'defendant'
+      })
+
+      rawParties
+        .filter(p => {
+          // 원본 라벨 추출 (btprtDvsNm: rawData용, btprDvsNm: basicInfo용, btprtStndngNm: 대안)
+          const rawLabel = p.btprtDvsNm || p.btprDvsNm || p.btprtStndngNm || ''
+          const normalizedLabel = normalizePartyLabel(rawLabel)
+
+          // 사건본인은 제외
+          if (normalizedLabel.startsWith('사건본인')) return false
+
+          // 히어로에 표시할 라벨인지 확인 (원본 라벨 기준)
+          // "기타" 등 heroPartyLabels에 없는 라벨은 히어로에서 제외
+          if (rawLabel && !heroPartyLabels.includes(normalizedLabel)) {
+            return false
+          }
+
+          return true
+        })
+        .forEach((p, idx) => {
+          const scourtName = p.btprtNm || p.btprNm || '-'
+          const cleanScourtName = removeNumberPrefix(scourtName)
+
+          // 원본 라벨 추출 (btprtDvsNm: rawData용, btprDvsNm: basicInfo용, btprtStndngNm: 대안)
+          const rawLabel = p.btprtDvsNm || p.btprDvsNm || p.btprtStndngNm || ''
+
+          // side 결정: rawLabel이 있으면 사용, 없으면 인덱스로 추론 (원고측이 먼저)
+          let side: 'plaintiff' | 'defendant' | null = null
+          if (rawLabel) {
+            side = getSideFromLabel(rawLabel)
+          } else {
+            // rawLabel 없을 때: 첫 번째 그룹이 원고측, 나머지가 피고측으로 가정
+            // (SCOURT API는 보통 원고측을 먼저 반환)
+            const plaintiffCount = rawParties.filter(sp => {
+              const l = sp.btprtDvsNm || sp.btprDvsNm || sp.btprtStndngNm || ''
+              return getSideFromLabel(l) === 'plaintiff'
+            }).length
+            if (plaintiffCount === 0 && idx === 0) {
+              side = 'plaintiff'
+            } else if (plaintiffCount === 0 && idx > 0) {
+              side = 'defendant'
+            }
+          }
+
+          // side가 null이면 히어로에서 제외 (원고측/피고측 모두 아닌 경우)
+          if (!side) {
+            return
+          }
+
+          // 실제 표시 라벨 결정: titRprsPtnr/titRprsRqstr 사용 (절대값)
+          let displayLabel = rawLabel
+          if (side === 'plaintiff' && actualPlaintiffLabel) {
+            displayLabel = actualPlaintiffLabel
+          } else if (side === 'defendant' && actualDefendantLabel) {
+            displayLabel = actualDefendantLabel
+          }
+
+          // side 기반으로 case_parties에서 매칭
+          const sideParties = side === 'plaintiff' ? plaintiffSideParties :
+                             side === 'defendant' ? defendantSideParties : []
+          const matchedParty = sideParties[0]
+
+          // 이름 결정: case_parties에 마스킹 해제된 이름이 있으면 사용, 없으면 SCOURT 원본
+          let displayName = cleanScourtName
+          let isClient = false
+          let clientName: string | undefined
+
+          if (matchedParty) {
+            const cpName = removeNumberPrefix(matchedParty.party_name)
+            // 마스킹 해제된 이름인지 확인
+            if (!isMaskedPartyName(matchedParty.party_name)) {
+              displayName = matchedParty.clients?.name || cpName
+            }
+            isClient = matchedParty.is_our_client || false
+            if (isClient) {
+              clientName = matchedParty.clients?.name || cpName
+            }
+          }
+
+          if (!labelGroups.has(displayLabel)) {
+            labelGroups.set(displayLabel, [])
+          }
+          labelGroups.get(displayLabel)!.push({
+            name: displayName,
+            isClient,
+            clientName
+          })
+        })
+
+      // 표시할 그룹 생성
+      const groups: { label: string; name: string; isClient: boolean; otherCount: number }[] = []
+
+      labelGroups.forEach((parties, label) => {
+        const clientParty = parties.find(p => p.isClient)
+        const displayName = clientParty?.clientName || clientParty?.name || parties[0]?.name || '-'
+        const otherCount = parties.length - 1
+
+        groups.push({
+          label,
+          name: displayName,
+          isClient: !!clientParty,
+          otherCount,
+        })
+      })
+
+      // 의뢰인을 먼저 정렬
+      groups.sort((a, b) => {
+        if (a.isClient && !b.isClient) return -1
+        if (!a.isClient && b.isClient) return 1
+        return 0
+      })
+
+      return groups.map((group, idx) => (
+        <div key={idx} className="flex items-center gap-2">
+          {group.isClient ? (
+            <>
+              <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
+                의뢰인 {group.label}
+              </span>
+              {caseData.client_id ? (
+                <Link
+                  href={`/clients/${caseData.client_id}`}
+                  className="text-sm font-semibold text-gray-900 hover:text-sage-600 hover:underline"
+                >
+                  {group.name}
+                  {caseData.client?.phone && (
+                    <span className="ml-2 font-normal text-gray-500">{caseData.client.phone}</span>
+                  )}
+                  {group.otherCount > 0 && (
+                    <span className="font-normal text-gray-500 ml-1">외 {group.otherCount}</span>
+                  )}
+                </Link>
+              ) : (
+                <span className="text-sm font-semibold text-gray-900">
+                  {group.name}
+                  {group.otherCount > 0 && (
+                    <span className="font-normal text-gray-500 ml-1">외 {group.otherCount}</span>
+                  )}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">{group.label}</span>
+              <span className="text-sm text-gray-700">
+                {group.name}
+                {group.otherCount > 0 && (
+                  <span className="text-gray-500 ml-1">외 {group.otherCount}</span>
+                )}
+              </span>
+            </>
+          )}
+        </div>
+      ))
+    }
+
+    // 2. case_parties fallback (scourtSnapshot 없을 때)
     if (caseParties.length > 0) {
-      // "사건본인"으로 시작하는 당사자 제외, party_type_label 기준으로 그룹화
       const labelGroups = new Map<string, typeof caseParties>()
 
-      // 번호 접두사 제거 함수 (예: "1. 정OO" -> "정OO")
-      const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, '')
-
-      // 표준 당사자 라벨 목록 (2026.01.07 보호사건/형사사건 추가)
-      const _standardLabels = [
-        '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
-        '항소인', '피항소인', '상고인', '피상고인',
-        // 보호사건
-        '행위자', '피해아동', '피해자', '보조인', '보호소년', '조사관',
-        // 형사사건
-        '피고인', '피고인명',
-        // 기타
-        '제3채무자', '관련자', '소송관계인'
-      ]
       const PARTY_TYPE_LABEL_MAP: Record<string, string> = {
         plaintiff: '원고',
         defendant: '피고',
@@ -1225,54 +1536,27 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         applicant: '신청인',
         respondent: '피신청인',
         third_debtor: '제3채무자',
-        // 보호사건 (2026.01.07 추가)
         actor: '행위자',
         victim: '피해아동',
         assistant: '보조인',
         juvenile: '보호소년',
         investigator: '조사관',
-        // 형사사건
         accused: '피고인',
         crime_victim: '피해자',
-        // 기타
         related: '관련자',
       }
 
-      // 히어로 영역에 표시할 당사자 라벨만 필터링
-      // 보호사건: 행위자만, 형사사건: 피고인만, 민사/가사: 원고/피고 등
-      const heroPartyLabels = [
-        '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
-        '항소인', '피항소인', '상고인', '피상고인', '항고인', '상대방',
-        '행위자', '보호소년',  // 보호사건 당사자
-        '피고인', '피고인명',  // 형사사건 당사자
-        '제3채무자'
-      ]
-      // 소송관계인은 히어로에서 제외 (피해아동, 보조인, 피해자, 조사관 등)
-
       caseParties
-        // 히어로에 표시할 당사자만 필터링 (소송관계인 제외)
         .filter(p => {
           const rawLabel = p.party_type_label || ''
           const normalizedLabel = normalizePartyLabel(rawLabel)
           if (normalizedLabel.startsWith('사건본인')) return false
-          // 히어로에 표시할 당사자 타입만
           return heroPartyLabels.includes(normalizedLabel) ||
                  ['plaintiff', 'defendant', 'creditor', 'debtor', 'applicant', 'respondent', 'actor', 'juvenile', 'accused', 'third_debtor'].includes(p.party_type || '')
         })
         .forEach(p => {
-          // SCOURT 라벨(party_type_label)을 그대로 사용 (일반탭과 동일)
           const rawLabel = p.party_type_label || ''
-          const _normalizedLabel = normalizePartyLabel(rawLabel)
-          let label: string
-
-          // party_type_label이 있으면 그대로 사용 (SCOURT 원본 라벨 우선)
-          if (rawLabel) {
-            label = rawLabel
-          }
-          // party_type_label이 없으면 party_type 기반 fallback
-          else {
-            label = PARTY_TYPE_LABEL_MAP[p.party_type || 'plaintiff'] || '기타'
-          }
+          const label = rawLabel || PARTY_TYPE_LABEL_MAP[p.party_type || 'plaintiff'] || '기타'
 
           if (!labelGroups.has(label)) {
             labelGroups.set(label, [])
@@ -1280,7 +1564,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           labelGroups.get(label)!.push(p)
         })
 
-      // 표시할 그룹 생성
       const groups: { label: string; name: string; isClient: boolean; otherCount: number }[] = []
 
       labelGroups.forEach((parties, label) => {
@@ -1299,7 +1582,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         })
       })
 
-      // 의뢰인을 먼저 정렬
       groups.sort((a, b) => {
         if (a.isClient && !b.isClient) return -1
         if (!a.isClient && b.isClient) return 1
@@ -1685,7 +1967,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         {activeTab === 'notice' && (
           <div className="space-y-4">
             {/* 알림 섹션 */}
-            <CaseNoticeSection notices={filteredNotices} onDismiss={handleDismissNotice} />
+            <CaseNoticeSection notices={filteredNotices} onAction={handleNoticeAction} onDismiss={handleDismissNotice} />
 
             {/* 심급내용 (원심) - SCOURT */}
             {(() => {
@@ -1920,7 +2202,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                     fetchCaseParties()
                     router.refresh()
                   }}
-                  scourtParties={(scourtSnapshot?.basicInfo as Record<string, unknown> | undefined)?.parties as Array<{ btprtNm?: string; btprtDvsNm?: string; btprtStndngNm?: string }> || []}
+                  scourtParties={(scourtSnapshot?.basicInfo as Record<string, unknown> | undefined)?.parties as Array<{ btprNm: string; btprDvsNm: string }> || []}
                 />
                 </div>
               </div>

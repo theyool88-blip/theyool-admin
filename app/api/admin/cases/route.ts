@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant, withTenantId } from '@/lib/api/with-tenant'
 import { SCOURT_RELATION_MAP, determineRelationDirection } from '@/lib/scourt/case-relations'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
+import { getCourtFullName } from '@/lib/scourt/court-codes'
+import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
 
 /**
  * GET /api/admin/cases
@@ -234,8 +236,20 @@ export const POST = withTenant(async (request, { tenant }) => {
       clientId = newClient.id
     }
 
-    const resolvedClientRole = body.client_role ?? sourceCase?.client_role ?? null
+    // client_role: 명시적으로 지정된 경우 사용, 아니면 기본값 'plaintiff'
+    const resolvedClientRole = body.client_role ?? sourceCase?.client_role ?? 'plaintiff'
+    // client_role_status: 명시적으로 client_role을 지정한 경우 'confirmed', 아니면 'provisional'
+    const resolvedClientRoleStatus = body.client_role ? 'confirmed' : (sourceCase?.client_role ? 'confirmed' : 'provisional')
     const resolvedOpponentName = body.opponent_name ?? sourceCase?.opponent_name ?? null
+    const parsedCourtNumber = body.court_case_number
+      ? parseCaseNumber(body.court_case_number)
+      : null
+    const resolvedCourtName = body.court_name
+      ? getCourtFullName(
+          body.court_name,
+          parsedCourtNumber?.valid ? parsedCourtNumber.caseType : undefined
+        )
+      : null
 
     // Create the case (테넌트 ID 포함)
     const { data: newCase, error } = await adminClient
@@ -252,9 +266,10 @@ export const POST = withTenant(async (request, { tenant }) => {
         success_fee_agreement: body.success_fee_agreement || null,
         notes: body.notes || null,
         court_case_number: body.court_case_number || null,
-        court_name: body.court_name || null,
+        court_name: resolvedCourtName,
         judge_name: body.judge_name || null,
         client_role: resolvedClientRole,
+        client_role_status: resolvedClientRoleStatus,
         opponent_name: resolvedOpponentName
       }, tenant)])
       .select()

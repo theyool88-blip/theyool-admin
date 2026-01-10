@@ -84,17 +84,6 @@ interface NewCasePayload {
   source_relation_enc_cs_no?: string
 }
 
-// 한글 성씨 추출 (첫 글자)
-function extractSurname(name: string): string {
-  const trimmed = name.trim()
-  if (!trimmed) return ''
-  const firstChar = trimmed.charAt(0)
-  if (/[가-힣]/.test(firstChar)) {
-    return firstChar
-  }
-  return ''
-}
-
 // 섹션 헤더 컴포넌트
 function SectionHeader({
   number,
@@ -219,6 +208,7 @@ export default function NewCaseForm({
   const [error, setError] = useState<string | null>(null)
   const [isNewClient, setIsNewClient] = useState(!initialClientId)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const resolvedInitialCourtName = getCourtAbbrev(initialCourtName || '')
 
   // 이해충돌 검색 관련 상태
   const [conflictResult, setConflictResult] = useState<ConflictResult | null>(null)
@@ -241,7 +231,7 @@ export default function NewCaseForm({
     notes: '',
     // 대법원 사건 정보
     court_case_number: initialCaseNumber || '',
-    court_name: initialCourtName || '',
+    court_name: resolvedInitialCourtName,
     judge_name: '',
     client_role: (initialClientRole || '') as 'plaintiff' | 'defendant' | '',
     opponent_name: initialOpponentName || '',
@@ -263,11 +253,6 @@ export default function NewCaseForm({
     return selectedClient?.name || ''
   }, [isNewClient, formData.client_name, formData.client_id, clients])
 
-  // 성씨 동일 여부
-  const clientSurname = extractSurname(getClientName())
-  const opponentSurname = extractSurname(formData.opponent_name)
-  const sameSurname = clientSurname && opponentSurname && clientSurname === opponentSurname
-
   // URL 파라미터로 전달된 경우 자동 연동 플래그
   const [autoSyncTriggered, setAutoSyncTriggered] = useState(false)
 
@@ -279,9 +264,21 @@ export default function NewCaseForm({
   const [scourtSearchError, setScourtSearchError] = useState<string | null>(null)
   const [scourtSearchPartyName, setScourtSearchPartyName] = useState(initialPartyName || '')
   const [showCourtDropdown, setShowCourtDropdown] = useState(false)
-  const filteredCourts = COURTS.filter(c =>
-    c.name.includes(formData.court_name)
-  ).slice(0, 15)
+  const filteredCourts = COURTS
+    .filter(c => {
+      const query = formData.court_name.trim()
+      if (!query) return true
+      const abbrev = getCourtAbbrev(c.name)
+      return c.name.includes(query) || abbrev.includes(query)
+    })
+    .reduce((acc, court) => {
+      const abbrev = getCourtAbbrev(court.name)
+      if (acc.seen.has(abbrev)) return acc
+      acc.seen.add(abbrev)
+      acc.items.push(court)
+      return acc
+    }, { items: [] as typeof COURTS, seen: new Set<string>() })
+    .items.slice(0, 15)
   const [scourtSearchSuccess, setScourtSearchSuccess] = useState(false)
 
   // 사건번호 또는 사건명 변경 시 자동분류
@@ -405,7 +402,7 @@ export default function NewCaseForm({
   // URL 파라미터로 전달된 경우 자동 대법원 연동
   useEffect(() => {
     const autoSync = async () => {
-      if (!initialCaseNumber || !initialCourtName || autoSyncTriggered) return
+      if (!initialCaseNumber || !resolvedInitialCourtName || autoSyncTriggered) return
 
       setAutoSyncTriggered(true)
 
@@ -432,7 +429,7 @@ export default function NewCaseForm({
               caseYear,
               caseType,
               caseSerial,
-              courtName: initialCourtName,
+              courtName: resolvedInitialCourtName,
               partyName: initialPartyName
             })
           })
@@ -476,7 +473,7 @@ export default function NewCaseForm({
                 setFormData(prev => ({
                   ...prev,
                   judge_name: general.judge || result.caseInfo.judgeName || prev.judge_name,
-                  court_name: general.court || prev.court_name,
+                  court_name: getCourtAbbrev(general.court || prev.court_name),
                   client_role: detectedRole || prev.client_role
                 }))
               }
@@ -506,7 +503,7 @@ export default function NewCaseForm({
     }
 
     autoSync()
-  }, [initialCaseNumber, initialCourtName, initialPartyName, autoSyncTriggered, clients, initialClientId])
+  }, [initialCaseNumber, resolvedInitialCourtName, initialPartyName, autoSyncTriggered, clients, initialClientId])
 
   // 대법원 사건 검색
   const handleScourtSearch = async () => {
@@ -569,7 +566,7 @@ export default function NewCaseForm({
 
           setFormData(prev => ({
             ...prev,
-            court_name: general.court || prev.court_name,
+            court_name: getCourtAbbrev(general.court || prev.court_name),
             judge_name: general.judge || prev.judge_name,
             client_role: detectedRole || prev.client_role,
             // 자동 입력: 의뢰인 이름, 사건 유형
@@ -586,7 +583,7 @@ export default function NewCaseForm({
 
           setFormData(prev => ({
             ...prev,
-            court_name: result.caseInfo.court || prev.court_name,
+            court_name: getCourtAbbrev(result.caseInfo.courtName || result.caseInfo.court || prev.court_name),
             client_name: partyName,
             case_type: autoType || prev.case_type,
             case_label: autoType || prev.case_label
@@ -605,8 +602,7 @@ export default function NewCaseForm({
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitCase = async (clientRoleOverride?: 'plaintiff' | 'defendant') => {
     setLoading(true)
     setError(null)
 
@@ -637,7 +633,7 @@ export default function NewCaseForm({
         court_case_number: formData.court_case_number || null,
         court_name: formData.court_name || null,
         judge_name: formData.judge_name || null,
-        client_role: formData.client_role || null,
+        client_role: clientRoleOverride || formData.client_role || null,
         opponent_name: formData.opponent_name || null
       }
 
@@ -711,6 +707,11 @@ export default function NewCaseForm({
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await submitCase()
   }
 
   const inputClassName = "w-full h-11 px-4 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors"
@@ -830,7 +831,7 @@ export default function NewCaseForm({
                                 key={c.code}
                                 className="px-4 py-3 text-sm cursor-pointer hover:bg-sage-50 text-gray-900 border-b border-sage-50 last:border-b-0"
                                 onMouseDown={() => {
-                                  setFormData({ ...formData, court_name: c.name })
+                                  setFormData({ ...formData, court_name: getCourtAbbrev(c.name) })
                                   setShowCourtDropdown(false)
                                 }}
                               >
@@ -1092,40 +1093,6 @@ export default function NewCaseForm({
                   />
                 </FormField>
 
-                {/* 성씨가 동일하면 원고/피고 선택 표시 */}
-                {sameSurname && (
-                  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                    <p className="text-sm text-amber-800 mb-3">
-                      <span className="font-medium">의뢰인({getClientName()})과 상대방({formData.opponent_name})의 성씨가 동일합니다.</span>
-                      <br />
-                      <span className="text-xs">의뢰인의 소송상 지위를 선택해주세요.</span>
-                    </p>
-                    <div className="flex gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="client_role"
-                          value="plaintiff"
-                          checked={formData.client_role === 'plaintiff'}
-                          onChange={(e) => setFormData({ ...formData, client_role: e.target.value as 'plaintiff' | 'defendant' })}
-                          className="w-4 h-4 text-sage-600 border-gray-300 focus:ring-sage-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">원고 (채권자)</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="client_role"
-                          value="defendant"
-                          checked={formData.client_role === 'defendant'}
-                          onChange={(e) => setFormData({ ...formData, client_role: e.target.value as 'plaintiff' | 'defendant' })}
-                          className="w-4 h-4 text-sage-600 border-gray-300 focus:ring-sage-500"
-                        />
-                        <span className="text-sm font-medium text-gray-700">피고 (채무자)</span>
-                      </label>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -1330,6 +1297,7 @@ export default function NewCaseForm({
           </div>
         </form>
       </div>
+
     </div>
   )
 }

@@ -62,7 +62,7 @@ interface NoticeItemProps {
 function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
   const [isDismissing, setIsDismissing] = useState(false)
   const icon = NOTICE_CATEGORY_ICONS[notice.category]
-  const categoryLabel = NOTICE_CATEGORY_LABELS[notice.category]
+  const _categoryLabel = NOTICE_CATEGORY_LABELS[notice.category]
 
   const handleDismiss = async () => {
     if (!onDismiss || isDismissing) return
@@ -123,6 +123,27 @@ function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
           <p className="text-xs text-gray-500 mt-0.5">
             {notice.description}
           </p>
+
+          {/* 의뢰인 역할 확인 액션 버튼 */}
+          {notice.category === 'client_role_confirm' && notice.actions && (
+            <div className="flex gap-2 mt-3 flex-wrap">
+              {notice.actions.map((action, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => onAction?.(notice, action.type)}
+                  className={`text-xs px-4 py-2 rounded-lg font-medium transition-colors ${
+                    action.type === 'confirm_plaintiff'
+                      ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                      : action.type === 'confirm_defendant'
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                      : 'border-gray-200 text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* 기일 충돌 액션 버튼 */}
           {notice.category === 'schedule_conflict' && notice.actions && (

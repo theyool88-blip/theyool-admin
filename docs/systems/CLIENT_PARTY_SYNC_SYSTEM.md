@@ -1,5 +1,7 @@
 # 의뢰인/당사자 동기화 시스템
 
+**Last Updated**: 2026-01-10
+
 ## 개요
 
 의뢰인(clients) 정보와 당사자(case_parties) 정보 간의 데이터 일관성을 유지하는 시스템입니다.
@@ -210,9 +212,108 @@ client_id 변경 감지
 
 ---
 
+## SCOURT 당사자 라벨 처리
+
+### 핵심 원칙: SCOURT 라벨 원본 유지
+
+**2026-01-10 업데이트**
+
+SCOURT(나의사건검색) 데이터의 당사자 지위명(`party_type_label`)을 원본 그대로 사용합니다.
+사건번호 기반 추론(`getPartyLabelsFromSchema`)으로 라벨을 변환하지 않습니다.
+
+#### 적용 영역
+
+| 영역 | 파일 | 라벨 소스 |
+|------|------|-----------|
+| 히어로 섹션 | `CaseDetail.tsx` | `party_type_label` 원본 |
+| 일반탭 | `ScourtGeneralInfoXml.tsx` | `party_type_label` 원본 |
+| 알림탭 당사자 | `CasePartiesSection.tsx` | `party_type_label` 원본 |
+
+#### 예시
+
+```
+SCOURT 원본: 신청인 - 정OOO, 피신청인 - 성OOO
+사건번호: 2024드단1234 (가사소송)
+
+기존(오류): 원고 - 정OOO, 피고 - 성OOO (사건번호 기반 추론)
+수정후: 신청인 - 정OOO, 피신청인 - 성OOO (SCOURT 원본 유지)
+```
+
+### 비의뢰인 당사자 유형 필터링
+
+**파일:** `lib/scourt/party-sync.ts`
+
+의뢰인 정보를 이전하면 안 되는 당사자 유형을 필터링합니다.
+
+```typescript
+const NON_CLIENT_PARTY_LABELS = [
+  '사건본인', '제3자', '제3채무자', '참가인', '보조참가인', '증인', '감정인',
+];
+
+function isNonClientPartyLabel(label: string): boolean {
+  return NON_CLIENT_PARTY_LABELS.some(l => label.includes(l));
+}
+```
+
+#### 매칭 조건
+
+SCOURT 당사자와 마이그레이션 당사자를 매칭할 때:
+
+1. **비의뢰인 유형 체크**: `isNonClientPartyLabel()` → true이면 의뢰인 정보 이전 제외
+2. **party_type 호환성 체크**: `isCompatiblePartyType()` → 같은 측(원고측/피고측)끼리만 매칭
+
+```typescript
+const PLAINTIFF_SIDE = ['plaintiff', 'creditor', 'applicant'];
+const DEFENDANT_SIDE = ['defendant', 'debtor', 'respondent'];
+
+function isCompatiblePartyType(migType, scourtType) {
+  if (migType === scourtType) return true;
+  if (PLAINTIFF_SIDE.includes(migType) && PLAINTIFF_SIDE.includes(scourtType)) return true;
+  if (DEFENDANT_SIDE.includes(migType) && DEFENDANT_SIDE.includes(scourtType)) return true;
+  return false;
+}
+```
+
+### 알림탭 당사자 섹션 숨김 조건
+
+**파일:** `CaseDetail.tsx` - `shouldShowPartiesSection`
+
+양측 모두 마스킹 해제된 당사자가 있으면 당사자 섹션을 숨깁니다.
+
+```typescript
+// 조건: 원고측 + 피고측 모두 마스킹 해제된 이름 존재
+const unmaskedPlaintiff = parties.find(p => isPlaintiffSide(p) && !MASKED_NAME_PATTERN.test(p.party_name));
+const unmaskedDefendant = parties.find(p => isDefendantSide(p) && !MASKED_NAME_PATTERN.test(p.party_name));
+
+return !(unmaskedPlaintiff && unmaskedDefendant); // 둘 다 있으면 숨김
+```
+
+### partyOverrides 로직
+
+**파일:** `CaseDetail.tsx` - `unmaskedPartyOverrides`
+
+일반탭에 전달하는 당사자 오버라이드 목록:
+
+```typescript
+// 기존: manual_override=true인 당사자만
+const manualPartyOverrides = caseParties.filter(p => p.manual_override);
+
+// 수정: 마스킹 해제된 모든 당사자
+const unmaskedPartyOverrides = caseParties.filter(p => {
+  const cleanName = p.party_name.replace(/^\d+\.\s*/, '').trim();
+  return !MASKED_NAME_PATTERN.test(cleanName);
+});
+```
+
+이 변경으로 `ScourtGeneralInfoXml`에서 `clientRole` 추론 로직을 사용하지 않고
+SCOURT 라벨 기반으로 당사자를 표시합니다.
+
+---
+
 ## 주의사항
 
 1. **manual_override 보호**: 사용자가 직접 수정한 당사자는 자동 동기화되지 않음
 2. **SCOURT 동기화와 충돌**: SCOURT 동기화도 manual_override 플래그를 존중함
 3. **삭제 제한**: 사건에서 사용 중인 의뢰인은 삭제 불가
 4. **테넌트 격리**: 모든 API는 테넌트 컨텍스트 내에서만 동작
+5. **SCOURT 라벨 우선**: 당사자 지위명은 SCOURT 원본(`party_type_label`)을 사용, 사건번호 기반 추론 사용 안함

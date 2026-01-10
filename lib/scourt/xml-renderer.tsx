@@ -94,33 +94,35 @@ export function BasicInfoTable({ layout, data, className }: BasicInfoTableProps)
 
   return (
     <div className={className}>
-      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+      <h3 className="text-base md:text-lg font-semibold mb-3 flex items-center gap-2">
         <span className="w-1 h-5 bg-sage-600 rounded"></span>
         {layout.title}
         {data.cortNm && (
-          <span className="text-sm font-normal text-gray-500">
+          <span className="text-xs md:text-sm font-normal text-gray-500">
             ({data.cortNm})
           </span>
         )}
       </h3>
-      <table className="w-full border-collapse">
-        {layout.colWidths.length > 0 && (
-          <colgroup>
-            {layout.colWidths.map((width, i) => (
-              <col key={i} style={{ width }} />
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          {layout.colWidths.length > 0 && (
+            <colgroup>
+              {layout.colWidths.map((width, i) => (
+                <col key={i} style={{ width }} />
+              ))}
+            </colgroup>
+          )}
+          <tbody>
+            {layout.rows.map((row, rowIndex) => (
+              <BasicInfoRowComponent
+                key={rowIndex}
+                row={row}
+                data={data}
+              />
             ))}
-          </colgroup>
-        )}
-        <tbody>
-          {layout.rows.map((row, rowIndex) => (
-            <BasicInfoRowComponent
-              key={rowIndex}
-              row={row}
-              data={data}
-            />
-          ))}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -175,8 +177,8 @@ function BasicInfoCellComponent({ cell, data }: BasicInfoCellProps) {
   }
 
   const baseClasses = isHeader
-    ? 'px-3 py-2 bg-gray-50 text-sm font-medium text-gray-700 text-left'
-    : 'px-3 py-2 text-sm text-gray-900';
+    ? 'px-2 md:px-3 py-1.5 md:py-2 bg-gray-50 text-xs md:text-sm font-medium text-gray-700 text-left'
+    : 'px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900';
 
   const Tag = isHeader ? 'th' : 'td';
 
@@ -254,13 +256,13 @@ export function GridTable({ layout, data, className, caseLinkMap }: GridTablePro
 
   return (
     <div className={className}>
-      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+      <h3 className="text-base md:text-lg font-semibold mb-3 flex items-center gap-2">
         <span className="w-1 h-5 bg-sage-600 rounded"></span>
         {layout.title}
       </h3>
 
       {!hasData ? (
-        <p className="text-sm text-gray-500 py-4 text-center bg-gray-50 rounded">
+        <p className="text-xs md:text-sm text-gray-500 py-4 text-center bg-gray-50 rounded">
           {layout.noResultMessage || '조회된 내용이 없습니다.'}
         </p>
       ) : (
@@ -271,7 +273,7 @@ export function GridTable({ layout, data, className, caseLinkMap }: GridTablePro
                 {visibleColumns.map((col, i) => (
                   <th
                     key={i}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 text-center"
+                    className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 text-center"
                     style={{ width: col.width ? `${col.width}%` : 'auto' }}
                   >
                     {col.header}
@@ -315,7 +317,7 @@ export function GridTable({ layout, data, className, caseLinkMap }: GridTablePro
                     return (
                       <td
                         key={colIndex}
-                        className="px-3 py-2 text-sm text-gray-900"
+                        className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900"
                         style={{ textAlign: (col.textAlign as any) || 'center' }}
                       >
                         {caseLink ? (

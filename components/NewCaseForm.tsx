@@ -49,6 +49,8 @@ interface NewCaseFormProps {
   sourceCaseId?: string
   initialClientRole?: 'plaintiff' | 'defendant' | null
   initialOpponentName?: string | null
+  sourceRelationType?: string
+  sourceRelationEncCsNo?: string
 }
 
 interface NewClientPayload {
@@ -78,6 +80,8 @@ interface NewCasePayload {
   client_role?: 'plaintiff' | 'defendant' | null
   opponent_name?: string | null
   source_case_id?: string
+  source_relation_type?: string
+  source_relation_enc_cs_no?: string
 }
 
 // 한글 성씨 추출 (첫 글자)
@@ -186,6 +190,18 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`
 }
 
+// 금액 포맷 (천단위 콤마)
+function formatMoney(value: string | number | null | undefined): string {
+  if (value === null || value === undefined || value === '' || value === 0) return ''
+  const num = typeof value === 'string' ? parseInt(value.replace(/,/g, ''), 10) : value
+  return isNaN(num) ? '' : num.toLocaleString('ko-KR')
+}
+
+// 콤마 제거 후 문자열 반환
+function parseMoney(value: string): string {
+  return value.replace(/,/g, '')
+}
+
 export default function NewCaseForm({
   clients,
   initialCaseNumber,
@@ -194,7 +210,9 @@ export default function NewCaseForm({
   initialPartyName,
   sourceCaseId,
   initialClientRole,
-  initialOpponentName
+  initialOpponentName,
+  sourceRelationType,
+  sourceRelationEncCsNo
 }: NewCaseFormProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -625,6 +643,12 @@ export default function NewCaseForm({
 
       if (sourceCaseId) {
         payload.source_case_id = sourceCaseId
+        if (sourceRelationType) {
+          payload.source_relation_type = sourceRelationType
+        }
+        if (sourceRelationEncCsNo) {
+          payload.source_relation_enc_cs_no = sourceRelationEncCsNo
+        }
       }
 
       if (isNewClient) {
@@ -726,7 +750,7 @@ export default function NewCaseForm({
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* ========== 섹션 1: 대법원 사건 연동 ========== */}
-          <div className={`rounded-2xl border overflow-hidden transition-all ${
+          <div className={`rounded-2xl border transition-all ${
             scourtSearchSuccess
               ? 'bg-sage-50 border-sage-300'
               : 'bg-white border-sage-200 shadow-sm'
@@ -743,31 +767,15 @@ export default function NewCaseForm({
             <div className="p-5">
               {scourtSearchSuccess ? (
                 // 연동 성공 상태
-                <div className="space-y-4">
+                <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sage-700">
                     <svg className="w-5 h-5 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <span className="font-medium">대법원 연동 완료</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                    <div className="p-3 bg-white rounded-lg border border-sage-200">
-                      <p className="text-xs text-sage-600 mb-1">사건번호</p>
-                      <p className="text-sm font-medium text-gray-900">{formData.court_case_number}</p>
-                    </div>
-                    <div className="p-3 bg-white rounded-lg border border-sage-200">
-                      <p className="text-xs text-sage-600 mb-1">법원</p>
-                      <p className="text-sm font-medium text-gray-900">{getCourtAbbrev(formData.court_name)}</p>
-                    </div>
-                    {formData.client_role && (
-                      <div className="p-3 bg-white rounded-lg border border-sage-200">
-                        <p className="text-xs text-sage-600 mb-1">의뢰인 지위</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {formData.client_role === 'plaintiff' ? '원고' : '피고'}
-                        </p>
-                      </div>
-                    )}
+                    <span className="font-medium">
+                      {formData.court_case_number} / {getCourtAbbrev(formData.court_name)}
+                      {formData.client_role && ` (${formData.client_role === 'plaintiff' ? '원고' : '피고'})`}
+                    </span>
                   </div>
 
                   <button
@@ -1188,9 +1196,10 @@ export default function NewCaseForm({
                 </FormField>
                 <FormField label="착수금 (원)">
                   <input
-                    type="number"
-                    value={formData.retainer_fee}
-                    onChange={(e) => setFormData({ ...formData, retainer_fee: e.target.value })}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatMoney(formData.retainer_fee)}
+                    onChange={(e) => setFormData({ ...formData, retainer_fee: parseMoney(e.target.value) })}
                     className={inputClassName}
                     placeholder="0"
                   />

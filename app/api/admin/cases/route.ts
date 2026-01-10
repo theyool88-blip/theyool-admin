@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant, withTenantId } from '@/lib/api/with-tenant'
+import { SCOURT_RELATION_MAP, determineRelationDirection } from '@/lib/scourt/case-relations'
+import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 
 /**
  * GET /api/admin/cases
@@ -118,6 +120,8 @@ export const POST = withTenant(async (request, { tenant }) => {
       client_role?: 'plaintiff' | 'defendant'
       opponent_name?: string
       source_case_id?: string
+      source_relation_type?: string
+      source_relation_enc_cs_no?: string
     }
 
     // case_name과 case_type은 자동 생성되므로 필수 아님
@@ -138,7 +142,13 @@ export const POST = withTenant(async (request, { tenant }) => {
     }
 
     const adminClient = createAdminClient()
-    let sourceCase: { client_role?: 'plaintiff' | 'defendant' | null; opponent_name?: string | null } | null = null
+    let sourceCase: {
+      client_role?: 'plaintiff' | 'defendant' | null
+      opponent_name?: string | null
+      case_level?: string | null
+      court_case_number?: string | null
+      main_case_id?: string | null
+    } | null = null
     let sourcePartyOverrides: Array<{
       party_name: string
       party_type: string
@@ -153,7 +163,7 @@ export const POST = withTenant(async (request, { tenant }) => {
     if (body.source_case_id) {
       let sourceCaseQuery = adminClient
         .from('legal_cases')
-        .select('client_role, opponent_name')
+        .select('client_role, opponent_name, case_level, court_case_number, main_case_id')
         .eq('id', body.source_case_id)
 
       if (!tenant.isSuperAdmin && tenant.tenantId) {
@@ -291,6 +301,91 @@ export const POST = withTenant(async (request, { tenant }) => {
 
         if (partyInsertError) {
           console.error('Error copying case parties:', partyInsertError)
+        }
+      }
+    } else {
+      // source_case_id가 없는 경우: 신규 사건 등록 시 case_parties 자동 생성
+      // 사건번호 또는 client_role이 있을 때만 생성 (정확한 지위 추론 가능)
+      const shouldCreateParties = body.court_case_number || body.client_role
+
+      // 의뢰인 이름 결정: 새 의뢰인이면 new_client.name, 기존 의뢰인이면 DB에서 조회
+      let clientNameForParty: string | null = null
+      if (body.new_client?.name) {
+        clientNameForParty = body.new_client.name
+      } else if (clientId) {
+        // 기존 의뢰인 이름 조회
+        const { data: existingClient } = await adminClient
+          .from('clients')
+          .select('name')
+          .eq('id', clientId)
+          .single()
+        clientNameForParty = existingClient?.name || null
+      }
+
+      if (shouldCreateParties && (clientNameForParty || resolvedOpponentName)) {
+        const partySeeds = buildManualPartySeeds({
+          clientName: clientNameForParty,
+          opponentName: resolvedOpponentName,
+          clientRole: resolvedClientRole,
+          caseNumber: body.court_case_number,
+          clientId: clientId,
+        })
+
+        if (partySeeds.length > 0) {
+          const seedPayload = partySeeds.map((seed, idx) => withTenantId({
+            case_id: newCase.id,
+            party_name: seed.party_name,
+            party_type: seed.party_type,
+            party_type_label: seed.party_type_label,
+            is_our_client: seed.is_our_client,
+            client_id: seed.client_id || null,
+            party_order: idx + 1,
+            manual_override: false,
+            scourt_synced: false,
+          }, tenant))
+
+          const { error: seedError } = await adminClient
+            .from('case_parties')
+            .insert(seedPayload)
+
+          if (seedError) {
+            console.error('Error seeding case parties:', seedError)
+          }
+        }
+      }
+    }
+
+    if (body.source_case_id) {
+      const rawRelationType = (body.source_relation_type || '').trim()
+      const relationType = rawRelationType || '관련사건'
+      const relationTypeCode = SCOURT_RELATION_MAP[relationType] || 'related'
+      const direction = determineRelationDirection(relationType)
+
+      const { data: existingRelation, error: existingRelationError } = await adminClient
+        .from('case_relations')
+        .select('id')
+        .or(`and(case_id.eq.${body.source_case_id},related_case_id.eq.${newCase.id}),and(case_id.eq.${newCase.id},related_case_id.eq.${body.source_case_id})`)
+        .maybeSingle()
+
+      if (existingRelationError) {
+        console.error('Error checking case_relations:', existingRelationError)
+      } else if (!existingRelation) {
+        const { error: relationInsertError } = await adminClient
+          .from('case_relations')
+          .insert({
+            case_id: body.source_case_id,
+            related_case_id: newCase.id,
+            relation_type: relationType,
+            relation_type_code: relationTypeCode,
+            direction,
+            auto_detected: false,
+            confirmed: true,
+            confirmed_at: new Date().toISOString(),
+            scourt_enc_cs_no: body.source_relation_enc_cs_no || null,
+          })
+
+        if (relationInsertError) {
+          console.error('Error creating case_relations:', relationInsertError)
         }
       }
     }

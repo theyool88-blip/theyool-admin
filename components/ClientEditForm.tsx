@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import AdminHeader from './AdminHeader'
 
 interface Client {
@@ -28,7 +27,6 @@ interface Profile {
 
 export default function ClientEditForm({ profile, clientData }: { profile: Profile, clientData: Client }) {
   const router = useRouter()
-  const supabase = createClient()
   const [saving, setSaving] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -48,9 +46,10 @@ export default function ClientEditForm({ profile, clientData }: { profile: Profi
     setSaving(true)
 
     try {
-      const { error } = await supabase
-        .from('clients')
-        .update({
+      const response = await fetch(`/api/admin/clients/${clientData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: formData.name,
           resident_number: formData.resident_number || null,
           phone: formData.phone || null,
@@ -61,11 +60,20 @@ export default function ClientEditForm({ profile, clientData }: { profile: Profi
           account_number: formData.account_number || null,
           notes: formData.notes || null,
         })
-        .eq('id', clientData.id)
+      })
 
-      if (error) throw error
+      const result = await response.json()
 
-      alert('저장되었습니다.')
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update client')
+      }
+
+      // 동기화된 당사자 수 표시
+      if (result.syncedParties && result.syncedParties > 0) {
+        alert(`저장되었습니다. (${result.syncedParties}건의 당사자 정보도 함께 업데이트됨)`)
+      } else {
+        alert('저장되었습니다.')
+      }
       router.push(`/clients/${clientData.id}`)
       router.refresh()
     } catch (error) {

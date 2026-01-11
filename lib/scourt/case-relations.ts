@@ -661,6 +661,9 @@ export const SCOURT_RELATION_MAP: Record<string, CaseRelationType> = {
   '반소': 'related',
   '병합': 'related',
   '분리': 'related',
+  '이송전사건': 'related',   // 이송 전 원래 사건
+  '이송후사건': 'related',   // 이송 후 사건
+  '이송': 'related',         // 이송 (약칭)
   '관련사건': 'related',
   '조정사건': 'related',
   '조정': 'related',         // 조정 (약칭)
@@ -700,6 +703,14 @@ export function determineRelationDirection(
   // 연관사건이 하위 심급, 현재 사건이 상위 심급
   if (['하심사건', '1심', '원심', '2심', '3심'].includes(relationType)) {
     return 'parent';  // 연관사건이 하위, 현재가 상위
+  }
+
+  // 이송 관계
+  if (['이송전사건'].includes(relationType)) {
+    return 'child';  // 연관사건(이송전)이 원래 사건, 현재가 이송받은 사건
+  }
+  if (['이송후사건', '이송'].includes(relationType)) {
+    return 'parent';  // 연관사건(이송후)이 이송받은 사건, 현재가 원래 사건
   }
 
   // 본안 → 보전 관계 (본안이 주사건)

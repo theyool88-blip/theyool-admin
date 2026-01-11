@@ -440,7 +440,11 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       const data = await res.json()
 
       if (data.success) {
-        if (showAlert) alert(data.message)
+        if (showAlert) {
+          alert(data.message)
+          // 스냅샷 새로고침하여 linkedCaseId 업데이트 → 알림 자동 제거
+          fetchScourtSnapshot()
+        }
         return true
       } else {
         if (showAlert) alert(data.error || '연동 실패')
@@ -458,7 +462,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         return next
       })
     }
-  }, [caseData.id, caseData.client_id])
+  }, [caseData.id, caseData.client_id, fetchScourtSnapshot])
 
   // 모두 연결 핸들러
   const handleLinkAllRelatedCases = useCallback(async (cases: Array<{
@@ -2882,7 +2886,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         <div className="fixed inset-0 z-[20050] flex items-center justify-center bg-black/40 px-4">
           <div className="bg-white w-full max-w-md rounded-2xl border border-gray-200 overflow-hidden shadow-xl">
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">당사자 이름 수정</h3>
+              <h3 className="text-lg font-semibold text-gray-900">당사자 수정</h3>
               <button
                 onClick={() => {
                   setEditingPartyFromGeneral(null)

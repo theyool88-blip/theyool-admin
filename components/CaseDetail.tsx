@@ -218,6 +218,13 @@ const DEFENDANT_SIDE_LABELS = new Set([
   '피해자',
 ].map(label => normalizePartyLabel(label)))
 
+const getPartySideFromType = (partyType?: string | null) => {
+  if (!partyType) return null
+  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return 'plaintiff'
+  if (DEFENDANT_SIDE_TYPES.has(partyType)) return 'defendant'
+  return null
+}
+
 export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [_unifiedSchedules, setUnifiedSchedules] = useState<UnifiedScheduleItem[]>([])
   const [_loading, setLoading] = useState(false)
@@ -504,41 +511,105 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     }
   }, [handleLinkRelatedCase, router, fetchScourtSnapshot])
 
+  // 당사자 표시용 데이터 - 알림 감지에서 사용하므로 먼저 정의
+  const casePartiesWithPending = useMemo(() => {
+    if (Object.keys(pendingPartyEdits).length === 0) return caseParties
+
+    const partyById = new Map(caseParties.map(party => [party.id, party]))
+    const pendingPrimaryBySide = new Map<'plaintiff' | 'defendant', string>()
+
+    Object.values(pendingPartyEdits).forEach(edit => {
+      if (!edit.isPrimary) return
+      const party = partyById.get(edit.partyId)
+      const side = getPartySideFromType(party?.party_type || null)
+      if (side) pendingPrimaryBySide.set(side, edit.partyId)
+    })
+
+    return caseParties.map(party => {
+      const edit = pendingPartyEdits[party.id]
+      const side = getPartySideFromType(party.party_type)
+      const forcedPrimaryId = side ? pendingPrimaryBySide.get(side) : null
+      const nextPrimary = forcedPrimaryId ? party.id === forcedPrimaryId : (edit ? edit.isPrimary : party.is_primary)
+
+      if (!edit && !forcedPrimaryId) return party
+
+      return {
+        ...party,
+        party_name: edit?.nextName ?? party.party_name,
+        is_primary: nextPrimary,
+        manual_override: edit ? true : party.manual_override,
+      }
+    })
+  }, [caseParties, pendingPartyEdits])
+
   // 일반 탭에서 당사자 이름 수정 시작
   const handlePartyEditFromGeneral = useCallback((partyId: string, partyLabel: string, currentName: string) => {
     // 번호 prefix 제거하고 편집 가능한 부분만 추출
     const nameWithoutNumber = currentName.replace(/^\d+\.\s*/, '')
-    const existingParty = caseParties.find(party => party.id === partyId)
+    const existingParty = casePartiesWithPending.find(party => party.id === partyId)
     const isPrimary = existingParty?.is_primary || false
     setEditingPartyFromGeneral({ partyId, partyLabel, partyName: currentName, isPrimary })
     setEditPartyNameInput(nameWithoutNumber)
     setEditPartyPrimaryInput(isPrimary)
-  }, [caseParties])
+  }, [casePartiesWithPending])
 
-  // 일반 탭 당사자 이름 저장 (대기열에 추가)
-  const handleSavePartyFromGeneral = useCallback(() => {
+  // 일반 탭 당사자 이름 저장 (즉시 반영)
+  const handleSavePartyFromGeneral = useCallback(async () => {
     if (!editingPartyFromGeneral || !editPartyNameInput.trim()) return
 
+    const { partyId, partyLabel, partyName } = editingPartyFromGeneral
+    const nextIsPrimary = editPartyPrimaryInput
+
     // 기존 party_name에서 번호 prefix 추출
-    const numberPrefixMatch = editingPartyFromGeneral.partyName.match(/^(\d+\.\s*)/)
+    const numberPrefixMatch = partyName.match(/^(\d+\.\s*)/)
     const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
     const newPartyName = `${numberPrefix}${editPartyNameInput.trim()}`
 
     setPendingPartyEdits(prev => ({
       ...prev,
-      [editingPartyFromGeneral.partyId]: {
-        partyId: editingPartyFromGeneral.partyId,
-        partyLabel: editingPartyFromGeneral.partyLabel,
-        originalName: editingPartyFromGeneral.partyName,
+      [partyId]: {
+        partyId,
+        partyLabel,
+        originalName: partyName,
         nextName: newPartyName,
-        isPrimary: editPartyPrimaryInput,
+        isPrimary: nextIsPrimary,
       }
     }))
 
     setEditingPartyFromGeneral(null)
     setEditPartyNameInput('')
     setEditPartyPrimaryInput(false)
-  }, [editingPartyFromGeneral, editPartyNameInput, editPartyPrimaryInput])
+    setSavingPartyFromGeneral(true)
+
+    try {
+      const res = await fetch(`/api/admin/cases/${caseData.id}/parties`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partyId,
+          party_name: newPartyName,
+          is_primary: nextIsPrimary,
+        }),
+      })
+
+      if (res.ok) {
+        await fetchCaseParties()
+        setPendingPartyEdits(prev => {
+          const next = { ...prev }
+          delete next[partyId]
+          return next
+        })
+        router.refresh()
+      } else {
+        const data = await res.json()
+        console.error('당사자 저장 실패:', data.error)
+      }
+    } catch (err) {
+      console.error('당사자 저장 중 오류:', err)
+    } finally {
+      setSavingPartyFromGeneral(false)
+    }
+  }, [editingPartyFromGeneral, editPartyNameInput, editPartyPrimaryInput, caseData.id, fetchCaseParties, router])
 
   const pendingPartyEditList = useMemo(
     () => Object.values(pendingPartyEdits),
@@ -979,22 +1050,21 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     fetchDismissedRelatedCases()
   }, [caseData.id])
 
-  // 당사자 표시용 데이터 - 알림 감지에서 사용하므로 먼저 정의
   const displayCaseParties = useMemo(() => {
-    if (caseParties.length === 0) return caseParties
+    if (casePartiesWithPending.length === 0) return casePartiesWithPending
 
     const clientFallbackName = caseData.client?.name?.trim() || ''
 
     const hasClientFallback = !!clientFallbackName && !isMaskedPartyName(clientFallbackName)
 
-    if (!hasClientFallback) return caseParties
+    if (!hasClientFallback) return casePartiesWithPending
 
     const clientFirstChar = hasClientFallback
       ? normalizePartyNameForMatch(clientFallbackName).charAt(0)
       : ''
 
     const charMatchedClient = clientFirstChar
-      ? caseParties.filter(p => {
+      ? casePartiesWithPending.filter(p => {
           const rawName = p.party_name || ''
           if (!isMaskedPartyName(rawName)) return false
           const firstChar = normalizePartyNameForMatch(rawName).charAt(0)
@@ -1021,7 +1091,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       return null
     }
 
-    const next = caseParties.map((party) => {
+    const next = casePartiesWithPending.map((party) => {
       const clientName = party.clients?.name?.trim()
       if (clientName && !isMaskedPartyName(clientName)) return party
       if (party.party_name && !isMaskedPartyName(party.party_name)) return party
@@ -1051,8 +1121,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       }
     })
 
-    return updated ? next : caseParties
-  }, [caseParties, caseData.client?.name, caseData.client_role, caseData.client_id])
+    return updated ? next : casePartiesWithPending
+  }, [casePartiesWithPending, caseData.client?.name, caseData.client_role, caseData.client_id])
 
   const casePartiesForDisplay = useMemo(() => {
     const scourtParties = displayCaseParties.filter(
@@ -1060,13 +1130,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     )
     return scourtParties.length > 0 ? scourtParties : displayCaseParties
   }, [displayCaseParties])
-
-  const getPartySideFromType = (partyType?: string | null) => {
-    if (!partyType) return null
-    if (PLAINTIFF_SIDE_TYPES.has(partyType)) return 'plaintiff'
-    if (DEFENDANT_SIDE_TYPES.has(partyType)) return 'defendant'
-    return null
-  }
 
   const getUnmaskedPartyName = (party?: { party_name?: string | null; clients?: { name?: string | null } | null }) => {
     if (!party) return null
@@ -1120,12 +1183,40 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       content2: doc.content,    // 서류명
     }))
 
-    // 미등록 관련사건/심급사건 (linkedCaseId가 없는 것만)
+    // 미등록 관련사건/심급사건 (case_relations에 없는 것)
+    // linkedCaseId가 있어도 case_relations에 등록되지 않았으면 미등록으로 표시
+    const existingRelatedCaseIds = new Set((caseData.case_relations || []).map(r => r.related_case_id))
+    const existingRelatedCaseNumbers = new Set(
+      (caseData.case_relations || [])
+        .map(r => r.related_case?.court_case_number)
+        .filter(Boolean)
+    )
     const unlinkedRelatedCases = (scourtSnapshot?.relatedCases || []).filter(
-      (c: { linkedCaseId?: string | null }) => !c.linkedCaseId
+      (c: { linkedCaseId?: string | null; caseNo?: string }) => {
+        // case_relations에 linkedCaseId로 등록됨 → 제외
+        if (c.linkedCaseId && existingRelatedCaseIds.has(c.linkedCaseId)) return false
+        // case_relations에 사건번호로 등록됨 → 제외
+        if (c.caseNo && existingRelatedCaseNumbers.has(c.caseNo)) return false
+        return true
+      }
+    )
+    const existingAppealCaseIds = new Set(
+      (caseData.case_relations || [])
+        .filter(r => r.relation_type_code === 'appeal')
+        .map(r => r.related_case_id)
+    )
+    const existingAppealCaseNumbers = new Set(
+      (caseData.case_relations || [])
+        .filter(r => r.relation_type_code === 'appeal')
+        .map(r => r.related_case?.court_case_number)
+        .filter(Boolean)
     )
     const unlinkedLowerCourt = (scourtSnapshot?.lowerCourt || []).filter(
-      (c: { linkedCaseId?: string | null }) => !c.linkedCaseId
+      (c: { linkedCaseId?: string | null; caseNo?: string }) => {
+        if (c.linkedCaseId && existingAppealCaseIds.has(c.linkedCaseId)) return false
+        if (c.caseNo && existingAppealCaseNumbers.has(c.caseNo)) return false
+        return true
+      }
     )
 
     const notices = detectCaseNotices({
@@ -1148,7 +1239,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     })
     setCaseNotices(notices)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseData.id, caseData.court_name, caseData.client_role, (caseData as { client_role_status?: string }).client_role_status, caseData.client?.name, primaryParties.opponentParty, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
+  }, [caseData.id, caseData.court_name, caseData.client_role, (caseData as { client_role_status?: string }).client_role_status, caseData.client?.name, caseData.case_relations, primaryParties.opponentParty, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
 
   // 계약서 파일 조회
   useEffect(() => {
@@ -1188,6 +1279,32 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     // 의뢰인 역할 확정 처리
     if (actionType === 'confirm_plaintiff' || actionType === 'confirm_defendant') {
       const newRole = actionType === 'confirm_plaintiff' ? 'plaintiff' : 'defendant'
+      const opponentNameInput = metadata?.opponentName?.trim()
+
+      if (opponentNameInput && primaryParties.opponentParty) {
+        const baseName = primaryParties.opponentParty.party_name || ''
+        const nextName = baseName ? preservePrefix(baseName, opponentNameInput) : opponentNameInput
+
+        try {
+          const res = await fetch(`/api/admin/cases/${caseData.id}/parties`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              partyId: primaryParties.opponentParty.id,
+              party_name: nextName,
+            })
+          })
+
+          if (res.ok) {
+            await fetchCaseParties()
+          } else {
+            const data = await res.json()
+            console.error('상대방 이름 저장 실패:', data.error)
+          }
+        } catch (error) {
+          console.error('상대방 이름 저장 중 오류:', error)
+        }
+      }
 
       try {
         const res = await fetch(`/api/admin/cases/${caseData.id}/client-role`, {
@@ -1706,7 +1823,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             {group.isClient ? (
               <>
                 <span className="text-xs px-2 py-0.5 bg-sage-100 text-sage-700 rounded font-medium">
-                  의뢰인 {group.label}
+                  {group.label}
                 </span>
                 {caseData.client_id ? (
                   <Link
@@ -2482,7 +2599,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         {/* 일반 탭 - SCOURT 일반내용 (XML 기반) */}
         {activeTab === 'general' && (
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            {pendingPartyEditList.length > 0 && (
+            {pendingPartyEditList.length > 0 && !savingPartyFromGeneral && (
               <div className="mb-4 rounded-lg border border-sage-100 bg-sage-50 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
                 <div className="text-sm text-sage-700">
                   당사자 수정 대기 {pendingPartyEditList.length}건
@@ -2927,12 +3044,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                     className="h-4 w-4 rounded border-gray-300 text-sage-600 focus:ring-sage-500"
                   />
                   <label htmlFor="party-primary" className="text-sm text-gray-700">
-                    대표로 표시
+                    당사자 대표로 표시
                   </label>
                 </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  같은 측의 대표 당사자로 표시됩니다.
-                </p>
               </div>
             </div>
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-2">

@@ -1049,7 +1049,7 @@ export function ScourtGeneralInfoXml({
               const partyName = String(row.btprtNm || row.btprtNmOrg || '');
               const partyLabel = String(row.btprtDvsNm || row.btprtStndngNm || row.btprtDvsCdNm || '');
               const matchedParty = findMatchingParty(row, rowIndex, caseParties);
-              const canEdit = matchedParty && isMaskedPartyName(partyName);
+              const canEdit = Boolean(matchedParty);
               if (!canEdit || !matchedParty) return null;
               return (
                 <button
@@ -1192,7 +1192,7 @@ function FallbackGridTable({
               const partyName = String(row.btprtNm || row.btprtNmOrg || '');
               const partyLabel = String(row.btprtDvsNm || row.btprtStndngNm || row.btprtDvsCdNm || '');
               const matchedParty = showEditButtons ? findMatchingParty(row, rowIndex, caseParties) : null;
-              const canEdit = matchedParty && isMaskedPartyName(partyName);
+              const canEdit = Boolean(matchedParty);
 
               return (
                 <tr key={rowIndex} className="border-b border-gray-100 hover:bg-gray-50">

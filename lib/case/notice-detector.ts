@@ -34,6 +34,22 @@ interface ScourtProgress {
   progCttDvs?: string        // 진행구분 코드
 }
 
+// 미등록 관련사건 타입
+interface UnlinkedRelatedCase {
+  caseNo: string
+  caseName?: string
+  relation?: string
+  linkedCaseId?: string | null
+}
+
+// 미등록 심급사건 타입
+interface UnlinkedLowerCourt {
+  caseNo: string
+  courtName?: string
+  court?: string
+  linkedCaseId?: string | null
+}
+
 export interface NoticeDetectorParams {
   caseId: string
   courtName?: string | null
@@ -46,6 +62,9 @@ export interface NoticeDetectorParams {
   clientRoleStatus?: 'provisional' | 'confirmed' | null  // 의뢰인 역할 상태
   clientName?: string | null      // 의뢰인 이름 (역할 확인 알림용)
   opponentName?: string | null    // 상대방 이름 (역할 확인 알림용)
+  // 미등록 관련사건/심급사건 (알림 표시용)
+  unlinkedRelatedCases?: UnlinkedRelatedCase[]
+  unlinkedLowerCourt?: UnlinkedLowerCourt[]
 }
 
 /**
@@ -94,6 +113,13 @@ export function detectCaseNotices(params: NoticeDetectorParams): CaseNotice[] {
     params.allHearings
   )
   notices.push(...conflictNotices)
+
+  // 8. 미등록 관련사건/심급사건 알림
+  const unlinkedNotices = detectUnlinkedRelatedCases(
+    params.unlinkedRelatedCases || [],
+    params.unlinkedLowerCourt || []
+  )
+  notices.push(...unlinkedNotices)
 
   return notices
 }
@@ -548,4 +574,73 @@ function formatTime(dateStr: string): string {
 function formatDateFromYYYYMMDD(yyyymmdd: string): string {
   if (!yyyymmdd || yyyymmdd.length !== 8) return yyyymmdd
   return `${yyyymmdd.slice(0, 4)}.${yyyymmdd.slice(4, 6)}.${yyyymmdd.slice(6, 8)}`
+}
+
+// ============================================================================
+// 8. 미등록 관련사건/심급사건 알림
+// ============================================================================
+
+/**
+ * 미등록 관련사건/심급사건 알림 감지
+ * linkedCaseId가 없는 관련사건/심급사건을 알림으로 표시
+ */
+function detectUnlinkedRelatedCases(
+  unlinkedRelatedCases: UnlinkedRelatedCase[],
+  unlinkedLowerCourt: UnlinkedLowerCourt[]
+): CaseNotice[] {
+  const notices: CaseNotice[] = []
+
+  // 미등록 관련사건
+  const filteredRelated = unlinkedRelatedCases.filter(c => !c.linkedCaseId)
+  if (filteredRelated.length > 0) {
+    const caseList = filteredRelated.slice(0, 3).map(c =>
+      `${c.relation || '관련'}: ${c.caseNo}`
+    ).join(', ')
+    const moreText = filteredRelated.length > 3 ? ` 외 ${filteredRelated.length - 3}건` : ''
+
+    notices.push({
+      id: `unlinked_related_${Date.now()}`,
+      category: 'unlinked_related_case',
+      title: `미등록 관련사건 ${filteredRelated.length}건`,
+      description: `${caseList}${moreText}`,
+      actions: [
+        {
+          type: 'view_related',
+          label: '확인',
+        },
+      ],
+      metadata: {
+        caseCount: String(filteredRelated.length),
+        cases: JSON.stringify(filteredRelated),
+      },
+    })
+  }
+
+  // 미등록 심급사건
+  const filteredLower = unlinkedLowerCourt.filter(c => !c.linkedCaseId)
+  if (filteredLower.length > 0) {
+    const caseList = filteredLower.slice(0, 3).map(c =>
+      `${c.courtName || c.court || ''} ${c.caseNo}`
+    ).join(', ')
+    const moreText = filteredLower.length > 3 ? ` 외 ${filteredLower.length - 3}건` : ''
+
+    notices.push({
+      id: `unlinked_lower_${Date.now()}`,
+      category: 'unlinked_lower_court',
+      title: `미등록 심급사건 ${filteredLower.length}건`,
+      description: `${caseList}${moreText}`,
+      actions: [
+        {
+          type: 'view_related',
+          label: '확인',
+        },
+      ],
+      metadata: {
+        caseCount: String(filteredLower.length),
+        cases: JSON.stringify(filteredLower),
+      },
+    })
+  }
+
+  return notices
 }

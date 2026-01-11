@@ -26,7 +26,7 @@ export async function PATCH(
     // 1. 기존 사건 정보 조회 (변경 감지용)
     const { data: existingCase, error: fetchError } = await adminClient
       .from('legal_cases')
-      .select('client_id, opponent_name, client_role')
+      .select('client_id, client_role')
       .eq('id', id)
       .single()
 
@@ -86,37 +86,7 @@ export async function PATCH(
       )
     }
 
-    // 3. opponent_name 변경 시 case_parties 동기화
-    if (body.opponent_name !== undefined && body.opponent_name !== existingCase.opponent_name) {
-      // 상대방 당사자 업데이트 (is_our_client=false, manual_override=false인 경우만)
-      const { data: opponentParties } = await adminClient
-        .from('case_parties')
-        .select('id, party_name')
-        .eq('case_id', id)
-        .eq('is_our_client', false)
-        .eq('manual_override', false)
-
-      if (opponentParties && opponentParties.length > 0) {
-        for (const party of opponentParties) {
-          // 번호 prefix 보존
-          const prefixMatch = party.party_name.match(/^(\d+\.\s*)/)
-          const prefix = prefixMatch ? prefixMatch[1] : ''
-          const newPartyName = body.opponent_name ? prefix + body.opponent_name : party.party_name
-
-          if (body.opponent_name) {
-            await adminClient
-              .from('case_parties')
-              .update({
-                party_name: newPartyName,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', party.id)
-          }
-        }
-      }
-    }
-
-    // 4. client_id 변경 시 case_parties 동기화
+    // 3. client_id 변경 시 case_parties 동기화
     if (body.client_id && body.client_id !== existingCase.client_id) {
       // 4a. 기존 의뢰인 당사자의 is_our_client 해제 (manual_override=false인 경우만)
       if (existingCase.client_id) {

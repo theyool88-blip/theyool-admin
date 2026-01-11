@@ -1,7 +1,7 @@
 /**
  * 사건 알림 타입 정의
  *
- * 7가지 알림 카테고리:
+ * 9가지 알림 카테고리:
  * 1. 다음기일 안내
  * 2. 기한 관리 (상소기한, 보정명령 기한)
  * 3. 준비서면 제출 알람
@@ -9,16 +9,20 @@
  * 5. 증거신청 회신 미수령
  * 6. 기일 충돌 경고
  * 7. 의뢰인 역할 확인
+ * 8. 미등록 관련사건
+ * 9. 미등록 심급사건
  */
 
 export type NoticeCategory =
-  | 'next_hearing'         // 다음기일
-  | 'deadline'             // 기한
-  | 'brief_required'       // 준비서면 제출
-  | 'document_issue'       // 서류 송달 문제
-  | 'evidence_pending'     // 증거회신 대기
-  | 'schedule_conflict'    // 기일 충돌
-  | 'client_role_confirm'  // 의뢰인 역할 확인
+  | 'next_hearing'           // 다음기일
+  | 'deadline'               // 기한
+  | 'brief_required'         // 준비서면 제출
+  | 'document_issue'         // 서류 송달 문제
+  | 'evidence_pending'       // 증거회신 대기
+  | 'schedule_conflict'      // 기일 충돌
+  | 'client_role_confirm'    // 의뢰인 역할 확인
+  | 'unlinked_related_case'  // 미등록 관련사건
+  | 'unlinked_lower_court'   // 미등록 심급사건
 
 export type NoticeActionType =
   | 'dismiss'            // 삭제 (경고 무시)
@@ -29,6 +33,7 @@ export type NoticeActionType =
   | 'edit'               // 수정
   | 'confirm_plaintiff'  // 원고측 확정
   | 'confirm_defendant'  // 피고측 확정
+  | 'view_related'       // 관련사건 보기
 
 export interface NoticeAction {
   label: string
@@ -63,6 +68,8 @@ export const NOTICE_CATEGORY_ICONS: Record<NoticeCategory, string> = {
   evidence_pending: '📬',
   schedule_conflict: '⚠️',
   client_role_confirm: '👤',
+  unlinked_related_case: '🔗',
+  unlinked_lower_court: '📊',
 }
 
 // 카테고리별 라벨 매핑
@@ -74,4 +81,6 @@ export const NOTICE_CATEGORY_LABELS: Record<NoticeCategory, string> = {
   evidence_pending: '증거 회신',
   schedule_conflict: '기일 충돌',
   client_role_confirm: '역할 확인',
+  unlinked_related_case: '관련사건',
+  unlinked_lower_court: '심급사건',
 }

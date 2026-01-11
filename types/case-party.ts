@@ -91,9 +91,12 @@ export interface CaseParty {
   // SCOURT 연동
   scourt_synced: boolean;
   scourt_party_index: number | null;
+  scourt_label_raw?: string | null;
+  scourt_name_raw?: string | null;
   adjdoc_rch_ymd: string | null;   // 판결도달일
   indvd_cfmtn_ymd: string | null;  // 확정일
   manual_override: boolean;
+  is_primary?: boolean;
 
   notes: string | null;
   created_at: string;
@@ -134,6 +137,7 @@ export interface CreateCasePartyRequest {
   party_order?: number;
   client_id?: string | null;
   is_our_client?: boolean;
+  is_primary?: boolean;
   fee_allocation_amount?: number | null;  // 착수금 (원)
   success_fee_terms?: string | null;      // 성공보수 약정내용
   notes?: string;
@@ -147,6 +151,7 @@ export interface UpdateCasePartyRequest {
   party_order?: number;
   client_id?: string | null;
   is_our_client?: boolean;
+  is_primary?: boolean;
   fee_allocation_amount?: number | null;  // 착수금 (원)
   success_fee_terms?: string | null;      // 성공보수 약정내용
   notes?: string;

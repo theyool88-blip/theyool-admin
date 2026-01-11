@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+SSGO003FA0(담보내용 목록) 화면 XML
+
+============ ============ ==========================
+ Date         Author       Description
+============ ============ ==========================
+2022.05.12.   최연구       [NELS]최초 생성
+============ ============ ==========================
+-->
+<html xmlns="http://www.w3.org/1999/xhtml"
+    xmlns:ev="http://www.w3.org/2001/xml-events"
+    xmlns:w2="http://www.inswave.com/websquare" xmlns:xf="http://www.w3.org/2002/xforms">
+   <head meta_screenName="담보내용 목록" >
+    	<w2:type>DEFAULT</w2:type>
+        <w2:buildDate/>
+        <xf:model>
+            <xf:instance>
+                <data xmlns="" />
+            </xf:instance>
+            <w2:dataCollection baseNode="map">
+                <!-- 담보내역 -->
+                <w2:dataList baseNode="list" repeatNode="map" id="dlt_scrtyCttLst" saveRemovedData="true">
+                    <w2:columnInfo>
+                        <w2:column id="prsvDspsScrtyDvsCd" name="보전처분담보구분코드" dataType="text"></w2:column>
+                        <w2:column id="prsvDspsScrtyDvsNm" name="보전처분담보구분코드" dataType="text"></w2:column>
+                        <w2:column id="scrtyAmt" name="담보금액" dataType="text"></w2:column>
+                        <w2:column id="scrtyStngYmd" name="담보일자" dataType="text"></w2:column>
+                        <w2:column id="dpsNo" name="공탁번호" dataType="text"></w2:column>
+                        <w2:column id="grtInsuCoCd" name="보증보험회사코드" dataType="text"></w2:column>
+                    </w2:columnInfo>
+                </w2:dataList>            
+            </w2:dataCollection>
+            <w2:workflowCollection>
+            </w2:workflowCollection>
+        </xf:model>
+         <script type="text/javascript" lazy="false"><![CDATA[/**
+ * 화면 pageload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */  
+scwin.onpageload = function() {
+    var dlt_param   = com.data.getParameter() || ssgo.getParameter();
+    
+    dlt_scrtyCttLst.removeAll();
+    dlt_scrtyCttLst.setJSON(dlt_param);
+
+    // 그리드 사이즈조정시 캔버스뒤로 숨는 오류처리
+    ssgo.setGrdResizeAddEvt(grdScrtyCttLst);        
+};
+
+/**
+ * 화면 pageunload 이벤트
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.10.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.onpageunload = function() {
+};
+
+/**
+ * 그리드 내용필드 expression
+ *
+ * ============ ============ ==========================
+ *  Date         Author       Description
+ * ============ ============ ==========================
+ * 2022.05.04.   최연구       [NELS]최초생성
+ * ============ ============ ==========================
+ */
+scwin.setExpScrtyCttLst = function (colIdx) {
+    var gridObj  = dlt_scrtyCttLst;
+    var scrtyAmt = gridObj.getCellData(colIdx, "scrtyAmt");
+    var prsvDspsScrtyDvsNm = gridObj.getCellData(colIdx, "prsvDspsScrtyDvsNm");
+
+    return prsvDspsScrtyDvsNm + "  " + scutilo.getCommaFmt(scrtyAmt) + "원";    
+}
+
+]]></script>
+	<style type="text/css"><![CDATA[
+			
+		 ]]></style>
+    </head>
+   <body ev:onpageload="scwin.onpageload" ev:onpageunload="scwin.onpageunload">
+
+   	<w2:span class="con_stit ic pt10" id="" label="담보내용" style=""></w2:span>
+
+   	<w2:gridView adaptive="" adaptiveThreshold="" autoFit="none" autoFitMinWidth="" captionTitle="담보내용 그리드" class="grid" contextMenu=""
+   		dataList="data:dlt_scrtyCttLst" id="grdScrtyCttLst" readOnly="true" style="height:110px;" visibleRowNum="all" noResultMessage="담보 내용이 없습니다." titleFormatter="ssgo.setGrdTitle">
+   		<w2:caption id="caption1" style="" value="this is a grid caption."></w2:caption>
+   		<w2:header id="header1" style="">
+   			<w2:row id="row1" style="">
+   				<w2:column displayMode="label" id="column19" inputType="text" style="height:20px;" value="담보금" width="30"></w2:column>
+   				<w2:column displayMode="label" id="column20" inputType="text" style="height:20px" value="담보제공일" width="90"></w2:column>
+   			</w2:row>
+   		</w2:header>
+   		<w2:gBody id="gBody1" style="">
+   			<w2:row id="row2" style="">
+   				<w2:column displayMode="label" excelCellType="" id="scrtyAmt" inputType="expression" style="" textAlign="left" expression="scwin.setExpScrtyCttLst(rowIndex())"></w2:column>
+   				<w2:column displayMode="label" id="scrtyStngYmd" inputType="text" style="height:20px" value="" displayFormat="####.##.##"></w2:column>
+   			</w2:row>
+   		</w2:gBody>
+   	</w2:gridView>
+   </body>
+</html>

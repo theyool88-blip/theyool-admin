@@ -25,6 +25,8 @@ export interface BasicInfoCell {
   displayFormat?: string; // ####.##.##
   colspan?: number;
   id?: string;           // 조건부 표시용 ID
+  /** 셀에 여러 span이 있을 때 각 span의 ref/format 정보 */
+  multiRefs?: Array<{ ref: string; displayFormat?: string }>;
 }
 
 /** 기본정보 테이블 레이아웃 */
@@ -209,24 +211,24 @@ function parseBasicInfoTable(doc: Document, fieldDefinitions: Record<string, str
       const tagname = cell.getAttribute('tagname') as 'th' | 'td';
       const colspan = cell.getAttribute('colspan');
 
-      // 셀 내부의 모든 span 요소 추출 (ref가 있는 것 우선)
+      // 셀 내부의 모든 span 요소 추출
       const allSpans = cell.querySelectorAll('w2\\:span, span');
-      let targetSpan: Element | null = null;
+      const refSpans: Element[] = [];
       let labelSpan: Element | null = null;
 
-      // ref 속성이 있는 span 찾기 (데이터 바인딩)
+      // ref 속성이 있는 span들과 라벨 span 분류
       allSpans.forEach(span => {
         const ref = span.getAttribute('ref');
         const label = span.getAttribute('label');
         if (ref && ref.startsWith('data:')) {
-          targetSpan = span;
+          refSpans.push(span);
         } else if (label && !labelSpan) {
           labelSpan = span;
         }
       });
 
-      // ref가 있는 span이 없으면 첫 번째 span 사용
-      const span = targetSpan || labelSpan || (allSpans.length > 0 ? allSpans[0] : null);
+      // 첫 번째 ref span을 기본으로 사용, 없으면 라벨 span
+      const primarySpan = refSpans[0] || labelSpan || (allSpans.length > 0 ? allSpans[0] : null);
 
       const cellData: BasicInfoCell = {
         type: tagname,
@@ -234,12 +236,12 @@ function parseBasicInfoTable(doc: Document, fieldDefinitions: Record<string, str
         id: rowId || undefined,
       };
 
-      if (span) {
-        cellData.label = span.getAttribute('label') || undefined;
-        cellData.ref = span.getAttribute('ref') || undefined;
-        cellData.displayFormat = span.getAttribute('displayFormat') || undefined;
+      if (primarySpan) {
+        cellData.label = primarySpan.getAttribute('label') || undefined;
+        cellData.ref = primarySpan.getAttribute('ref') || undefined;
+        cellData.displayFormat = primarySpan.getAttribute('displayFormat') || undefined;
 
-        const spanId = span.getAttribute('id') || undefined;
+        const spanId = primarySpan.getAttribute('id') || undefined;
         if (!cellData.id) {
           cellData.id = spanId;
         }
@@ -251,6 +253,14 @@ function parseBasicInfoTable(doc: Document, fieldDefinitions: Record<string, str
           if (resolvedFieldId) {
             cellData.ref = `data:dma_csBasCtt.${resolvedFieldId}`;
           }
+        }
+
+        // 여러 ref span이 있으면 multiRefs에 저장 (예: 청구금액 + 통화단위)
+        if (refSpans.length > 1) {
+          cellData.multiRefs = refSpans.map(span => ({
+            ref: span.getAttribute('ref') || '',
+            displayFormat: span.getAttribute('displayFormat') || undefined,
+          }));
         }
       }
 

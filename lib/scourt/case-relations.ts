@@ -613,24 +613,67 @@ export const CASE_RELATION_STATS = {
  * SCOURT에서 반환하는 연관사건 유형(reltCsDvsNm) → 시스템 relation_type_code 매핑
  */
 export const SCOURT_RELATION_MAP: Record<string, CaseRelationType> = {
-  // 심급 관계
+  // 심급 관계 (항소/상고/항고)
   '항소심': 'appeal',
   '상고심': 'appeal',
+  '항고심': 'appeal',
+  '재항고심': 'appeal',
+  '특별항고': 'appeal',
+  '즉시항고': 'appeal',
   '하심사건': 'appeal',      // 하심 = 원심
+  '원심': 'appeal',
   '1심': 'appeal',
   '2심': 'appeal',
   '3심': 'appeal',
 
   // 본안/보전 관계
   '본안사건': 'provisional', // 보전→본안
+  '본사건': 'provisional',   // 보전→본안 (동의어)
   '신청사건': 'provisional', // 본안→보전
+  '가처분': 'provisional',
+  '가압류': 'provisional',
+
+  // 집행 관계
+  '집행사건': 'execution',
+  '판결정본': 'execution',   // 집행의 기초가 되는 판결
+  '집행권원': 'execution',
+  '압류': 'execution',
+  '배당': 'execution',
+  '경매': 'execution',
+  '소송비용확정': 'execution',
+  '카확': 'execution',       // 소송비용확정 사건 (사건유형 코드)
+  '보전확정': 'execution',   // 카확의 fullName
+  '확정': 'execution',       // 확정 관련
+  '강제집행': 'execution',
+  '인도명령': 'execution',
+  '추심': 'execution',
+
+  // 독촉/지급명령 관계
+  '독촉사건': 'related',     // 지급명령 사건
+  '독촉': 'related',         // 독촉 (약칭)
+  '지급명령': 'related',
+  '전차': 'related',         // 지급명령 전 원래 사건 (이의신청 시)
+  '후차': 'related',         // 지급명령 이의신청 후 사건
+  '이의신청': 'related',
+  '차전': 'related',         // 전자독촉 사건유형 코드
 
   // 관련사건
   '반소': 'related',
-  '이의신청': 'related',
   '병합': 'related',
   '분리': 'related',
   '관련사건': 'related',
+  '조정사건': 'related',
+  '조정': 'related',         // 조정 (약칭)
+  '중재사건': 'related',
+  '화해사건': 'related',
+  '화해': 'related',         // 화해 (약칭)
+  '파산사건': 'related',
+  '파산': 'related',         // 파산 (약칭)
+  '회생사건': 'related',
+  '회생': 'related',         // 회생 (약칭)
+  '개인회생': 'related',
+  '면책': 'related',         // 파산 면책
+  '기타': 'related',
 
   // 재심
   '재심': 'retrial',
@@ -648,24 +691,34 @@ export function determineRelationDirection(
   _sourceCaseType?: string
 ): 'parent' | 'child' | 'sibling' {
   // 상위 심급을 가리키는 경우 (현재 사건이 하위)
-  if (['항소심', '상고심', '재심', '준재심'].includes(relationType)) {
+  // 연관사건이 상위 심급, 현재 사건이 하위 심급
+  if (['항소심', '상고심', '항고심', '재항고심', '특별항고', '즉시항고', '재심', '준재심'].includes(relationType)) {
     return 'child';  // 연관사건이 상위, 현재가 하위
   }
 
   // 하위 심급을 가리키는 경우 (현재 사건이 상위)
-  if (['하심사건', '1심', '원심'].includes(relationType)) {
+  // 연관사건이 하위 심급, 현재 사건이 상위 심급
+  if (['하심사건', '1심', '원심', '2심', '3심'].includes(relationType)) {
     return 'parent';  // 연관사건이 하위, 현재가 상위
   }
 
-  // 본안 → 보전 관계
-  if (relationType === '본안사건') {
+  // 본안 → 보전 관계 (본안이 주사건)
+  if (['본안사건', '본사건'].includes(relationType)) {
     return 'child';  // 연관사건(본안)이 상위, 현재(보전)가 하위
   }
-  if (relationType === '신청사건') {
+  if (['신청사건', '가처분', '가압류'].includes(relationType)) {
     return 'parent';  // 연관사건(보전)이 하위, 현재(본안)가 상위
   }
 
-  // 나머지는 대등 관계
+  // 집행 관계 (판결이 주사건)
+  if (['판결정본', '집행권원'].includes(relationType)) {
+    return 'child';  // 연관사건(판결)이 상위, 현재(집행)가 하위
+  }
+  if (['집행사건', '압류', '배당', '경매', '소송비용확정', '카확', '보전확정', '확정', '강제집행', '인도명령', '추심'].includes(relationType)) {
+    return 'parent';  // 연관사건(집행)이 하위, 현재(판결)가 상위
+  }
+
+  // 나머지는 대등 관계 (반소, 병합, 분리, 독촉, 조정 등)
   return 'sibling';
 }
 

@@ -841,13 +841,14 @@ export async function POST(request: NextRequest) {
     // 8. 심급내용(원심) 및 연관사건 자동 연결 (공통 모듈 사용)
     // shouldUseGeneralData 여부와 관계없이 relatedCasesData/lowerCourtData를 사용
     // (shouldUseGeneralData=false면 기존 스냅샷 데이터가 사용됨)
+    let linkResult: { unlinkedRelatedCases: typeof relatedCasesData; unlinkedLowerCourt: typeof lowerCourtData } | null = null;
     if (lowerCourtData.length > 0 || relatedCasesData.length > 0) {
       try {
         // 사건번호에서 caseType 추출
         const parsedCaseNumber = parseCaseNumber(caseNumber);
         const caseType = parsedCaseNumber.caseType || '';
 
-        await linkRelatedCases({
+        linkResult = await linkRelatedCases({
           supabase,
           legalCaseId,
           tenantId,
@@ -933,6 +934,12 @@ export async function POST(request: NextRequest) {
       .eq('id', legalCaseId);
 
     // 9. 응답
+    // 미등록 관련사건/심급사건 정보 포함 (사용자 알림용)
+    const unlinkedCases = linkResult ? {
+      relatedCases: linkResult.unlinkedRelatedCases || [],
+      lowerCourt: linkResult.unlinkedLowerCourt || [],
+    } : { relatedCases: [], lowerCourt: [] };
+
     return NextResponse.json({
       success: true,
       caseNumber,
@@ -948,6 +955,7 @@ export async function POST(request: NextRequest) {
       partySync: partySyncResult,
       syncType: effectiveSyncType,
       progressChanged,
+      unlinkedCases,  // 미등록 관련사건/심급사건 정보
     });
 
   } catch (error) {

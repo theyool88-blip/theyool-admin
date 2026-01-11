@@ -377,7 +377,18 @@ export const DLT_TABLE_COLUMNS: Record<string, string[]> = {
   dlt_reltCsLst: ['reltCsCortNm', 'userCsNo', 'reltCsDvsNm'],
   dlt_inscrtDtsLst: ['cortNm', 'userCsNo', 'ultmtDvsNm', 'ultmtYmd'],
   dlt_crctnOrdLst: ['crctnOrdYmd', 'crctnRsnNm'],
-  dlt_scrtyCttLst: ['scrtyAmt', 'grtInsuCoCd', 'scrtyPvsnCtt', 'scrtyStngYmd', 'prsvDspsScrtyDvsNm'],
+  dlt_scrtyCttLst: ['scrtyAmt', 'scrtyStngYmd', 'prsvDspsScrtyDvsNm'],
+};
+
+/**
+ * DLT 테이블 컬럼별 displayFormat
+ * - "#,###" : 숫자 천단위 콤마
+ * - "####.##.##" : 날짜 (YYYYMMDD → YYYY.MM.DD)
+ * - "##:##" : 시간 (HHMM → HH:MM)
+ */
+export const DLT_COLUMN_FORMATS: Record<string, string> = {
+  // 금액 필드
+  scrtyAmt: '#,###',
 };
 
 /**

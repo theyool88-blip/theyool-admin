@@ -112,7 +112,7 @@ export interface CaseGeneralData {
   siblingCsNo?: string;    // 형제번호 (보호 사건)
 
   // 사건 분류 정보
-  caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other';  // 사건 카테고리
+  caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'summary' | 'order' | 'other';  // 사건 카테고리
 
   // 당사자 라벨 (SCOURT API 절대값)
   titRprsPtnr?: string;    // 원고측 라벨 (신청인, 원고, 채권자 등)
@@ -538,7 +538,7 @@ export class ScourtApiClient {
     encCsNo: string;      // 암호화된 사건번호 (검색 결과에서)
     captchaAnswer: string; // 캡챠 답
     csNo?: string;        // 14자리 사건번호 (검색 결과에서)
-    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other';  // 사건 카테고리
+    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'summary' | 'order' | 'other';  // 사건 카테고리
   }): Promise<CaseGeneralResult> {
     if (!this.session) {
       return { success: false, error: '세션이 초기화되지 않았습니다.' };
@@ -556,8 +556,8 @@ export class ScourtApiClient {
     const csDvsCdNum = this.getCaseTypeCode(params.csDvsCd);
 
     // 사건 카테고리별 파라미터 분기 (브라우저 캡처 결과 반영)
-    // 형사, 항고, 보호, 감치 사건은 csNo와 srchDvs: '06' 필요
-    const needsFullParams = caseCategory === 'criminal' || caseCategory === 'appeal' || caseCategory === 'protection' || caseCategory === 'contempt';
+    // 형사(공판/약식), 항고, 보호, 감치 사건은 csNo와 srchDvs: '06' 필요
+    const needsFullParams = caseCategory === 'criminal' || caseCategory === 'summary' || caseCategory === 'appeal' || caseCategory === 'protection' || caseCategory === 'contempt';
     const csSerialValue = needsFullParams ? params.csSerial.padStart(7, '0') : params.csSerial;
     const csNoValue = needsFullParams
       ? (params.csNo || `${params.csYear}${csDvsCdNum}${params.csSerial.padStart(7, '0')}`)
@@ -736,7 +736,8 @@ export class ScourtApiClient {
       const progressEndpoints: Record<string, string> = {
         family: '/ssgo/ssgo102/selectHmpgFmlyCsProgCtt.on',           // 가사
         civil: '/ssgo/ssgo101/selectHmpgCvlcsCsProgCtt.on',            // 민사
-        criminal: '/ssgo/ssgo10g/selectHmpgCrmcsPbtrlCsProgCtt.on',    // 형사
+        criminal: '/ssgo/ssgo10g/selectHmpgCrmcsPbtrlCsProgCtt.on',    // 형사공판
+        summary: '/ssgo/ssgo10j/selectHmpgCrmcsSmryCsProgCtt.on',      // 형사약식 (고약) - 2026.01.11 추가
         application: '/ssgo/ssgo105/selectHmpgAplyCsProgCtt.on',       // 신청
         execution: '/ssgo/ssgo10a/selectHmpgEtexecCsProgCtt.on',        // 집행(타채) ✅ 브라우저 확인
         electronicOrder: '/ssgo/ssgo10c/selectHmpgElctnUrgngCsProgCtt.on',  // 전자독촉 (차전) ✅ 브라우저 확인
@@ -827,7 +828,7 @@ export class ScourtApiClient {
    */
   private parseGeneralResponse(
     response: { data?: Record<string, unknown>; [key: string]: unknown },
-    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'
+    caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'summary' | 'order' | 'other'
   ): CaseGeneralData {
     const result: CaseGeneralData = {
       raw: response,
@@ -1522,7 +1523,7 @@ export class ScourtApiClient {
    * - 대전지방법원 천안지원: 000283 (민사/형사)
    * - 대전가정법원 천안지원: 000294 (가사)
    */
-  private getCourtCode(cortNm: string, caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
+  private getCourtCode(cortNm: string, caseCategory?: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'summary' | 'order' | 'other'): string {
     // 숫자 코드면 그대로 반환
     if (/^\d+$/.test(cortNm)) {
       return cortNm;
@@ -1591,7 +1592,7 @@ export class ScourtApiClient {
    * - 전자독촉(차전): ssgo10c 엔드포인트 사용 (브라우저 분석으로 확인)
    * - 회생/파산(개회, 하단, 하면): ssgo107 엔드포인트 사용 (브라우저 분석으로 확인)
    */
-  private getCaseCategory(csDvsCd: string): 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other' {
+  private getCaseCategory(csDvsCd: string): 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'summary' | 'order' | 'other' {
     // 1. 특수 사건 유형 우선 처리 (API 엔드포인트 기준)
     // 참고: docs/scourt-api-endpoint-discovery.md
 
@@ -1685,6 +1686,14 @@ export class ScourtApiClient {
     const contemptTypes = ['정', '정로', '정모', '정가', '정명', '정령', '100', '101', '103', '240', '241'];
     if (contemptTypes.includes(csDvsCd)) {
       return 'contempt';
+    }
+
+    // 약식 사건 (고약) → ssgo10j (summary) - 브라우저 XHR 캡처 확인 (2026.01.11)
+    // 실제 호출: /ssgo/ssgo10j/selectHmpgCrmcsSmryCsGnrlCtt.on
+    // 고약(078): 약식사건, 고약전(234): 전자약식사건
+    const summaryTypes = ['고약', '고약전', '재고약', '078', '114', '234'];
+    if (summaryTypes.includes(csDvsCd)) {
+      return 'summary';
     }
 
     // 형사 사건 → ssgo10g (criminal)
@@ -1812,11 +1821,12 @@ export class ScourtApiClient {
    * - 집행(타채): /ssgo/ssgo10a/selectHmpgEtexecCsGnrlCtt.on ✅
    * - 항고/재항고(스,브): /ssgo/ssgo108/selectHmpgApalRaplCsGnrlCtt.on ✅ (2026.01.07)
    */
-  private getGeneralApiEndpoints(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string[] {
+  private getGeneralApiEndpoints(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'summary' | 'order' | 'other'): string[] {
     // 브라우저 실제 API 호출에서 확인한 엔드포인트
     const primaryEndpoints: Record<string, string> = {
       family: '/ssgo/ssgo102/selectHmpgFmlyCsGnrlCtt.on',             // 가사사건
       criminal: '/ssgo/ssgo10g/selectHmpgCrmcsPbtrlCsGnrlCtt.on',     // 형사사건 (공판)
+      summary: '/ssgo/ssgo10j/selectHmpgCrmcsSmryCsGnrlCtt.on',       // 형사약식사건 (고약) - XHR 캡처 확인 (2026.01.11)
       civil: '/ssgo/ssgo101/selectHmpgCvlcsCsGnrlCtt.on',             // 민사사건
       application: '/ssgo/ssgo105/selectHmpgAplyCsGnrlCtt.on',        // 신청사건 (아 포함)
       execution: '/ssgo/ssgo10a/selectHmpgEtexecCsGnrlCtt.on',         // 집행(타채) ✅ 브라우저 확인
@@ -1858,7 +1868,7 @@ export class ScourtApiClient {
   /**
    * 사건 카테고리에 따른 API 엔드포인트 결정 (단일 반환 - 호환성 유지)
    */
-  private getGeneralApiEndpoint(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'order' | 'other'): string {
+  private getGeneralApiEndpoint(caseCategory: 'family' | 'criminal' | 'civil' | 'application' | 'execution' | 'insolvency' | 'electronicOrder' | 'appeal' | 'protection' | 'contempt' | 'summary' | 'order' | 'other'): string {
     return this.getGeneralApiEndpoints(caseCategory)[0];
   }
 

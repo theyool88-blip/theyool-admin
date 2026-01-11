@@ -31,7 +31,8 @@ export type ScourtCaseType =
   | "ssgo10c" // 전자독촉/지급명령
   | "ssgo108" // 항고/재항고
   | "ssgo10i" // 보호
-  | "ssgo10g"; // 형사
+  | "ssgo10g" // 형사 (공판)
+  | "ssgo10j"; // 형사 (약식)
 
 /**
  * 데이터 리스트 ID (API 응답 키)
@@ -48,7 +49,8 @@ export type DataListId =
   | "dlt_hrngProgCurst" // 심리진행현황 (형사)
   | "dlt_acsCttLst" // 피고인/죄명 (형사)
   | "dlt_mergeCttLst" // 병합사건
-  | "dlt_gurdnCttLst"; // 후견인 (가사)
+  | "dlt_gurdnCttLst" // 후견인 (가사)
+  | "dlt_scrtyCttLst"; // 담보내용 (보전처분)
 
 /**
  * dataList ID 별칭 (API 응답 키 → 표준 key)
@@ -71,6 +73,7 @@ const DATA_LIST_ID_LOOKUP: Record<DataListId, true> = {
   dlt_acsCttLst: true,
   dlt_mergeCttLst: true,
   dlt_gurdnCttLst: true,
+  dlt_scrtyCttLst: true,
 };
 
 /**
@@ -311,6 +314,7 @@ export const CASE_TYPE_XML_MAP: Record<
     dlt_reltCsLst: "ssgo003/SSGO003F50.xml",
     dlt_inscrtDtsLst: "ssgo003/SSGO003F10.xml",
     dlt_hrngProgCurst: "ssgo003/SSGO003F20.xml",
+    dlt_scrtyCttLst: "ssgo003/SSGO003FA0.xml", // 담보내용
   },
   // 회생/파산 (ssgo107)
   ssgo107: {
@@ -383,6 +387,15 @@ export const CASE_TYPE_XML_MAP: Record<
     dlt_rcntSbmsnDocmtLst: "ssgo003/SSGO003F40.xml",
     dlt_reltCsLst: "ssgo003/SSGO003F50.xml",
   },
+  // 형사 약식 (ssgo10j) - 2026.01.11 추가
+  // 고약(078), 고약전(234): 약식사건
+  ssgo10j: {
+    basic_info: "ssgo10j/SSGO10JF01.xml",
+    dlt_acsCttLst: "ssgo003/SSGO003F6A.xml", // 피고인내용 (약식용)
+    dlt_atrnyCttLst: "ssgo003/SSGO003F71.xml", // 변호인정보
+    dlt_reltCsLst: "ssgo003/SSGO003F50.xml", // 관련사건
+    dlt_rcntSbmsnDocmtLst: "ssgo003/SSGO003F40.xml", // 제출서류
+  },
 };
 
 /**
@@ -424,6 +437,9 @@ export const DATA_LIST_XML_CANDIDATES: Record<string, string[]> = {
 // 사건유형 판별
 // ============================================================================
 
+// 약식(summary) 사건 유형
+const SUMMARY_CASE_TYPES = new Set(['고약', '재고약', '고약전']);
+
 function resolveCaseTypeFromInfo(info?: CaseTypeInfo): ScourtCaseType | null {
   if (!info) return null;
 
@@ -433,6 +449,11 @@ function resolveCaseTypeFromInfo(info?: CaseTypeInfo): ScourtCaseType | null {
   }
   if (description.includes("항고") && info.category !== "행정") {
     return "ssgo108";
+  }
+
+  // 약식 사건은 ssgo10j 사용 (공판 ssgo10g와 다른 API/XML)
+  if (SUMMARY_CASE_TYPES.has(info.name) || info.category === "전자약식") {
+    return "ssgo10j";
   }
 
   switch (info.category) {
@@ -528,18 +549,23 @@ export function detectCaseTypeFromCaseNumber(
     return "ssgo102";
   }
 
-  // 3. 형사 사건 (고, 노 등)
+  // 3. 약식 사건 (고약, 재고약, 고약전) - 형사보다 먼저 체크
+  if (/^(재)?고약(전)?$/.test(caseCode)) {
+    return "ssgo10j";
+  }
+
+  // 4. 형사 사건 (고, 노 등)
   // 보: 형사에서는 보호관찰 등, 소: 소년형사
-  if (/^(고단|고합|고정|고약|고|노|도|로|모|보|소|오|조|초)/.test(caseCode)) {
+  if (/^(고단|고합|고정|고|노|도|로|모|보|소|오|조|초)/.test(caseCode)) {
     return "ssgo10g";
   }
 
-  // 4. 민사 사건 (가, 나, 다 등)
+  // 5. 민사 사건 (가, 나, 다 등)
   if (/^(가단|가합|가소|가|나|다|라|마|바|사|자|차)/.test(caseCode)) {
     return "ssgo101";
   }
 
-  // 5. 기타 사건
+  // 6. 기타 사건
   if (/^(거|버|서|어|저|처)/.test(caseCode)) {
     return "ssgo106";
   }

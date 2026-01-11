@@ -164,7 +164,15 @@ function BasicInfoCellComponent({ cell, data }: BasicInfoCellProps) {
 
   // 값 계산
   let displayValue = '';
-  if (cell.ref) {
+
+  // 여러 ref가 있는 경우 (예: 청구금액 + 통화단위)
+  if (cell.multiRefs && cell.multiRefs.length > 0) {
+    const parts = cell.multiRefs.map(({ ref, displayFormat }) => {
+      const rawValue = getValueFromRef(ref, data);
+      return applyFormat(rawValue, displayFormat);
+    }).filter(v => v !== '');
+    displayValue = parts.join('');
+  } else if (cell.ref) {
     // ref가 있으면 데이터에서 값 추출 후 포맷 적용
     const rawValue = getValueFromRef(cell.ref, data);
     displayValue = applyFormat(rawValue, cell.displayFormat);
@@ -228,12 +236,14 @@ interface GridTableProps {
   data: Record<string, unknown>[];
   className?: string;
   caseLinkMap?: Record<string, string>;
+  rowActionHeader?: string;
+  renderRowAction?: (row: Record<string, unknown>, rowIndex: number) => React.ReactNode;
 }
 
 /**
  * 그리드 (테이블 목록) 렌더링
  */
-export function GridTable({ layout, data, className, caseLinkMap }: GridTableProps) {
+export function GridTable({ layout, data, className, caseLinkMap, rowActionHeader, renderRowAction }: GridTableProps) {
   if (!layout) return null;
 
   const hasData = data && data.length > 0;
@@ -281,6 +291,11 @@ export function GridTable({ layout, data, className, caseLinkMap }: GridTablePro
                     {col.header}
                   </th>
                 ))}
+                {renderRowAction && (
+                  <th className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 text-center w-16">
+                    {rowActionHeader || '수정'}
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -332,6 +347,11 @@ export function GridTable({ layout, data, className, caseLinkMap }: GridTablePro
                       </td>
                     );
                   })}
+                  {renderRowAction && (
+                    <td className="px-2 md:px-3 py-1.5 md:py-2 text-center">
+                      {renderRowAction(row, rowIndex)}
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

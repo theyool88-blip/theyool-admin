@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef } from 'react'
 import AdminHeader from '@/components/AdminHeader'
-import type { ImportOptions, ImportReport, ColumnMappingResult } from '@/types/onboarding'
+import type { ImportOptions, ImportReport } from '@/types/onboarding'
 import { downloadReport } from '@/lib/onboarding/import-report-generator'
 import { downloadTemplate } from '@/lib/onboarding/template-generator'
 import { getCourtAbbrev } from '@/lib/scourt/court-codes'
@@ -32,7 +32,6 @@ export default function OnboardingImportPage() {
   const [error, setError] = useState<string | null>(null)
 
   const [parsedData, setParsedData] = useState<ParsedData | null>(null)
-  const [mappingResult, setMappingResult] = useState<ColumnMappingResult | null>(null)
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({})
   const [fileName, setFileName] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -89,6 +88,7 @@ export default function OnboardingImportPage() {
     } finally {
       setLoading(false)
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 파일 선택
@@ -136,7 +136,6 @@ export default function OnboardingImportPage() {
 
       const json = await response.json()
       if (response.ok) {
-        setMappingResult(json.data)
         const newMapping: Record<string, string> = {}
         for (const m of json.data.mappings) {
           if (m.targetField) {
@@ -208,7 +207,7 @@ export default function OnboardingImportPage() {
 
               switch (eventType) {
                 case 'phase':
-                  setProgress(prev => ({
+                  setProgress(_prev => ({
                     phase: data.phase,
                     current: 0,
                     total: data.total,
@@ -262,7 +261,6 @@ export default function OnboardingImportPage() {
   const handleReset = useCallback(() => {
     setStep('input')
     setParsedData(null)
-    setMappingResult(null)
     setColumnMapping({})
     setFileName(null)
     setReport(null)
@@ -503,12 +501,6 @@ export default function OnboardingImportPage() {
                     <div className="text-xl font-bold text-sage-600">{parsedData.rows.length}</div>
                     <div className="text-gray-500">전체</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-blue-600">
-                      {Object.values(columnMapping).filter(Boolean).length}
-                    </div>
-                    <div className="text-gray-500">매핑됨</div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -565,7 +557,7 @@ export default function OnboardingImportPage() {
               </div>
               <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-xs text-blue-700">
-                  <strong>대법원 연동 필수:</strong> 대법원에서 사건을 찾을 수 없으면 등록되지 않습니다.
+                  <strong>대법원 자동 연결:</strong> 대법원에서 사건을 찾으면 자동연동됩니다.
                 </p>
               </div>
               <p className="mt-3 text-xs text-gray-500">
@@ -633,29 +625,27 @@ export default function OnboardingImportPage() {
                     <span className="text-gray-700 font-medium truncate max-w-[300px]">
                       {progress.currentCase}
                     </span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      progress.status === 'success'
-                        ? 'bg-green-100 text-green-700'
-                        : progress.status === 'failed'
-                        ? 'bg-red-100 text-red-700'
-                        : progress.status === 'skipped'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : progress.status === 'processing'
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {progress.status === 'success' ? '성공' :
-                       progress.status === 'failed' ? '실패' :
-                       progress.status === 'skipped' ? '건너뜀' :
-                       progress.status === 'processing' ? '처리중' :
-                       progress.status === 'partial' ? '부분성공' :
-                       progress.status}
-                    </span>
+                    {/* 실패한 경우에만 상태 표시 */}
+                    {progress.status === 'failed' && (
+                      <span className="px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700">
+                        실패
+                      </span>
+                    )}
                   </div>
                 )}
 
+                {/* 진행 시간 및 예상 소요 시간 */}
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-3">
+                  <span>
+                    경과: {Math.floor((progress.current * 2.5) / 60)}분 {Math.round((progress.current * 2.5) % 60)}초
+                  </span>
+                  <span>
+                    예상 남은 시간: {Math.floor(((progress.total - progress.current) * 2.5) / 60)}분 {Math.round(((progress.total - progress.current) * 2.5) % 60)}초
+                  </span>
+                </div>
+
                 <p className="text-xs text-gray-500 text-center mt-4">
-                  대법원 API 연동은 건당 약 2.5초가 소요됩니다
+                  대법원 나의사건 연동은 건당 약 2.5초가 소요됩니다
                 </p>
               </div>
             )}
@@ -708,11 +698,39 @@ export default function OnboardingImportPage() {
                   <span className="text-gray-500">연동 성공:</span>
                   <span className="ml-2 font-medium text-green-600">{report.summary.scourtLinked}건</span>
                 </div>
-                <div>
-                  <span className="text-gray-500">연동 실패:</span>
-                  <span className="ml-2 font-medium text-red-600">{report.summary.scourtFailed}건</span>
-                </div>
+                {report.summary.scourtFailed > 0 && (
+                  <div>
+                    <span className="text-gray-500">연동 안됨:</span>
+                    <span className="ml-2 font-medium text-orange-600">{report.summary.scourtFailed}건</span>
+                  </div>
+                )}
               </div>
+
+              {/* 연동 안된 사건 목록 */}
+              {report.summary.scourtFailed > 0 && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="text-xs text-gray-500 mb-2">연동되지 않은 사건:</p>
+                  <div className="max-h-32 overflow-y-auto">
+                    <ul className="text-xs text-gray-600 space-y-1">
+                      {report.results
+                        .filter(r => !r.scourtLinked && (r.status === 'success' || r.status === 'partial'))
+                        .slice(0, 20)
+                        .map((r, idx) => (
+                          <li key={idx} className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-orange-400 rounded-full flex-shrink-0" />
+                            <span>{r.created?.caseName || r.originalData?.court_case_number || `행 ${r.rowIndex + 1}`}</span>
+                          </li>
+                        ))}
+                      {report.results.filter(r => !r.scourtLinked && (r.status === 'success' || r.status === 'partial')).length > 20 && (
+                        <li className="text-gray-400">외 {report.results.filter(r => !r.scourtLinked && (r.status === 'success' || r.status === 'partial')).length - 20}건</li>
+                      )}
+                    </ul>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    * 사건 상세 페이지에서 수동으로 대법원 연동할 수 있습니다.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* 버튼 */}

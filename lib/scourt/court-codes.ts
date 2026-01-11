@@ -1,3 +1,5 @@
+import { getCaseCategoryByTypeName } from './case-type-codes';
+
 /**
  * 대법원 나의사건검색 법원코드 매핑
  * 출처: https://github.com/iicdii/case-ing
@@ -84,6 +86,7 @@ export const COURT_CODES: Record<string, string> = {
   '대전지방법원 논산지원': '000282',
   '대전지방법원 서산지원': '000285',
   '대전지방법원 천안지원': '000283',
+  '대전지방법원 아산시법원': '283877',
   '동두천시법원': '214808',
   '동해시법원': '261846',
   '마산지원': '000431',
@@ -134,6 +137,7 @@ export const COURT_CODES: Record<string, string> = {
   '수원고등법원': '000800',
   '수원지방법원': '000250',
   '수원지방법원 평택지원': '000253',
+  '수원지방법원 안성시법원': '250821',
   '순창군법원': '523979',
   '아산시법원': '283877',
   '안산지원': '250826',
@@ -290,9 +294,83 @@ export const COURT_ABBREV_MAP: Record<string, string> = {
   '순천지원': '광주지방법원 순천지원',
 };
 
+type ScourtCaseCategory =
+  | 'family'
+  | 'criminal'
+  | 'civil'
+  | 'application'
+  | 'execution'
+  | 'insolvency'
+  | 'electronicOrder'
+  | 'appeal'
+  | 'protection'
+  | 'contempt'
+  | 'order'
+  | 'other';
+
 export interface CourtInfo {
   name: string;
   code: string;
+}
+
+function mapKorCategoryToEng(korCategory?: string): ScourtCaseCategory | undefined {
+  if (!korCategory) return undefined;
+  const categoryMap: Record<string, ScourtCaseCategory> = {
+    '가사': 'family',
+    '형사': 'criminal',
+    '민사': 'civil',
+    '신청': 'application',
+    '집행': 'execution',
+    '비송도산': 'insolvency',
+    '전자약식': 'criminal',
+    '가족관계등록공탁': 'family',
+    '보호': 'other',
+    '행정': 'other',
+    '특허': 'other',
+    '선거특별': 'other',
+    '감치': 'other',
+    '기타': 'other',
+  };
+  return categoryMap[korCategory] || 'other';
+}
+
+/**
+ * 법원명 표준화 (정식명 반환)
+ *
+ * 입력된 축약명/부분명/코드를 사건유형에 맞는 정식 법원명으로 변환
+ * 예: "평택지원" + 드단 → "수원가정법원 평택지원"
+ */
+export function getCourtFullName(courtName: string, caseType?: string): string {
+  const trimmed = courtName?.trim();
+  if (!trimmed) return trimmed;
+
+  if (/^\d+$/.test(trimmed)) {
+    const byCode = getCourtByCode(trimmed);
+    return byCode?.name || trimmed;
+  }
+
+  const korCategory = caseType ? getCaseCategoryByTypeName(caseType) : undefined;
+  const caseCategory = mapKorCategoryToEng(korCategory);
+
+  if (caseCategory) {
+    const categoryCode = getCourtCodeByNameAndCategory(trimmed, caseCategory);
+    if (categoryCode) {
+      const byCode = getCourtByCode(categoryCode);
+      if (byCode?.name) return byCode.name;
+    }
+  }
+
+  if (COURT_ABBREV_MAP[trimmed]) {
+    return COURT_ABBREV_MAP[trimmed];
+  }
+
+  const code = getCourtCodeByName(trimmed);
+  if (code) {
+    const byCode = getCourtByCode(code);
+    if (byCode?.name) return byCode.name;
+  }
+
+  return trimmed;
 }
 
 /**

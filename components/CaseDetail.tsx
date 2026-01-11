@@ -16,12 +16,11 @@ import UnifiedScheduleModal from './UnifiedScheduleModal'
 import AdminHeader from './AdminHeader'
 import HearingDetailModal from './HearingDetailModal'
 import CasePaymentsModal from './CasePaymentsModal'
-import CasePartiesSection from './CasePartiesSection'
 import CaseNoticeSection from './case/CaseNoticeSection'
 import { detectCaseNotices } from '@/lib/case/notice-detector'
 import type { CaseNotice } from '@/types/case-notice'
 import ScourtGeneralInfoXml from './scourt/ScourtGeneralInfoXml'
-import { getPartyLabels as getPartyLabelsFromSchema, getCaseCategory } from '@/lib/scourt/party-labels'
+import { getPartyLabels as getPartyLabelsFromSchema, getCaseCategory } from '@/types/case-party'
 import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
 import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber, type ScourtCaseType } from '@/lib/scourt/xml-mapping'
 import { normalizeCaseNumber } from '@/lib/scourt/case-number-utils'
@@ -223,6 +222,10 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   // 심급/관련사건 연동 상태 (사건번호별 로딩 상태)
   const [linkingCases, setLinkingCases] = useState<Set<string>>(new Set())
   const [isLinkingAll, setIsLinkingAll] = useState(false)
+
+  // 상대방 이름 입력 상태
+  const [opponentNameInput, setOpponentNameInput] = useState('')
+  const [savingOpponentName, setSavingOpponentName] = useState(false)
 
   // 법원 필터링
   const filteredCourts = COURTS
@@ -619,6 +622,50 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     })
   }
 
+  // 종결 처리
+  const handleFinalize = async () => {
+    if (!confirm('사건을 종결 상태로 변경하시겠습니까?\n종결 후에는 자동 갱신이 중단됩니다.')) return
+
+    try {
+      const res = await fetch(`/api/admin/cases/${caseData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: '종결' })
+      })
+
+      if (res.ok) {
+        router.refresh()
+      } else {
+        const data = await res.json()
+        alert(data.error || '종결 처리에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('종결 처리 실패:', error)
+      alert('종결 처리 중 오류가 발생했습니다.')
+    }
+  }
+
+  // 삭제 처리
+  const handleDelete = async () => {
+    if (!confirm('정말로 이 사건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return
+
+    try {
+      const res = await fetch(`/api/admin/cases/${caseData.id}`, {
+        method: 'DELETE'
+      })
+
+      if (res.ok) {
+        router.push('/cases')
+      } else {
+        const data = await res.json()
+        alert(data.error || '삭제에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('삭제 실패:', error)
+      alert('삭제 중 오류가 발생했습니다.')
+    }
+  }
+
   // SCOURT 사건 일반내용 탭 열기 (Puppeteer)
   const _handleOpenScourtCase = async () => {
     if (!caseData.court_case_number) {
@@ -915,7 +962,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }
 
   // 알림 액션 핸들러 (역할 확정 등)
-  const handleNoticeAction = async (notice: CaseNotice, actionType: string) => {
+  const handleNoticeAction = async (notice: CaseNotice, actionType: string, metadata?: { opponentName?: string }) => {
     // 의뢰인 역할 확정 처리
     if (actionType === 'confirm_plaintiff' || actionType === 'confirm_defendant') {
       const newRole = actionType === 'confirm_plaintiff' ? 'plaintiff' : 'defendant'
@@ -926,7 +973,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             client_role: newRole,
-            status: 'confirmed'
+            status: 'confirmed',
+            ...(metadata?.opponentName && { opponent_name: metadata.opponentName })
           })
         })
 
@@ -967,39 +1015,52 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     }
   }
 
+  // 상대방 이름 저장 핸들러
+  const handleSaveOpponentName = async () => {
+    if (!opponentNameInput.trim()) return
+    setSavingOpponentName(true)
+    try {
+      const res = await fetch(`/api/admin/cases/${caseData.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opponent_name: opponentNameInput.trim() })
+      })
+      const data = await res.json()
+      if (data.success) {
+        setOpponentNameInput('')
+        router.refresh()
+      }
+    } catch (error) {
+      console.error('Failed to save opponent name:', error)
+    } finally {
+      setSavingOpponentName(false)
+    }
+  }
+
   // 삭제되지 않은 알림만 필터링
   const filteredNotices = caseNotices.filter(n => !dismissedNoticeIds.has(n.id))
 
-  // 당사자 섹션 표시 조건: 의뢰인과 상대방 모두 마스킹 해제된 이름이 있으면 숨김
-  const shouldShowPartiesSection = useMemo(() => {
+  // 상대방 이름 미입력 감지: 의뢰인측이 아닌 당사자 중 모두 마스킹 상태이면 true
+  const needsOpponentName = useMemo(() => {
     const parties = caseParties || []
+    if (parties.length === 0) return false
 
-    // 원고측/피고측 구분 헬퍼
-    const isPlaintiffSide = (p: typeof parties[0]) =>
-      PLAINTIFF_SIDE_TYPES.has(p.party_type) ||
-      PLAINTIFF_SIDE_LABELS.has(normalizePartyLabel(p.party_type_label))
+    const clientRole = caseData.client_role
+    const opponentParties = parties.filter(p => {
+      const isClientSide = clientRole === 'plaintiff'
+        ? ['plaintiff', 'creditor', 'applicant'].includes(p.party_type)
+        : ['defendant', 'debtor', 'respondent'].includes(p.party_type)
+      return !isClientSide
+    })
 
-    const isDefendantSide = (p: typeof parties[0]) =>
-      DEFENDANT_SIDE_TYPES.has(p.party_type) ||
-      DEFENDANT_SIDE_LABELS.has(normalizePartyLabel(p.party_type_label))
+    if (opponentParties.length === 0) return false
+    return opponentParties.every(p => isMaskedPartyName(p.party_name))
+  }, [caseParties, caseData.client_role])
 
-    // 마스킹 해제된 이름인지 확인 (번호 제거 후 체크)
-    const hasUnmaskedName = (p: typeof parties[0]) => !isMaskedPartyName(p.party_name)
-
-    // 원고측에서 마스킹 해제된 당사자 찾기
-    const unmaskedPlaintiffSide = parties.find(p => isPlaintiffSide(p) && hasUnmaskedName(p))
-
-    // 피고측에서 마스킹 해제된 당사자 찾기
-    const unmaskedDefendantSide = parties.find(p => isDefendantSide(p) && hasUnmaskedName(p))
-
-    // 양측 모두 마스킹 해제된 당사자가 있으면 숨김 (false)
-    if (unmaskedPlaintiffSide && unmaskedDefendantSide) {
-      return false
-    }
-
-    // 그 외에는 표시
-    return true
-  }, [caseParties])
+  // 등록되지 않은 의뢰인 감지: 의뢰인 지정됐지만 clients 테이블에 없음
+  const isUnregisteredClient = useMemo(() => {
+    return caseData.client_id === null && caseParties.some(p => p.is_our_client)
+  }, [caseData.client_id, caseParties])
 
   const formatCurrency = (amount: number | null) => {
     if (!amount) return '-'
@@ -1084,75 +1145,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     })
     return linkMap
   }, [caseData.case_relations])
-
-  // 마스킹이 해제된 모든 당사자 (SCOURT 라벨 기반으로 일반탭에 적용)
-  // 중요: case_parties의 party_type_label이 오래된 값일 수 있으므로
-  // scourtSnapshot.basicInfo의 titRprsPtnr/titRprsRqstr (실제 라벨)을 사용해야 함
-  const unmaskedPartyOverrides = useMemo(() => {
-    const unmaskedParties = caseParties.filter((party) => {
-      return !isMaskedPartyName(party.party_name)
-    })
-
-    // scourtSnapshot.basicInfo에서 실제 라벨 가져오기
-    // titRprsPtnr: 원고측 라벨 (예: "신청인", "원고", "채권자")
-    // titRprsRqstr: 피고측 라벨 (예: "피신청인", "피고", "채무자")
-    interface BasicInfoWithLabels {
-      titRprsPtnr?: string
-      titRprsRqstr?: string
-    }
-    const basicInfo = scourtSnapshot?.basicInfo as BasicInfoWithLabels | undefined
-    const plaintiffLabel = basicInfo?.titRprsPtnr?.trim() || ''
-    const defendantLabel = basicInfo?.titRprsRqstr?.trim() || ''
-
-    // scourtSnapshot 라벨이 없으면 그대로 반환
-    if (!plaintiffLabel && !defendantLabel) {
-      return unmaskedParties
-    }
-
-    // side 분류용 라벨 목록
-    const PLAINTIFF_SIDE_LABELS = ['원고', '채권자', '신청인', '항고인', '항소인', '상고인', '행위자']
-    const DEFENDANT_SIDE_LABELS = ['피고', '채무자', '피신청인', '상대방', '피항고인', '피항소인', '피상고인', '보호소년', '피고인', '제3채무자']
-
-    // party_type 필드로 side 결정
-    const PLAINTIFF_SIDE_TYPES = ['plaintiff', 'creditor', 'applicant']
-    const DEFENDANT_SIDE_TYPES = ['defendant', 'debtor', 'respondent']
-
-    const getSideFromParty = (party: typeof caseParties[0]): 'plaintiff' | 'defendant' | null => {
-      // 1. party_type_label에서 시도
-      const normalized = normalizePartyLabel(party.party_type_label || '')
-      if (PLAINTIFF_SIDE_LABELS.includes(normalized)) return 'plaintiff'
-      if (DEFENDANT_SIDE_LABELS.includes(normalized)) return 'defendant'
-
-      // 2. party_type에서 시도
-      const partyType = party.party_type?.toLowerCase() || ''
-      if (PLAINTIFF_SIDE_TYPES.includes(partyType)) return 'plaintiff'
-      if (DEFENDANT_SIDE_TYPES.includes(partyType)) return 'defendant'
-
-      // 3. is_our_client로 의뢰인측 추론 (plaintiffLabel이 있으면 해당 측으로)
-      if (party.is_our_client && plaintiffLabel) {
-        // plaintiffLabel이 있으면 의뢰인을 원고측으로 가정 (대부분의 경우)
-        return 'plaintiff'
-      }
-
-      return null
-    }
-
-    // case_parties에 SCOURT 라벨 적용
-    return unmaskedParties.map(party => {
-      const partySide = getSideFromParty(party)
-      if (!partySide) return party
-
-      // side에 맞는 SCOURT 라벨 사용
-      const correctLabel = partySide === 'plaintiff' ? plaintiffLabel : defendantLabel
-      if (!correctLabel) return party
-
-      // SCOURT 라벨로 업데이트
-      return {
-        ...party,
-        party_type_label: correctLabel // SCOURT 원본 라벨 사용
-      }
-    })
-  }, [caseParties, scourtSnapshot])
 
   const preferredPartyName = useMemo(() => {
     const normalizePartyName = (name: string) => name.replace(/^\d+\.\s*/, '').trim()
@@ -1898,16 +1890,43 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               </button>
             )}
 
-            {/* 수정 버튼 */}
-            <button
-              onClick={() => router.push(`/cases/${caseData.id}/edit`)}
-              className="flex items-center gap-2 px-4 py-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-sm font-medium ml-auto"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-              수정
-            </button>
+            {/* 우측 버튼 그룹 */}
+            <div className="flex items-center gap-2 ml-auto">
+              {/* 종결 버튼 (진행중일 때만) */}
+              {caseData.status === '진행중' && (
+                <button
+                  onClick={handleFinalize}
+                  className="flex items-center gap-2 px-4 py-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-sm font-medium"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  종결
+                </button>
+              )}
+
+              {/* 삭제 버튼 */}
+              <button
+                onClick={handleDelete}
+                className="flex items-center gap-2 px-4 py-2.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                삭제
+              </button>
+
+              {/* 수정 버튼 */}
+              <button
+                onClick={() => router.push(`/cases/${caseData.id}/edit`)}
+                className="flex items-center gap-2 px-4 py-2.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors text-sm font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                수정
+              </button>
+            </div>
 
             {/* 최종 갱신 시각 */}
             {scourtSyncStatus?.lastSync && (
@@ -1966,6 +1985,62 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         {/* 알림 탭 */}
         {activeTab === 'notice' && (
           <div className="space-y-4">
+            {/* 상대방 이름 미입력 알림 */}
+            {needsOpponentName && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-800">상대방 이름이 입력되지 않았습니다</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={opponentNameInput}
+                    onChange={(e) => setOpponentNameInput(e.target.value)}
+                    placeholder="상대방 이름을 입력해주세요"
+                    className="flex-1 text-sm px-3 py-2 border border-amber-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && opponentNameInput.trim()) {
+                        handleSaveOpponentName()
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={handleSaveOpponentName}
+                    disabled={!opponentNameInput.trim() || savingOpponentName}
+                    className="px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+                  >
+                    {savingOpponentName ? '저장 중...' : '저장'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 의뢰인 연락처 미입력 알림 */}
+            {caseData.client && !caseData.client.phone && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <svg className="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-800">의뢰인 연락처가 등록되지 않았습니다</p>
+                    <p className="text-xs text-amber-600 mt-0.5">알림톡/SMS 발송을 위해 연락처를 입력해주세요</p>
+                  </div>
+                  <button
+                    onClick={() => router.push(`/cases/${caseData.id}/edit`)}
+                    className="px-3 py-1.5 bg-amber-600 text-white text-xs font-medium rounded-lg hover:bg-amber-700 transition-colors whitespace-nowrap"
+                  >
+                    입력하기
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* 알림 섹션 */}
             <CaseNoticeSection notices={filteredNotices} onAction={handleNoticeAction} onDismiss={handleDismissNotice} />
 
@@ -2183,31 +2258,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               )
             })()}
 
-            {/* 당사자 - 원고/피고/의뢰인 중 하나라도 없으면 표시 */}
-            {shouldShowPartiesSection && (
-              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div className="px-4 py-3 flex items-center gap-2">
-                  <div className="w-1 h-4 bg-sage-500 rounded-full" />
-                  <h3 className="text-sm font-semibold text-gray-900">당사자</h3>
-                </div>
-                <div className="border-t border-gray-200">
-                <CasePartiesSection
-                  caseId={caseData.id}
-                  courtCaseNumber={caseData.court_case_number}
-                  clientId={caseData.client_id}
-                  clientName={caseData.client?.name}
-                  clientRole={caseData.client_role}
-                  opponentName={caseData.opponent_name}
-                  onPartiesUpdate={() => {
-                    fetchCaseParties()
-                    router.refresh()
-                  }}
-                  scourtParties={(scourtSnapshot?.basicInfo as Record<string, unknown> | undefined)?.parties as Array<{ btprNm: string; btprDvsNm: string }> || []}
-                />
-                </div>
-              </div>
-            )}
-
             {/* 계약 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               {/* 헤더 */}
@@ -2224,6 +2274,21 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   입금 관리
                 </button>
               </div>
+
+              {/* 등록되지 않은 의뢰인 알림 */}
+              {isUnregisteredClient && (
+                <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-gray-600">등록되지 않은 의뢰인입니다</p>
+                    <button
+                      onClick={() => setShowPaymentModal(true)}
+                      className="text-sm text-sage-600 hover:text-sage-700 font-medium"
+                    >
+                      계약 추가하기+
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* 테이블 */}
               <div className="border-t border-gray-200 text-sm">
@@ -2319,10 +2384,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 apiData={scourtSnapshot.rawData}
                 caseType={resolvedScourtCaseType}
                 caseNumber={caseData.court_case_number || undefined}
-                clientName={caseData.client?.name}
-                opponentName={caseData.opponent_name}
-                clientRole={caseData.client_role}
-                partyOverrides={unmaskedPartyOverrides}
                 representativeOverrides={manualRepresentativeOverrides}
                 relatedCaseLinks={relatedCaseLinks}
                 onPartyEdit={handlePartyEditFromGeneral}

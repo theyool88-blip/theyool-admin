@@ -18,7 +18,6 @@ import { getScourtApiClient } from '@/lib/scourt/api-client'
 import { saveSnapshot } from '@/lib/scourt/case-storage'
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
-import { inferClientRoleFromGeneralData } from '@/lib/scourt/party-role'
 import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync'
 
 // 딜레이 유틸리티
@@ -67,12 +66,33 @@ export async function POST(request: NextRequest) {
       convertToStandardRow(row, mapping as Map<string, keyof StandardCaseRow> | undefined)
     )
 
+    // 클라이언트 연결 끊김 감지를 위한 공유 상태
+    let streamClosed = false
+
     // SSE 스트림 생성
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
+
         const sendEvent = (event: string, data: unknown) => {
-          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+          if (streamClosed) return // 이미 닫혔으면 무시
+          try {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+          } catch {
+            // Controller가 닫혔을 때 에러 무시
+            streamClosed = true
+          }
+        }
+
+        const closeController = () => {
+          if (!streamClosed) {
+            streamClosed = true
+            try {
+              controller.close()
+            } catch {
+              // 이미 닫혔을 수 있음
+            }
+          }
         }
 
         const adminClient = createAdminClient()
@@ -87,6 +107,12 @@ export async function POST(request: NextRequest) {
           })
 
           for (let i = 0; i < standardRows.length; i++) {
+            // 클라이언트 연결 끊김 감지 시 조기 종료
+            if (streamClosed) {
+              console.log(`[Batch Create Stream] 클라이언트 연결 끊김 감지 - ${i}/${standardRows.length}에서 중단`)
+              break
+            }
+
             const row = applyDefaults(standardRows[i]) as StandardCaseRow
             const originalData: Record<string, string> = {}
             for (const [key, value] of Object.entries(row)) {
@@ -214,7 +240,11 @@ export async function POST(request: NextRequest) {
               continue
             }
 
-            let scourtResult
+            // 3. 대법원 연동 시도 (실패해도 사건은 등록)
+            let scourtResult: { success: boolean; encCsNo?: string; wmonid?: string; generalData?: unknown; progressData?: unknown; error?: string } | null = null
+            let scourtLinked = false
+            let scourtError: string | null = null
+
             try {
               scourtResult = await apiClient.searchAndRegisterCase({
                 cortCd: row.court_name!,
@@ -223,65 +253,31 @@ export async function POST(request: NextRequest) {
                 csSerial: parsed.serial,
                 btprNm: partyName,
               })
+
+              if (scourtResult.success && scourtResult.encCsNo) {
+                scourtLinked = true
+              } else {
+                scourtError = scourtResult.error || '대법원에서 사건을 찾을 수 없습니다'
+              }
             } catch (error) {
               console.error(`[SCOURT] 연동 실패 (row ${i}):`, error)
-              results.push({
-                rowIndex: i,
-                status: 'failed',
-                originalData,
-                errors: [{
-                  field: 'scourt',
-                  errorCode: 'SCOURT_ERROR',
-                  message: `대법원 연동 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
-                }],
-                warnings: []
-              })
-
-              sendEvent('progress', {
-                current: i + 1,
-                total: standardRows.length,
-                phase: 'processing',
-                status: 'failed',
-                caseName: row.court_case_number
-              })
-
-              await delay(options.scourtDelayMs)
-              continue
+              scourtError = error instanceof Error ? error.message : '대법원 연동 오류'
             }
 
-            // 대법원 연동 실패 → 사건 등록하지 않음
-            if (!scourtResult.success || !scourtResult.encCsNo) {
-              results.push({
-                rowIndex: i,
-                status: 'failed',
-                originalData,
-                errors: [{
-                  field: 'scourt',
-                  errorCode: 'SCOURT_NOT_FOUND',
-                  message: scourtResult.error || '대법원에서 사건을 찾을 수 없습니다',
-                }],
-                warnings: []
-              })
+            // 기본값 'plaintiff'로 임시 지정 (알림탭에서 사후 확인)
+            const inferredRole = row.client_role ? null : 'plaintiff'
+            const resolvedClientRole = row.client_role || inferredRole || 'plaintiff'
 
-              sendEvent('progress', {
-                current: i + 1,
-                total: standardRows.length,
-                phase: 'processing',
-                status: 'failed',
-                caseName: row.court_case_number
-              })
-
-              await delay(options.scourtDelayMs)
-              continue
-            }
-
-            const inferredRole = row.client_role
-              ? null
-              : inferClientRoleFromGeneralData(scourtResult.generalData, partyName)
-            const resolvedClientRole = row.client_role || inferredRole || null
-
-            // 4. 대법원 연동 성공! 이제 사건과 의뢰인 등록
+            // 4. 사건과 의뢰인 등록 (대법원 연동 여부와 관계없이 진행)
             const warnings: ImportResult['warnings'] = []
+
+            // 대법원 연동 실패 시 경고 추가
+            if (!scourtLinked && scourtError) {
+              warnings.push({
+                field: 'scourt',
+                message: `대법원 연동 안됨: ${scourtError}`
+              })
+            }
             let clientId: string | null = null
             let isNewClient = false
 
@@ -349,31 +345,35 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // 4-3. 사건 생성 (대법원 정보 포함)
+            // 4-3. 사건 생성 (대법원 연동 여부에 따라 다르게 처리)
+            const caseData: Record<string, unknown> = {
+              tenant_id: tenant.tenantId,
+              case_name: row.case_name || row.court_case_number,
+              case_type: (row as { case_type?: string }).case_type || '기타',
+              court_case_number: row.court_case_number,
+              court_name: row.court_name,
+              client_id: clientId,
+              client_role: resolvedClientRole,
+              opponent_name: row.opponent_name || null,
+              assigned_to: assignedTo,
+              status: '진행중',
+              contract_date: row.contract_date,
+              retainer_fee: row.retainer_fee || null,
+              success_fee_agreement: row.success_fee_agreement || null,
+              notes: row.notes || null,
+            }
+
+            // 대법원 연동 성공 시에만 연동 정보 추가
+            if (scourtLinked && scourtResult) {
+              caseData.enc_cs_no = scourtResult.encCsNo
+              caseData.scourt_wmonid = scourtResult.wmonid
+              caseData.scourt_last_sync = new Date().toISOString()
+              caseData.scourt_sync_status = 'synced'
+            }
+
             const { data: newCase, error: caseError } = await adminClient
               .from('legal_cases')
-              .insert([{
-                tenant_id: tenant.tenantId,
-                case_name: row.case_name || row.court_case_number,
-                case_type: (row as { case_type?: string }).case_type || '기타',
-                court_case_number: row.court_case_number,
-                court_name: row.court_name,
-                client_id: clientId,
-                client_role: resolvedClientRole,
-                opponent_name: row.opponent_name || null,
-                assigned_to: assignedTo,
-                status: '진행중',
-                contract_date: row.contract_date,
-                retainer_fee: row.retainer_fee || null,
-                success_fee_agreement: row.success_fee_agreement || null,
-                earned_success_fee: row.earned_success_fee || null,
-                notes: row.notes || null,
-                // 대법원 연동 정보
-                enc_cs_no: scourtResult.encCsNo,
-                scourt_wmonid: scourtResult.wmonid,
-                scourt_last_sync: new Date().toISOString(),
-                scourt_sync_status: 'synced',
-              }])
+              .insert([caseData])
               .select()
               .single()
 
@@ -436,15 +436,16 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // 4-4. 스냅샷 저장 (일반내용, 진행내용)
-            if (scourtResult.generalData || scourtResult.progressData) {
+            // 4-4. 스냅샷 저장 (대법원 연동 성공 시에만)
+            if (scourtLinked && scourtResult && (scourtResult.generalData || scourtResult.progressData)) {
               try {
+                const generalData = scourtResult.generalData as Record<string, unknown> | undefined
                 await saveSnapshot({
                   legalCaseId: newCase.id,
                   caseNumber: row.court_case_number!,
                   courtCode: row.court_name!,
-                  basicInfo: (scourtResult.generalData || {}) as Record<string, unknown>,
-                  hearings: (scourtResult.generalData?.hearings || []) as unknown[],
+                  basicInfo: (generalData || {}) as Record<string, unknown>,
+                  hearings: ((generalData?.hearings as unknown[]) || []),
                   progress: (scourtResult.progressData || []) as unknown[],
                 })
               } catch (snapshotError) {
@@ -456,9 +457,11 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // 4-5. SCOURT 당사자 동기화 (NewCaseForm과 동일)
-            if (scourtResult.generalData) {
-              const generalData = scourtResult.generalData
+            // 4-5. SCOURT 당사자 동기화 (대법원 연동 성공 시에만)
+            if (scourtLinked && scourtResult && scourtResult.generalData) {
+              type PartyType = { btprNm: string; btprDvsNm: string; adjdocRchYmd?: string; indvdCfmtnYmd?: string }
+              type RepType = { agntDvsNm: string; agntNm: string; jdafrCorpNm?: string }
+              const generalData = scourtResult.generalData as { parties?: PartyType[]; representatives?: RepType[] }
               if ((generalData.parties && generalData.parties.length > 0) ||
                   (generalData.representatives && generalData.representatives.length > 0)) {
                 try {
@@ -493,8 +496,8 @@ export async function POST(request: NextRequest) {
                 clientName: row.client_name,
                 isNewClient
               },
-              scourtLinked: true,
-              encCsNo: scourtResult.encCsNo
+              scourtLinked,
+              encCsNo: scourtLinked && scourtResult ? scourtResult.encCsNo : undefined
             })
 
             sendEvent('progress', {
@@ -520,13 +523,23 @@ export async function POST(request: NextRequest) {
           })
 
         } catch (error) {
-          console.error('[Batch Create Stream] Error:', error)
-          sendEvent('error', {
-            message: error instanceof Error ? error.message : '일괄 생성 중 오류 발생'
-          })
+          // 스트림이 이미 닫힌 경우는 에러 로깅만 하고 이벤트 전송 시도하지 않음
+          if (streamClosed) {
+            console.log('[Batch Create Stream] Stream closed by client, ignoring error:', error)
+          } else {
+            console.error('[Batch Create Stream] Error:', error)
+            sendEvent('error', {
+              message: error instanceof Error ? error.message : '일괄 생성 중 오류 발생'
+            })
+          }
         } finally {
-          controller.close()
+          closeController()
         }
+      },
+      // 클라이언트가 연결을 끊었을 때 호출됨
+      cancel() {
+        console.log('[Batch Create Stream] Client disconnected')
+        streamClosed = true
       }
     })
 

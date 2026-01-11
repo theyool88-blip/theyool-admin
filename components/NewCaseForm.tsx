@@ -55,7 +55,7 @@ interface NewCaseFormProps {
 
 interface NewClientPayload {
   name: string
-  phone: string
+  phone: string | null  // 연락처 선택
   email: string | null
   birth_date: string | null
   address: string | null
@@ -303,25 +303,31 @@ export default function NewCaseForm({
 
   // 이해충돌 검색 (디바운스)
   useEffect(() => {
-    if (!isNewClient || !formData.client_name || !formData.client_phone) {
+    if (!isNewClient || !formData.client_name) {
       setConflictResult(null)
       return
     }
 
-    // 전화번호가 충분히 입력되었는지 확인 (최소 10자리)
-    const phoneDigits = formData.client_phone.replace(/\D/g, '')
-    if (phoneDigits.length < 10) {
-      setConflictResult(null)
-      return
+    // 전화번호가 입력된 경우에만 전화번호 검증 (최소 10자리)
+    if (formData.client_phone) {
+      const phoneDigits = formData.client_phone.replace(/\D/g, '')
+      if (phoneDigits.length > 0 && phoneDigits.length < 10) {
+        // 전화번호 입력 중이면 검색하지 않음
+        return
+      }
     }
 
     const debounceTimer = setTimeout(async () => {
       setIsSearchingConflict(true)
       try {
-        const params = new URLSearchParams({
-          name: formData.client_name,
-          phone: formData.client_phone
-        })
+        const params = new URLSearchParams({ name: formData.client_name })
+        // 전화번호가 완전히 입력된 경우에만 포함
+        if (formData.client_phone) {
+          const phoneDigits = formData.client_phone.replace(/\D/g, '')
+          if (phoneDigits.length >= 10) {
+            params.set('phone', formData.client_phone)
+          }
+        }
         const res = await fetch(`/api/admin/clients/search?${params}`)
         const data = await res.json()
         if (data.success) {
@@ -648,12 +654,12 @@ export default function NewCaseForm({
       }
 
       if (isNewClient) {
-        if (!formData.client_name || !formData.client_phone) {
-          throw new Error('의뢰인 이름과 연락처는 필수입니다')
+        if (!formData.client_name) {
+          throw new Error('의뢰인 이름은 필수입니다')
         }
         payload.new_client = {
           name: formData.client_name,
-          phone: formData.client_phone,
+          phone: formData.client_phone || null,  // 연락처 선택
           email: formData.client_email || null,
           birth_date: formData.client_birth_date || null,
           address: formData.client_address || null,
@@ -938,10 +944,9 @@ export default function NewCaseForm({
                         placeholder="홍길동"
                       />
                     </FormField>
-                    <FormField label="연락처" required>
+                    <FormField label="연락처">
                       <input
                         type="tel"
-                        required={isNewClient}
                         value={formData.client_phone}
                         onChange={(e) => setFormData({ ...formData, client_phone: formatPhoneNumber(e.target.value) })}
                         className={inputClassName}
@@ -963,33 +968,39 @@ export default function NewCaseForm({
                     </div>
                   )}
 
-                  {conflictResult?.found && conflictResult.client && (
-                    <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                  {conflictResult?.found && conflictResult.client && (() => {
+                    // 연락처 일치 여부 확인
+                    const isPhoneMatch = conflictResult.client.phone && formData.client_phone &&
+                      conflictResult.client.phone.replace(/-/g, '') === formData.client_phone.replace(/-/g, '')
+                    return (
+                    <div className={`p-4 border rounded-xl ${isPhoneMatch ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
                       <div className="flex items-start gap-3">
-                        <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPhoneMatch ? 'text-amber-600' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-amber-800 mb-1">
-                            이해충돌 검토 필요
+                          <p className={`text-sm font-semibold mb-1 ${isPhoneMatch ? 'text-amber-800' : 'text-blue-800'}`}>
+                            {isPhoneMatch ? '이해충돌 검토 필요' : '동명이인 확인'}
                           </p>
-                          <p className="text-sm text-amber-700 mb-2">
-                            동일한 연락처의 의뢰인이 이미 등록되어 있습니다.
+                          <p className={`text-sm mb-2 ${isPhoneMatch ? 'text-amber-700' : 'text-blue-700'}`}>
+                            {isPhoneMatch
+                              ? '동일한 연락처의 의뢰인이 이미 등록되어 있습니다.'
+                              : '동일한 이름의 의뢰인이 있습니다. 확인해주세요.'}
                           </p>
-                          <p className="text-sm text-amber-900 font-medium">
-                            기존 의뢰인: {conflictResult.client.name} ({conflictResult.client.phone})
+                          <p className={`text-sm font-medium ${isPhoneMatch ? 'text-amber-900' : 'text-blue-900'}`}>
+                            기존 의뢰인: {conflictResult.client.name}{conflictResult.client.phone ? ` (${conflictResult.client.phone})` : ''}
                           </p>
                           {conflictResult.cases.length > 0 && (
                             <div className="mt-2">
-                              <p className="text-xs text-amber-700 mb-1">진행 중 사건:</p>
+                              <p className={`text-xs mb-1 ${isPhoneMatch ? 'text-amber-700' : 'text-blue-700'}`}>진행 중 사건:</p>
                               <ul className="space-y-1">
                                 {conflictResult.cases.slice(0, 3).map(c => (
-                                  <li key={c.id} className="text-xs text-amber-800">
+                                  <li key={c.id} className={`text-xs ${isPhoneMatch ? 'text-amber-800' : 'text-blue-800'}`}>
                                     - {c.case_name} ({c.case_type})
                                   </li>
                                 ))}
                                 {conflictResult.cases.length > 3 && (
-                                  <li className="text-xs text-amber-600">
+                                  <li className={`text-xs ${isPhoneMatch ? 'text-amber-600' : 'text-blue-600'}`}>
                                     외 {conflictResult.cases.length - 3}건
                                   </li>
                                 )}
@@ -1000,14 +1011,14 @@ export default function NewCaseForm({
                             <button
                               type="button"
                               onClick={switchToExistingClient}
-                              className="px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-100 rounded-lg hover:bg-amber-200 transition-colors"
+                              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${isPhoneMatch ? 'text-amber-800 bg-amber-100 hover:bg-amber-200' : 'text-blue-800 bg-blue-100 hover:bg-blue-200'}`}
                             >
                               기존 의뢰인으로 등록
                             </button>
                             <button
                               type="button"
                               onClick={() => setConflictResult(null)}
-                              className="px-3 py-1.5 text-xs font-medium text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-50 transition-colors"
+                              className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${isPhoneMatch ? 'text-amber-700 border-amber-300 hover:bg-amber-50' : 'text-blue-700 border-blue-300 hover:bg-blue-50'}`}
                             >
                               새 의뢰인으로 계속
                             </button>
@@ -1015,7 +1026,8 @@ export default function NewCaseForm({
                         </div>
                       </div>
                     </div>
-                  )}
+                    )
+                  })()}
 
                   <FormField label="계좌번호" hint="은행명과 계좌번호를 입력하세요">
                     <input

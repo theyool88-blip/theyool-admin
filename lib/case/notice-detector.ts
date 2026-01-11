@@ -582,7 +582,7 @@ function formatDateFromYYYYMMDD(yyyymmdd: string): string {
 
 /**
  * 미등록 관련사건/심급사건 알림 감지
- * linkedCaseId가 없는 관련사건/심급사건을 알림으로 표시
+ * linkedCaseId가 없는 관련사건/심급사건을 통합 알림으로 표시
  */
 function detectUnlinkedRelatedCases(
   unlinkedRelatedCases: UnlinkedRelatedCase[],
@@ -590,57 +590,44 @@ function detectUnlinkedRelatedCases(
 ): CaseNotice[] {
   const notices: CaseNotice[] = []
 
-  // 미등록 관련사건
+  // 미등록 관련사건 + 심급사건 통합
   const filteredRelated = unlinkedRelatedCases.filter(c => !c.linkedCaseId)
-  if (filteredRelated.length > 0) {
-    const caseList = filteredRelated.slice(0, 3).map(c =>
-      `${c.relation || '관련'}: ${c.caseNo}`
-    ).join(', ')
-    const moreText = filteredRelated.length > 3 ? ` 외 ${filteredRelated.length - 3}건` : ''
-
-    notices.push({
-      id: `unlinked_related_${Date.now()}`,
-      category: 'unlinked_related_case',
-      title: `미등록 관련사건 ${filteredRelated.length}건`,
-      description: `${caseList}${moreText}`,
-      actions: [
-        {
-          type: 'view_related',
-          label: '확인',
-        },
-      ],
-      metadata: {
-        caseCount: String(filteredRelated.length),
-        cases: JSON.stringify(filteredRelated),
-      },
-    })
-  }
-
-  // 미등록 심급사건
   const filteredLower = unlinkedLowerCourt.filter(c => !c.linkedCaseId)
-  if (filteredLower.length > 0) {
-    const caseList = filteredLower.slice(0, 3).map(c =>
-      `${c.courtName || c.court || ''} ${c.caseNo}`
-    ).join(', ')
-    const moreText = filteredLower.length > 3 ? ` 외 ${filteredLower.length - 3}건` : ''
+  const totalCount = filteredRelated.length + filteredLower.length
 
-    notices.push({
-      id: `unlinked_lower_${Date.now()}`,
-      category: 'unlinked_lower_court',
-      title: `미등록 심급사건 ${filteredLower.length}건`,
-      description: `${caseList}${moreText}`,
-      actions: [
-        {
-          type: 'view_related',
-          label: '확인',
-        },
-      ],
-      metadata: {
-        caseCount: String(filteredLower.length),
-        cases: JSON.stringify(filteredLower),
-      },
-    })
+  if (totalCount === 0) return notices
+
+  // 통합 설명 생성 (관련사건 먼저, 심급사건 나중에)
+  const descriptions: string[] = []
+
+  for (const c of filteredRelated.slice(0, 2)) {
+    descriptions.push(`${c.relation || '관련'}: ${c.caseNo}`)
   }
+
+  for (const c of filteredLower.slice(0, 2 - Math.min(filteredRelated.length, 2))) {
+    descriptions.push(`하심: ${c.caseNo}`)
+  }
+
+  const moreCount = totalCount - descriptions.length
+  const moreText = moreCount > 0 ? ` 외 ${moreCount}건` : ''
+
+  notices.push({
+    id: `unlinked_cases_${Date.now()}`,
+    category: 'unlinked_related_case',  // 통합 카테고리 사용
+    title: `미등록 관련사건 ${totalCount}건`,
+    description: `${descriptions.join(', ')}${moreText}`,
+    actions: [
+      {
+        type: 'view_related',
+        label: '확인',
+      },
+    ],
+    metadata: {
+      caseCount: String(totalCount),
+      relatedCases: JSON.stringify(filteredRelated),
+      lowerCourt: JSON.stringify(filteredLower),
+    },
+  })
 
   return notices
 }

@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // 원본 사건 정보 조회 (당사자 복사를 위해 client_role, opponent_name, clients 포함)
+    // 원본 사건 정보 조회 (당사자 복사를 위해 client_role, clients 포함)
     const { data: sourceCase, error: sourceCaseError } = await supabase
       .from('legal_cases')
-      .select('id, tenant_id, client_id, case_level, court_case_number, main_case_id, client_role, opponent_name, clients(name)')
+      .select('id, tenant_id, client_id, case_level, court_case_number, main_case_id, client_role, clients(name)')
       .eq('id', sourceCaseId)
       .single();
 
@@ -66,6 +66,17 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       );
     }
+
+    // case_parties에서 상대방(is_our_client=false, is_primary=true) 이름 조회
+    const { data: opponentParty } = await supabase
+      .from('case_parties')
+      .select('party_name')
+      .eq('case_id', sourceCaseId)
+      .eq('is_our_client', false)
+      .eq('is_primary', true)
+      .maybeSingle();
+
+    const sourceOpponentName = opponentParty?.party_name || '';
 
     // 건너뛰기
     if (action === 'skip') {
@@ -92,7 +103,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 새 사건 생성 (원본 사건의 client_role, opponent_name 복사)
+      // 새 사건 생성 (원본 사건의 client_role 복사, opponent_name은 case_parties로 관리)
       const newCase = {
         tenant_id: sourceCase.tenant_id,
         client_id: clientId || sourceCase.client_id,  // 지정된 의뢰인 또는 원본 사건 의뢰인
@@ -103,7 +114,8 @@ export async function POST(request: NextRequest) {
         case_type: parsed.caseType,
         enc_cs_no: relatedCaseInfo.encCsNo || null,
         client_role: sourceCase.client_role || null,  // 원본 사건의 의뢰인 지위 복사
-        opponent_name: sourceCase.opponent_name || null,  // 원본 사건의 상대방 이름 복사
+        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
+        opponent_name: null,
         // 연관관계 설명
         related_case_info: `${sourceCase.court_case_number}의 ${relatedCaseInfo.relationType}`,
       };
@@ -170,7 +182,7 @@ export async function POST(request: NextRequest) {
         const clientName = (sourceCase.clients as { name?: string } | null)?.name || '';
         const partySeeds = buildManualPartySeeds({
           clientName,
-          opponentName: sourceCase.opponent_name || '',
+          opponentName: sourceOpponentName || '',
           clientRole: sourceCase.client_role as 'plaintiff' | 'defendant' | 'applicant' | 'respondent' | undefined,
           caseNumber: relatedCaseInfo.caseNumber,
           clientId: clientId || sourceCase.client_id || undefined,
@@ -359,7 +371,7 @@ export async function POST(request: NextRequest) {
             legalCaseId: targetCaseId,
             caseNumber: relatedCaseInfo.caseNumber,
             courtName: relatedCaseInfo.courtName,
-            partyName: clientName || sourceCase.opponent_name || '',
+            partyName: clientName || sourceOpponentName || '',
             forceRefresh: true,
             syncType: 'full',           // 진행+일반내용 함께 조회
             triggerSource: 'manual',    // 수동 연동 표시

@@ -352,7 +352,8 @@ async function createSingleCase(
         client_id: clientId,
         client_role: caseData.client_role || null,
         client_role_status: resolvedClientRoleStatus,
-        opponent_name: caseData.opponent_name || null,
+        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
+        opponent_name: null,
         assigned_to: assignedTo,
         status: '진행중',
         contract_date: caseData.contract_date,

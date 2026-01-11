@@ -48,7 +48,7 @@ export async function PATCH(
         )
       : null
 
-    // 2. legal_cases 업데이트
+    // 2. legal_cases 업데이트 (opponent_name은 case_parties로 관리하므로 저장하지 않음)
     const { data, error } = await adminClient
       .from('legal_cases')
       .update({
@@ -70,7 +70,7 @@ export async function PATCH(
         notes: body.notes || null,
         onedrive_folder_url: body.onedrive_folder_url || null,
         client_role: body.client_role || null,
-        opponent_name: body.opponent_name || null,
+        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
         enc_cs_no: body.enc_cs_no || null,
         scourt_case_name: body.scourt_case_name || null
       })
@@ -144,6 +144,83 @@ export async function PATCH(
               manual_override: false,
               scourt_synced: false
             })
+        }
+      }
+    }
+
+    // 4. opponent_name 변경 시 case_parties 동기화
+    if (body.opponent_name !== undefined) {
+      const opponentName = (body.opponent_name || '').trim()
+
+      if (opponentName) {
+        // 4a. 상대방측 primary 당사자 찾기
+        const { data: opponentParty } = await adminClient
+          .from('case_parties')
+          .select('id, party_name')
+          .eq('case_id', id)
+          .eq('is_our_client', false)
+          .eq('is_primary', true)
+          .maybeSingle()
+
+        if (opponentParty) {
+          // 기존 primary 상대방 이름 업데이트 (prefix 보존)
+          const currentName = opponentParty.party_name || ''
+          const numberPrefixMatch = currentName.match(/^(\d+\.\s*)/)
+          const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
+          const newName = `${numberPrefix}${opponentName}`
+
+          await adminClient
+            .from('case_parties')
+            .update({
+              party_name: newName,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', opponentParty.id)
+        } else {
+          // primary 상대방이 없으면 is_our_client=false, manual_override=false인 당사자 중 첫 번째 찾기
+          const { data: anyOpponent } = await adminClient
+            .from('case_parties')
+            .select('id, party_name')
+            .eq('case_id', id)
+            .eq('is_our_client', false)
+            .eq('manual_override', false)
+            .order('party_order', { ascending: true })
+            .limit(1)
+            .maybeSingle()
+
+          if (anyOpponent) {
+            // 기존 상대방 이름 업데이트 (prefix 보존)
+            const currentName = anyOpponent.party_name || ''
+            const numberPrefixMatch = currentName.match(/^(\d+\.\s*)/)
+            const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
+            const newName = `${numberPrefix}${opponentName}`
+
+            await adminClient
+              .from('case_parties')
+              .update({
+                party_name: newName,
+                is_primary: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', anyOpponent.id)
+          } else {
+            // 상대방 당사자가 없으면 새로 생성
+            const clientRole = body.client_role || existingCase.client_role || 'plaintiff'
+            const opponentRole = clientRole === 'plaintiff' ? 'defendant' : 'plaintiff'
+
+            await adminClient
+              .from('case_parties')
+              .insert({
+                case_id: id,
+                party_name: opponentName,
+                party_type: opponentRole,
+                is_our_client: false,
+                is_primary: true,
+                party_order: 1,
+                manual_override: false,
+                scourt_synced: false
+              })
+          }
         }
       }
     }

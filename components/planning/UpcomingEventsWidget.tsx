@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
+import { HEARING_TYPE_LABELS, DEADLINE_TYPE_LABELS, type HearingType, type DeadlineType } from '@/types/court-hearing';
 
 interface UpcomingEvent {
   id: string;
@@ -51,8 +52,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
             id,
             case_name,
             court_case_number,
-            client:client_id(id, name),
-            opponent_name
+            client:client_id(id, name)
           )
         `)
         .gte('hearing_date', today)
@@ -73,8 +73,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
             id,
             case_name,
             court_case_number,
-            client:client_id(id, name),
-            opponent_name
+            client:client_id(id, name)
           )
         `)
         .gte('deadline_date', today)
@@ -86,24 +85,49 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
         console.error('기한 조회 오류:', deadlineError);
       }
 
+      // case_parties에서 상대방 이름 조회 (opponent_name은 case_parties로 관리)
+      const caseIdsFromHearings = (hearings || []).map(h => (h.legal_cases as { id?: string })?.id).filter(Boolean);
+      const caseIdsFromDeadlines = (deadlines || []).map(d => (d.legal_cases as { id?: string })?.id).filter(Boolean);
+      const allCaseIds = [...new Set([...caseIdsFromHearings, ...caseIdsFromDeadlines])];
+
+      let opponentMap = new Map<string, string>();
+      if (allCaseIds.length > 0) {
+        const { data: opponents } = await supabase
+          .from('case_parties')
+          .select('case_id, party_name')
+          .in('case_id', allCaseIds)
+          .eq('is_our_client', false)
+          .eq('is_primary', true);
+
+        if (opponents) {
+          opponentMap = new Map(opponents.map(o => [o.case_id, o.party_name]));
+        }
+      }
+
       // 기일 데이터 변환
       if (hearings) {
         for (const h of hearings) {
           const daysRemaining = Math.ceil(
             (new Date(h.hearing_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          const legalCase = h.legal_cases as { court_case_number?: string; case_name?: string; client?: { name?: string }; opponent_name?: string } | null;
+          const legalCase = h.legal_cases as { id?: string; court_case_number?: string; case_name?: string; client?: { name?: string } } | null;
+          // scourt_type_raw 우선 사용 (예: "제1회 변론기일"), 없으면 ENUM 라벨
+          const hearingTitle = h.scourt_type_raw
+            || HEARING_TYPE_LABELS[h.hearing_type as HearingType]
+            || h.hearing_type
+            || '기일';
+
           allEvents.push({
             id: h.id,
             type: 'hearing',
             date: h.hearing_date,
             time: h.hearing_date?.split('T')[1]?.slice(0, 5),
-            title: h.hearing_type || '기일',
+            title: hearingTitle,
             caseId: h.case_id,
             caseNumber: legalCase?.court_case_number || '',
             caseName: legalCase?.case_name,
             clientName: legalCase?.client?.name,
-            opponentName: legalCase?.opponent_name,
+            opponentName: legalCase?.id ? opponentMap.get(legalCase.id) : undefined,
             attendingLawyerName: (h.attending_lawyer as { display_name?: string } | null)?.display_name,
             daysRemaining,
             location: h.location,
@@ -117,17 +141,22 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
           const daysRemaining = Math.ceil(
             (new Date(d.deadline_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          const legalCase = d.legal_cases as { court_case_number?: string; case_name?: string; client?: { name?: string }; opponent_name?: string } | null;
+          const legalCase = d.legal_cases as { id?: string; court_case_number?: string; case_name?: string; client?: { name?: string } } | null;
+          // DEADLINE_TYPE_LABELS에서 한글 라벨 사용
+          const deadlineTitle = DEADLINE_TYPE_LABELS[d.deadline_type as DeadlineType]
+            || d.deadline_type
+            || '기한';
+
           allEvents.push({
             id: d.id,
             type: 'deadline',
             date: d.deadline_date,
-            title: d.deadline_type || '기한',
+            title: deadlineTitle,
             caseId: d.case_id,
             caseNumber: legalCase?.court_case_number || '',
             caseName: legalCase?.case_name,
             clientName: legalCase?.client?.name,
-            opponentName: legalCase?.opponent_name,
+            opponentName: legalCase?.id ? opponentMap.get(legalCase.id) : undefined,
             daysRemaining,
           });
         }

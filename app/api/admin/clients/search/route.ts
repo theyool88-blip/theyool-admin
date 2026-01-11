@@ -71,7 +71,7 @@ export const GET = withTenant(async (request, { tenant }) => {
     // 첫 번째 일치하는 의뢰인의 사건 목록 조회
     const matchedClient = clients[0];
 
-    const { data: cases, error: casesError } = await supabase
+    const { data: casesRaw, error: casesError } = await supabase
       .from('legal_cases')
       .select(`
         id,
@@ -80,7 +80,6 @@ export const GET = withTenant(async (request, { tenant }) => {
         status,
         court_case_number,
         contract_number,
-        opponent_name,
         created_at
       `)
       .eq('client_id', matchedClient.id)
@@ -91,11 +90,33 @@ export const GET = withTenant(async (request, { tenant }) => {
       // 사건 조회 실패해도 의뢰인 정보는 반환
     }
 
+    // case_parties에서 상대방 이름 조회 (opponent_name은 case_parties로 관리)
+    const caseIds = (casesRaw || []).map(c => c.id);
+    let opponentMap = new Map<string, string>();
+    if (caseIds.length > 0) {
+      const { data: opponents } = await supabase
+        .from('case_parties')
+        .select('case_id, party_name')
+        .in('case_id', caseIds)
+        .eq('is_our_client', false)
+        .eq('is_primary', true);
+
+      if (opponents) {
+        opponentMap = new Map(opponents.map(o => [o.case_id, o.party_name]));
+      }
+    }
+
+    // 사건 목록에 opponent_name 매핑
+    const cases = (casesRaw || []).map(c => ({
+      ...c,
+      opponent_name: opponentMap.get(c.id) || null
+    }));
+
     return NextResponse.json({
       success: true,
       found: true,
       client: matchedClient,
-      cases: cases || [],
+      cases,
       // 추가 매칭 의뢰인이 있으면 알림
       additionalMatches: clients.length > 1 ? clients.length - 1 : 0,
     });

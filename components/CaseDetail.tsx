@@ -593,7 +593,13 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       })
 
       if (res.ok) {
-        await fetchCaseParties()
+        const responseData = await res.json()
+        // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신 (fetchCaseParties 대신)
+        if (responseData.data) {
+          setCaseParties(prev =>
+            prev.map(p => p.id === partyId ? { ...p, ...responseData.data } : p)
+          )
+        }
         setPendingPartyEdits(prev => {
           const next = { ...prev }
           delete next[partyId]
@@ -609,7 +615,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     } finally {
       setSavingPartyFromGeneral(false)
     }
-  }, [editingPartyFromGeneral, editPartyNameInput, editPartyPrimaryInput, caseData.id, fetchCaseParties, router])
+  }, [editingPartyFromGeneral, editPartyNameInput, editPartyPrimaryInput, caseData.id, router])
 
   const pendingPartyEditList = useMemo(
     () => Object.values(pendingPartyEdits),
@@ -634,8 +640,20 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       })
 
       if (res.ok) {
+        const responseData = await res.json()
         setPendingPartyEdits({})
-        await fetchCaseParties()
+        // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신 (fetchCaseParties 대신)
+        if (responseData.updatedParties && responseData.updatedParties.length > 0) {
+          const updatedMap = new Map(
+            responseData.updatedParties.map((p: { id: string }) => [p.id, p])
+          )
+          setCaseParties(prev =>
+            prev.map(p => {
+              const updated = updatedMap.get(p.id)
+              return updated ? { ...p, ...updated } : p
+            })
+          )
+        }
         router.refresh()
       } else {
         const data = await res.json()
@@ -646,7 +664,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     } finally {
       setSavingPartyFromGeneral(false)
     }
-  }, [pendingPartyEditList, caseData.id, fetchCaseParties, router])
+  }, [pendingPartyEditList, caseData.id, router])
 
   // 변호사 목록 조회 (출석변호사 선택용)
   const fetchTenantMembers = useCallback(async () => {
@@ -1286,17 +1304,24 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         const nextName = baseName ? preservePrefix(baseName, opponentNameInput) : opponentNameInput
 
         try {
+          const partyId = primaryParties.opponentParty.id
           const res = await fetch(`/api/admin/cases/${caseData.id}/parties`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              partyId: primaryParties.opponentParty.id,
+              partyId,
               party_name: nextName,
             })
           })
 
           if (res.ok) {
-            await fetchCaseParties()
+            const responseData = await res.json()
+            // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신 (fetchCaseParties 대신)
+            if (responseData.data) {
+              setCaseParties(prev =>
+                prev.map(p => p.id === partyId ? { ...p, ...responseData.data } : p)
+              )
+            }
           } else {
             const data = await res.json()
             console.error('상대방 이름 저장 실패:', data.error)

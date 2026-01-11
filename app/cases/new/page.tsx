@@ -61,7 +61,7 @@ export default async function NewCasePage({ searchParams }: PageProps) {
   if (params.sourceCaseId) {
     let sourceCaseQuery = adminClient
       .from('legal_cases')
-      .select('client_role, opponent_name')
+      .select('client_role')
       .eq('id', params.sourceCaseId)
 
     if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
@@ -70,7 +70,19 @@ export default async function NewCasePage({ searchParams }: PageProps) {
 
     const { data: sourceCaseData, error: sourceCaseError } = await sourceCaseQuery.single()
     if (!sourceCaseError && sourceCaseData) {
-      sourceCase = sourceCaseData
+      // case_parties에서 상대방(is_our_client=false, is_primary=true) 이름 조회
+      const { data: opponentParty } = await adminClient
+        .from('case_parties')
+        .select('party_name')
+        .eq('case_id', params.sourceCaseId)
+        .eq('is_our_client', false)
+        .eq('is_primary', true)
+        .maybeSingle()
+
+      sourceCase = {
+        client_role: sourceCaseData.client_role,
+        opponent_name: opponentParty?.party_name || null
+      }
     }
   }
 

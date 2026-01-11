@@ -148,11 +148,11 @@ export const POST = withTenant(async (request, { tenant }) => {
     let sourceCase: {
       client_role?: 'plaintiff' | 'defendant' | null
       client_role_status?: 'provisional' | 'confirmed' | null
-      opponent_name?: string | null
       case_level?: string | null
       court_case_number?: string | null
       main_case_id?: string | null
     } | null = null
+    let sourceOpponentName: string | null = null  // case_parties에서 조회
     let sourcePartyOverrides: Array<{
       party_name: string
       party_type: string
@@ -167,7 +167,7 @@ export const POST = withTenant(async (request, { tenant }) => {
     if (body.source_case_id) {
       let sourceCaseQuery = adminClient
         .from('legal_cases')
-        .select('client_role, client_role_status, opponent_name, case_level, court_case_number, main_case_id')
+        .select('client_role, client_role_status, case_level, court_case_number, main_case_id')
         .eq('id', body.source_case_id)
 
       if (!tenant.isSuperAdmin && tenant.tenantId) {
@@ -201,6 +201,25 @@ export const POST = withTenant(async (request, { tenant }) => {
       }
 
       sourcePartyOverrides = sourcePartiesData || []
+
+      // sourcePartyOverrides에서 상대방 이름 추출
+      const opponentPartyFromOverrides = sourcePartyOverrides.find(p => !p.is_our_client)
+      if (opponentPartyFromOverrides) {
+        sourceOpponentName = opponentPartyFromOverrides.party_name
+      } else {
+        // manual_override가 아닌 당사자에서 상대방 조회
+        const { data: opponentParty } = await adminClient
+          .from('case_parties')
+          .select('party_name')
+          .eq('case_id', body.source_case_id)
+          .eq('is_our_client', false)
+          .eq('is_primary', true)
+          .maybeSingle()
+
+        if (opponentParty) {
+          sourceOpponentName = opponentParty.party_name
+        }
+      }
     }
 
     let clientId = body.client_id
@@ -240,7 +259,7 @@ export const POST = withTenant(async (request, { tenant }) => {
 
     // client_role: 명시적으로 지정된 경우 사용, 아니면 기본값 'plaintiff'
     const resolvedClientRole = body.client_role ?? sourceCase?.client_role ?? 'plaintiff'
-    const resolvedOpponentName = body.opponent_name ?? sourceCase?.opponent_name ?? null
+    const resolvedOpponentName = body.opponent_name ?? sourceOpponentName ?? null
 
     // client_role_status 결정 (공통 유틸리티 사용)
     const clientNameForStatus = body.new_client?.name
@@ -290,7 +309,8 @@ export const POST = withTenant(async (request, { tenant }) => {
         judge_name: body.judge_name || null,
         client_role: resolvedClientRole,
         client_role_status: resolvedClientRoleStatus,
-        opponent_name: resolvedOpponentName
+        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
+        opponent_name: null
       }, tenant)])
       .select()
       .single()

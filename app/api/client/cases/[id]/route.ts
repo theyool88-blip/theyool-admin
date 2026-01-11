@@ -23,8 +23,8 @@ export async function GET(
     const { id: caseId } = await params;
     const supabase = await createClient();
 
-    // 사건 조회 (본인 사건인지 확인)
-    const { data: caseDetail, error: caseError } = await supabase
+    // 사건 조회 (본인 사건인지 확인, opponent_name은 case_parties에서 별도 조회)
+    const { data: caseDetailRaw, error: caseError } = await supabase
       .from('legal_cases')
       .select(`
         id,
@@ -34,7 +34,6 @@ export async function GET(
         status,
         office_location,
         court_name,
-        opponent_name,
         lawyer_name,
         description,
         created_at
@@ -43,9 +42,23 @@ export async function GET(
       .eq('client_id', clientId)
       .single();
 
-    if (caseError || !caseDetail) {
+    if (caseError || !caseDetailRaw) {
       return NextResponse.json({ error: '사건을 찾을 수 없습니다.' }, { status: 404 });
     }
+
+    // case_parties에서 상대방(is_our_client=false, is_primary=true) 이름 조회
+    const { data: opponentParty } = await supabase
+      .from('case_parties')
+      .select('party_name')
+      .eq('case_id', caseId)
+      .eq('is_our_client', false)
+      .eq('is_primary', true)
+      .maybeSingle();
+
+    const caseDetail = {
+      ...caseDetailRaw,
+      opponent_name: opponentParty?.party_name || null
+    };
 
     // 재판기일 조회
     const { data: hearings, error: _hearingsError } = await supabase

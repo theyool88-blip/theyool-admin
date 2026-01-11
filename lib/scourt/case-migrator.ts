@@ -289,7 +289,7 @@ export class CaseMigrator {
   }
 
   /**
-   * 사건별 당사자명 조회 (legal_cases 테이블에서)
+   * 사건별 당사자명 조회 (legal_cases + case_parties)
    */
   async getPartyNameForLegalCase(params: {
     legalCaseId?: string | null;
@@ -297,37 +297,54 @@ export class CaseMigrator {
     tenantId?: string | null;
   }): Promise<string | null> {
     const { legalCaseId, caseNumber, tenantId } = params;
+    let resolvedCaseId = legalCaseId;
 
-    if (legalCaseId) {
-      const { data, error } = await this.supabase
+    // legalCaseId가 없으면 caseNumber로 조회
+    if (!resolvedCaseId && caseNumber && tenantId) {
+      const { data: caseData } = await this.supabase
         .from('legal_cases')
-        .select('client_name, opponent_name')
-        .eq('id', legalCaseId)
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('court_case_number', caseNumber)
         .maybeSingle();
 
-      if (!error && data) {
-        // 의뢰인명 또는 상대방명 반환
-        return data.client_name || data.opponent_name || null;
+      if (caseData) {
+        resolvedCaseId = caseData.id;
       }
     }
 
-    if (!caseNumber || !tenantId) {
+    if (!resolvedCaseId) {
       return null;
     }
 
-    const { data, error } = await this.supabase
+    // 1. legal_cases에서 clients JOIN으로 의뢰인 이름 조회
+    const { data: caseWithClient } = await this.supabase
       .from('legal_cases')
-      .select('client_name, opponent_name')
-      .eq('tenant_id', tenantId)
-      .eq('court_case_number', caseNumber)
+      .select('clients(name)')
+      .eq('id', resolvedCaseId)
       .maybeSingle();
 
-    if (error || !data) {
-      return null;
+    const clientName = (caseWithClient?.clients as { name?: string } | null)?.name;
+    if (clientName) {
+      return clientName;
     }
 
-    // 의뢰인명 또는 상대방명 반환
-    return data.client_name || data.opponent_name || null;
+    // 2. case_parties에서 당사자명 조회 (is_primary=true 우선)
+    const { data: parties } = await this.supabase
+      .from('case_parties')
+      .select('party_name, is_our_client, is_primary')
+      .eq('case_id', resolvedCaseId)
+      .order('is_primary', { ascending: false })
+      .order('party_order', { ascending: true });
+
+    if (parties && parties.length > 0) {
+      // 의뢰인 측 당사자 우선, 없으면 상대방
+      const ourParty = parties.find(p => p.is_our_client);
+      const opponentParty = parties.find(p => !p.is_our_client);
+      return ourParty?.party_name || opponentParty?.party_name || null;
+    }
+
+    return null;
   }
 
   /**

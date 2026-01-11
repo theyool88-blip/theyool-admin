@@ -376,7 +376,19 @@ export async function PATCH(
           .eq("id", primaryId);
       }
 
-      return NextResponse.json({ success: true });
+      // 업데이트된 당사자들 조회하여 반환 (낙관적 업데이트용)
+      const { data: updatedParties } = await adminClient
+        .from("case_parties")
+        .select(`
+          id, party_name, party_type, party_type_label, party_order,
+          is_our_client, is_primary, manual_override, client_id,
+          scourt_party_index, scourt_label_raw, scourt_name_raw,
+          clients:client_id(id, name)
+        `)
+        .eq("case_id", caseId)
+        .in("id", partyIds);
+
+      return NextResponse.json({ success: true, updatedParties: updatedParties || [] });
     }
 
     // 당사자 수정
@@ -393,7 +405,12 @@ export async function PATCH(
       .update(payload)
       .eq("id", partyId)
       .eq("case_id", caseId)
-      .select()
+      .select(`
+        id, party_name, party_type, party_type_label, party_order,
+        is_our_client, is_primary, manual_override, client_id,
+        scourt_party_index, scourt_label_raw, scourt_name_raw,
+        clients:client_id(id, name)
+      `)
       .single();
 
     if (error) {

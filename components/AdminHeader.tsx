@@ -30,7 +30,7 @@ export default function AdminHeader({ title, subtitle, tenantLogo, tenantName }:
   const canPortal = typeof document !== 'undefined'
 
   // 테넌트 정보 가져오기
-  const { memberRole, tenantLogo: fetchedLogo, tenantName: fetchedName, isLoading } = useTenant()
+  const { memberRole, tenantLogo: fetchedLogo, tenantName: fetchedName, isLoading: _isLoading } = useTenant()
 
   // 외부에서 전달된 값 우선, 없으면 훅에서 가져온 값 사용
   const effectiveLogo = tenantLogo ?? fetchedLogo
@@ -89,6 +89,7 @@ export default function AdminHeader({ title, subtitle, tenantLogo, tenantName }:
       if (!item.module) return true // module이 없으면 모든 역할 접근 가능
       return canAccessModule(role, item.module)
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [role])
 
   return (

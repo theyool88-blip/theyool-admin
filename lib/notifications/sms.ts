@@ -4,6 +4,7 @@
  */
 
 import type { SendResult, MessageType } from '@/types/notification';
+import crypto from 'crypto';
 
 // Solapi API 설정
 const SOLAPI_API_URL = 'https://api.solapi.com/messages/v4/send';
@@ -33,7 +34,6 @@ function getAuthHeader(): string | null {
   const salt = Math.random().toString(36).substring(2, 15);
 
   // HMAC-SHA256 서명 생성
-  const crypto = require('crypto');
   const signature = crypto
     .createHmac('sha256', apiSecret)
     .update(timestamp + salt)

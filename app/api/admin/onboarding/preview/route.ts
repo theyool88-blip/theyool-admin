@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withTenant } from '@/lib/api/with-tenant'
 import type { StandardCaseRow } from '@/types/onboarding'
 import { generatePreview } from '@/lib/onboarding/batch-case-creator'
-import { convertToStandardRow, applyDefaults, validateRow } from '@/lib/onboarding/csv-schema'
+import { convertToStandardRow } from '@/lib/onboarding/csv-schema'
 
 export const POST = withTenant(async (request: NextRequest, { tenant }) => {
   try {

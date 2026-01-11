@@ -7,10 +7,9 @@ import { createClient } from '@/lib/supabase/client'
 import AdminHeader from './AdminHeader'
 import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
 import {
-  CASE_TYPE_OPTIONS,
-  CASE_TYPE_GROUPS,
   getGroupedCaseTypes,
-  getCaseTypeAuto
+  getCaseTypeAuto,
+  isCriminalCase
 } from '@/lib/constants/case-types'
 
 interface Client {
@@ -79,6 +78,17 @@ interface UploadedFile {
   file_size: number | null
   file_type: string | null
   publicUrl: string
+}
+
+// 한글 성씨 추출 (첫 글자)
+function extractSurname(name: string): string {
+  const trimmed = name.trim()
+  if (!trimmed) return ''
+  const firstChar = trimmed.charAt(0)
+  if (/[가-힣]/.test(firstChar)) {
+    return firstChar
+  }
+  return ''
 }
 
 // 섹션 헤더 컴포넌트
@@ -161,7 +171,7 @@ function parseMoney(value: string): number {
 }
 
 export default function CaseEditForm({
-  profile,
+  profile: _profile,
   caseData,
   allCases,
   relatedCases
@@ -187,7 +197,7 @@ export default function CaseEditForm({
     success_fee_agreement: caseData.success_fee_agreement || '',
     calculated_success_fee: caseData.calculated_success_fee || 0,
     court_case_number: caseData.court_case_number || '',
-    court_name: caseData.court_name || '',
+    court_name: getCourtAbbrev(caseData.court_name || ''),
     case_type: caseData.case_type || '',
     application_type: caseData.application_type || '',
     judge_name: caseData.judge_name || '',
@@ -209,15 +219,27 @@ export default function CaseEditForm({
 
   // 법원 선택 드롭다운
   const [showCourtDropdown, setShowCourtDropdown] = useState(false)
-  const filteredCourts = COURTS.filter(c =>
-    c.name.includes(formData.court_name)
-  ).slice(0, 15)
+  const filteredCourts = COURTS
+    .filter(c => {
+      const query = formData.court_name.trim()
+      if (!query) return true
+      const abbrev = getCourtAbbrev(c.name)
+      return c.name.includes(query) || abbrev.includes(query)
+    })
+    .reduce((acc, court) => {
+      const abbrev = getCourtAbbrev(court.name)
+      if (acc.seen.has(abbrev)) return acc
+      acc.seen.add(abbrev)
+      acc.items.push(court)
+      return acc
+    }, { items: [] as typeof COURTS, seen: new Set<string>() })
+    .items.slice(0, 15)
 
   // 대법원 검색 성공 여부
   const [scourtSearchSuccess, setScourtSearchSuccess] = useState(!!caseData.enc_cs_no)
 
   // 그룹별 사건 유형 옵션 (메모이제이션)
-  const groupedCaseTypes = useMemo(() => getGroupedCaseTypes(), [])
+  const _groupedCaseTypes = useMemo(() => getGroupedCaseTypes(), [])
 
   // 사건번호 변경 시 자동분류
   const handleAutoClassify = (caseNumber: string) => {
@@ -229,6 +251,17 @@ export default function CaseEditForm({
 
   const [allClients, setAllClients] = useState<Client[]>([])
   const [loadingClients, setLoadingClients] = useState(true)
+  const selectedClientName = useMemo(() => {
+    const selectedClient = allClients.find(client => client.id === formData.client_id)
+    return selectedClient?.name || ''
+  }, [allClients, formData.client_id])
+  const clientSurname = extractSurname(selectedClientName)
+  const opponentSurname = extractSurname(formData.opponent_name)
+  const sameSurname = clientSurname && opponentSurname && clientSurname === opponentSurname
+  const [showRoleConfirm, setShowRoleConfirm] = useState(false)
+  const [pendingClientRole, setPendingClientRole] = useState<'plaintiff' | 'defendant' | ''>('')
+  const [roleTouched, setRoleTouched] = useState(!!caseData.client_role)
+  const [roleConfirmError, setRoleConfirmError] = useState('')
 
   const [relations, setRelations] = useState<RelatedCase[]>(relatedCases)
   const [showAddRelation, setShowAddRelation] = useState(false)
@@ -324,7 +357,7 @@ export default function CaseEditForm({
       if (result.success && result.caseInfo) {
         setFormData(prev => ({
           ...prev,
-          court_name: result.caseInfo.courtName || prev.court_name,
+          court_name: getCourtAbbrev(result.caseInfo.courtName || prev.court_name),
           client_role: result.caseInfo.clientRole || prev.client_role,
           enc_cs_no: result.caseInfo.encCsNo || prev.enc_cs_no,
         }))
@@ -378,7 +411,7 @@ export default function CaseEditForm({
   }
 
   // 파일 삭제 핸들러
-  const handleFileDelete = async (fileId: string, filePath: string) => {
+  const handleFileDelete = async (fileId: string, _filePath: string) => {
     try {
       await fetch(`/api/admin/contracts/upload?id=${fileId}`, {
         method: 'DELETE'
@@ -389,14 +422,7 @@ export default function CaseEditForm({
     }
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (!formData.client_id) {
-      alert('의뢰인을 선택해주세요.')
-      return
-    }
-
+  const submitCaseUpdate = async (clientRoleOverride?: 'plaintiff' | 'defendant') => {
     setSaving(true)
 
     try {
@@ -420,7 +446,7 @@ export default function CaseEditForm({
           judge_name: formData.judge_name || null,
           notes: formData.notes || null,
           onedrive_folder_url: formData.onedrive_folder_url || null,
-          client_role: formData.client_role || null,
+          client_role: clientRoleOverride || formData.client_role || null,
           opponent_name: formData.opponent_name || null,
           enc_cs_no: formData.enc_cs_no || null,
           scourt_case_name: formData.scourt_case_name || null
@@ -442,6 +468,37 @@ export default function CaseEditForm({
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!formData.client_id) {
+      alert('의뢰인을 선택해주세요.')
+      return
+    }
+
+    if (sameSurname && !roleTouched) {
+      setPendingClientRole(formData.client_role || '')
+      setRoleConfirmError('')
+      setShowRoleConfirm(true)
+      return
+    }
+
+    await submitCaseUpdate()
+  }
+
+  const handleRoleConfirm = async () => {
+    if (!pendingClientRole) {
+      setRoleConfirmError('의뢰인 역할을 선택해주세요.')
+      return
+    }
+
+    setShowRoleConfirm(false)
+    setRoleConfirmError('')
+    setRoleTouched(true)
+    setFormData(prev => ({ ...prev, client_role: pendingClientRole }))
+    await submitCaseUpdate(pendingClientRole)
   }
 
   const handleAddRelation = async () => {
@@ -603,7 +660,7 @@ export default function CaseEditForm({
                                 key={c.code}
                                 className="px-4 py-3 text-sm cursor-pointer hover:bg-sage-50 text-gray-900 border-b border-sage-50 last:border-b-0"
                                 onMouseDown={() => {
-                                  setFormData({ ...formData, court_name: c.name })
+                                  setFormData({ ...formData, court_name: getCourtAbbrev(c.name) })
                                   setShowCourtDropdown(false)
                                 }}
                               >
@@ -651,7 +708,9 @@ export default function CaseEditForm({
               <SectionHeader
                 number={2}
                 title="당사자 정보"
-                subtitle="의뢰인과 상대방 정보"
+                subtitle={isCriminalCase(formData.case_type, formData.court_case_number)
+                  ? "의뢰인(피고인) 정보"
+                  : "의뢰인과 상대방 정보"}
               />
             </div>
 
@@ -685,7 +744,11 @@ export default function CaseEditForm({
                   <div className="relative">
                     <select
                       value={formData.client_role}
-                      onChange={(e) => setFormData({ ...formData, client_role: e.target.value as 'plaintiff' | 'defendant' | '' })}
+                      onChange={(e) => {
+                        const nextRole = e.target.value as 'plaintiff' | 'defendant' | ''
+                        setFormData({ ...formData, client_role: nextRole })
+                        setRoleTouched(!!nextRole)
+                      }}
                       className={selectClassName}
                     >
                       <option value="">선택하세요</option>
@@ -701,15 +764,18 @@ export default function CaseEditForm({
                 </FormField>
               </div>
 
-              <FormField label="상대방 이름" hint="분쟁 상대방이 있는 경우에만 입력하세요">
-                <input
-                  type="text"
-                  value={formData.opponent_name}
-                  onChange={(e) => setFormData({ ...formData, opponent_name: e.target.value })}
-                  className={inputClassName}
-                  placeholder="상대방 이름 (선택)"
-                />
-              </FormField>
+              {/* 상대방 정보 - 형사사건에서는 표시하지 않음 */}
+              {!isCriminalCase(formData.case_type, formData.court_case_number) && (
+                <FormField label="상대방 이름" hint="분쟁 상대방이 있는 경우에만 입력하세요">
+                  <input
+                    type="text"
+                    value={formData.opponent_name}
+                    onChange={(e) => setFormData({ ...formData, opponent_name: e.target.value })}
+                    className={inputClassName}
+                    placeholder="상대방 이름 (선택)"
+                  />
+                </FormField>
+              )}
             </div>
           </div>
 
@@ -1049,6 +1115,73 @@ export default function CaseEditForm({
           </div>
         </form>
       </div>
+
+      {showRoleConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900">의뢰인 역할 확인</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              의뢰인({selectedClientName || '의뢰인'})과 상대방({formData.opponent_name || '상대방'})의 성씨가 동일합니다.
+              의뢰인의 소송상 지위를 선택해주세요.
+            </p>
+
+            <div className="mt-4 space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="client_role_confirm"
+                  value="plaintiff"
+                  checked={pendingClientRole === 'plaintiff'}
+                  onChange={(e) => {
+                    setPendingClientRole(e.target.value as 'plaintiff' | 'defendant')
+                    setRoleConfirmError('')
+                  }}
+                  className="w-4 h-4 text-sage-600 border-gray-300 focus:ring-sage-500"
+                />
+                <span className="text-sm font-medium text-gray-700">원고 (채권자)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="client_role_confirm"
+                  value="defendant"
+                  checked={pendingClientRole === 'defendant'}
+                  onChange={(e) => {
+                    setPendingClientRole(e.target.value as 'plaintiff' | 'defendant')
+                    setRoleConfirmError('')
+                  }}
+                  className="w-4 h-4 text-sage-600 border-gray-300 focus:ring-sage-500"
+                />
+                <span className="text-sm font-medium text-gray-700">피고 (채무자)</span>
+              </label>
+            </div>
+
+            {roleConfirmError && (
+              <p className="mt-2 text-sm text-coral-600">{roleConfirmError}</p>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRoleConfirm(false)
+                  setRoleConfirmError('')
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleRoleConfirm}
+                className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700"
+              >
+                확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -5,8 +5,12 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/cron/scourt-batch-sync?secret=scourt-batch-sync-secret",
-      "schedule": "0 6 * * 1-5"
+      "path": "/api/cron/scourt-sync-scheduler?secret=scourt-batch-sync-secret",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/scourt-sync-worker?secret=scourt-batch-sync-secret",
+      "schedule": "*/2 * * * *"
     }
   ]
 }

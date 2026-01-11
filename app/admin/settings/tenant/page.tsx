@@ -28,7 +28,6 @@ import {
   FolderOpen,
   Link2,
   Link2Off,
-  ExternalLink,
 } from 'lucide-react';
 import Image from 'next/image';
 import { TenantSettings, MemberRole, ROLE_DISPLAY_NAMES } from '@/types/tenant';

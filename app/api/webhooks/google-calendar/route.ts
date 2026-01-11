@@ -10,9 +10,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Google Calendar Push Notification Webhook (비활성화)
-export async function POST(request: NextRequest) {
-  const channelId = request.headers.get('x-goog-channel-id');
-  const resourceState = request.headers.get('x-goog-resource-state');
+export async function POST(_request: NextRequest) {
+  const channelId = _request.headers.get('x-goog-channel-id');
+  const resourceState = _request.headers.get('x-goog-resource-state');
 
   console.log('[Google Calendar Webhook] [DEPRECATED] Received:', {
     channelId,

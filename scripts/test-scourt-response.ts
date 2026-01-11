@@ -26,13 +26,13 @@ async function main() {
     const result = await client.searchAndGetGeneral(params);
 
     if (result.generalResult?.success) {
-      const rawData = result.generalResult.data?.raw?.data;
+      const rawData = result.generalResult.data?.raw?.data as Record<string, unknown> | undefined;
 
       if (rawData) {
         console.log('\n=== API 응답의 모든 필드 ===');
 
         // dma_csBasCtt (기본정보) 확인
-        const caseInfo = rawData.dma_csBasCtt || rawData.dma_csBsCtt || rawData.dma_gnrlCtt || rawData;
+        const caseInfo = (rawData.dma_csBasCtt || rawData.dma_csBsCtt || rawData.dma_gnrlCtt || rawData) as Record<string, unknown>;
 
         console.log('\n[기본정보 필드]');
         const allKeys = Object.keys(caseInfo);

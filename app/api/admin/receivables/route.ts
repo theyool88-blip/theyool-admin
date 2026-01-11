@@ -3,7 +3,7 @@
  * 미수금 관리 API (테넌트 격리 적용)
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant } from '@/lib/api/with-tenant'
 import { canAccessAccountingWithContext } from '@/lib/auth/permissions'
@@ -247,7 +247,7 @@ export const GET = withTenant(async (request, { tenant }) => {
     const clientIds = [...new Set(cases?.map(c => c.client_id).filter(Boolean) || [])]
 
     // 의뢰인별 메모 조회
-    let clientMemosMap = new Map<string, Memo[]>()
+    const clientMemosMap = new Map<string, Memo[]>()
     try {
       if (clientIds.length > 0) {
         let memosQuery = supabase
@@ -285,14 +285,15 @@ export const GET = withTenant(async (request, { tenant }) => {
     let collectionCount = 0
     const officeOutstanding: Record<string, number> = {}
 
-    cases?.forEach((c: any) => {
+    cases?.forEach((c) => {
       const clientId = c.client_id
-      const clientName = c.clients?.name || '미지정'
+      const clientData = Array.isArray(c.clients) ? c.clients[0] : c.clients
+      const clientName = clientData?.name || '미지정'
 
       const retainer = c.retainer_fee || 0
       const successFee = c.calculated_success_fee || 0
       const received = c.total_received || 0
-      const outstanding = c.outstanding_balance > 0 ? c.outstanding_balance : 0
+      const outstanding = (c.outstanding_balance ?? 0) > 0 ? (c.outstanding_balance ?? 0) : 0
       const grade: ReceivableGrade = c.receivable_grade || 'normal'
       const caseOffice = c.office || '미지정'
 

@@ -31,12 +31,14 @@ export interface HearingInfo {
   type: string;
   location: string;
   result?: string;
+  [key: string]: unknown;
 }
 
 export interface ProgressItem {
   date: string;
   content: string;
   result?: string;
+  [key: string]: unknown;
 }
 
 export interface DocumentItem {
@@ -52,9 +54,9 @@ export interface LowerCourtInfo {
 export interface CaseUpdate {
   updateType: UpdateType;
   updateSummary: string;
-  details: Record<string, any>;
-  oldValue?: any;
-  newValue?: any;
+  details: Record<string, unknown>;
+  oldValue?: unknown;
+  newValue?: unknown;
   importance: 'high' | 'normal' | 'low';
 }
 
@@ -70,6 +72,8 @@ export type UpdateType =
   | 'appeal_filed'
   | 'status_changed'
   | 'party_changed'
+  | 'related_case_new'      // 새 연관사건 발견
+  | 'lower_court_new'       // 새 심급사건 발견
   | 'other';
 
 // ============================================================
@@ -111,6 +115,18 @@ export class CaseChangeDetector {
 
     // 3. 기본정보 변경 감지
     updates.push(...this.detectBasicInfoChanges(oldSnapshot.basicInfo, newSnapshot.basicInfo));
+
+    // 4. 연관사건 변경 감지
+    updates.push(...this.detectRelatedCaseChanges(
+      oldSnapshot.relatedCases || [],
+      newSnapshot.relatedCases || []
+    ));
+
+    // 5. 심급사건(원심) 변경 감지
+    updates.push(...this.detectLowerCourtChanges(
+      oldSnapshot.lowerCourt || [],
+      newSnapshot.lowerCourt || []
+    ));
 
     return updates;
   }
@@ -388,6 +404,61 @@ export class CaseChangeDetector {
     today.setHours(0, 0, 0, 0);
     return date >= today;
   }
+
+  /**
+   * 연관사건 변경 감지
+   */
+  private static detectRelatedCaseChanges(
+    oldRelated: RelatedCaseInfo[],
+    newRelated: RelatedCaseInfo[]
+  ): CaseUpdate[] {
+    const updates: CaseUpdate[] = [];
+    const oldSet = new Set(oldRelated.map((r) => r.caseNo));
+
+    for (const relCase of newRelated) {
+      if (!oldSet.has(relCase.caseNo)) {
+        updates.push({
+          updateType: 'related_case_new',
+          updateSummary: `${relCase.relation || '관련'} 사건 발견: ${relCase.caseNo}`,
+          details: {
+            caseNo: relCase.caseNo,
+            caseName: relCase.caseName,
+            relation: relCase.relation,
+          },
+          importance: 'normal',
+        });
+      }
+    }
+
+    return updates;
+  }
+
+  /**
+   * 심급사건(원심) 변경 감지
+   */
+  private static detectLowerCourtChanges(
+    oldLower: LowerCourtInfo[],
+    newLower: LowerCourtInfo[]
+  ): CaseUpdate[] {
+    const updates: CaseUpdate[] = [];
+    const oldSet = new Set(oldLower.map((l) => l.caseNo));
+
+    for (const lowerCase of newLower) {
+      if (!oldSet.has(lowerCase.caseNo)) {
+        updates.push({
+          updateType: 'lower_court_new',
+          updateSummary: `심급사건 발견: ${lowerCase.caseNo} (${lowerCase.court || ''})`,
+          details: {
+            caseNo: lowerCase.caseNo,
+            court: lowerCase.court,
+          },
+          importance: 'normal',
+        });
+      }
+    }
+
+    return updates;
+  }
 }
 
 // ============================================================
@@ -409,6 +480,8 @@ export const UPDATE_TYPE_NAMES: Record<UpdateType, string> = {
   appeal_filed: '상소 제기',
   status_changed: '상태 변경',
   party_changed: '당사자 변경',
+  related_case_new: '연관사건 발견',
+  lower_court_new: '심급사건 발견',
   other: '기타',
 };
 

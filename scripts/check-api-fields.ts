@@ -20,13 +20,13 @@ async function main() {
   });
 
   if (result.success && result.generalData?.raw) {
-    const data = result.generalData.raw.data;
+    const data = result.generalData.raw.data as Record<string, unknown>;
     console.log('\n=== API 응답 필드 목록 ===');
     console.log(Object.keys(data).join('\n'));
 
     // 당사자 정보
     console.log('\n=== 당사자 정보 (dlt_btprtCttLst) ===');
-    const parties = data.dlt_btprtCttLst || data.dlt_btprLst || [];
+    const parties = (data.dlt_btprtCttLst || data.dlt_btprLst || []) as Record<string, unknown>[];
     if (parties.length > 0) {
       console.log('필드:', Object.keys(parties[0]).join(', '));
       console.log('데이터:', JSON.stringify(parties, null, 2));

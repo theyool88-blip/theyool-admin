@@ -59,8 +59,8 @@ async function collectFields() {
       });
 
       if (result.success && result.generalData?.raw?.data) {
-        const data = result.generalData.raw.data;
-        const caseInfo = data.dma_csBasCtt || {};
+        const data = result.generalData.raw.data as Record<string, unknown>;
+        const caseInfo = (data.dma_csBasCtt || {}) as Record<string, unknown>;
 
         // 기본 필드 수집
         const basicFields: FieldInfo[] = Object.keys(caseInfo)

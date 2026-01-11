@@ -334,10 +334,10 @@ export async function getMonthlyExpenseSummary(params?: {
 /**
  * 카테고리별 지출 통계 조회
  */
-export async function getExpenseStatsByCategory(tenantId?: string) {
+export async function getExpenseStatsByCategory(_tenantId?: string) {
   const supabase = createAdminClient()
 
-  let query = supabase
+  const query = supabase
     .from('expense_stats_by_category')
     .select('*')
     .order('total_amount', { ascending: false })

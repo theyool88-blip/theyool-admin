@@ -12,8 +12,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { transformHearings, transformProgress } from '@/lib/scourt/field-transformer';
 import { getScourtApiClient } from '@/lib/scourt/api-client';
-import { scrapeProgress, closeBrowser } from '@/lib/scourt/progress-scraper';
+import { scrapeProgress } from '@/lib/scourt/progress-scraper';
 import { extractRawData } from '@/lib/scourt/dynamic-renderer';
+import { getCourtCodeByName, getCourtFullName } from '@/lib/scourt/court-codes';
 
 export async function GET(request: NextRequest) {
   try {
@@ -275,14 +276,8 @@ export async function POST(request: NextRequest) {
     };
     const csDvsCd = caseTypeCodes[csDvsNm] || csDvsNm;
 
-    // 법원 코드 변환
-    const courtCodes: Record<string, string> = {
-      '수원가정법원': '000302', '수원가정': '000302',
-      '수원가정법원 평택지원': '000305', '평택가정': '000305',
-      '수원가정법원 성남지원': '000303', '성남가정': '000303',
-      '서울가정법원': '000201', '서울가정': '000201',
-    };
-    const cortCd = courtCodes[legalCase.court_name] || legalCase.court_name;
+    const normalizedCourtName = getCourtFullName(legalCase.court_name, csDvsNm);
+    const cortCd = getCourtCodeByName(normalizedCourtName) || normalizedCourtName;
 
     // API 클라이언트로 진행내용 조회
     const apiClient = getScourtApiClient();

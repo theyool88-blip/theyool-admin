@@ -70,14 +70,14 @@ async function main() {
       const result = await apiClient.searchAndRegisterCase(testCase.params);
 
       if (result.success && result.generalData?.raw) {
-        const data = result.generalData.raw.data;
+        const data = result.generalData.raw.data as Record<string, unknown>;
 
         // 사건 카테고리
         console.log('\n📌 사건 카테고리:', result.generalData.caseCategory || '(없음)');
 
         // 기본정보
         console.log('\n📌 기본정보 (dma_csBasCtt):');
-        const basicInfo = data.dma_csBasCtt;
+        const basicInfo = data.dma_csBasCtt as Record<string, unknown> | undefined;
         if (basicInfo) {
           console.log('  사건명:', basicInfo.csNm);
           console.log('  원고/신청인:', basicInfo.rprsClmntNm || basicInfo.aplNm);
@@ -90,10 +90,10 @@ async function main() {
 
         // 당사자 정보
         console.log('\n📌 당사자 정보 (dlt_btprtCttLst):');
-        const parties = data.dlt_btprtCttLst || [];
+        const parties = (data.dlt_btprtCttLst || []) as Record<string, unknown>[];
         if (parties.length > 0) {
           console.log('  첫번째 당사자 필드:', Object.keys(parties[0]).join(', '));
-          parties.forEach((p: any, i: number) => {
+          parties.forEach((p: Record<string, unknown>, i: number) => {
             console.log(`  [${i}] ${p.btprtStndngNm || p.btprtDvsNm}: ${p.btprtNm}`);
           });
         } else {
@@ -102,10 +102,10 @@ async function main() {
 
         // 대리인 정보
         console.log('\n📌 대리인 정보 (dlt_agntCttLst):');
-        const agents = data.dlt_agntCttLst || [];
+        const agents = (data.dlt_agntCttLst || []) as Record<string, unknown>[];
         if (agents.length > 0) {
           console.log('  첫번째 대리인 필드:', Object.keys(agents[0]).join(', '));
-          agents.forEach((a: any, i: number) => {
+          agents.forEach((a: Record<string, unknown>, i: number) => {
             console.log(`  [${i}] ${a.agntDvsNm}: ${a.agntNm}`);
           });
         } else {
@@ -114,7 +114,7 @@ async function main() {
 
         // 기일 정보
         console.log('\n📌 기일 정보 (dlt_rcntDxdyLst):');
-        const hearings = data.dlt_rcntDxdyLst || [];
+        const hearings = (data.dlt_rcntDxdyLst || []) as Record<string, unknown>[];
         if (hearings.length > 0) {
           console.log('  첫번째 기일 필드:', Object.keys(hearings[0]).join(', '));
           console.log('  기일 수:', hearings.length);
@@ -128,7 +128,7 @@ async function main() {
         for (const field of dltFields) {
           const arr = data[field];
           if (Array.isArray(arr)) {
-            console.log(`  ${field}: ${arr.length}건`);
+            console.log(`  ${field}: ${(arr as unknown[]).length}건`);
           }
         }
 

@@ -120,7 +120,7 @@ function getAppealDeadlineMapping(
 function getDeadlineMappingForUpdate(
   updateType: UpdateType,
   caseNumber: string,
-  details: Record<string, any>
+  details: Record<string, unknown>
 ): DeadlineMapping | null {
   const category = getCaseCategoryFromNumber(caseNumber);
 
@@ -131,7 +131,7 @@ function getDeadlineMappingForUpdate(
 
     case 'hearing_result':
       // 기일 결과 중 조정 성립 → 조정 이의기간
-      const resultText = details?.result || '';
+      const resultText = (details?.result as string | undefined) || '';
       if (
         resultText.includes('조정') ||
         resultText.includes('화해') ||
@@ -155,7 +155,7 @@ function getDeadlineMappingForUpdate(
  */
 function extractTriggerDate(
   updateType: UpdateType,
-  details: Record<string, any>
+  details: Record<string, unknown>
 ): string | null {
   // 선고일/결정일 추출
   if (updateType === 'result_announced') {
@@ -169,7 +169,7 @@ function extractTriggerDate(
 
   // 기일 결과에서 날짜 추출
   if (updateType === 'hearing_result' && details?.date) {
-    const dateStr = details.date;
+    const dateStr = details.date as string;
     const dateMatch = dateStr.match(/(\d{4})\.(\d{2})\.(\d{2})/);
     if (dateMatch) {
       return `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`;
@@ -230,11 +230,13 @@ async function isDuplicateDeadline(
  * @param caseNumber - 사건번호 (예: "2024드단12345")
  * @param updates - 감지된 업데이트 목록
  * @param scourtUpdateId - SCOURT 업데이트 ID (중복 방지용, optional)
+ * @param tenantId - 테넌트 ID (필수)
  */
 export async function autoRegisterDeadlines(
   caseNumber: string,
   updates: CaseUpdate[],
-  scourtUpdateId?: string
+  scourtUpdateId?: string,
+  tenantId?: string
 ): Promise<AutoRegisterResult> {
   const result: AutoRegisterResult = {
     registered: 0,
@@ -243,12 +245,18 @@ export async function autoRegisterDeadlines(
     details: [],
   };
 
-  // case_number로 case_id 조회
+  if (!tenantId) {
+    result.errors.push('tenantId가 필요합니다');
+    return result;
+  }
+
+  // court_case_number + tenant_id로 case_id 조회
   const supabaseForCase = createAdminClient();
   const { data: caseData } = await supabaseForCase
-    .from('cases')
+    .from('legal_cases')
     .select('id')
-    .eq('case_number', caseNumber)
+    .eq('tenant_id', tenantId)
+    .eq('court_case_number', caseNumber)
     .single();
 
   const caseId = caseData?.id;
@@ -310,7 +318,7 @@ export async function autoRegisterDeadlines(
         deadline_type: mapping.deadlineType,
         trigger_date: triggerDate,
         notes: `[SCOURT 자동등록] ${mapping.triggerEvent} 기준`,
-      });
+      }, tenantId);
 
       // scourt_update_id 연결 (컬럼이 추가된 경우)
       if (scourtUpdateId) {

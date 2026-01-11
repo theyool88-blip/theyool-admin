@@ -99,7 +99,7 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
     try {
       await page.waitForSelector('#mf_ssgoTopMainTab', { timeout: 30000 });
       console.log('✅ 메인 탭 로드됨');
-    } catch (e) {
+    } catch (_e) {
       console.log('⚠️ 메인 탭 대기 타임아웃, 계속 진행...');
     }
 
@@ -133,7 +133,17 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
       courtName: string;
       partyName: string;
     }) => {
-      const w = (window as any).$w;
+      interface WebSquareComponent {
+        set?: (key: string, value: string) => void;
+        execute?: () => void;
+        show?: () => void;
+        getValue?: () => Record<string, unknown>;
+      }
+      interface WebSquareAPI {
+        getComponentById?: (id: string) => WebSquareComponent | null;
+        executeSubmission?: (id: string) => void;
+      }
+      const w = (window as unknown as { $w?: WebSquareAPI }).$w;
       if (!w) {
         return { success: false, error: 'WebSquare5 API 없음' };
       }
@@ -141,21 +151,21 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
       try {
         // 1. dma_search DataMap에 API와 동일한 값 설정
         const searchDataMapId = 'mf_ssgoTopMainTab_contents_content1_body_dma_search';
-        const searchDataMap = w.getComponentById(searchDataMapId);
+        const searchDataMap = w.getComponentById?.(searchDataMapId);
 
         if (!searchDataMap) {
           return { success: false, error: 'dma_search DataMap 없음' };
         }
 
         // API와 동일한 필드 설정
-        searchDataMap.set('cortCd', params.courtName);  // 법원명
-        searchDataMap.set('csNo', '');
-        searchDataMap.set('encCsNo', params.encCsNo);
-        searchDataMap.set('csYear', params.csYear);
-        searchDataMap.set('csDvsCd', params.csDvsCd);
-        searchDataMap.set('csSerial', params.csSerial.padStart(7, '0'));
-        searchDataMap.set('btprtNm', params.partyName);  // 당사자명
-        searchDataMap.set('captchaAnswer', '');
+        searchDataMap.set?.('cortCd', params.courtName);  // 법원명
+        searchDataMap.set?.('csNo', '');
+        searchDataMap.set?.('encCsNo', params.encCsNo);
+        searchDataMap.set?.('csYear', params.csYear);
+        searchDataMap.set?.('csDvsCd', params.csDvsCd);
+        searchDataMap.set?.('csSerial', params.csSerial.padStart(7, '0'));
+        searchDataMap.set?.('btprtNm', params.partyName);  // 당사자명
+        searchDataMap.set?.('captchaAnswer', '');
 
         console.log('dma_search 설정 완료:', {
           cortCd: params.courtName,
@@ -177,7 +187,7 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
         }
 
         // 대안: submission 컴포넌트 직접 실행
-        const submission = w.getComponentById(submissionId);
+        const submission = w.getComponentById?.(submissionId);
         if (submission && typeof submission.execute === 'function') {
           console.log('submission.execute 호출');
           submission.execute();
@@ -232,10 +242,16 @@ export async function openCaseInBrowser(params: OpenCaseParams): Promise<OpenCas
           const data = await response.json();
 
           // 응답을 화면에 반영
-          const w = (window as any).$w;
+          interface WebSquareComponent {
+            show?: () => void;
+          }
+          interface WebSquareAPI {
+            getComponentById?: (id: string) => WebSquareComponent | null;
+          }
+          const w = (window as unknown as { $w?: WebSquareAPI }).$w;
           if (w) {
             // 일반내용 패널 열기 시도
-            const detailPanel = w.getComponentById('mf_ssgoTopMainTab_contents_content1_body_wfSsgoDetail');
+            const detailPanel = w.getComponentById?.('mf_ssgoTopMainTab_contents_content1_body_wfSsgoDetail');
             if (detailPanel && typeof detailPanel.show === 'function') {
               detailPanel.show();
             }

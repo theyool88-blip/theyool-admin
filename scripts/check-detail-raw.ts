@@ -51,13 +51,13 @@ async function main() {
     console.log('\n✅ 일반내용 조회 성공!');
 
     // raw 응답의 모든 필드 출력
-    const raw = result.data.raw?.data;
+    const raw = result.data.raw?.data as Record<string, unknown> | undefined;
     if (raw) {
       console.log('\n=== raw.data의 모든 키 ===');
       console.log(Object.keys(raw).join(', '));
 
       // dma_csBasCtt (기본정보)
-      const basicInfo = raw.dma_csBasCtt || raw.dma_csBsCtt || raw.dma_gnrlCtt;
+      const basicInfo = (raw.dma_csBasCtt || raw.dma_csBsCtt || raw.dma_gnrlCtt) as Record<string, unknown> | undefined;
       if (basicInfo) {
         console.log('\n=== 기본정보 (dma_csBasCtt) 모든 필드 ===');
         Object.entries(basicInfo).forEach(([k, v]) => {

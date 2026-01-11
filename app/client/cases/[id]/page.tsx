@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { getCourtAbbrev } from '@/lib/scourt/court-codes';
 
 interface CaseDetail {
   id: string;
@@ -60,6 +61,7 @@ export default function CaseDetailPage() {
     if (session?.user?.id && caseId) {
       fetchCaseDetail();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, caseId]);
 
   async function fetchCaseDetail() {
@@ -182,7 +184,7 @@ export default function CaseDetailPage() {
                 </div>
                 <div className="flex">
                   <span className="w-20 text-gray-500">관할법원</span>
-                  <span className="text-gray-900">{caseDetail.court_name || '-'}</span>
+                  <span className="text-gray-900">{getCourtAbbrev(caseDetail.court_name || '') || '-'}</span>
                 </div>
                 <div className="flex">
                   <span className="w-20 text-gray-500">상대방</span>
@@ -223,7 +225,7 @@ export default function CaseDetailPage() {
                       <p className="text-sm font-medium text-gray-900">
                         {hearing.hearing_date} {hearing.hearing_time}
                       </p>
-                      <p className="text-xs text-gray-500">{hearing.court_name}</p>
+                      <p className="text-xs text-gray-500">{getCourtAbbrev(hearing.court_name)}</p>
                     </div>
                     {hearing.hearing_result && (
                       <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700">

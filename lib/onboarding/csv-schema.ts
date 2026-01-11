@@ -3,7 +3,7 @@
  * 대량 사건 등록을 위한 필수/선택 필드 및 유효성 검사 규칙
  */
 
-import type { StandardCaseRow, ClientRole, ValidationResult, ImportError, ImportWarning } from '@/types/onboarding'
+import type { StandardCaseRow, ClientRole, ImportError, ImportWarning } from '@/types/onboarding'
 import { KOREAN_ROLE_MAP, KOREAN_COLUMN_ALIASES } from '@/types/onboarding'
 import { getCaseTypeAuto } from '@/lib/constants/case-types'
 
@@ -231,7 +231,7 @@ export function normalizeRole(role: string): ClientRole | null {
 /**
  * 단일 행 유효성 검사
  */
-export function validateRow(row: Partial<StandardCaseRow>, rowIndex: number): ValidationResult {
+export function validateRow(row: Partial<StandardCaseRow>, _rowIndex: number): { isValid: boolean; errors: ImportError[]; warnings: ImportWarning[] } {
   const errors: ImportError[] = []
   const warnings: ImportWarning[] = []
 

@@ -158,8 +158,8 @@ export default function AdminConsultationsPage() {
         const data = await response.json();
         alert('상담 상태 업데이트에 실패했습니다: ' + (data.error || '알 수 없는 오류'));
       }
-    } catch (error) {
-      console.error('Error updating consultation:', error);
+    } catch (_error) {
+      console.error('Error updating consultation:', _error);
       alert('상담 상태 업데이트에 실패했습니다.');
     }
   };
@@ -177,8 +177,8 @@ export default function AdminConsultationsPage() {
         fetchStats();
         setShowDetailModal(false);
       }
-    } catch (error) {
-      console.error('Error deleting consultation:', error);
+    } catch (_error) {
+      console.error('Error deleting consultation:', _error);
       alert('상담 삭제에 실패했습니다.');
     }
   };
@@ -236,7 +236,7 @@ export default function AdminConsultationsPage() {
       c.phone,
       c.email || '',
       c.category || '',
-      (c as any).source || '',
+      c.source || '',
       statusLabels[c.status] || c.status,
       (c.message || '').replace(/"/g, '""')
     ]);
@@ -263,8 +263,8 @@ export default function AdminConsultationsPage() {
       if (response.ok) {
         await fetchConsultations();
       }
-    } catch (error) {
-      console.error('Error updating source:', error);
+    } catch (_error) {
+      console.error('Error updating source:', _error);
       alert('유입 경로 업데이트에 실패했습니다.');
     }
   };
@@ -276,14 +276,6 @@ export default function AdminConsultationsPage() {
       </div>
     );
   }
-
-  const statusLabels: Record<string, string> = {
-    pending: '대기',
-    contacted: '연락완료',
-    confirmed: '확정',
-    completed: '완료',
-    cancelled: '취소'
-  };
 
   const requestTypeLabels: Record<string, string> = {
     callback: '전화',
@@ -473,8 +465,8 @@ export default function AdminConsultationsPage() {
                           >
                             {consultation.phone}
                           </span>
-                          {(consultation as any).source && (
-                            <span className="text-xs text-gray-400">{(consultation as any).source}</span>
+                          {consultation.source && (
+                            <span className="text-xs text-gray-400">{consultation.source}</span>
                           )}
                         </div>
                       </div>
@@ -591,7 +583,7 @@ export default function AdminConsultationsPage() {
               <div>
                 <span className="text-sm text-gray-500 block mb-1">유입 경로</span>
                 <select
-                  value={(selectedConsultation as any).source || ''}
+                  value={selectedConsultation.source || ''}
                   onChange={(e) => updateConsultationSource(selectedConsultation.id, e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-200 rounded bg-white"
                 >

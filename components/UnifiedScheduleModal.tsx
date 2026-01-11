@@ -215,7 +215,17 @@ export default function UnifiedScheduleModal({
       const res = await fetch(url)
       const json = await res.json()
       if (json.error) throw new Error(json.error)
-      const mapped = (json.data || []).map((item: any) => ({
+      interface SearchResultItem {
+        id: string;
+        case_name?: string;
+        name?: string;
+        office?: string;
+        office_location?: string;
+        court_case_number?: string;
+        contract_number?: string;
+        phone?: string;
+      }
+      const mapped = (json.data || []).map((item: SearchResultItem) => ({
         id: item.id,
         name: paymentForm.linkage === 'case' ? item.case_name : item.name,
         office: paymentForm.linkage === 'case' ? item.office : item.office_location,
@@ -416,7 +426,13 @@ export default function UnifiedScheduleModal({
         const res = await fetch(`/api/admin/cases/search?q=${encodeURIComponent(searchTerm.trim())}`)
         const json = await res.json()
         if (json.error) throw new Error(json.error)
-        const options = (json.data || []).map((c: any) => ({
+        interface CaseSearchResult {
+          id: string;
+          court_case_number?: string;
+          contract_number?: string;
+          case_name?: string;
+        }
+        const options = (json.data || []).map((c: CaseSearchResult) => ({
           id: c.id,
           case_number: c.court_case_number || c.contract_number || '',
           case_name: c.case_name || '',

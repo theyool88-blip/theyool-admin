@@ -32,6 +32,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
 
   useEffect(() => {
     fetchEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
 
   async function fetchEvents() {
@@ -91,7 +92,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
           const daysRemaining = Math.ceil(
             (new Date(h.hearing_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          const legalCase = h.legal_cases as any;
+          const legalCase = h.legal_cases as { court_case_number?: string; case_name?: string; client?: { name?: string }; opponent_name?: string } | null;
           allEvents.push({
             id: h.id,
             type: 'hearing',
@@ -103,7 +104,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
             caseName: legalCase?.case_name,
             clientName: legalCase?.client?.name,
             opponentName: legalCase?.opponent_name,
-            attendingLawyerName: (h.attending_lawyer as any)?.display_name,
+            attendingLawyerName: (h.attending_lawyer as { display_name?: string } | null)?.display_name,
             daysRemaining,
             location: h.location,
           });
@@ -116,7 +117,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
           const daysRemaining = Math.ceil(
             (new Date(d.deadline_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          const legalCase = d.legal_cases as any;
+          const legalCase = d.legal_cases as { court_case_number?: string; case_name?: string; client?: { name?: string }; opponent_name?: string } | null;
           allEvents.push({
             id: d.id,
             type: 'deadline',

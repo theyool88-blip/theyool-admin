@@ -12,7 +12,6 @@ import type {
   SendResult,
   RecipientType,
   RelatedType,
-  RenderedMessage,
 } from '@/types/notification';
 
 /**

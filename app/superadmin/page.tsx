@@ -143,6 +143,12 @@ export default function SuperAdminDashboard() {
               >
                 테넌트 관리
               </Link>
+              <Link
+                href="/superadmin/scourt"
+                className="text-sm text-gray-600 hover:text-gray-900"
+              >
+                SCOURT 관리
+              </Link>
               <button
                 onClick={fetchStats}
                 className="p-2 hover:bg-gray-100 rounded"

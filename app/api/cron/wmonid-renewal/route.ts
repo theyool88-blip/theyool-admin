@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getWmonidManager } from '@/lib/scourt/wmonid-manager';
 import { getCaseMigrator } from '@/lib/scourt/case-migrator';
+import { getScourtSyncSettings } from '@/lib/scourt/sync-settings';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -35,11 +36,22 @@ export async function GET(request: NextRequest) {
   try {
     console.log('[WMONID Renewal] 시작...');
 
+    const settings = await getScourtSyncSettings();
+    if (!settings.wmonid.autoRotateEnabled) {
+      return NextResponse.json({
+        success: true,
+        message: 'WMONID auto-rotate disabled',
+        renewedCount: 0,
+        migratedCases: 0,
+        durationMs: Date.now() - startTime,
+      });
+    }
+
     const wmonidManager = getWmonidManager();
-    const migrator = getCaseMigrator();
+    const _migrator = getCaseMigrator();
 
     // 2. 만료 임박 WMONID 조회
-    const expiringWmonids = await wmonidManager.getExpiringWmonids();
+    const expiringWmonids = await wmonidManager.getExpiringWmonids(settings.wmonid.renewalBeforeDays);
 
     if (expiringWmonids.length === 0) {
       console.log('[WMONID Renewal] 갱신 대상 없음');

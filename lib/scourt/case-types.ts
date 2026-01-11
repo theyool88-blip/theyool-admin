@@ -657,6 +657,15 @@ export const CASE_TYPES: CaseTypeInfo[] = [
     partyLabels: { plaintiff: '채권자', defendant: '채무자' }
   },
   {
+    code: '타경',
+    name: '타경',
+    fullName: '부동산강제경매',
+    category: 'execution',
+    level: '신청',
+    description: '부동산 강제경매',
+    partyLabels: { plaintiff: '채권자', defendant: '채무자' }
+  },
+  {
     code: '타인',
     name: '타인',
     fullName: '인도명령',
@@ -2392,7 +2401,6 @@ export function getRelatedCaseTypes(caseTypeCode: string): string[] {
  * 사건유형 검색
  */
 export function searchCaseTypes(query: string): CaseTypeInfo[] {
-  const lowerQuery = query.toLowerCase();
   return CASE_TYPES.filter(
     ct =>
       ct.code.includes(query) ||

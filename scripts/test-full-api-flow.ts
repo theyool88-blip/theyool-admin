@@ -45,7 +45,8 @@ async function testFullFlow() {
     console.log(`  암호화된 사건번호: ${result.searchResult.encCsNo?.substring(0, 30)}...`);
 
     // 검색 결과 데이터
-    const csList = result.searchResult.data?.data?.dlt_csNoHistLst;
+    const innerData = result.searchResult.data?.data as Record<string, unknown> | undefined;
+    const csList = innerData?.dlt_csNoHistLst as unknown[] | undefined;
     if (csList && csList.length > 0) {
       console.log(`  검색된 사건 수: ${csList.length}`);
     }

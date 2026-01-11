@@ -19,6 +19,8 @@ interface CaseToMigrate {
   court_name: string;
   enc_cs_no: string;
   profile_id: string;
+  legal_case_id?: string | null;
+  tenant_id?: string | null;
 }
 
 interface MigrationResult {
@@ -195,7 +197,7 @@ export class CaseMigrator {
     // 기존 WMONID에 연결된 사건들 조회
     const { data: cases, error: queryError } = await this.supabase
       .from('scourt_profile_cases')
-      .select('id, case_number, court_code, court_name, enc_cs_no, profile_id')
+      .select('id, case_number, court_code, court_name, enc_cs_no, profile_id, legal_case_id, tenant_id')
       .eq('user_wmonid_id', oldWmonidId);
 
     if (queryError) {
@@ -289,12 +291,36 @@ export class CaseMigrator {
   /**
    * 사건별 당사자명 조회 (legal_cases 테이블에서)
    */
-  async getPartyNameForCase(caseNumber: string): Promise<string | null> {
+  async getPartyNameForLegalCase(params: {
+    legalCaseId?: string | null;
+    caseNumber?: string | null;
+    tenantId?: string | null;
+  }): Promise<string | null> {
+    const { legalCaseId, caseNumber, tenantId } = params;
+
+    if (legalCaseId) {
+      const { data, error } = await this.supabase
+        .from('legal_cases')
+        .select('client_name, opponent_name')
+        .eq('id', legalCaseId)
+        .maybeSingle();
+
+      if (!error && data) {
+        // 의뢰인명 또는 상대방명 반환
+        return data.client_name || data.opponent_name || null;
+      }
+    }
+
+    if (!caseNumber || !tenantId) {
+      return null;
+    }
+
     const { data, error } = await this.supabase
       .from('legal_cases')
       .select('client_name, opponent_name')
+      .eq('tenant_id', tenantId)
       .eq('court_case_number', caseNumber)
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
       return null;
@@ -312,13 +338,17 @@ export class CaseMigrator {
     newWmonid: string
   ): Promise<MigrationResult> {
     // 당사자명 조회
-    const partyName = await this.getPartyNameForCase(caseItem.case_number);
+    const partyName = await this.getPartyNameForLegalCase({
+      legalCaseId: caseItem.legal_case_id,
+      caseNumber: caseItem.case_number,
+      tenantId: caseItem.tenant_id,
+    });
 
     if (!partyName) {
       return {
         caseNumber: caseItem.case_number,
         success: false,
-        error: '당사자명 조회 실패 - legal_cases에 등록된 사건이 아닙니다',
+        error: '당사자명 조회 실패 - 사건을 찾을 수 없습니다',
       };
     }
 
@@ -330,7 +360,7 @@ export class CaseMigrator {
    *
    * @param maxConcurrent - 동시 처리 WMONID 수 (기본 1)
    */
-  async migrateExpiringWmonids(maxConcurrent: number = 1): Promise<{
+  async migrateExpiringWmonids(_maxConcurrent: number = 1): Promise<{
     wmonidCount: number;
     totalMigrated: number;
     totalFailed: number;
@@ -381,13 +411,17 @@ export class CaseMigrator {
       // 대표 당사자명 조회 (첫 번째 사건에서)
       const { data: firstCase } = await this.supabase
         .from('scourt_profile_cases')
-        .select('case_number')
+        .select('case_number, legal_case_id, tenant_id')
         .eq('user_wmonid_id', wmonid.id)
         .limit(1)
         .single();
 
       const partyName = firstCase
-        ? await this.getPartyNameForCase(firstCase.case_number)
+        ? await this.getPartyNameForLegalCase({
+            legalCaseId: firstCase.legal_case_id,
+            caseNumber: firstCase.case_number,
+            tenantId: firstCase.tenant_id,
+          })
         : null;
 
       if (!partyName) {
@@ -439,11 +473,11 @@ export class CaseMigrator {
 }
 
 // 싱글톤 인스턴스
-let migrator: CaseMigrator | null = null;
+let _migratorInstance: CaseMigrator | null = null;
 
 export function getCaseMigrator(): CaseMigrator {
-  if (!migrator) {
-    migrator = new CaseMigrator();
+  if (!_migratorInstance) {
+    _migratorInstance = new CaseMigrator();
   }
-  return migrator;
+  return _migratorInstance;
 }

@@ -25,6 +25,7 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
 
   useEffect(() => {
     fetchAlerts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
 
   async function fetchAlerts() {

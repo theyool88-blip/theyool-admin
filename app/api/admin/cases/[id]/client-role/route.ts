@@ -61,7 +61,7 @@ export async function PATCH(
 
     const { id } = await params
     const body = await request.json()
-    const { client_role, status = 'confirmed' } = body
+    const { client_role, status = 'confirmed', opponent_name } = body
 
     // Validation
     if (!client_role || !['plaintiff', 'defendant'].includes(client_role)) {
@@ -81,13 +81,19 @@ export async function PATCH(
     const adminClient = createAdminClient()
 
     // 1. legal_cases 업데이트
+    const updatePayload: Record<string, unknown> = {
+      client_role,
+      client_role_status: status,
+      updated_at: new Date().toISOString(),
+    }
+    // opponent_name이 제공된 경우에만 업데이트
+    if (opponent_name !== undefined) {
+      updatePayload.opponent_name = opponent_name
+    }
+
     const { data, error } = await adminClient
       .from('legal_cases')
-      .update({
-        client_role,
-        client_role_status: status,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select('id, client_role, client_role_status, client_id, opponent_name')
       .single()

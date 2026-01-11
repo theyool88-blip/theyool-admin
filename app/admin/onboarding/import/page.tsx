@@ -182,15 +182,14 @@ export default function OnboardingImportPage() {
       const decoder = new TextDecoder()
       let buffer = ''
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
+      // SSE 이벤트 처리 함수
+      const processBuffer = (text: string, isFinal: boolean = false) => {
+        buffer += text
 
         // SSE 이벤트 파싱
         const lines = buffer.split('\n')
-        buffer = lines.pop() || ''
+        // 마지막이 아니면 불완전한 라인 보존
+        buffer = isFinal ? '' : (lines.pop() || '')
 
         let eventType = ''
         let eventData = ''
@@ -248,6 +247,18 @@ export default function OnboardingImportPage() {
             eventData = ''
           }
         }
+      }
+
+      while (true) {
+        const { done, value } = await reader.read()
+
+        if (done) {
+          // 스트림 종료 시 남은 버퍼 처리 (complete 이벤트 포함)
+          processBuffer(decoder.decode(), true)
+          break
+        }
+
+        processBuffer(decoder.decode(value, { stream: true }))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : '가져오기 중 오류가 발생했습니다')

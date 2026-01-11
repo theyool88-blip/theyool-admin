@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminHeader from './AdminHeader'
 import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
-import { getCaseTypeAuto } from '@/lib/constants/case-types'
+import { getCaseTypeAuto, isCriminalCase } from '@/lib/constants/case-types'
 
 interface Client {
   id: string
@@ -900,7 +900,9 @@ export default function NewCaseForm({
               <SectionHeader
                 number={2}
                 title="당사자 정보"
-                subtitle="의뢰인과 상대방 정보를 입력하세요"
+                subtitle={isCriminalCase(formData.case_type || formData.case_label, formData.court_case_number)
+                  ? "의뢰인(피고인) 정보를 입력하세요"
+                  : "의뢰인과 상대방 정보를 입력하세요"}
               />
             </div>
 
@@ -1093,19 +1095,20 @@ export default function NewCaseForm({
                 </FormField>
               )}
 
-              {/* 상대방 정보 */}
-              <div className="pt-4 border-t border-sage-100">
-                <FormField label="상대방 이름" hint="분쟁 상대방이 있는 경우에만 입력하세요">
-                  <input
-                    type="text"
-                    value={formData.opponent_name}
-                    onChange={(e) => setFormData({ ...formData, opponent_name: e.target.value })}
-                    className={inputClassName}
-                    placeholder="상대방 이름 (선택)"
-                  />
-                </FormField>
-
-              </div>
+              {/* 상대방 정보 - 형사사건에서는 표시하지 않음 */}
+              {!isCriminalCase(formData.case_type || formData.case_label, formData.court_case_number) && (
+                <div className="pt-4 border-t border-sage-100">
+                  <FormField label="상대방 이름" hint="분쟁 상대방이 있는 경우에만 입력하세요">
+                    <input
+                      type="text"
+                      value={formData.opponent_name}
+                      onChange={(e) => setFormData({ ...formData, opponent_name: e.target.value })}
+                      className={inputClassName}
+                      placeholder="상대방 이름 (선택)"
+                    />
+                  </FormField>
+                </div>
+              )}
             </div>
           </div>
 

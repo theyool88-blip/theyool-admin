@@ -5,14 +5,14 @@
  * Puppeteer를 사용해 브라우저에서 데이터를 추출합니다.
  */
 
-import puppeteer, { Browser, Page, Frame } from 'puppeteer';
+import puppeteer, { Browser, Page } from 'puppeteer';
 import * as path from 'path';
 
 export interface ProgressItem {
   date: string;      // 날짜 (YYYYMMDD 또는 YYYY.MM.DD)
   content: string;   // 진행 내용
   result: string;    // 결과/도달
-  notice: string;    // 고지
+  notice?: string;   // 고지
 }
 
 export interface BasicInfo {
@@ -141,7 +141,7 @@ export async function scrapeProgress(caseNumber: string): Promise<ProgressResult
       const result: Record<string, string> = {};
 
       // WebSquare5 그리드 API로 일반내용 데이터 추출
-      const w = (window as any).$w;
+      const w = (window as unknown as { $w?: { getComponentById?: (id: string) => { getValue?: () => Record<string, unknown> } } }).$w;
 
       // 방법 1: 입력 필드에서 직접 추출 (일반내용 탭의 각 필드)
       const fieldMappings: Record<string, string> = {
@@ -176,13 +176,13 @@ export async function scrapeProgress(caseNumber: string): Promise<ProgressResult
         const gnrlCtt = w.getComponentById(gnrlCttId);
         if (gnrlCtt && gnrlCtt.getValue) {
           const data = gnrlCtt.getValue();
-          if (data.jdgpNm) result['재판부'] = data.jdgpNm;
-          if (data.rcptYmd) result['접수일'] = data.rcptYmd;
-          if (data.endRsltNm) result['종국결과'] = data.endRsltNm;
-          if (data.cfrmYmd) result['확정일'] = data.cfrmYmd;
-          if (data.injiAek) result['인지액'] = data.injiAek;
-          if (data.aplYmd) result['상소일'] = data.aplYmd;
-          if (data.jdgArvYmd) result['판결도달일'] = data.jdgArvYmd;
+          if (data.jdgpNm) result['재판부'] = String(data.jdgpNm);
+          if (data.rcptYmd) result['접수일'] = String(data.rcptYmd);
+          if (data.endRsltNm) result['종국결과'] = String(data.endRsltNm);
+          if (data.cfrmYmd) result['확정일'] = String(data.cfrmYmd);
+          if (data.injiAek) result['인지액'] = String(data.injiAek);
+          if (data.aplYmd) result['상소일'] = String(data.aplYmd);
+          if (data.jdgArvYmd) result['판결도달일'] = String(data.jdgArvYmd);
         }
       }
 
@@ -238,12 +238,15 @@ export async function scrapeProgress(caseNumber: string): Promise<ProgressResult
 
     await new Promise(r => setTimeout(r, 5000));
 
+    interface ProgressItem { date: string; content: string; result: string; notice?: string; deliveryInfo?: string; recipientRelation?: string; }
     // WebSquare5 그리드 API를 사용하여 진행내용 데이터 추출
     const progressData = await page.evaluate(() => {
       const gridId = 'mf_ssgoTopMainTab_contents_content1_body_wfSsgoDetail_ssgoCsDetailTab_contents_ssgoTab2_body_grd_csProgLst';
 
       // WebSquare5 API 사용
-      const w = (window as any).$w;
+      interface WebSquareGrid { getAllJSON?: () => Record<string, string>[]; }
+      interface WebSquareAPI { getComponentById?: (id: string) => WebSquareGrid | null; }
+      const w = (window as unknown as { $w?: WebSquareAPI }).$w;
       if (w && w.getComponentById) {
         const grid = w.getComponentById(gridId);
         if (grid && grid.getAllJSON) {
@@ -251,7 +254,7 @@ export async function scrapeProgress(caseNumber: string): Promise<ProgressResult
           return {
             found: true,
             source: 'websquare5',
-            data: allData.map((item: any) => ({
+            data: allData.map((item) => ({
               date: item.progYmd || '',        // YYYYMMDD 형식
               content: item.progCtt || '',     // 진행내용
               result: (item.progRslt || '').trim(),  // 결과
@@ -283,17 +286,17 @@ export async function scrapeProgress(caseNumber: string): Promise<ProgressResult
               result: cells[2]?.textContent?.trim() || '',
               notice: cells[3]?.textContent?.trim() || '',
             };
-          }).filter((item: any) => item.content)
+          }).filter((item) => item.content)
         };
       }
 
-      return { found: false, source: 'none', data: [] };
+      return { found: false, source: 'none', data: [] as { date: string; content: string; result: string; notice?: string; }[] };
     });
 
     console.log('진행내용 추출 결과:', { found: progressData.found, source: progressData.source, count: progressData.data?.length });
 
     // 데이터 추출
-    const normalizedProgress = (progressData.data || []).filter((p: any) => p.content);
+    const normalizedProgress = (progressData.data || []).filter((p: ProgressItem) => p.content);
 
     return {
       success: true,

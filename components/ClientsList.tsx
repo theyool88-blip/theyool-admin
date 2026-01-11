@@ -28,7 +28,7 @@ interface Profile {
   role: string
 }
 
-export default function ClientsList({ profile, initialClients }: { profile: Profile, initialClients: Client[] }) {
+export default function ClientsList({ profile: _profile, initialClients }: { profile: Profile, initialClients: Client[] }) {
   const [clients] = useState<Client[]>(initialClients)
   const [searchTerm, setSearchTerm] = useState('')
   const [currentPage, setCurrentPage] = useState(1)

@@ -4,9 +4,13 @@ import { useMemo, useState } from 'react'
 import type { CaseNotice } from '@/types/case-notice'
 import { NOTICE_CATEGORY_ICONS, NOTICE_CATEGORY_LABELS } from '@/types/case-notice'
 
+interface ActionMetadata {
+  opponentName?: string
+}
+
 interface CaseNoticeSectionProps {
   notices: CaseNotice[]
-  onAction?: (notice: CaseNotice, actionType: string) => void
+  onAction?: (notice: CaseNotice, actionType: string, metadata?: ActionMetadata) => void
   onDismiss?: (notice: CaseNotice) => Promise<void>
 }
 
@@ -55,14 +59,18 @@ export default function CaseNoticeSection({ notices, onAction, onDismiss }: Case
 
 interface NoticeItemProps {
   notice: CaseNotice
-  onAction?: (notice: CaseNotice, actionType: string) => void
+  onAction?: (notice: CaseNotice, actionType: string, metadata?: ActionMetadata) => void
   onDismiss?: (notice: CaseNotice) => Promise<void>
 }
 
 function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
   const [isDismissing, setIsDismissing] = useState(false)
+  const [opponentNameInput, setOpponentNameInput] = useState('')
   const icon = NOTICE_CATEGORY_ICONS[notice.category]
   const _categoryLabel = NOTICE_CATEGORY_LABELS[notice.category]
+
+  // 상대방 이름 미입력 여부
+  const opponentNameMissing = notice.category === 'client_role_confirm' && notice.metadata?.opponentNameMissing === 'true'
 
   const handleDismiss = async () => {
     if (!onDismiss || isDismissing) return
@@ -126,22 +134,45 @@ function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
 
           {/* 의뢰인 역할 확인 액션 버튼 */}
           {notice.category === 'client_role_confirm' && notice.actions && (
-            <div className="flex gap-2 mt-3 flex-wrap">
-              {notice.actions.map((action, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => onAction?.(notice, action.type)}
-                  className={`text-xs px-4 py-2 rounded-lg font-medium transition-colors ${
-                    action.type === 'confirm_plaintiff'
-                      ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
-                      : action.type === 'confirm_defendant'
-                      ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-100'
-                  }`}
-                >
-                  {action.label}
-                </button>
-              ))}
+            <div className="mt-3 space-y-3">
+              {/* 상대방 이름 입력 필드 (미입력 시) */}
+              {opponentNameMissing && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-gray-600 whitespace-nowrap">상대방:</label>
+                  <input
+                    type="text"
+                    value={opponentNameInput}
+                    onChange={(e) => setOpponentNameInput(e.target.value)}
+                    placeholder="상대방 이름을 입력해주세요"
+                    className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  />
+                </div>
+              )}
+              {/* 역할 확정 버튼 */}
+              <div className="flex gap-2 flex-wrap">
+                {notice.actions.map((action, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      const metadata: ActionMetadata = {}
+                      if (opponentNameMissing && opponentNameInput.trim()) {
+                        metadata.opponentName = opponentNameInput.trim()
+                      }
+                      onAction?.(notice, action.type, Object.keys(metadata).length > 0 ? metadata : undefined)
+                    }}
+                    disabled={opponentNameMissing && !opponentNameInput.trim()}
+                    className={`text-xs px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                      action.type === 'confirm_plaintiff'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                        : action.type === 'confirm_defendant'
+                        ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+                        : 'border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {action.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

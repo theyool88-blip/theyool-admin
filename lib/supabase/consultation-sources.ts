@@ -139,7 +139,14 @@ export async function updateConsultationSource(
       .neq('id', id);
   }
 
-  const updateData: any = {};
+  const updateData: Partial<{
+    name: string;
+    display_order: number;
+    color: string;
+    is_active: boolean;
+    is_default: boolean;
+    description: string | null;
+  }> = {};
   if (input.name !== undefined) updateData.name = input.name.trim();
   if (input.display_order !== undefined) updateData.display_order = input.display_order;
   if (input.color !== undefined) updateData.color = input.color;

@@ -103,13 +103,13 @@ async function main() {
         console.log(`  저장: ${fileName}`);
 
         // 필드 분석
-        const rawData = result.generalData.raw?.data || {};
+        const rawData = (result.generalData.raw?.data || {}) as Record<string, unknown>;
         const fields = Object.keys(rawData);
         console.log(`  필드 수: ${fields.length}`);
         console.log(`  필드 목록: ${fields.join(', ')}`);
 
         // 연관사건 확인
-        const relatedCases = rawData.dlt_reltCsLst || rawData.dlt_relatedCsLst || [];
+        const relatedCases = (rawData.dlt_reltCsLst || rawData.dlt_relatedCsLst || []) as unknown[];
         const hasRelatedCases = relatedCases.length > 0;
         console.log(`  연관사건: ${hasRelatedCases ? `${relatedCases.length}건` : '없음'}`);
 

@@ -61,20 +61,23 @@ export function transformHearings(apiHearings: unknown[]): TransformedHearing[] 
     return [];
   }
 
-  return apiHearings.map((h: any) => ({
-    // 변환된 필드
-    date: h.trmDt || h.date || '',
-    time: h.trmHm || h.time || '',
-    type: h.trmNm || h.type || '',
-    location: h.trmPntNm || h.location || '',
-    result: h.rslt || h.result || '',
-    // 원본 필드 유지 (하위 호환성)
-    trmDt: h.trmDt || h.date,
-    trmHm: h.trmHm || h.time,
-    trmNm: h.trmNm || h.type,
-    trmPntNm: h.trmPntNm || h.location,
-    rslt: h.rslt || h.result,
-  }));
+  return apiHearings.map((h) => {
+    const hearing = h as Record<string, unknown>;
+    return {
+      // 변환된 필드
+      date: (hearing.trmDt || hearing.date || '') as string,
+      time: (hearing.trmHm || hearing.time || '') as string,
+      type: (hearing.trmNm || hearing.type || '') as string,
+      location: (hearing.trmPntNm || hearing.location || '') as string,
+      result: (hearing.rslt || hearing.result || '') as string,
+      // 원본 필드 유지 (하위 호환성)
+      trmDt: (hearing.trmDt || hearing.date) as string | undefined,
+      trmHm: (hearing.trmHm || hearing.time) as string | undefined,
+      trmNm: (hearing.trmNm || hearing.type) as string | undefined,
+      trmPntNm: (hearing.trmPntNm || hearing.location) as string | undefined,
+      rslt: (hearing.rslt || hearing.result) as string | undefined,
+    };
+  });
 }
 
 /**
@@ -91,12 +94,15 @@ export function transformProgress(apiProgress: unknown[]): TransformedProgress[]
     return [];
   }
 
-  return apiProgress.map((p: any) => ({
-    date: p.prcdDt || p.date || '',
-    content: p.prcdNm || p.content || '',
-    result: p.prcdRslt || p.result || '',
-    progCttDvs: p.progCttDvs,
-  }));
+  return apiProgress.map((p) => {
+    const progress = p as Record<string, unknown>;
+    return {
+      date: (progress.prcdDt || progress.date || '') as string,
+      content: (progress.prcdNm || progress.content || '') as string,
+      result: (progress.prcdRslt || progress.result || '') as string,
+      progCttDvs: progress.progCttDvs as string | undefined,
+    };
+  });
 }
 
 /**
@@ -111,16 +117,16 @@ export function transformProgress(apiProgress: unknown[]): TransformedProgress[]
  * - rslt: 종국결과
  * - rsltDt: 종국일자
  */
-export function transformBasicInfo(apiInfo: Record<string, any>): TransformedBasicInfo {
+export function transformBasicInfo(apiInfo: Record<string, unknown>): TransformedBasicInfo {
   return {
-    caseNumber: apiInfo.csNo || '',
-    caseName: apiInfo.csNm || '',
-    courtName: apiInfo.cortNm || '',
-    plaintiffName: apiInfo.aplNm || '',
-    defendantName: apiInfo.rspNm || '',
-    judgeName: apiInfo.jdgNm || apiInfo.judge,
-    caseResult: apiInfo.rslt,
-    resultDate: apiInfo.rsltDt,
+    caseNumber: (apiInfo.csNo as string | undefined) || '',
+    caseName: (apiInfo.csNm as string | undefined) || '',
+    courtName: (apiInfo.cortNm as string | undefined) || '',
+    plaintiffName: (apiInfo.aplNm as string | undefined) || '',
+    defendantName: (apiInfo.rspNm as string | undefined) || '',
+    judgeName: (apiInfo.jdgNm as string | undefined) || (apiInfo.judge as string | undefined),
+    caseResult: apiInfo.rslt as string | undefined,
+    resultDate: apiInfo.rsltDt as string | undefined,
   };
 }
 

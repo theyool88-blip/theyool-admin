@@ -11,7 +11,7 @@ import { normalizeColumnName, convertToStandardRow } from './csv-schema'
 /**
  * 파일 형식 감지
  */
-export function detectFileFormat(content: string, filename: string): FileFormat {
+export function detectFileFormat(content: string, _filename: string): FileFormat {
   const lower = content.toLowerCase()
 
   // 케이스노트 형식 감지
@@ -187,7 +187,8 @@ export async function parseFile(
   // Excel 파일
   if (isExcel && content instanceof ArrayBuffer) {
     const { columns, rows } = parseExcelBuffer(content)
-    const format = detectFileFormat(
+    // 형식 감지 (현재 Excel은 표준 형식으로 간주)
+    const _format = detectFileFormat(
       rows.slice(0, 3).map(r => Object.values(r).join(',')).join('\n'),
       filename
     )

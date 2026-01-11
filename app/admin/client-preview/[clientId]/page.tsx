@@ -117,6 +117,7 @@ export default function ClientPortalPreview() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
   // 비밀번호 입력 처리

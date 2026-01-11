@@ -40,7 +40,7 @@ export default function ClientPaymentsModal({
       const seen = new Set<string>()
 
       // 1) client_id 기반 조회 결과
-      ;(byClientId || []).forEach((p: any) => {
+      ;(byClientId || []).forEach((p: Payment & { legal_cases?: { case_name?: string } | null }) => {
         if (!seen.has(p.id)) {
           seen.add(p.id)
           results.push({
@@ -67,7 +67,7 @@ export default function ClientPaymentsModal({
           .is('client_id', null)  // client_id가 없는 것만 (중복 방지)
           .order('payment_date', { ascending: false })
         if (caseErr) throw caseErr
-        ;(byCase || []).forEach((p: any) => {
+        ;(byCase || []).forEach((p: Payment & { legal_cases?: { case_name?: string } | null }) => {
           if (!seen.has(p.id)) {
             seen.add(p.id)
             results.push({

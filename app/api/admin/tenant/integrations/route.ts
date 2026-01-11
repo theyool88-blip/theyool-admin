@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/with-tenant';
 import {
   getTenantIntegrations,

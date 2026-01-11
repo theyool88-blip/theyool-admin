@@ -35,8 +35,8 @@ async function collectFields() {
       });
 
       if (result.success && result.generalData?.raw?.data) {
-        const data = result.generalData.raw.data;
-        const caseInfo = data.dma_csBasCtt || {};
+        const data = result.generalData.raw.data as Record<string, unknown>;
+        const caseInfo = (data.dma_csBasCtt || {}) as Record<string, unknown>;
 
         // 값이 있는 필드만 출력
         const fields = Object.keys(caseInfo).sort();

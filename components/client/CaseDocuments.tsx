@@ -46,7 +46,7 @@ export default function CaseDocuments({ caseId }: CaseDocumentsProps) {
   const [selectedFile, setSelectedFile] = useState<ClientFile | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [previewType, setPreviewType] = useState<'pdf' | 'image' | 'unsupported'>('unsupported')
+  const [_previewType, setPreviewType] = useState<'pdf' | 'image' | 'unsupported'>('unsupported')
   const [expandedCategories, setExpandedCategories] = useState<Set<ClientDocType>>(new Set())
 
   // 카테고리 토글

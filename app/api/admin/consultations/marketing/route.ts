@@ -60,7 +60,18 @@ export async function GET(request: NextRequest) {
     let confirmed = 0;
     let completed = 0;
 
-    data.forEach((consultation: any) => {
+    interface MarketingConsultation {
+      id: string;
+      status: string;
+      request_type: string;
+      source: string | null;
+      utm_source: string | null;
+      utm_medium: string | null;
+      utm_campaign: string | null;
+      created_at: string;
+    }
+
+    data.forEach((consultation: MarketingConsultation) => {
       total++;
       const isConverted = consultation.status === 'completed' || consultation.status === 'contracted';
 

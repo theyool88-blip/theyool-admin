@@ -85,11 +85,11 @@ function formatAmount(value: number | string): string {
 }
 
 /** 값 포맷팅 (키 패턴에 따라) */
-function formatValue(key: string, value: any): string {
+function formatValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '';
   if (isDateField(key)) return formatDate(String(value));
   if (isTimeField(key)) return formatTime(String(value));
-  if (isAmountField(key)) return formatAmount(value);
+  if (isAmountField(key)) return formatAmount(value as string | number);
   return String(value).trim();
 }
 
@@ -110,21 +110,21 @@ export interface BasicInfoItem {
  * 2. rprs*Nm → 해당 라벨과 매칭
  * 3. 나머지 *Nm, *Ctt, *Amt, *Ymd → 필드명 기반 표시
  */
-export function parseBasicInfo(dmaData: Record<string, any>): BasicInfoItem[] {
+export function parseBasicInfo(dmaData: Record<string, unknown>): BasicInfoItem[] {
   if (!dmaData || typeof dmaData !== 'object') return [];
 
   const items: BasicInfoItem[] = [];
   const processed = new Set<string>();
 
   // 1. 당사자 정보 (라벨 필드와 값 필드 매칭)
-  const plaintiffLabel = dmaData.titRprsPtnr || '원고';
-  const defendantLabel = dmaData.titRprsRqstr || '피고';
+  const plaintiffLabel = (dmaData.titRprsPtnr as string) || '원고';
+  const defendantLabel = (dmaData.titRprsRqstr as string) || '피고';
 
   // 원고측 이름 찾기
   const plaintiffNameFields = ['rprsClmntNm', 'rprsPtnrNm', 'rprsAplcntNm', 'rprsGrnshNm'];
   for (const field of plaintiffNameFields) {
     if (dmaData[field]) {
-      items.push({ label: plaintiffLabel, value: dmaData[field] });
+      items.push({ label: plaintiffLabel, value: String(dmaData[field]) });
       processed.add(field);
       break;
     }
@@ -134,7 +134,7 @@ export function parseBasicInfo(dmaData: Record<string, any>): BasicInfoItem[] {
   const defendantNameFields = ['rprsAcsdNm', 'rprsRqstrNm', 'rprsRspndnNm'];
   for (const field of defendantNameFields) {
     if (dmaData[field]) {
-      items.push({ label: defendantLabel, value: dmaData[field] });
+      items.push({ label: defendantLabel, value: String(dmaData[field]) });
       processed.add(field);
       break;
     }
@@ -167,7 +167,7 @@ export function parseBasicInfo(dmaData: Record<string, any>): BasicInfoItem[] {
  */
 function extractSimpleLabel(key: string): string {
   // suffix 제거
-  let label = key
+  const label = key
     .replace(/Nm$/, '')
     .replace(/Ctt$/, '')
     .replace(/Ymd$/, '')
@@ -199,7 +199,7 @@ export interface TableRow {
  * 2. 나머지 *Nm, *Ctt → 값
  * 3. *Cd, *Yn 등은 숨김
  */
-export function parseTable(tableKey: string, tableData: any[]): TableData | null {
+export function parseTable(tableKey: string, tableData: Record<string, unknown>[]): TableData | null {
   if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
     return null;
   }
@@ -213,7 +213,7 @@ export function parseTable(tableKey: string, tableData: any[]): TableData | null
       k.endsWith('StndngNm') || k.endsWith('DvsNm') || k.endsWith('RltnCtt')
     );
     if (labelKeys.length > 0) {
-      label = rowData[labelKeys[0]] || '';
+      label = String(rowData[labelKeys[0]] || '');
     }
 
     // 값들 수집 (*Nm, *Ctt 중 라벨이 아닌 것)
@@ -248,7 +248,7 @@ export interface ParsedScourtData {
 /**
  * SCOURT API 응답 전체 파싱
  */
-export function parseScourtResponse(rawData: Record<string, any>): ParsedScourtData {
+export function parseScourtResponse(rawData: Record<string, unknown>): ParsedScourtData {
   const result: ParsedScourtData = {
     basicInfo: [],
     tables: [],
@@ -256,13 +256,13 @@ export function parseScourtResponse(rawData: Record<string, any>): ParsedScourtD
 
   // 기본정보 파싱
   if (rawData.dma_csBasCtt) {
-    result.basicInfo = parseBasicInfo(rawData.dma_csBasCtt);
+    result.basicInfo = parseBasicInfo(rawData.dma_csBasCtt as Record<string, unknown>);
   }
 
   // 테이블 파싱 (dlt_* 키들)
   for (const [key, value] of Object.entries(rawData)) {
     if (key.startsWith('dlt_') && Array.isArray(value)) {
-      const table = parseTable(key, value);
+      const table = parseTable(key, value as Record<string, unknown>[]);
       if (table) {
         result.tables.push(table);
       }
@@ -275,22 +275,32 @@ export function parseScourtResponse(rawData: Record<string, any>): ParsedScourtD
 /**
  * 저장된 snapshot에서 raw API 데이터 추출
  */
-export function extractRawData(snapshotData: any): Record<string, any> | null {
+export function extractRawData(snapshotData: Record<string, unknown>): Record<string, unknown> | null {
   // 여러 가능한 경로 시도
-  if (snapshotData?.basicInfo?.generalData?.raw?.data) {
-    return snapshotData.basicInfo.generalData.raw.data;
+  const basicInfo = snapshotData?.basicInfo as Record<string, unknown> | undefined;
+  const generalDataFromBasic = basicInfo?.generalData as Record<string, unknown> | undefined;
+  const rawFromGeneralBasic = generalDataFromBasic?.raw as Record<string, unknown> | undefined;
+  if (rawFromGeneralBasic?.data) {
+    return rawFromGeneralBasic.data as Record<string, unknown>;
   }
-  if (snapshotData?.basicInfo?.detailData?.raw?.data) {
-    return snapshotData.basicInfo.detailData.raw.data;
+  const detailDataFromBasic = basicInfo?.detailData as Record<string, unknown> | undefined;
+  const rawFromDetailBasic = detailDataFromBasic?.raw as Record<string, unknown> | undefined;
+  if (rawFromDetailBasic?.data) {
+    return rawFromDetailBasic.data as Record<string, unknown>;
   }
-  if (snapshotData?.generalData?.raw?.data) {
-    return snapshotData.generalData.raw.data;
+  const generalData = snapshotData?.generalData as Record<string, unknown> | undefined;
+  const rawFromGeneral = generalData?.raw as Record<string, unknown> | undefined;
+  if (rawFromGeneral?.data) {
+    return rawFromGeneral.data as Record<string, unknown>;
   }
-  if (snapshotData?.detailData?.raw?.data) {
-    return snapshotData.detailData.raw.data;
+  const detailData = snapshotData?.detailData as Record<string, unknown> | undefined;
+  const rawFromDetail = detailData?.raw as Record<string, unknown> | undefined;
+  if (rawFromDetail?.data) {
+    return rawFromDetail.data as Record<string, unknown>;
   }
-  if (snapshotData?.raw?.data) {
-    return snapshotData.raw.data;
+  const rawDirect = snapshotData?.raw as Record<string, unknown> | undefined;
+  if (rawDirect?.data) {
+    return rawDirect.data as Record<string, unknown>;
   }
   // dma_csBasCtt가 직접 있으면 그것 사용
   if (snapshotData?.dma_csBasCtt) {

@@ -41,13 +41,18 @@ client_role_status VARCHAR(20) DEFAULT 'provisional'
 사건 등록 폼 제출
     ↓
 client_role = body.client_role ?? 'plaintiff'
-client_role_status = body.client_role ? 'confirmed' : 'provisional'
+    ↓
+의뢰인-상대방 성씨 비교
+    ↓
+client_role_status = 성씨가 같으면 'provisional', 다르면 'confirmed'
     ↓
 DB 저장
 ```
 
 - 사용자가 명시적으로 `client_role`을 지정한 경우: `confirmed`
-- 지정하지 않은 경우: `plaintiff` + `provisional` (기본값)
+- 원본 사건에서 `client_role`이 복사된 경우: `confirmed`
+- 의뢰인과 상대방 성씨가 **같은** 경우: `provisional` (역할 확인 필요)
+- 의뢰인과 상대방 성씨가 **다른** 경우: `confirmed` (자동 확정)
 
 ### 2. 알림탭 표시
 
@@ -134,10 +139,14 @@ type NoticeCategory =
 
 - **아이콘**: 👤
 - **제목**: "의뢰인 역할 확인 필요"
-- **설명**: "현재 {의뢰인명}님이 '원고측'으로 임시 지정되어 있습니다."
+- **설명**:
+  - 상대방 이름이 있는 경우: "현재 {의뢰인명}님이 '원고측'으로 임시 지정되어 있습니다. (상대방: {상대방명})"
+  - 상대방 이름이 없는 경우: "현재 {의뢰인명}님이 '원고측'으로 임시 지정되어 있습니다. 상대방 이름을 입력하고 역할을 확정해주세요."
+- **상대방 이름 입력**: 상대방 이름이 미입력된 경우 입력 필드 표시
 - **액션 버튼**:
   - "원고측 확정" (파란색)
   - "피고측으로 변경" (주황색)
+  - 상대방 이름 미입력 시 버튼 비활성화 (입력 필수)
 
 ## 관련 파일
 

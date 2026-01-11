@@ -8,10 +8,12 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withTenant } from '@/lib/api/with-tenant';
 import { getScourtApiClient } from '@/lib/scourt/api-client';
-import { parseCasenoteCSV, type ParsedCaseFromCSV } from '@/lib/scourt/csv-parser';
+import { parseCasenoteCSV } from '@/lib/scourt/csv-parser';
 import { createClient } from '@/lib/supabase/server';
 import { saveEncCsNoToCase } from '@/lib/scourt/case-storage';
+import { getCourtFullName } from '@/lib/scourt/court-codes';
 
 interface BatchImportRequest {
   csvContent: string;  // CSV 파일 내용
@@ -42,15 +44,9 @@ interface BatchImportResponse {
   parseErrors: Array<{ caseNumber: string; error: string }>;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withTenant(async (request: NextRequest, { tenant }) => {
   try {
     const supabase = await createClient();
-
-    // 인증 확인
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return NextResponse.json({ error: '인증이 필요합니다' }, { status: 401 });
-    }
 
     const body: BatchImportRequest = await request.json();
     const { csvContent, options = {} } = body;
@@ -91,16 +87,22 @@ export async function POST(request: NextRequest) {
     for (let i = 0; i < validCases.length; i++) {
       const pc = validCases[i];
       const fullCaseNumber = `${pc.courtName}${pc.caseNumber}`;
+      const normalizedCourtName = pc.courtFullName || getCourtFullName(pc.courtName, pc.caseType);
 
       console.log(`\n[${i + 1}/${validCases.length}] ${fullCaseNumber} - ${pc.clientName}`);
 
       // 이미 등록된 사건 확인
       if (skipExisting) {
-        const { data: existingCase } = await supabase
+        let caseQuery = supabase
           .from('legal_cases')
           .select('id, enc_cs_no')
-          .eq('court_case_number', pc.caseNumber)
-          .maybeSingle();
+          .eq('court_case_number', pc.caseNumber);
+
+        if (!tenant.isSuperAdmin && tenant.tenantId) {
+          caseQuery = caseQuery.eq('tenant_id', tenant.tenantId);
+        }
+
+        const { data: existingCase } = await caseQuery.maybeSingle();
 
         if (existingCase?.enc_cs_no) {
           console.log(`  ⏭️ 스킵: 이미 SCOURT 연동됨`);
@@ -132,7 +134,7 @@ export async function POST(request: NextRequest) {
       try {
         // SCOURT API 호출
         const result = await client.searchAndRegisterCase({
-          cortCd: pc.courtName,  // 축약명 그대로 전달 (court-codes.ts에서 매핑)
+          cortCd: normalizedCourtName,
           csYr: pc.caseYear,
           csDvsCd: pc.caseType,
           csSerial: pc.caseSerial,
@@ -146,11 +148,16 @@ export async function POST(request: NextRequest) {
           let legalCaseId: string | undefined;
 
           // 기존 사건 확인
-          const { data: existingCase } = await supabase
+          let existingCaseQuery = supabase
             .from('legal_cases')
             .select('id')
-            .eq('court_case_number', pc.caseNumber)
-            .maybeSingle();
+            .eq('court_case_number', pc.caseNumber);
+
+          if (!tenant.isSuperAdmin && tenant.tenantId) {
+            existingCaseQuery = existingCaseQuery.eq('tenant_id', tenant.tenantId);
+          }
+
+          const { data: existingCase } = await existingCaseQuery.maybeSingle();
 
           if (existingCase) {
             legalCaseId = existingCase.id;
@@ -160,7 +167,7 @@ export async function POST(request: NextRequest) {
               encCsNo: result.encCsNo,
               wmonid: result.wmonid!,
               caseNumber: pc.caseNumber,
-              courtName: pc.courtFullName || pc.courtName,
+              courtName: normalizedCourtName,
             });
           }
           // 새 사건 생성은 여기서 하지 않음 (별도 플로우)
@@ -226,7 +233,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 // GET: 일괄 가져오기 상태 확인 (미래 구현 - SSE 등)
 export async function GET() {

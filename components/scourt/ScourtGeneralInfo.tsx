@@ -18,9 +18,31 @@ import {
   sortFields,
 } from "@/lib/scourt/field-renderer";
 
+/** Legacy party for backward compatibility */
+interface LegacyParty {
+  btprtStndngNm?: string;
+  partyType?: string;
+  btprtNm?: string;
+  name?: string;
+  csUltmtDvsNm?: string;
+  result?: string;
+  csUltmtYmd?: string;
+  resultDate?: string;
+}
+
+/** Legacy representative for backward compatibility */
+interface LegacyRepresentative {
+  btprtRltnCtt?: string;
+  relation?: string;
+  agntNm?: string;
+  name?: string;
+  jdafrCorpNm?: string;
+  lawFirm?: string;
+}
+
 interface ScourtGeneralInfoProps {
   /** scourt_snapshot 테이블에서 가져온 raw 데이터 (전체 snapshot 객체 또는 basicInfo) */
-  snapshotData: any;
+  snapshotData: Record<string, unknown> | null;
   /** 컴팩트 모드 (기본정보만 표시) */
   compact?: boolean;
   /** 표시할 테이블 목록 (기본: 전체) */
@@ -36,7 +58,7 @@ export function ScourtGeneralInfo({
   showTables,
 }: ScourtGeneralInfoProps) {
   // raw API 데이터 추출 시도
-  const rawData = extractRawApiData(snapshotData);
+  const rawData = snapshotData ? extractRawApiData(snapshotData) : null;
 
   // raw API 데이터가 있으면 동적 렌더링
   if (rawData) {
@@ -66,9 +88,15 @@ export function ScourtGeneralInfo({
 
   // Fallback: 기존 형식 데이터 (한글 키)
   // basicInfo가 직접 전달되었거나 snapshot.basicInfo 형태일 때
-  const legacyBasicInfo = snapshotData?.basicInfo || snapshotData;
+  interface LegacyBasicInfoType {
+    parties?: LegacyParty[];
+    representatives?: LegacyRepresentative[];
+    [key: string]: unknown;
+  }
+  const snapshotObj = snapshotData as { basicInfo?: LegacyBasicInfoType } | null;
+  const legacyBasicInfo: LegacyBasicInfoType | undefined = snapshotObj?.basicInfo || (snapshotData as LegacyBasicInfoType | undefined);
   if (legacyBasicInfo && typeof legacyBasicInfo === 'object') {
-    const fields = getVisibleFields(legacyBasicInfo);
+    const fields = getVisibleFields(legacyBasicInfo as Record<string, unknown>);
     const sortedFields = sortFields(fields);
 
     if (sortedFields.length > 0) {
@@ -77,13 +105,13 @@ export function ScourtGeneralInfo({
           <LegacyBasicInfoSection fields={sortedFields} />
 
           {/* 기존 parties/representatives 테이블 */}
-          {!compact && legacyBasicInfo.parties?.length > 0 && (
+          {!compact && legacyBasicInfo.parties && legacyBasicInfo.parties.length > 0 && (
             <LegacyPartyTable
               title="당사자"
               parties={legacyBasicInfo.parties}
             />
           )}
-          {!compact && legacyBasicInfo.representatives?.length > 0 && (
+          {!compact && legacyBasicInfo.representatives && legacyBasicInfo.representatives.length > 0 && (
             <LegacyRepresentativeTable
               title="대리인"
               representatives={legacyBasicInfo.representatives}
@@ -105,7 +133,7 @@ export function ScourtGeneralInfo({
  * 기본정보 Key-Value 섹션
  */
 interface BasicInfoSectionProps {
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 export function BasicInfoSection({ data }: BasicInfoSectionProps) {
@@ -142,11 +170,12 @@ export function BasicInfoSection({ data }: BasicInfoSectionProps) {
  * 개별 필드 항목
  */
 function FieldItem({ field }: { field: VisibleField }) {
+  const displayValue = field.value != null ? String(field.value) : '';
   return (
     <div className="flex flex-col">
       <dt className="text-xs text-gray-500">{field.label}</dt>
-      <dd className="text-sm text-gray-900 font-medium truncate" title={String(field.value)}>
-        {field.value}
+      <dd className="text-sm text-gray-900 font-medium truncate" title={displayValue}>
+        {displayValue}
       </dd>
     </div>
   );
@@ -159,7 +188,7 @@ interface TableSectionProps {
   title: string;
   columns: string[];
   columnLabels: string[];
-  rows: Record<string, string>[];
+  rows: Record<string, unknown>[];
 }
 
 export function TableSection({
@@ -200,7 +229,7 @@ export function TableSection({
                     key={colIdx}
                     className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap"
                   >
-                    {row[col] || "-"}
+                    {row[col] != null ? String(row[col]) : "-"}
                   </td>
                 ))}
               </tr>
@@ -217,7 +246,14 @@ export function TableSection({
  * API의 titRprsPtnr, titRprsRqstr 라벨을 사용
  */
 interface PartyTableProps {
-  rawData: Record<string, any>;
+  rawData: Record<string, unknown>;
+}
+
+interface PartyItem {
+  btprtStndngNm?: string;
+  btprtDvsNm?: string;
+  btprtNm?: string;
+  csUltmtDvsNm?: string;
 }
 
 export function PartyTable({ rawData }: PartyTableProps) {
@@ -227,12 +263,13 @@ export function PartyTable({ rawData }: PartyTableProps) {
   }
 
   // API가 제공하는 당사자 라벨 (원고측/피고측)
-  const plaintiffLabel = rawData?.dma_csBasCtt?.titRprsPtnr || "원고";
-  const defendantLabel = rawData?.dma_csBasCtt?.titRprsRqstr || "피고";
+  const dma = rawData?.dma_csBasCtt as Record<string, unknown> | undefined;
+  const _plaintiffLabel = (dma?.titRprsPtnr as string) || "원고";
+  const _defendantLabel = (dma?.titRprsRqstr as string) || "피고";
 
   // 당사자를 유형별로 그룹화
-  const grouped: Record<string, any[]> = {};
-  for (const party of parties) {
+  const grouped: Record<string, PartyItem[]> = {};
+  for (const party of parties as PartyItem[]) {
     const type = party.btprtStndngNm || party.btprtDvsNm || "기타";
     if (!grouped[type]) grouped[type] = [];
     grouped[type].push(party);
@@ -381,14 +418,17 @@ function LegacyBasicInfoSection({ fields }: { fields: VisibleField[] }) {
       </div>
       <div className="px-4 py-3">
         <dl className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2">
-          {fields.map((field) => (
-            <div key={field.key} className="flex flex-col">
-              <dt className="text-xs text-gray-500">{field.label}</dt>
-              <dd className="text-sm text-gray-900 font-medium truncate" title={String(field.value)}>
-                {field.value}
-              </dd>
-            </div>
-          ))}
+          {fields.map((field) => {
+            const displayValue = field.value != null ? String(field.value) : '';
+            return (
+              <div key={field.key} className="flex flex-col">
+                <dt className="text-xs text-gray-500">{field.label}</dt>
+                <dd className="text-sm text-gray-900 font-medium truncate" title={displayValue}>
+                  {displayValue}
+                </dd>
+              </div>
+            );
+          })}
         </dl>
       </div>
     </div>
@@ -398,7 +438,7 @@ function LegacyBasicInfoSection({ fields }: { fields: VisibleField[] }) {
 /**
  * 기존 형식 당사자 테이블
  */
-function LegacyPartyTable({ title, parties }: { title: string; parties: any[] }) {
+function LegacyPartyTable({ title, parties }: { title: string; parties: LegacyParty[] }) {
   if (!parties || parties.length === 0) return null;
 
   return (
@@ -443,7 +483,7 @@ function LegacyPartyTable({ title, parties }: { title: string; parties: any[] })
 /**
  * 기존 형식 대리인 테이블
  */
-function LegacyRepresentativeTable({ title, representatives }: { title: string; representatives: any[] }) {
+function LegacyRepresentativeTable({ title, representatives }: { title: string; representatives: LegacyRepresentative[] }) {
   if (!representatives || representatives.length === 0) return null;
 
   return (

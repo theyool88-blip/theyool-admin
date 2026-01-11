@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
       const since = new Date();
       since.setDate(since.getDate() - daysBack);
 
-      let query = supabase
+      const query = supabase
         .from('scourt_case_updates')
         .select(
           `
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 클라이언트 필터링
-      let results = Array.from(caseMap.values());
+      const results = Array.from(caseMap.values());
       if (clientId) {
         // legal_case.client.id로 필터링 필요 - 현재 구조에서는 추가 쿼리 필요
         // 간단히 처리

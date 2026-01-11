@@ -129,7 +129,14 @@ export async function PATCH(
     }
 
     // Update source
-    const updateData: any = {};
+    const updateData: Partial<{
+      name: string;
+      display_order: number;
+      color: string;
+      is_active: boolean;
+      is_default: boolean;
+      description: string;
+    }> = {};
     if (body.name !== undefined) updateData.name = body.name.trim();
     if (body.display_order !== undefined) updateData.display_order = body.display_order;
     if (body.color !== undefined) updateData.color = body.color;

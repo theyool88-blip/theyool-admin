@@ -562,20 +562,20 @@ export function generateTableLabel(tableKey: string): string {
 export interface VisibleField {
   key: string;
   label: string;
-  value: any;
+  value: unknown;
   isDate?: boolean;
 }
 
 export interface ListField {
   key: string;
   label: string;
-  items: any[];
+  items: unknown[];
 }
 
 /**
  * 값이 유효한지 확인 (null, undefined, 빈 문자열, '-' 제외)
  */
-function isValidValue(value: any): boolean {
+function isValidValue(value: unknown): boolean {
   if (value === null || value === undefined) return false;
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -626,7 +626,7 @@ export function formatDateValue(value: string): string {
 // 값이 없어도 항상 표시할 필드 (빈 값 허용)
 const ALWAYS_SHOW_FIELDS = new Set(['종국결과', 'endRslt', 'csUltmtDvsNm']);
 
-export function getVisibleFields(data: Record<string, any>): VisibleField[] {
+export function getVisibleFields(data: Record<string, unknown>): VisibleField[] {
   if (!data || typeof data !== 'object') return [];
 
   return Object.entries(data)
@@ -662,7 +662,7 @@ export function getVisibleFields(data: Record<string, any>): VisibleField[] {
  * @param data - basicInfo 객체
  * @returns LIST 필드 배열
  */
-export function getListFields(data: Record<string, any>): ListField[] {
+export function getListFields(data: Record<string, unknown>): ListField[] {
   if (!data || typeof data !== 'object') return [];
 
   return Object.entries(data)
@@ -675,7 +675,7 @@ export function getListFields(data: Record<string, any>): ListField[] {
     .map(([key, items]) => ({
       key,
       label: LIST_FIELD_LABELS[key] || key,
-      items: items as any[],
+      items: items as Record<string, unknown>[],
     }));
 }
 
@@ -838,7 +838,7 @@ export function formatAmountValue(value: number | string): string {
 /**
  * API 응답 값을 포맷팅
  */
-export function formatApiValue(key: string, value: any): string {
+export function formatApiValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '';
 
   if (isApiDateField(key)) {
@@ -848,7 +848,7 @@ export function formatApiValue(key: string, value: any): string {
     return formatTimeValue(String(value));
   }
   if (isAmountField(key)) {
-    return formatAmountValue(value);
+    return formatAmountValue(value as string | number);
   }
 
   return String(value);
@@ -858,17 +858,17 @@ export interface ScourtSection {
   type: 'keyValue' | 'table';
   key: string;
   title: string;
-  data: any;
+  data: unknown;
 }
 
 export interface ParsedApiResponse {
-  basicInfo: Record<string, any>;  // dma_csBasCtt
+  basicInfo: Record<string, unknown>;  // dma_csBasCtt
   tables: Array<{
     key: string;
     title: string;
     columns: string[];
     columnLabels: string[];
-    rows: any[];
+    rows: Record<string, unknown>[];
   }>;
 }
 
@@ -876,7 +876,7 @@ export interface ParsedApiResponse {
  * SCOURT API 응답에서 dma_csBasCtt 필드 파싱
  * 표시할 필드만 추출하고 코드 필드는 제외
  */
-export function parseBasicInfo(dmaData: Record<string, any>): VisibleField[] {
+export function parseBasicInfo(dmaData: Record<string, unknown>): VisibleField[] {
   if (!dmaData || typeof dmaData !== 'object') return [];
 
   const fields: VisibleField[] = [];
@@ -908,13 +908,13 @@ export function parseBasicInfo(dmaData: Record<string, any>): VisibleField[] {
  */
 export function parseDltTable(
   tableKey: string,
-  tableData: any[]
+  tableData: Record<string, unknown>[]
 ): {
   key: string;
   title: string;
   columns: string[];
   columnLabels: string[];
-  rows: any[];
+  rows: Record<string, unknown>[];
 } | null {
   if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
     return null;
@@ -965,7 +965,7 @@ export function parseDltTable(
  * SCOURT API 전체 응답 파싱
  * generalData.raw.data 구조에서 dma_csBasCtt와 dlt_* 추출
  */
-export function parseFullApiResponse(apiData: Record<string, any>): ParsedApiResponse {
+export function parseFullApiResponse(apiData: Record<string, unknown>): ParsedApiResponse {
   const result: ParsedApiResponse = {
     basicInfo: {},
     tables: [],
@@ -975,7 +975,7 @@ export function parseFullApiResponse(apiData: Record<string, any>): ParsedApiRes
 
   // dma_csBasCtt 파싱
   if (apiData.dma_csBasCtt) {
-    result.basicInfo = apiData.dma_csBasCtt;
+    result.basicInfo = apiData.dma_csBasCtt as Record<string, unknown>;
   }
 
   // dlt_* 테이블 순서 정의
@@ -996,7 +996,7 @@ export function parseFullApiResponse(apiData: Record<string, any>): ParsedApiRes
   // 정의된 순서대로 테이블 파싱
   for (const tableKey of tableOrder) {
     if (apiData[tableKey]) {
-      const parsed = parseDltTable(tableKey, apiData[tableKey]);
+      const parsed = parseDltTable(tableKey, apiData[tableKey] as Record<string, unknown>[]);
       if (parsed) {
         result.tables.push(parsed);
       }
@@ -1029,37 +1029,48 @@ export function parseFullApiResponse(apiData: Record<string, any>): ParsedApiRes
  * 6. savedData.basicInfo.generalData.raw.data - snapshot API 응답 형식
  * 7. savedData.basicInfo.detailData.raw.data - 레거시 snapshot API 응답 형식
  */
-export function extractRawApiData(savedData: any): Record<string, any> | null {
+export function extractRawApiData(savedData: Record<string, unknown>): Record<string, unknown> | null {
   if (!savedData) return null;
 
   // snapshot API 응답에서 basicInfo.generalData.raw.data 형식
-  if (savedData.basicInfo?.generalData?.raw?.data) {
-    return savedData.basicInfo.generalData.raw.data;
+  const basicInfo = savedData.basicInfo as Record<string, unknown> | undefined;
+  const generalDataFromBasic = basicInfo?.generalData as Record<string, unknown> | undefined;
+  const rawFromGeneralBasic = generalDataFromBasic?.raw as Record<string, unknown> | undefined;
+  if (rawFromGeneralBasic?.data) {
+    return rawFromGeneralBasic.data as Record<string, unknown>;
   }
 
   // snapshot API 응답에서 basicInfo.detailData.raw.data 형식 (레거시)
-  if (savedData.basicInfo?.detailData?.raw?.data) {
-    return savedData.basicInfo.detailData.raw.data;
+  const detailDataFromBasic = basicInfo?.detailData as Record<string, unknown> | undefined;
+  const rawFromDetailBasic = detailDataFromBasic?.raw as Record<string, unknown> | undefined;
+  if (rawFromDetailBasic?.data) {
+    return rawFromDetailBasic.data as Record<string, unknown>;
   }
 
   // generalData.raw.data 형식 (scourt_snapshot basic_info)
-  if (savedData.generalData?.raw?.data) {
-    return savedData.generalData.raw.data;
+  const generalData = savedData.generalData as Record<string, unknown> | undefined;
+  const rawFromGeneral = generalData?.raw as Record<string, unknown> | undefined;
+  if (rawFromGeneral?.data) {
+    return rawFromGeneral.data as Record<string, unknown>;
   }
 
   // detailData.raw.data 형식 (레거시)
-  if (savedData.detailData?.raw?.data) {
-    return savedData.detailData.raw.data;
+  const detailData = savedData.detailData as Record<string, unknown> | undefined;
+  const rawFromDetail = detailData?.raw as Record<string, unknown> | undefined;
+  if (rawFromDetail?.data) {
+    return rawFromDetail.data as Record<string, unknown>;
   }
 
   // raw.data 형식
-  if (savedData.raw?.data) {
-    return savedData.raw.data;
+  const rawDirect = savedData.raw as Record<string, unknown> | undefined;
+  if (rawDirect?.data) {
+    return rawDirect.data as Record<string, unknown>;
   }
 
   // data 형식
-  if (savedData.data?.dma_csBasCtt) {
-    return savedData.data;
+  const data = savedData.data as Record<string, unknown> | undefined;
+  if (data?.dma_csBasCtt) {
+    return data;
   }
 
   // 직접 dma_csBasCtt 포함

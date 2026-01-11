@@ -6,7 +6,7 @@
  * ,이혼 등 청구 / 평택가정2024드단25547,엄현식[피고] / 심민선
  */
 
-import { COURT_ABBREV_MAP, getCourtCodeByName } from './court-codes';
+import { getCourtFullName } from './court-codes';
 
 export interface ParsedCaseFromCSV {
   caseName: string;        // "이혼 등 청구"
@@ -84,7 +84,7 @@ function parseParties(partiesStr: string): {
   opponentName: string;
 } {
   // 끝에 " /" 또는 "/" 제거 (형사사건 등 상대방 없는 경우)
-  let cleanedStr = partiesStr.replace(/\s*\/\s*$/, '').trim();
+  const cleanedStr = partiesStr.replace(/\s*\/\s*$/, '').trim();
 
   const parts = cleanedStr.split(' / ');
   const clientPart = parts[0]?.trim() || '';
@@ -137,21 +137,8 @@ function parseCSVLine(line: string): string[] {
 /**
  * 법원 축약명을 정식명으로 변환
  */
-function getFullCourtName(abbrev: string): string {
-  // 축약명 매핑에서 먼저 찾기
-  if (COURT_ABBREV_MAP[abbrev]) {
-    return COURT_ABBREV_MAP[abbrev];
-  }
-
-  // 코드 매핑에서 찾기 (이미 정식명일 수 있음)
-  const code = getCourtCodeByName(abbrev);
-  if (code) {
-    // 이미 정식명이면 그대로 반환
-    return abbrev;
-  }
-
-  // 찾지 못하면 원본 반환
-  return abbrev;
+function getFullCourtName(abbrev: string, caseType?: string): string {
+  return getCourtFullName(abbrev, caseType);
 }
 
 /**
@@ -233,7 +220,7 @@ export function parseCasenoteCSV(csvContent: string): ParsedCaseFromCSV[] {
     }
 
     const parties = parseParties(partiesCol);
-    const courtFullName = getFullCourtName(caseNumberParsed.courtName);
+    const courtFullName = getFullCourtName(caseNumberParsed.courtName, caseNumberParsed.caseType);
 
     results.push({
       caseName,

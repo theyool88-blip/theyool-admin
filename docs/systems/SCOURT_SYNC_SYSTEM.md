@@ -1,6 +1,6 @@
 # SCOURT 사건 갱신 시스템 (1년 WMONID 기준)
 
-**Last Updated**: 2026-01-10
+**Last Updated**: 2026-02-01
 
 대법원 나의사건검색(SCOURT) 데이터를 안정적으로 갱신하기 위한 시스템 설계 문서입니다.
 
@@ -52,18 +52,22 @@
 CREATE TABLE scourt_sync_jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   legal_case_id UUID REFERENCES legal_cases(id) ON DELETE CASCADE,
+  tenant_id UUID REFERENCES tenants(id) ON DELETE SET NULL,
   sync_type TEXT NOT NULL, -- progress, general, full, wmonid_renewal
-  priority TEXT NOT NULL DEFAULT 'auto', -- auto, manual
+  priority INTEGER NOT NULL DEFAULT 0, -- 0=auto, 10=manual
   scheduled_at TIMESTAMPTZ NOT NULL,
   started_at TIMESTAMPTZ,
   finished_at TIMESTAMPTZ,
   status TEXT NOT NULL DEFAULT 'queued', -- queued, running, success, failed, skipped
   attempts INTEGER DEFAULT 0,
+  backoff_until TIMESTAMPTZ,
   last_error TEXT,
-  requested_by UUID, -- 수동 갱신 요청자
-  wmonid_id UUID REFERENCES scourt_user_wmonid(id),
+  lock_token TEXT,
+  dedup_key TEXT,
+  requested_by UUID,
   payload JSONB DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
@@ -79,41 +83,62 @@ CREATE TABLE scourt_sync_jobs (
 - `scourt_general_hash`
 - `scourt_sync_enabled` (bool, 기본 true)
 - `scourt_last_manual_sync_at`
+- `scourt_sync_cooldown_until`
+- `scourt_sync_locked_at`
+- `scourt_sync_lock_token`
 
 ### 3) 전역 설정 (슈퍼어드민)
 
-`scourt_sync_settings` 테이블 또는 `system_settings`에 다음 값을 저장합니다.
+`app_settings`의 `key = 'scourt_sync_settings'`에 JSON으로 저장합니다.
 
-- `progress_interval_hours` (기본 6~8시간)
-- `general_backoff_hours` (기본 24시간)
-- `global_concurrency` (기본 6~10)
-- `wmonid_concurrency` (기본 1)
-- `request_jitter_seconds` (기본 1~3초)
-- `max_cases_per_run` (기본 100~300)
-- `auto_sync_enabled` (전체 on/off)
+```json
+{
+  "autoSyncEnabled": true,
+  "progressIntervalHours": 6,
+  "progressJitterMinutes": 15,
+  "generalBackoffHours": 24,
+  "schedulerBatchSize": 300,
+  "workerBatchSize": 20,
+  "workerConcurrency": 4,
+  "requestJitterMs": { "min": 600, "max": 1800 },
+  "rateLimitPerMinute": 40,
+  "autoCooldownMinutes": 10,
+  "manualCooldownMinutes": 30,
+  "activeCaseRule": {
+    "statusAllowList": ["진행중", "진행", "active"],
+    "statusBlockList": ["종결", "종국", "확정", "종료", "완료"],
+    "excludeFinalResult": true,
+    "requireLinked": true
+  },
+  "wmonid": {
+    "autoRotateEnabled": true,
+    "renewalBeforeDays": 45,
+    "earlyRotateEnabled": true
+  }
+}
+```
 
 ---
 
 ## 자동 갱신 흐름
 
 ```
-Scheduler (5~10분마다)
-  -> 활성 사건 필터링
+Scheduler `/api/cron/scourt-sync-scheduler` (10분마다)
+  -> 활성 사건 필터링 + 분산 슬롯 계산
   -> next_progress_sync_at <= now 인 사건을 큐잉
-  -> 진행내용 변경 감지 시 general 큐잉
-  -> queue 크기와 동시성 제한 준수
+  -> WMONID 만료 임박 건 큐잉
 
-Worker
+Worker `/api/cron/scourt-sync-worker` (2분마다)
   -> scourt_sync_jobs 가져오기 (FOR UPDATE SKIP LOCKED)
   -> progress/general 호출
   -> 변경 감지 및 스냅샷 저장
-  -> next_*_sync_at 갱신
+  -> 진행 변화 시 general 큐잉 (24시간 백오프)
 ```
 
 ### 진행 -> 일반 갱신 조건
 
-- 진행내용 변경 감지 시 **즉시** 일반내용 갱신
-- 변경이 없더라도 `last_general_sync_at`이 24시간 경과하면 일반내용 갱신
+- 진행내용 변경 감지 시 **즉시** 일반내용 갱신 큐 생성
+- `last_general_sync_at`이 24시간 미만이면 일반내용은 스킵
 
 ---
 
@@ -125,6 +150,9 @@ Worker
   - `scourt_last_manual_sync_at` 갱신
   - `scourt_last_*_sync_at` 갱신
   - `next_*_sync_at`를 뒤로 밀기
+  - `scourt_sync_cooldown_until` 설정 (자동 호출 쿨다운)
+- 자동 진행 갱신 성공 시:
+  - `scourt_sync_cooldown_until`을 `autoCooldownMinutes` 기준으로 설정
 - 수동 갱신 실패 시:
   - 자동 스케줄은 유지 (재시도 대상)
 
@@ -134,18 +162,20 @@ Worker
 
 다음 조건을 모두 만족하는 사건만 자동 갱신합니다.
 
-- `legal_cases.status IN ('진행중','진행','active')`
 - `scourt_sync_enabled = true`
-- 종국결과 확정 또는 비활성 표시 시 `scourt_sync_enabled = false` 자동 전환
+- `activeCaseRule.statusAllowList`에 포함 (또는 statusBlockList 제외)
+- `activeCaseRule.excludeFinalResult = true`일 경우 `case_result`/`case_result_date` 보유 사건 제외
+- `activeCaseRule.requireLinked = true`일 경우 encCsNo/WMONID 없는 사건 제외
 
 ---
 
 ## 호출 분산/과도 호출 방지
 
 - 사건별 해시 슬롯 분산:
-  - 예: `hash(case_id) % 1440` 분 단위 슬롯 + 0~30분 지터
-- WMONID당 동시 1건, 전역 동시성 제한
-- 요청 간 1~3초 랜덤 딜레이
+  - 예: `hash(case_id) % intervalMinutes` 분 단위 슬롯 + 지터
+- 워커 동시성 제한 (`workerConcurrency`)
+- 요청 간 랜덤 딜레이 (`requestJitterMs`)
+- 분당 호출 제한 (`rateLimitPerMinute`)
 - 실패 시 지수 백오프 (예: 5m -> 15m -> 30m)
 
 ---
@@ -156,6 +186,7 @@ Worker
 
 - `expires_at` (Set-Cookie Expires) 기준으로 만료 판단
 - 만료 30~45일 전 `wmonid_renewal` 큐 생성
+- 스케줄러에서 자동 큐잉 + 슈퍼어드민 수동 회전 API 제공
 - 갱신 흐름:
   1. 새 WMONID 발급
   2. 사건 재등록(캡챠) -> 새 encCsNo 확보
@@ -166,6 +197,25 @@ Worker
 - 10,000건 / 50건(1 WMONID) = 최소 200 WMONID 필요
 - `scourt_user_wmonid.case_count` 기반으로 자동 분배
 - 남은 용량 부족 시 슈퍼어드민 경고
+
+---
+
+## 관리 API/크론
+
+- `GET/PUT /api/admin/scourt/sync-settings` (슈퍼어드민)
+- `POST /api/admin/scourt/refresh` (슈퍼어드민 수동 큐잉)
+- `POST /api/admin/scourt/wmonid/rotate` (슈퍼어드민 수동 회전)
+- `GET /api/admin/scourt/queue-status` (슈퍼어드민 대시보드 요약)
+- `GET /api/cron/scourt-sync-scheduler?secret=...`
+- `GET /api/cron/scourt-sync-worker?secret=...`
+
+---
+
+## 슈퍼어드민 UI
+
+- `/superadmin/scourt`에서 큐/WMONID/설정 요약 확인
+- 사건 검색 또는 `case_id` 직접 입력으로 수동 큐 등록
+- 최근 작업/로그 확인
 
 ---
 
@@ -199,9 +249,9 @@ Worker
 
 ## 구현 체크리스트
 
-- [ ] `scourt_sync_jobs` 테이블 생성 및 인덱스 추가
-- [ ] 스케줄러(5~10분) + 워커(락 기반) 구현
-- [ ] 진행/일반 분리 호출 로직 적용
-- [ ] 수동 갱신 API와 자동 스케줄 연동
-- [ ] WMONID 만료 갱신 크론 통합
+- [x] `scourt_sync_jobs` 테이블 생성 및 인덱스 추가
+- [x] 스케줄러/워커 크론 구현
+- [x] 진행/일반 분리 호출 로직 적용
+- [x] 수동 갱신 API와 자동 스케줄 연동
+- [x] WMONID 만료 갱신 큐 통합
 - [ ] 지표/알림 수집

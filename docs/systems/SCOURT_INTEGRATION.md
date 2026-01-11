@@ -437,6 +437,12 @@ SCOURT API는 법원코드(6자리 숫자)를 사용합니다. 같은 "지원"�
 | 천안지원 | 대전지방법원 천안지원 (000283) | - |
 | 천안가정 | - | 대전가정법원 천안지원 (000294) |
 
+### 저장 규칙
+
+- `legal_cases.court_name`은 **정식 법원명**으로 저장
+- UI 표시는 `getCourtAbbrev()`로 축약형 표기
+- 입력/연동 시 축약어는 `getCourtFullName()`으로 정규화 후 저장
+
 ### 사건유형별 자동 변환
 
 `getCourtCodeByNameAndCategory` 함수가 사건유형에 따라 자동 변환합니다:

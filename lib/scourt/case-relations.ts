@@ -12,7 +12,7 @@
  * - 신청 → 항고 → 재항고
  */
 
-import { getCaseTypeByCode, CaseCategory, CaseLevel } from './case-types';
+import { getCaseTypeByCode } from './case-types';
 
 // ============================================================
 // 타입 정의
@@ -645,7 +645,7 @@ export const SCOURT_RELATION_MAP: Record<string, CaseRelationType> = {
  */
 export function determineRelationDirection(
   relationType: string,
-  sourceCaseType?: string
+  _sourceCaseType?: string
 ): 'parent' | 'child' | 'sibling' {
   // 상위 심급을 가리키는 경우 (현재 사건이 하위)
   if (['항소심', '상고심', '재심', '준재심'].includes(relationType)) {

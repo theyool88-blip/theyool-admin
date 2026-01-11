@@ -1,4 +1,4 @@
-import { getCaseCategory } from '../lib/scourt/party-labels';
+import { getCaseCategory } from '../types/case-party';
 
 const testCases = [
   '2025즈기1108',

@@ -27,7 +27,7 @@ async function main() {
     const result = await client.searchAndGetGeneral(params);
 
     if (result.generalResult?.success) {
-      const rawData = result.generalResult.data?.raw?.data;
+      const rawData = result.generalResult.data?.raw?.data as Record<string, Record<string, unknown>> | undefined;
 
       if (rawData) {
         console.log('\n=== dma_csBasCtt (기본정보) 모든 필드 ===\n');

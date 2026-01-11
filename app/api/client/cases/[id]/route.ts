@@ -48,7 +48,7 @@ export async function GET(
     }
 
     // 재판기일 조회
-    const { data: hearings, error: hearingsError } = await supabase
+    const { data: hearings, error: _hearingsError } = await supabase
       .from('court_hearings')
       .select(`
         id,
@@ -64,7 +64,7 @@ export async function GET(
       .order('hearing_date', { ascending: false });
 
     // 기한 조회
-    const { data: deadlines, error: deadlinesError } = await supabase
+    const { data: deadlines, error: _deadlinesError } = await supabase
       .from('case_deadlines')
       .select(`
         id,

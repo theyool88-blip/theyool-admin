@@ -1,8 +1,8 @@
-import { getPartyLabels } from '@/lib/scourt/party-labels'
 import {
   PARTY_TYPE_LABELS,
   getOppositePartyType,
   mapScourtPartyType,
+  getPartyLabels,
   type PartyType,
 } from '@/types/case-party'
 

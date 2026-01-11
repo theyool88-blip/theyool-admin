@@ -5,7 +5,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { sendNotification, sendByCategory } from '@/lib/notifications/sender';
+import { sendNotification } from '@/lib/notifications/sender';
 import type { CaseUpdate, UpdateType } from './change-detector';
 
 // ============================================================
@@ -108,6 +108,18 @@ const NOTIFICATION_CONFIG: Record<
     category: 'manual',
     urgent: false,
     messageTemplate: '',
+  },
+  related_case_new: {
+    shouldNotify: false, // 담당자용 알림이므로 의뢰인에게는 발송 안함
+    category: 'manual',
+    urgent: false,
+    messageTemplate: '[더윤] {{case_name}} 사건에 연관사건이 발견되었습니다.\n\n{{update_summary}}\n\n확인이 필요합니다.',
+  },
+  lower_court_new: {
+    shouldNotify: false, // 담당자용 알림이므로 의뢰인에게는 발송 안함
+    category: 'manual',
+    urgent: false,
+    messageTemplate: '[더윤] {{case_name}} 사건의 심급사건이 발견되었습니다.\n\n{{update_summary}}\n\n확인이 필요합니다.',
   },
   other: {
     shouldNotify: false,

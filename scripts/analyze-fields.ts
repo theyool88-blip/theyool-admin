@@ -30,8 +30,9 @@ async function analyzeFields() {
         btprNm: tc.party,
       });
 
-      if (result.success && result.generalData?.raw?.data?.dma_csBasCtt) {
-        const caseInfo = result.generalData.raw.data.dma_csBasCtt;
+      const rawData = result.generalData?.raw?.data as Record<string, unknown> | undefined;
+      if (result.success && rawData?.dma_csBasCtt) {
+        const caseInfo = rawData.dma_csBasCtt as Record<string, unknown>;
         const fields = Object.keys(caseInfo).sort();
 
         console.log('\n총 ' + fields.length + '개 필드:');

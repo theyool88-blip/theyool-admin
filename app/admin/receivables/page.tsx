@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import Link from 'next/link'
 import AdminHeader from '@/components/AdminHeader'
 import { formatCurrency } from '@/types/payment'
 
@@ -115,7 +114,11 @@ export default function ReceivablesPage() {
   const toggleExpand = (id: string) => {
     setExpandedClients(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
       return next
     })
   }

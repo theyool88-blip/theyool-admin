@@ -4,6 +4,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { getCourtAbbrev } from '@/lib/scourt/court-codes';
 
 interface Case {
   id: string;
@@ -122,7 +123,7 @@ export default function ClientDashboard() {
                       <p className="text-sm font-medium text-gray-900">
                         {hearing.hearing_date} {hearing.hearing_time}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">{hearing.court_name}</p>
+                      <p className="text-xs text-gray-500 mt-1">{getCourtAbbrev(hearing.court_name)}</p>
                       <p className="text-xs text-gray-400 mt-0.5">{hearing.case_name}</p>
                     </div>
                     <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">

@@ -2,7 +2,7 @@
  * 사용자별 WMONID 관리
  *
  * - WMONID 발급 및 저장
- * - 만료 1개월 전 갱신
+ * - 만료 30~45일 전 갱신
  * - encCsNo 마이그레이션 (case-migrator 연동)
  */
 
@@ -10,8 +10,8 @@ import { createClient } from '@/lib/supabase';
 import { getCaseMigrator } from './case-migrator';
 
 const SCOURT_BASE_URL = 'https://ssgo.scourt.go.kr';
-const WMONID_VALIDITY_YEARS = 2;
-const RENEWAL_BEFORE_DAYS = 30; // 만료 1개월 전 갱신
+const WMONID_VALIDITY_YEARS = 1;
+const DEFAULT_RENEWAL_BEFORE_DAYS = 45; // 만료 30~45일 전 갱신
 
 export interface UserWmonid {
   id: string;
@@ -68,7 +68,7 @@ export class WmonidManager {
       const wmonid = wmonidMatch[1];
       const issuedAt = new Date();
 
-      // 만료일 계산 (Set-Cookie에서 추출 또는 2년 후)
+      // 만료일 계산 (Set-Cookie에서 추출 또는 1년 후)
       let expiresAt: Date;
       if (expiresMatch) {
         expiresAt = new Date(expiresMatch[1]);
@@ -111,7 +111,10 @@ export class WmonidManager {
   /**
    * 사용자의 WMONID 가져오기 (없으면 발급)
    */
-  async getOrCreateWmonid(userId: string): Promise<UserWmonid | null> {
+  async getOrCreateWmonid(
+    userId: string,
+    renewalBeforeDays: number = DEFAULT_RENEWAL_BEFORE_DAYS
+  ): Promise<UserWmonid | null> {
     // 기존 활성 WMONID 확인
     let wmonid = await this.getActiveWmonid(userId);
 
@@ -121,8 +124,8 @@ export class WmonidManager {
     }
 
     // 갱신 필요 여부 확인
-    if (wmonid && this.needsRenewal(wmonid)) {
-      console.log(`⚠️ WMONID 갱신 필요 (만료 ${RENEWAL_BEFORE_DAYS}일 이내)`);
+    if (wmonid && this.needsRenewal(wmonid, renewalBeforeDays)) {
+      console.log(`⚠️ WMONID 갱신 필요 (만료 ${renewalBeforeDays}일 이내)`);
       // 갱신은 별도 프로세스에서 처리 (사건 재등록 필요)
       await this.markAsExpiring(wmonid.id);
     }
@@ -133,10 +136,10 @@ export class WmonidManager {
   /**
    * 갱신 필요 여부 확인 (만료 1개월 이내)
    */
-  needsRenewal(wmonid: UserWmonid): boolean {
+  needsRenewal(wmonid: UserWmonid, renewalBeforeDays: number = DEFAULT_RENEWAL_BEFORE_DAYS): boolean {
     const expiresAt = new Date(wmonid.expires_at);
     const renewalDate = new Date(expiresAt);
-    renewalDate.setDate(renewalDate.getDate() - RENEWAL_BEFORE_DAYS);
+    renewalDate.setDate(renewalDate.getDate() - renewalBeforeDays);
 
     return new Date() >= renewalDate;
   }
@@ -154,9 +157,9 @@ export class WmonidManager {
   /**
    * 만료 임박 WMONID 목록 조회
    */
-  async getExpiringWmonids(): Promise<UserWmonid[]> {
+  async getExpiringWmonids(renewalBeforeDays: number = DEFAULT_RENEWAL_BEFORE_DAYS): Promise<UserWmonid[]> {
     const renewalDate = new Date();
-    renewalDate.setDate(renewalDate.getDate() + RENEWAL_BEFORE_DAYS);
+    renewalDate.setDate(renewalDate.getDate() + renewalBeforeDays);
 
     const { data, error } = await this.supabase
       .from('scourt_user_wmonid')
@@ -214,7 +217,7 @@ export class WmonidManager {
     // 기존 WMONID의 사건들 조회
     const { data: cases } = await this.supabase
       .from('scourt_profile_cases')
-      .select('case_number')
+      .select('case_number, legal_case_id, tenant_id')
       .eq('user_wmonid_id', oldWmonidId);
 
     const caseCount = cases?.length || 0;
@@ -232,10 +235,14 @@ export class WmonidManager {
 
     // 대표 당사자명 조회
     const migrator = getCaseMigrator();
-    const partyName = await migrator.getPartyNameForCase(cases[0].case_number);
+    const partyName = await migrator.getPartyNameForLegalCase({
+      legalCaseId: cases[0].legal_case_id,
+      caseNumber: cases[0].case_number,
+      tenantId: cases[0].tenant_id,
+    });
 
     if (!partyName) {
-      console.warn('⚠️ 당사자명 조회 실패 - 마이그레이션은 별도 배치에서 처리');
+      console.warn('⚠️ 당사자명 조회 실패 - 사건을 찾을 수 없습니다');
       // 기존 WMONID를 expiring 상태로 유지 (나중에 배치 처리)
       return newWmonid;
     }

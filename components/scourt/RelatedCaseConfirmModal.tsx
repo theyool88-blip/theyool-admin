@@ -24,14 +24,14 @@ export default function RelatedCaseConfirmModal({
   isOpen,
   onClose,
   onConfirm,
-  sourceCaseId,
+  sourceCaseId: _sourceCaseId,
   sourceCaseName,
   relatedCases,
   loading = false
 }: RelatedCaseConfirmModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedAction, setSelectedAction] = useState<'create' | 'skip'>('create')
-  const [processedCount, setProcessedCount] = useState(0)
+  const [_processedCount, setProcessedCount] = useState(0)
 
   if (!isOpen || relatedCases.length === 0) return null
 

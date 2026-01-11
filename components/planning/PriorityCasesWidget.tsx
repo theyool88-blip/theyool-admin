@@ -43,6 +43,7 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
 
   useEffect(() => {
     fetchPriorities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [limit]);
 
   async function fetchPriorities() {

@@ -49,7 +49,7 @@ export default function SourceStatsWidget() {
       const total = consultations.length;
       const counts = new Map<string, number>();
 
-      consultations.forEach((consultation: any) => {
+      consultations.forEach((consultation: { source?: string }) => {
         if (consultation.source) {
           counts.set(consultation.source, (counts.get(consultation.source) || 0) + 1);
         }

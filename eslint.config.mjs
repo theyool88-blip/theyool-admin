@@ -15,6 +15,19 @@ const eslintConfig = defineConfig([
     // Project-specific: skip utility scripts (CommonJS, one-off migrations/tests)
     "scripts/**",
   ]),
+  // Allow unused variables with _ prefix
+  {
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

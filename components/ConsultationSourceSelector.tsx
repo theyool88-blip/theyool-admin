@@ -26,6 +26,7 @@ export default function ConsultationSourceSelector({
 
   useEffect(() => {
     fetchSources();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchSources = async () => {

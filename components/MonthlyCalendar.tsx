@@ -61,7 +61,6 @@ interface Holiday {
   year: number
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function MonthlyCalendar({ profile: _profile }: { profile: Profile }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [schedules, setSchedules] = useState<UnifiedSchedule[]>([])

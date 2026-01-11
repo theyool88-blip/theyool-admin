@@ -13,7 +13,7 @@ import {
   GridColumn,
   extractFieldId,
 } from './xml-parser';
-import { getExpressionFields, getViewFieldMapping, checkRowVisibility } from './xml-mapping';
+import { getExpressionFields, getViewFieldMapping, checkRowVisibility, normalizeDataListId } from './xml-mapping';
 import { normalizeCaseNumber } from './case-number-utils';
 
 // ============================================================================
@@ -28,7 +28,7 @@ import { normalizeCaseNumber } from './case-number-utils';
  * - "##:##" : 시간 (1400 → 14:00)
  * - "#,###" : 숫자 (70000 → 70,000)
  */
-export function applyFormat(value: any, format?: string): string {
+export function applyFormat(value: unknown, format?: string): string {
   if (value === null || value === undefined || value === '') return '';
 
   const strValue = String(value);
@@ -70,7 +70,7 @@ export function applyFormat(value: any, format?: string): string {
  * data = { userCsNo: "2024드단531", ... }
  * → "2024드단531"
  */
-export function getValueFromRef(ref: string, data: Record<string, any>): any {
+export function getValueFromRef(ref: string, data: Record<string, unknown>): unknown {
   const fieldId = extractFieldId(ref);
   return data[fieldId];
 }
@@ -82,7 +82,7 @@ export function getValueFromRef(ref: string, data: Record<string, any>): any {
 
 interface BasicInfoTableProps {
   layout: BasicInfoLayout;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
   className?: string;
 }
 
@@ -97,7 +97,7 @@ export function BasicInfoTable({ layout, data, className }: BasicInfoTableProps)
       <h3 className="text-base md:text-lg font-semibold mb-3 flex items-center gap-2">
         <span className="w-1 h-5 bg-sage-600 rounded"></span>
         {layout.title}
-        {data.cortNm && (
+        {typeof data.cortNm === 'string' && data.cortNm && (
           <span className="text-xs md:text-sm font-normal text-gray-500">
             ({data.cortNm})
           </span>
@@ -129,7 +129,7 @@ export function BasicInfoTable({ layout, data, className }: BasicInfoTableProps)
 
 interface BasicInfoRowProps {
   row: BasicInfoRow;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 function BasicInfoRowComponent({ row, data }: BasicInfoRowProps) {
@@ -156,7 +156,7 @@ function BasicInfoRowComponent({ row, data }: BasicInfoRowProps) {
 
 interface BasicInfoCellProps {
   cell: BasicInfoCell;
-  data: Record<string, any>;
+  data: Record<string, unknown>;
 }
 
 function BasicInfoCellComponent({ cell, data }: BasicInfoCellProps) {
@@ -200,9 +200,9 @@ function BasicInfoCellComponent({ cell, data }: BasicInfoCellProps) {
  * expression 컬럼의 값 계산
  * 여러 필드를 조합하여 하나의 문자열로 반환
  */
-function computeExpressionValue(row: Record<string, any>, col: GridColumn): string {
+function computeExpressionValue(row: Record<string, unknown>, col: GridColumn): string {
   if (!col.expressionFields || col.expressionFields.length === 0) {
-    return row[col.id] || '';
+    return (row[col.id] as string) || '';
   }
 
   const parts: string[] = [];
@@ -225,7 +225,7 @@ function computeExpressionValue(row: Record<string, any>, col: GridColumn): stri
 
 interface GridTableProps {
   layout: GridLayout;
-  data: any[];
+  data: Record<string, unknown>[];
   className?: string;
   caseLinkMap?: Record<string, string>;
 }
@@ -237,7 +237,9 @@ export function GridTable({ layout, data, className, caseLinkMap }: GridTablePro
   if (!layout) return null;
 
   const hasData = data && data.length > 0;
-  const enableCaseLinks = layout.dataListId === 'dlt_reltCsLst' && caseLinkMap && Object.keys(caseLinkMap).length > 0;
+  const normalizedDataListId = normalizeDataListId(layout.dataListId);
+  const enableCaseLinks = ['dlt_reltCsLst', 'dlt_inscrtDtsLst'].includes(normalizedDataListId)
+    && caseLinkMap && Object.keys(caseLinkMap).length > 0;
 
   // expression 컬럼 중 모든 행에서 빈 값인 컬럼 필터링
   const visibleColumns = layout.columns.filter(col => {
@@ -318,7 +320,7 @@ export function GridTable({ layout, data, className, caseLinkMap }: GridTablePro
                       <td
                         key={colIndex}
                         className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900"
-                        style={{ textAlign: (col.textAlign as any) || 'center' }}
+                        style={{ textAlign: (col.textAlign as React.CSSProperties['textAlign']) || 'center' }}
                       >
                         {caseLink ? (
                           <a href={caseLink} className="text-sage-700 hover:underline">
@@ -372,14 +374,14 @@ interface ScourtGeneralInfoRendererProps {
   basicInfoLayout: BasicInfoLayout;
   gridLayouts: Record<string, GridLayout>;
   apiData: {
-    dma_csBasCtt: Record<string, any>;
-    dlt_btprtCttLst?: any[];
-    dlt_agntCttLst?: any[];
-    dlt_rcntDxdyLst?: any[];
-    dlt_rcntSbmsnDocmtLst?: any[];
-    dlt_reltCsLst?: any[];
-    dlt_inscrtDtsLst?: any[];
-    [key: string]: any;
+    dma_csBasCtt: Record<string, unknown>;
+    dlt_btprtCttLst?: Record<string, unknown>[];
+    dlt_agntCttLst?: Record<string, unknown>[];
+    dlt_rcntDxdyLst?: Record<string, unknown>[];
+    dlt_rcntSbmsnDocmtLst?: Record<string, unknown>[];
+    dlt_reltCsLst?: Record<string, unknown>[];
+    dlt_inscrtDtsLst?: Record<string, unknown>[];
+    [key: string]: unknown;
   };
 }
 
@@ -508,35 +510,35 @@ function formatYmd(value?: string): string {
  * - txt_csUltmtDvsNm → ultmtDvsNm (종국결과)
  * - txt_prsvCtt → prsvCtt
  */
-export function preprocessBasicInfo(data: Record<string, any>): Record<string, any> {
+export function preprocessBasicInfo(data: Record<string, unknown>): Record<string, unknown> {
   if (!data) return {};
 
   const processed = { ...data };
 
   // 원고명 (외 N명) - txt_rprsClmntNm이 참조
   if (data.rprsClmntNm) {
-    const cnt = parseInt(data.clmntCnt || '1', 10);
+    const cnt = parseInt(String(data.clmntCnt || '1'), 10);
     const display = cnt > 1
       ? `${data.rprsClmntNm} 외 ${cnt - 1}명`
-      : data.rprsClmntNm;
+      : String(data.rprsClmntNm);
     processed.rprsClmntNm = display;  // 원래 필드 덮어쓰기
     processed.rprsClmntNmDisplay = display;
   }
 
   // 피고명 (외 N명) - txt_rprsAcsdNm이 참조
   if (data.rprsAcsdNm) {
-    const cnt = parseInt(data.acsdCnt || '1', 10);
+    const cnt = parseInt(String(data.acsdCnt || '1'), 10);
     const display = cnt > 1
       ? `${data.rprsAcsdNm} 외 ${cnt - 1}명`
-      : data.rprsAcsdNm;
+      : String(data.rprsAcsdNm);
     processed.rprsAcsdNm = display;  // 원래 필드 덮어쓰기
     processed.rprsAcsdNmDisplay = display;
   }
 
   // 재판부 + 전화번호 - txt_jdbnNm1, txt_jdbnNm2가 참조
-  let jdbnText = data.jdbnNm || '';
+  let jdbnText = String(data.jdbnNm || '');
   if (data.csUltmtYmd && data.ultmtJdbnNm) {
-    jdbnText = data.ultmtJdbnNm;
+    jdbnText = String(data.ultmtJdbnNm);
   }
   // cfupMarkNm(주심)이 있고, jdbnNm에 아직 포함되지 않은 경우에만 추가
   if (data.cfupMarkNm && !jdbnText.includes(`(${data.cfupMarkNm})`)) {
@@ -561,7 +563,7 @@ export function preprocessBasicInfo(data: Record<string, any>): Record<string, a
 
     // 날짜 포맷팅
     if (data.csUltmtYmd) {
-      const ymd = data.csUltmtYmd;
+      const ymd = String(data.csUltmtYmd);
       ultmtDisplay = /^\d{8}$/.test(ymd)
         ? `${ymd.slice(0, 4)}.${ymd.slice(4, 6)}.${ymd.slice(6, 8)}`
         : ymd;
@@ -579,31 +581,31 @@ export function preprocessBasicInfo(data: Record<string, any>): Record<string, a
 
   // 형사 종국결과 - SSGO10GF01 JS 로직 재현
   if (!processed.ultmtDvsNm && (data.crmcsUltmtDvsNm || data.btprtUltmtYmd)) {
-    const btprtUltmtYmd = data.btprtUltmtYmd;
+    const btprtUltmtYmd = String(data.btprtUltmtYmd || '');
     let showResult = false;
     if (btprtUltmtYmd && /^\d{8}$/.test(btprtUltmtYmd)) {
       const now = new Date();
       const today = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
       showResult = parseInt(btprtUltmtYmd, 10) <= parseInt(today, 10);
     }
-    processed.ultmtDvsNm = showResult ? (data.crmcsUltmtDvsNm || '') : '';
+    processed.ultmtDvsNm = showResult ? String(data.crmcsUltmtDvsNm || '') : '';
   }
 
   // 형사 상소제기내용 - SSGO10GF01 JS 로직 재현
   if (!processed.aplPrpndCtt) {
-    const csDvsCd = typeof data.csDvsCd === 'number' ? String(data.csDvsCd) : data.csDvsCd || '';
+    const csDvsCd = typeof data.csDvsCd === 'number' ? String(data.csDvsCd) : String(data.csDvsCd || '');
     const isSecondInstance = CRIMINAL_SECOND_INSTANCE_CODES.has(csDvsCd);
     let aplPrpndCtt = '';
     let code = '';
 
     if (!isSecondInstance && data.apelCrmcsLwstRltnrDvsCd) {
-      const dateText = formatYmd(data.acsApelPrpndYmd);
+      const dateText = formatYmd(data.acsApelPrpndYmd as string | undefined);
       aplPrpndCtt = dateText ? `${dateText} ` : '';
-      code = data.apelCrmcsLwstRltnrDvsCd;
+      code = String(data.apelCrmcsLwstRltnrDvsCd);
     } else if (isSecondInstance && data.applCrmcsLwstRltnrDvsCd) {
-      const dateText = formatYmd(data.acsApplPrpndYmd);
+      const dateText = formatYmd(data.acsApplPrpndYmd as string | undefined);
       aplPrpndCtt = dateText ? `${dateText} ` : '';
-      code = data.applCrmcsLwstRltnrDvsCd;
+      code = String(data.applCrmcsLwstRltnrDvsCd);
     }
 
     if (code) {
@@ -611,8 +613,8 @@ export function preprocessBasicInfo(data: Record<string, any>): Record<string, a
     }
 
     if (data.aplPrpndRsltYmd && data.aplPrpndRsltCd) {
-      const dateText = formatYmd(data.aplPrpndRsltYmd);
-      const resultText = data.aplPrpndRsltNm || '';
+      const dateText = formatYmd(data.aplPrpndRsltYmd as string | undefined);
+      const resultText = String(data.aplPrpndRsltNm || '');
       const suffix = `${dateText ? `${dateText} ` : ''}${resultText}`.trim();
       if (suffix) {
         aplPrpndCtt += aplPrpndCtt ? ` / ${suffix}` : suffix;

@@ -17,7 +17,9 @@ import { convertToStandardRow, applyDefaults } from '@/lib/onboarding/csv-schema
 import { getScourtApiClient } from '@/lib/scourt/api-client'
 import { saveSnapshot } from '@/lib/scourt/case-storage'
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
+import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/lib/scourt/related-case-linker'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
+import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync'
 
 // 딜레이 유틸리티
@@ -346,6 +348,13 @@ export async function POST(request: NextRequest) {
             }
 
             // 4-3. 사건 생성 (대법원 연동 여부에 따라 다르게 처리)
+            // client_role_status 결정
+            const resolvedClientRoleStatus = determineClientRoleStatus({
+              explicitClientRole: row.client_role,
+              clientName: row.client_name,
+              opponentName: row.opponent_name
+            })
+
             const caseData: Record<string, unknown> = {
               tenant_id: tenant.tenantId,
               case_name: row.case_name || row.court_case_number,
@@ -354,6 +363,7 @@ export async function POST(request: NextRequest) {
               court_name: row.court_name,
               client_id: clientId,
               client_role: resolvedClientRole,
+              client_role_status: resolvedClientRoleStatus,
               opponent_name: row.opponent_name || null,
               assigned_to: assignedTo,
               status: '진행중',
@@ -439,7 +449,41 @@ export async function POST(request: NextRequest) {
             // 4-4. 스냅샷 저장 (대법원 연동 성공 시에만)
             if (scourtLinked && scourtResult && (scourtResult.generalData || scourtResult.progressData)) {
               try {
-                const generalData = scourtResult.generalData as Record<string, unknown> | undefined
+                type GeneralDataType = {
+                  hearings?: unknown[];
+                  lowerCourtCases?: Array<{
+                    userCsNo: string;
+                    cortNm?: string;
+                    ultmtDvsNm?: string;
+                    ultmtYmd?: string;
+                    encCsNo?: string;
+                  }>;
+                  relatedCases?: Array<{
+                    userCsNo: string;
+                    reltCsCortNm?: string;
+                    reltCsDvsNm?: string;
+                    encCsNo?: string;
+                  }>;
+                  documents?: unknown[];
+                }
+                const generalData = scourtResult.generalData as GeneralDataType | undefined
+
+                // 연관사건/심급 데이터 변환
+                const lowerCourtData: LowerCourtData[] = (generalData?.lowerCourtCases || []).map(lc => ({
+                  caseNo: lc.userCsNo,
+                  courtName: lc.cortNm,
+                  result: lc.ultmtDvsNm,
+                  resultDate: lc.ultmtYmd,
+                  encCsNo: lc.encCsNo || null,
+                }))
+
+                const relatedCasesData: RelatedCaseData[] = (generalData?.relatedCases || []).map(rc => ({
+                  caseNo: rc.userCsNo,
+                  caseName: rc.reltCsCortNm,
+                  relation: rc.reltCsDvsNm,
+                  encCsNo: rc.encCsNo || null,
+                }))
+
                 await saveSnapshot({
                   legalCaseId: newCase.id,
                   caseNumber: row.court_case_number!,
@@ -447,7 +491,31 @@ export async function POST(request: NextRequest) {
                   basicInfo: (generalData || {}) as Record<string, unknown>,
                   hearings: ((generalData?.hearings as unknown[]) || []),
                   progress: (scourtResult.progressData || []) as unknown[],
+                  documents: ((generalData?.documents as unknown[]) || []),
+                  lowerCourt: lowerCourtData,
+                  relatedCases: relatedCasesData,
                 })
+
+                // 4-4-1. 연관사건/심급 자동 연결
+                if (lowerCourtData.length > 0 || relatedCasesData.length > 0) {
+                  try {
+                    await linkRelatedCases({
+                      supabase: adminClient,
+                      legalCaseId: newCase.id,
+                      tenantId: tenant.tenantId,
+                      caseNumber: row.court_case_number!,
+                      caseType: parsed.caseType,
+                      relatedCases: relatedCasesData,
+                      lowerCourt: lowerCourtData,
+                    })
+                  } catch (linkError) {
+                    console.error('연관사건 연결 실패:', linkError)
+                    warnings.push({
+                      field: 'related_cases',
+                      message: '연관사건 자동 연결 실패 (사건은 정상 등록됨)'
+                    })
+                  }
+                }
               } catch (snapshotError) {
                 console.error('스냅샷 저장 실패:', snapshotError)
                 warnings.push({

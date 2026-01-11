@@ -11,9 +11,11 @@ import type {
   ImportError,
   ImportWarning,
   PreviewData,
-  ValidationResult
 } from '@/types/onboarding'
 import { validateRow, applyDefaults } from './csv-schema'
+import { getCourtFullName } from '@/lib/scourt/court-codes'
+import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
+import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 
 // 테넌트 컨텍스트
 interface TenantContext {
@@ -39,16 +41,25 @@ export async function generatePreview(
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     const validation = validateRow(row, i)
+    const parsedCourtNumber = row.court_case_number
+      ? parseCaseNumber(row.court_case_number)
+      : null
+    const normalizedCourtName = row.court_name
+      ? getCourtFullName(
+          row.court_name,
+          parsedCourtNumber?.valid ? parsedCourtNumber.caseType : undefined
+        )
+      : row.court_name
 
     // 기존 사건 확인
     let existingCase: { id: string; caseName: string } | undefined
-    if (row.court_case_number && row.court_name) {
+    if (row.court_case_number && normalizedCourtName) {
       const { data: existing } = await adminClient
         .from('legal_cases')
         .select('id, case_name')
         .eq('tenant_id', tenant.tenantId)
         .eq('court_case_number', row.court_case_number)
-        .eq('court_name', row.court_name)
+        .eq('court_name', normalizedCourtName)
         .single()
 
       if (existing) {
@@ -146,6 +157,15 @@ async function createSingleCase(
   const errors: ImportError[] = []
   const warnings: ImportWarning[] = []
   const originalData = { ...row } as Record<string, string>
+  const parsedCourtNumber = row.court_case_number
+    ? parseCaseNumber(row.court_case_number)
+    : null
+  const normalizedCourtName = row.court_name
+    ? getCourtFullName(
+        row.court_name,
+        parsedCourtNumber?.valid ? parsedCourtNumber.caseType : undefined
+      )
+    : row.court_name
 
   // 1. 유효성 검사
   const validation = validateRow(row, rowIndex)
@@ -181,7 +201,7 @@ async function createSingleCase(
       .select('id, case_name')
       .eq('tenant_id', tenant.tenantId)
       .eq('court_case_number', row.court_case_number!)
-      .eq('court_name', row.court_name!)
+      .eq('court_name', normalizedCourtName!)
       .single()
 
     if (existingCase) {
@@ -206,7 +226,7 @@ async function createSingleCase(
 
         case 'update':
           // 기존 사건 업데이트
-          const updateResult = await updateExistingCase(
+          await updateExistingCase(
             existingCase.id,
             row,
             tenant,
@@ -312,8 +332,15 @@ async function createSingleCase(
 
     // 5. 기본값 적용
     const caseData = applyDefaults(row)
+    const resolvedCourtName = normalizedCourtName || caseData.court_name
 
-    // 6. 사건 생성
+    // 6. 사건 생성 (client_role_status 결정)
+    const resolvedClientRoleStatus = determineClientRoleStatus({
+      explicitClientRole: caseData.client_role,
+      clientName: row.client_name,
+      opponentName: caseData.opponent_name
+    })
+
     const { data: newCase, error: caseError } = await adminClient
       .from('legal_cases')
       .insert([{
@@ -321,9 +348,10 @@ async function createSingleCase(
         case_name: caseData.case_name,
         case_type: caseData.case_type,
         court_case_number: caseData.court_case_number,
-        court_name: caseData.court_name,
+        court_name: resolvedCourtName,
         client_id: clientId,
         client_role: caseData.client_role || null,
+        client_role_status: resolvedClientRoleStatus,
         opponent_name: caseData.opponent_name || null,
         assigned_to: assignedTo,
         status: '진행중',

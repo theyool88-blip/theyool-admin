@@ -34,9 +34,18 @@ import {
   DATA_LIST_XML_CANDIDATES,
 } from "@/lib/scourt/xml-mapping";
 import { extractSubXmlPaths, normalizeDataListPaths } from "@/lib/scourt/xml-utils";
-import { getPartyLabels as getPartyLabelsFromSchema } from "@/lib/scourt/party-labels";
 import { normalizeCaseNumber } from "@/lib/scourt/case-number-utils";
-import { isMaskedPartyName, normalizePartyLabel, PARTY_TYPE_LABELS } from "@/types/case-party";
+import {
+  isMaskedPartyName,
+  normalizePartyLabel,
+  PARTY_TYPE_LABELS,
+  getPartyLabels as getPartyLabelsFromSchema,
+  getNameFieldsByLabel,
+  normalizePartyName as normalizePartyNameUtil,
+  normalizePartyNameForMatch,
+  preservePrefix,
+  ConfirmedParty,
+} from "@/types/case-party";
 
 // ============================================================================
 // 타입 정의
@@ -50,6 +59,12 @@ interface CasePartyInfo {
   party_type_label?: string | null;
   scourt_party_index?: number | null;
   is_our_client?: boolean;
+  clients?: {
+    id: string;
+    name: string;
+    phone?: string | null;
+    email?: string | null;
+  } | null;
 }
 
 interface ScourtGeneralInfoXmlProps {
@@ -62,14 +77,6 @@ interface ScourtGeneralInfoXmlProps {
   caseType?: ScourtCaseType;
   /** 사건번호 (당사자 라벨 판단용) */
   caseNumber?: string;
-  /** 의뢰인명 (기본내용/당사자 반영) */
-  clientName?: string | null;
-  /** 상대방명 (기본내용/당사자 반영) */
-  opponentName?: string | null;
-  /** 의뢰인 역할 */
-  clientRole?: "plaintiff" | "defendant" | null;
-  /** 사용자 입력 당사자 목록 */
-  partyOverrides?: PartyOverride[];
   /** 사용자 입력 대리인 목록 */
   representativeOverrides?: RepresentativeOverride[];
   /** 관련사건 링크 맵 (사건번호 -> caseId) */
@@ -78,7 +85,7 @@ interface ScourtGeneralInfoXmlProps {
   compact?: boolean;
   /** 당사자 수정 콜백 (partyId, partyLabel, currentName) */
   onPartyEdit?: (partyId: string, partyLabel: string, currentName: string) => void;
-  /** DB 당사자 목록 (수정 시 ID 매칭용) */
+  /** DB 당사자 목록 (마스킹 치환 및 수정 시 사용) */
   caseParties?: CasePartyInfo[];
 }
 
@@ -221,79 +228,12 @@ async function fetchXmlWithFallback(
   return null;
 }
 
-type ClientRole = "plaintiff" | "defendant";
-
-interface PartyOverride {
-  party_name: string;
-  party_type: string;
-  party_type_label?: string | null;
-  party_order?: number | null;
-  is_our_client?: boolean | null;
-}
-
 interface RepresentativeOverride {
   representative_name: string;
   representative_type_label?: string | null;
   law_firm_name?: string | null;
   is_our_firm?: boolean | null;
 }
-
-const PARTY_NAME_FIELDS: Record<ClientRole, string[]> = {
-  plaintiff: [
-    "rprsClmntNm",
-    "rprsPtnrNm",
-    "rprsAplcntNm",
-    "rprsGrnshNm",
-    "aplNm",
-    "clmntNm",
-    "ptnrNm",
-  ],
-  defendant: [
-    "rprsAcsdNm",
-    "rprsRqstrNm",
-    "rprsRspndnNm",
-    "acsdNm",
-    "rspNm",
-    "rqstrNm",
-    "dfndtNm",
-    "btprtNm",
-    "acsFullNm",
-    "acsNm",
-  ],
-};
-
-const LABEL_FIELD_FALLBACK: Record<string, string> = {
-  원고: "rprsClmntNm",
-  피고: "rprsAcsdNm",
-  채권자: "rprsPtnrNm",
-  채무자: "rprsRqstrNm",
-  신청인: "rprsAplcntNm",
-  피신청인: "rprsRspndnNm",
-  항고인: "rprsAplcntNm",
-  상대방: "rprsRspndnNm",
-  항소인: "rprsClmntNm",
-  피항소인: "rprsAcsdNm",
-  상고인: "rprsClmntNm",
-  피상고인: "rprsAcsdNm",
-  피고인: "acsFullNm",
-  제3채무자: "thrdDbtrNm",
-  압류채권자: "rprsGrnshNm",
-};
-
-const COUNT_FIELD_BY_LABEL: Record<string, string> = {
-  원고: "clmntCnt",
-  피고: "acsdCnt",
-  채권자: "ptnrCnt",
-  채무자: "rqstrCnt",
-  신청인: "ptnrCnt",
-  피신청인: "rqstrCnt",
-  항고인: "clmntCnt",
-  상대방: "acsdCnt",
-  항소인: "clmntCnt",
-  피항소인: "acsdCnt",
-  상고인: "clmntCnt",
-  피상고인: "acsdCnt",
-};
 
 const PARTY_LIST_LABEL_FIELDS = [
   "btprtDvsNm",
@@ -311,6 +251,7 @@ const PARTY_LIST_NAME_FIELDS = [
   "partyNm",
 ];
 
+// 라벨 별칭 (XML 당사자 리스트에서 매칭용)
 const PARTY_LABEL_ALIASES: Record<string, string[]> = {
   항고인: ["원고"],
   상대방: ["피고"],
@@ -321,25 +262,54 @@ const PARTY_LABEL_ALIASES: Record<string, string[]> = {
   피상고인: ["피고"],
 };
 
+const PLAINTIFF_SIDE_LABELS = new Set([
+  "원고",
+  "채권자",
+  "신청인",
+  "항고인",
+  "항소인",
+  "상고인",
+  "행위자",
+  "청구인",
+]);
+
+const DEFENDANT_SIDE_LABELS = new Set([
+  "피고",
+  "채무자",
+  "피신청인",
+  "상대방",
+  "피항고인",
+  "피항소인",
+  "피상고인",
+  "보호소년",
+  "피고인",
+  "피고인명",
+  "제3채무자",
+  "피청구인",
+  "피해아동",
+  "피해자",
+]);
+
+function getSideFromLabel(label: string): "plaintiff" | "defendant" | null {
+  const normalized = normalizePartyLabel(label);
+  if (PLAINTIFF_SIDE_LABELS.has(normalized)) return "plaintiff";
+  if (DEFENDANT_SIDE_LABELS.has(normalized)) return "defendant";
+  return null;
+}
+
 const FALLBACK_CASE_NUMBER_PATTERN = /\d{4}\s*[가-힣]+\s*\d+/;
 const FALLBACK_NORMALIZED_CASE_NUMBER_PATTERN = /^\d{4}[가-힣]+\d+$/;
 
 function getPartyLabelsForCase(
   caseNumber?: string,
-  basicInfoData?: Record<string, any>
+  basicInfoData?: Record<string, unknown>
 ): { plaintiffLabel: string; defendantLabel: string; isCriminal: boolean } {
-  const source = caseNumber || basicInfoData?.userCsNo || "";
+  const userCsNo = basicInfoData?.userCsNo;
+  const source = caseNumber || (typeof userCsNo === 'string' ? userCsNo : "") || "";
   const labels = getPartyLabelsFromSchema(source);
   const plaintiffLabel = labels.plaintiff || (labels.isCriminal ? "" : "원고");
   const defendantLabel = labels.defendant || (labels.isCriminal ? "피고인" : "피고");
   return { plaintiffLabel, defendantLabel, isCriminal: labels.isCriminal };
-}
-
-interface PartyOverrideGroup {
-  label: string;
-  displayLabel: string;
-  names: string[];
-  overrides: PartyOverride[];
 }
 
 interface RepresentativeOverrideGroup {
@@ -347,52 +317,6 @@ interface RepresentativeOverrideGroup {
   displayLabel: string;
   names: string[];
   overrides: RepresentativeOverride[];
-}
-
-function resolvePartyOverrideLabel(party: PartyOverride): { label: string; displayLabel: string } | null {
-  const rawLabel = (party.party_type_label || PARTY_TYPE_LABELS[party.party_type as keyof typeof PARTY_TYPE_LABELS] || "").trim();
-  const normalized = normalizePartyLabel(rawLabel);
-  if (!normalized) return null;
-  return { label: normalized, displayLabel: rawLabel || normalized };
-}
-
-function buildPartyOverrideGroups(parties?: PartyOverride[]): PartyOverrideGroup[] {
-  if (!Array.isArray(parties) || parties.length === 0) return [];
-
-  const groupMap = new Map<string, PartyOverrideGroup>();
-  parties.forEach((party) => {
-    const resolved = resolvePartyOverrideLabel(party);
-    if (!resolved) return;
-    if (!party.party_name || !party.party_name.trim()) return;
-
-    const existing = groupMap.get(resolved.label);
-    if (existing) {
-      existing.overrides.push(party);
-    } else {
-      groupMap.set(resolved.label, {
-        label: resolved.label,
-        displayLabel: resolved.displayLabel,
-        overrides: [party],
-        names: [],
-      });
-    }
-  });
-
-  return Array.from(groupMap.values())
-    .map((group) => {
-      const sorted = [...group.overrides].sort((a, b) => {
-        const aOrder = a.party_order ?? 9999;
-        const bOrder = b.party_order ?? 9999;
-        return aOrder - bOrder;
-      });
-      // party_name에서 번호 prefix 제거 (예: "1. 김정아" → "김정아")
-      // applyIndexedName에서 XML 원본의 번호를 사용하므로 중복 방지
-      const names = sorted
-        .map((party) => party.party_name.trim().replace(/^\d+\.\s*/, ''))
-        .filter((name) => name);
-      return { ...group, overrides: sorted, names };
-    })
-    .filter((group) => group.names.length > 0);
 }
 
 function formatRepresentativeName(rep: RepresentativeOverride): string {
@@ -448,112 +372,9 @@ function buildRepresentativeOverrideGroups(
     .filter((group) => group.names.length > 0);
 }
 
-function getFirstFieldValue(data: Record<string, any>, fields: string[]): string {
-  for (const field of fields) {
-    const value = data[field];
-    if (value !== null && value !== undefined && value !== "") {
-      return String(value);
-    }
-  }
-  return "";
-}
-
-function inferClientRole(
-  data: Record<string, any> | null,
-  clientName?: string | null,
-  opponentName?: string | null
-): ClientRole | null {
-  if (!data || !clientName || !opponentName) return null;
-
-  const clientInitial = clientName.trim().charAt(0);
-  const opponentInitial = opponentName.trim().charAt(0);
-  if (!clientInitial) return null;
-
-  const plaintiffValue = getFirstFieldValue(data, PARTY_NAME_FIELDS.plaintiff);
-  const defendantValue = getFirstFieldValue(data, PARTY_NAME_FIELDS.defendant);
-
-  const clientMatchesPlaintiff = plaintiffValue.trim().startsWith(clientInitial);
-  const clientMatchesDefendant = defendantValue.trim().startsWith(clientInitial);
-
-  if (clientMatchesPlaintiff && !clientMatchesDefendant) return "plaintiff";
-  if (clientMatchesDefendant && !clientMatchesPlaintiff) return "defendant";
-
-  const opponentMatchesPlaintiff = opponentInitial
-    ? plaintiffValue.trim().startsWith(opponentInitial)
-    : false;
-  const opponentMatchesDefendant = opponentInitial
-    ? defendantValue.trim().startsWith(opponentInitial)
-    : false;
-
-  if (opponentMatchesPlaintiff && !opponentMatchesDefendant) return "defendant";
-  if (opponentMatchesDefendant && !opponentMatchesPlaintiff) return "plaintiff";
-
-  return null;
-}
-
-function resolveClientRole(
-  clientRole: ClientRole | null | undefined,
-  isCriminal: boolean,
-  basicInfoData: Record<string, any> | null,
-  clientName?: string | null,
-  opponentName?: string | null
-): ClientRole | null {
-  if (clientRole) return clientRole;
-  if (isCriminal) return "defendant";
-  return inferClientRole(basicInfoData, clientName, opponentName);
-}
-
-function pickPartyField(
-  data: Record<string, any>,
-  side: ClientRole,
-  label: string
-): string | null {
-  const candidates = PARTY_NAME_FIELDS[side];
-  const existing = candidates.find((field) =>
-    Object.prototype.hasOwnProperty.call(data, field)
-  );
-  if (existing) return existing;
-
-  if (label && LABEL_FIELD_FALLBACK[label]) {
-    return LABEL_FIELD_FALLBACK[label];
-  }
-
-  return candidates[0] || null;
-}
-
-function applyPartyNameOverride(
-  data: Record<string, any>,
-  side: ClientRole,
-  name: string,
-  label: string
-): boolean {
-  if (!name || !label) return false;
-  const targetField = pickPartyField(data, side, label);
-  if (!targetField) return false;
-  if (data[targetField] === name) return false;
-  data[targetField] = name;
-  return true;
-}
-
-function applyPartyNameByLabel(
-  data: Record<string, any>,
-  label: string,
-  name: string
-): boolean {
-  if (!label || !name) return false;
-  const normalized = normalizePartyLabel(label);
-  const targetField = LABEL_FIELD_FALLBACK[normalized];
-  if (!targetField) return false;
-  if (data[targetField] === name) return false;
-  data[targetField] = name;
-  return true;
-}
-
 function applyIndexedName(originalValue: unknown, name: string): string {
   if (typeof originalValue !== "string") return name;
-  const match = originalValue.match(/^(\d+\.\s*)/);
-  if (!match) return name;
-  return `${match[1]}${name}`;
+  return preservePrefix(originalValue, name);
 }
 
 function updatePartyRowName(row: Record<string, unknown>, name: string): Record<string, unknown> {
@@ -583,7 +404,7 @@ function updatePartyRowName(row: Record<string, unknown>, name: string): Record<
   return updated ? next : row;
 }
 
-function getPartyRowLabel(row: Record<string, any>): string {
+function getPartyRowLabel(row: Record<string, unknown>): string {
   for (const field of PARTY_LIST_LABEL_FIELDS) {
     const value = row[field];
     if (value !== null && value !== undefined && value !== "") {
@@ -593,133 +414,49 @@ function getPartyRowLabel(row: Record<string, any>): string {
   return "";
 }
 
-function updatePartyListRows(
+/**
+ * 당사자 리스트의 마스킹된 이름을 확정된 당사자 정보로 치환
+ *
+ * 단순 로직:
+ * 1. 각 행의 라벨(지위)을 가져옴 (예: "신청인")
+ * 2. 확정된 당사자 중 같은 라벨을 가진 것을 찾음
+ * 3. 해당 이름으로 치환
+ */
+function substitutePartyListNames(
   list: Record<string, unknown>[] | undefined,
-  label: string,
-  name: string
-): Record<string, unknown>[] | undefined {
-  if (!Array.isArray(list) || !label || !name) return list;
-  const normalizedTarget = normalizePartyLabel(label);
-  if (!normalizedTarget) return list;
-  const aliasCandidates = PARTY_LABEL_ALIASES[normalizedTarget] || [];
-  const candidateLabels = [normalizedTarget, ...aliasCandidates]
-    .map((candidate) => normalizePartyLabel(candidate))
-    .filter(Boolean);
-
-  const matches = list
-    .map((row, index) => ({
-      row,
-      index,
-      label: normalizePartyLabel(getPartyRowLabel(row)),
-    }))
-    .filter((item) => {
-      if (!item.label) return false;
-      return candidateLabels.some((candidate) => {
-        return (
-          item.label === candidate ||
-          item.label.includes(candidate) ||
-          candidate.includes(item.label)
-        );
-      });
-    });
-
-  if (matches.length !== 1) return list;
-
-  const { row, index } = matches[0];
-  const updatedRow = updatePartyRowName(row, name);
-  if (updatedRow === row) return list;
-
-  return list.map((item, idx) => (idx === index ? updatedRow : item));
-}
-
-function updatePartyListRowsWithNames(
-  list: Record<string, unknown>[],
-  label: string,
-  names: string[],
-  displayLabel?: string
-): { list: Record<string, unknown>[]; updated: boolean } {
-  if (!Array.isArray(list) || !label) return { list, updated: false };
-  const normalizedTarget = normalizePartyLabel(label);
-  if (!normalizedTarget) return { list, updated: false };
-
-  const trimmedNames = names
-    .map((name) => name.trim())
-    .filter((name) => name);
-  if (trimmedNames.length === 0) return { list, updated: false };
-
-  const aliasCandidates = PARTY_LABEL_ALIASES[normalizedTarget] || [];
-  const candidateLabels = [normalizedTarget, ...aliasCandidates]
-    .map((candidate) => normalizePartyLabel(candidate))
-    .filter(Boolean);
-
-  const matches = list
-    .map((row, index) => ({
-      row,
-      index,
-      label: normalizePartyLabel(getPartyRowLabel(row)),
-    }))
-    .filter((item) => {
-      if (!item.label) return false;
-      return candidateLabels.some((candidate) => {
-        return (
-          item.label === candidate ||
-          item.label.includes(candidate) ||
-          candidate.includes(item.label)
-        );
-      });
-    });
-
-  const next = [...list];
-  let updated = false;
-
-  const updateCount = Math.min(matches.length, trimmedNames.length);
-  for (let i = 0; i < updateCount; i += 1) {
-    const match = matches[i];
-    const updatedRow = updatePartyRowName(match.row, trimmedNames[i]);
-    if (updatedRow !== match.row) {
-      next[match.index] = updatedRow;
-      updated = true;
-    }
-  }
-
-  if (trimmedNames.length > matches.length) {
-    const labelValue = displayLabel || label;
-    trimmedNames.slice(matches.length).forEach((name) => {
-      next.push({
-        btprtDvsNm: labelValue,
-        btprtNm: name,
-        btprtNmOrg: name,
-      });
-    });
-    updated = true;
-  }
-
-  return { list: updated ? next : list, updated };
-}
-
-function applyPartyOverridesToList(
-  list: Record<string, unknown>[] | undefined,
-  groups: PartyOverrideGroup[]
+  confirmedParties: ConfirmedParty[]
 ): { list: Record<string, unknown>[] | undefined; updated: boolean } {
-  if (!groups || groups.length === 0) return { list, updated: false };
-  // 원래 리스트가 없거나 비어있으면 새 데이터를 추가하지 않음
-  // (피고인 및 죄명내용 등 형사 전용 섹션이 가사 사건에 생성되는 것 방지)
   if (!Array.isArray(list) || list.length === 0) return { list, updated: false };
+  if (confirmedParties.length === 0) return { list, updated: false };
 
-  let next = [...list];
-  let updated = false;
-
-  groups.forEach((group) => {
-    const result = updatePartyListRowsWithNames(
-      next,
-      group.label,
-      group.names,
-      group.displayLabel
-    );
-    if (result.updated) {
-      next = result.list;
-      updated = true;
+  // 라벨별 확정된 이름 맵 (예: { "신청인": "이명규", "피신청인": "이정효" })
+  const confirmedByLabel: Record<string, string> = {};
+  confirmedParties.forEach(p => {
+    if (!confirmedByLabel[p.label]) {
+      confirmedByLabel[p.label] = p.name;
     }
+  });
+
+  let updated = false;
+  const next = list.map(row => {
+    // 행의 라벨(지위) 가져오기
+    const rowLabel = normalizePartyLabel(getPartyRowLabel(row));
+    if (!rowLabel) return row;
+
+    // 같은 라벨의 확정된 이름 찾기
+    const confirmedName = confirmedByLabel[rowLabel];
+    if (!confirmedName) return row;
+
+    // 행의 이름 필드 확인
+    const nameField = PARTY_LIST_NAME_FIELDS.find(f => Object.prototype.hasOwnProperty.call(row, f));
+    if (!nameField) return row;
+
+    const currentName = String(row[nameField] || '');
+    if (!isMaskedPartyName(currentName)) return row;
+
+    // 확정된 이름으로 치환
+    updated = true;
+    return updatePartyRowName(row, confirmedName);
   });
 
   return { list: updated ? next : list, updated };
@@ -728,7 +465,7 @@ function applyPartyOverridesToList(
 const REPRESENTATIVE_LABEL_FIELDS = ["agntDvsNm", "agntDvsCdNm", "btprtRltnCtt"];
 const REPRESENTATIVE_NAME_FIELDS = ["agntNm", "athrzNm", "representative_name"];
 
-function getRepresentativeRowLabel(row: Record<string, any>): string {
+function getRepresentativeRowLabel(row: Record<string, unknown>): string {
   for (const field of REPRESENTATIVE_LABEL_FIELDS) {
     const value = row[field];
     if (value !== null && value !== undefined && value !== "") {
@@ -738,7 +475,7 @@ function getRepresentativeRowLabel(row: Record<string, any>): string {
   return "";
 }
 
-function updateRepresentativeRowName(row: Record<string, any>, name: string): Record<string, any> {
+function updateRepresentativeRowName(row: Record<string, unknown>, name: string): Record<string, unknown> {
   const next = { ...row };
   let updated = false;
 
@@ -874,10 +611,6 @@ export function ScourtGeneralInfoXml({
   apiData,
   caseType,
   caseNumber,
-  clientName,
-  opponentName,
-  clientRole,
-  partyOverrides,
   representativeOverrides,
   relatedCaseLinks,
   compact = false,
@@ -885,31 +618,31 @@ export function ScourtGeneralInfoXml({
   caseParties,
 }: ScourtGeneralInfoXmlProps) {
   const apiEnvelope = useMemo(() => {
-    if (!apiData) return {} as Record<string, any>;
+    if (!apiData) return {} as Record<string, unknown>;
     if (typeof apiData === "string") {
       try {
         const parsed = JSON.parse(apiData);
         if (parsed && typeof parsed === "object") {
-          return parsed as Record<string, any>;
+          return parsed as Record<string, unknown>;
         }
       } catch (e) {
         console.warn("[XML] Failed to parse apiData JSON string", e);
       }
-      return {} as Record<string, any>;
+      return {} as Record<string, unknown>;
     }
-    return apiData as Record<string, any>;
+    return apiData as Record<string, unknown>;
   }, [apiData]);
 
   const resolvedApiData = useMemo(() => {
-    const dataCandidate = (apiEnvelope as { data?: Record<string, any> }).data;
+    const dataCandidate = (apiEnvelope as { data?: Record<string, unknown> }).data;
     if (dataCandidate && typeof dataCandidate === "object") {
       return dataCandidate;
     }
-    const rawCandidate = (apiEnvelope as { raw?: { data?: Record<string, any> } }).raw?.data;
+    const rawCandidate = (apiEnvelope as { raw?: { data?: Record<string, unknown> } }).raw?.data;
     if (rawCandidate && typeof rawCandidate === "object") {
       return rawCandidate;
     }
-    return apiEnvelope as Record<string, any>;
+    return apiEnvelope as Record<string, unknown>;
   }, [apiEnvelope]);
 
   const [basicInfoLayout, setBasicInfoLayout] = useState<BasicInfoLayout | null>(null);
@@ -942,17 +675,14 @@ export function ScourtGeneralInfoXml({
     return null;
   }, [resolvedApiData]);
 
-  const basicInfoData = useMemo(() => {
+  const basicInfoData = useMemo((): Record<string, unknown> | null => {
     if (!resolvedApiData || !basicInfoKey) return null;
-    return resolvedApiData[basicInfoKey] || null;
+    const data = resolvedApiData[basicInfoKey];
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      return data as Record<string, unknown>;
+    }
+    return null;
   }, [resolvedApiData, basicInfoKey]);
-
-  const normalizedClientName = clientName?.trim() || "";
-  const normalizedOpponentName = opponentName?.trim() || "";
-
-  const partyOverrideGroups = useMemo(() => {
-    return buildPartyOverrideGroups(partyOverrides);
-  }, [partyOverrides]);
 
   const representativeOverrideGroups = useMemo(() => {
     return buildRepresentativeOverrideGroups(representativeOverrides);
@@ -962,108 +692,109 @@ export function ScourtGeneralInfoXml({
     return getPartyLabelsForCase(caseNumber, basicInfoData || undefined);
   }, [caseNumber, basicInfoData]);
 
-  const effectiveClientRole = useMemo(() => {
-    return resolveClientRole(
-      clientRole,
-      partyLabels.isCriminal,
-      basicInfoData,
-      normalizedClientName,
-      normalizedOpponentName
-    );
-  }, [
-    clientRole,
-    partyLabels.isCriminal,
-    basicInfoData,
-    normalizedClientName,
-    normalizedOpponentName,
-  ]);
+  /**
+   * 확정된 당사자 정보 추출
+   * - party_name이 마스킹 해제되었거나
+   * - clients.name이 있으면 확정된 것으로 간주
+   * { label: "신청인", name: "이명규", isClient: true }
+   */
+  const confirmedParties = useMemo((): ConfirmedParty[] => {
+    if (!caseParties || caseParties.length === 0) return [];
 
+    return caseParties
+      .filter(p => {
+        // clients.name이 있으면 확정된 것으로 간주 (의뢰인)
+        if (p.clients?.name && !isMaskedPartyName(p.clients.name)) return true;
+        // party_name이 마스킹 해제되었으면 확정
+        return p.party_name && !isMaskedPartyName(p.party_name);
+      })
+      .map(p => {
+        // 이름 결정: clients.name 우선, 없으면 party_name
+        const resolvedName = (p.clients?.name && !isMaskedPartyName(p.clients.name))
+          ? p.clients.name
+          : normalizePartyNameUtil(p.party_name);
+
+        return {
+          label: normalizePartyLabel(p.party_type_label || PARTY_TYPE_LABELS[p.party_type as keyof typeof PARTY_TYPE_LABELS] || ''),
+          name: resolvedName,
+          isClient: p.is_our_client || false,
+        };
+      })
+      .filter(p => p.label); // 라벨이 있는 것만
+  }, [caseParties]);
+
+  /**
+   * 기본정보 마스킹 치환
+   *
+   * 단순 로직:
+   * 1. 확정된 당사자의 라벨(지위)을 가져옴 (예: "신청인")
+   * 2. 그 라벨에 해당하는 필드들을 찾음 (예: rprsAplcntNm, aplNm)
+   * 3. 해당 필드에 확정된 이름을 넣음
+   */
   const overriddenBasicInfo = useMemo(() => {
     if (!basicInfoData) return basicInfoData;
+    if (confirmedParties.length === 0) return basicInfoData;
 
     const next = { ...basicInfoData };
     let updated = false;
 
-    // partyOverrides가 있으면 SCOURT 라벨 기반으로만 적용 (clientRole 추론 사용 안함)
-    // partyOverrides는 마스킹 해제된 모든 당사자를 포함하므로 이것만으로 충분
-    partyOverrideGroups.forEach((group) => {
-      if (group.names.length === 0) return;
-      const name = group.names[0];
-      if (applyPartyNameByLabel(next, group.label, name)) {
+    // 각 확정된 당사자에 대해
+    for (const party of confirmedParties) {
+      // 라벨에 해당하는 필드들 가져오기
+      const targetFields = getNameFieldsByLabel(party.label);
+
+      // 해당 필드들에 이름 치환
+      for (const field of targetFields) {
+        const value = next[field];
+        if (typeof value !== 'string') continue;
+
+        // 마스킹된 값이면 치환, 아니어도 치환 (확정된 이름이 우선)
+        next[field] = preservePrefix(value, party.name);
         updated = true;
-      }
-
-      const countField = COUNT_FIELD_BY_LABEL[group.label];
-      if (countField) {
-        const nextCount = group.names.length;
-        if (next[countField] !== nextCount) {
-          next[countField] = nextCount;
-          updated = true;
-        }
-      }
-    });
-
-    // partyOverrides가 없는 경우에만 clientRole 기반 fallback 사용
-    // (레거시 호환성 - 마스킹 해제된 당사자가 없는 경우)
-    if (partyOverrideGroups.length === 0 && effectiveClientRole && (normalizedClientName || normalizedOpponentName)) {
-      const clientSide = effectiveClientRole;
-      const opponentSide = clientSide === "plaintiff" ? "defendant" : "plaintiff";
-
-      if (normalizedClientName) {
-        const label = clientSide === "plaintiff"
-          ? partyLabels.plaintiffLabel
-          : partyLabels.defendantLabel;
-        if (applyPartyNameOverride(next, clientSide, normalizedClientName, label)) {
-          updated = true;
-        }
-      }
-
-      if (normalizedOpponentName) {
-        const label = opponentSide === "plaintiff"
-          ? partyLabels.plaintiffLabel
-          : partyLabels.defendantLabel;
-        if (applyPartyNameOverride(next, opponentSide, normalizedOpponentName, label)) {
-          updated = true;
-        }
       }
     }
 
     return updated ? next : basicInfoData;
-  }, [
-    basicInfoData,
-    partyOverrideGroups,
-    normalizedClientName,
-    normalizedOpponentName,
-    effectiveClientRole,
-    partyLabels.plaintiffLabel,
-    partyLabels.defendantLabel,
-  ]);
+  }, [basicInfoData, confirmedParties]);
 
+  /**
+   * 전체 API 데이터 마스킹 치환
+   * - 기본정보: overriddenBasicInfo
+   * - 당사자 리스트: substitutePartyListNames
+   * - 대리인 리스트: 기존 로직 유지
+   */
   const effectiveApiData = useMemo(() => {
     if (!resolvedApiData) return resolvedApiData;
 
     let updated = false;
-    const next = { ...resolvedApiData };
+    const next: Record<string, unknown> = { ...resolvedApiData };
 
+    // 1. 기본정보 치환
     if (basicInfoKey && overriddenBasicInfo && overriddenBasicInfo !== basicInfoData) {
       next[basicInfoKey] = overriddenBasicInfo;
       updated = true;
     }
 
-    // partyOverrides가 있으면 SCOURT 라벨 기반으로만 적용
-    if (partyOverrideGroups.length > 0) {
-      const partiesResult = applyPartyOverridesToList(
-        next.dlt_btprtCttLst,
-        partyOverrideGroups
+    // Helper to safely extract array from unknown
+    const getRecordArray = (key: string): Record<string, unknown>[] | undefined => {
+      const val = next[key];
+      return Array.isArray(val) ? val as Record<string, unknown>[] : undefined;
+    };
+
+    // 2. 당사자 리스트 치환 (confirmedParties 사용)
+    if (confirmedParties.length > 0) {
+      const partiesResult = substitutePartyListNames(
+        getRecordArray('dlt_btprtCttLst'),
+        confirmedParties
       );
       if (partiesResult.updated) {
         next.dlt_btprtCttLst = partiesResult.list;
         updated = true;
       }
 
-      const accusedResult = applyPartyOverridesToList(
-        next.dlt_acsCttLst,
-        partyOverrideGroups
+      const accusedResult = substitutePartyListNames(
+        getRecordArray('dlt_acsCttLst'),
+        confirmedParties
       );
       if (accusedResult.updated) {
         next.dlt_acsCttLst = accusedResult.list;
@@ -1071,64 +802,10 @@ export function ScourtGeneralInfoXml({
       }
     }
 
-    // partyOverrides가 없는 경우에만 clientRole 기반 fallback 사용
-    // (레거시 호환성 - 마스킹 해제된 당사자가 없는 경우)
-    if (partyOverrideGroups.length === 0 && (normalizedClientName || normalizedOpponentName) && effectiveClientRole) {
-      const clientSide = effectiveClientRole;
-      const opponentSide = clientSide === "plaintiff" ? "defendant" : "plaintiff";
-      const clientLabel = clientSide === "plaintiff"
-        ? partyLabels.plaintiffLabel
-        : partyLabels.defendantLabel;
-      const opponentLabel = opponentSide === "plaintiff"
-        ? partyLabels.plaintiffLabel
-        : partyLabels.defendantLabel;
-
-      if (normalizedClientName && clientLabel) {
-        const updatedParties = updatePartyListRows(
-          next.dlt_btprtCttLst,
-          clientLabel,
-          normalizedClientName
-        );
-        const updatedAccused = updatePartyListRows(
-          next.dlt_acsCttLst,
-          clientLabel,
-          normalizedClientName
-        );
-        if (updatedParties !== next.dlt_btprtCttLst) {
-          next.dlt_btprtCttLst = updatedParties;
-          updated = true;
-        }
-        if (updatedAccused !== next.dlt_acsCttLst) {
-          next.dlt_acsCttLst = updatedAccused;
-          updated = true;
-        }
-      }
-
-      if (normalizedOpponentName && opponentLabel) {
-        const updatedParties = updatePartyListRows(
-          next.dlt_btprtCttLst,
-          opponentLabel,
-          normalizedOpponentName
-        );
-        const updatedAccused = updatePartyListRows(
-          next.dlt_acsCttLst,
-          opponentLabel,
-          normalizedOpponentName
-        );
-        if (updatedParties !== next.dlt_btprtCttLst) {
-          next.dlt_btprtCttLst = updatedParties;
-          updated = true;
-        }
-        if (updatedAccused !== next.dlt_acsCttLst) {
-          next.dlt_acsCttLst = updatedAccused;
-          updated = true;
-        }
-      }
-    }
-
+    // 3. 대리인 리스트 치환 (기존 로직 유지)
     if (representativeOverrideGroups.length > 0) {
       const repsResult = applyRepresentativeOverridesToList(
-        next.dlt_agntCttLst,
+        getRecordArray('dlt_agntCttLst'),
         representativeOverrideGroups
       );
       if (repsResult.updated) {
@@ -1143,13 +820,8 @@ export function ScourtGeneralInfoXml({
     basicInfoKey,
     overriddenBasicInfo,
     basicInfoData,
-    partyOverrideGroups,
+    confirmedParties,
     representativeOverrideGroups,
-    normalizedClientName,
-    normalizedOpponentName,
-    effectiveClientRole,
-    partyLabels.plaintiffLabel,
-    partyLabels.defendantLabel,
   ]);
 
   // API 응답에서 dlt_* 데이터 리스트 동적 감지 (alias 정규화 포함)
@@ -1297,7 +969,7 @@ export function ScourtGeneralInfoXml({
   // 기본정보 데이터 전처리 (원고/피고명 조합, 종국결과 등)
   // 주의: Hook은 early return 전에 호출되어야 함
   const processedBasicInfo = useMemo(() => {
-    return preprocessBasicInfo(overriddenBasicInfo || {});
+    return preprocessBasicInfo(overriddenBasicInfo ?? {});
   }, [overriddenBasicInfo]);
 
   // 로딩 중
@@ -1341,7 +1013,8 @@ export function ScourtGeneralInfoXml({
       {/* 동적 그리드 렌더링 - API 응답의 모든 dlt_* 리스트 */}
       {!compact && dataListEntries.map((entry) => {
         const gridLayout = gridLayouts[entry.layoutKey];
-        const gridData = (effectiveApiData || resolvedApiData)[entry.dataKey];
+        const rawGridData = (effectiveApiData || resolvedApiData)?.[entry.dataKey];
+        const gridData = Array.isArray(rawGridData) ? rawGridData as Record<string, unknown>[] : [];
         const normalizedLayoutKey = normalizeDataListId(entry.layoutKey);
         const isPartyTable = normalizedLayoutKey === "dlt_btprtCttLst" || normalizedLayoutKey === "dlt_acsCttLst";
 
@@ -1385,18 +1058,21 @@ function normalizePartyName(name: string): string {
  * XML 당사자 행과 DB 당사자를 매칭
  */
 function findMatchingParty(
-  row: Record<string, any>,
+  row: Record<string, unknown>,
   rowIndex: number,
   caseParties?: CasePartyInfo[]
 ): CasePartyInfo | null {
   if (!caseParties || caseParties.length === 0) return null;
 
+  // Helper to safely convert unknown to string
+  const toStr = (val: unknown): string => (typeof val === 'string' ? val : '');
+
   // XML 행에서 당사자 라벨과 이름 추출
   const rowLabel = normalizePartyLabel(
-    row.btprtDvsNm || row.btprtStndngNm || row.btprtDvsCdNm || ''
+    toStr(row.btprtDvsNm) || toStr(row.btprtStndngNm) || toStr(row.btprtDvsCdNm) || ''
   );
   const rowName = normalizePartyName(
-    row.btprtNm || row.btprtNmOrg || ''
+    toStr(row.btprtNm) || toStr(row.btprtNmOrg) || ''
   );
   const rowFirstChar = rowName.charAt(0);
 
@@ -1486,7 +1162,7 @@ function FallbackGridTable({
           (key) => !key.startsWith("_") && key !== "id"
         );
   const enableCaseLinks =
-    dataListId === "dlt_reltCsLst" &&
+    ['dlt_reltCsLst', 'dlt_inscrtDtsLst'].includes(normalizedId) &&
     caseLinkMap &&
     Object.keys(caseLinkMap).length > 0;
 

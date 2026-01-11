@@ -66,6 +66,7 @@ export default function CaseDetailPreview() {
 
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId, caseId]);
 
   async function fetchData() {

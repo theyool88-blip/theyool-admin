@@ -3,7 +3,7 @@
  * 이름+전화번호로 기존 의뢰인 검색 (이해충돌 검토용)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withTenant } from '@/lib/api/with-tenant';
 

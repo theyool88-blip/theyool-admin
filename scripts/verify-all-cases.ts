@@ -67,7 +67,8 @@ async function main() {
       });
 
       if (result.success && result.generalData?.raw?.data) {
-        const caseInfo = result.generalData.raw.data.dma_csBasCtt || {};
+        const rawData = result.generalData.raw.data as Record<string, unknown>;
+        const caseInfo = (rawData.dma_csBasCtt || {}) as Record<string, unknown>;
         const fields = Object.keys(caseInfo).filter(k => caseInfo[k] !== null && caseInfo[k] !== '');
         const progressCount = result.progressData?.length || 0;
 

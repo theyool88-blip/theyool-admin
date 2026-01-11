@@ -3,7 +3,7 @@
  * 계약서 파일 업로드
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withTenant, withTenantId } from '@/lib/api/with-tenant';
 

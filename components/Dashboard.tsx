@@ -71,7 +71,7 @@ export default function Dashboard({ profile, initialSchedules }: { profile: Prof
   const [showUnifiedModal, setShowUnifiedModal] = useState(false)
   const [editScheduleData, setEditScheduleData] = useState<EditScheduleData | undefined>(undefined)
   const [unifiedModalTab, setUnifiedModalTab] = useState<'schedule' | 'payment' | 'expense'>('schedule')
-  const [dayEvents, setDayEvents] = useState<Array<{ id?: string; type: string; time: string; title: string; amount?: number; event_type?: string; event_data?: any; payment_data?: any; expense_data?: any; sortType?: string }>>([])
+  const [dayEvents, setDayEvents] = useState<Array<{ id?: string; type: string; time: string; title: string; amount?: number; event_type?: string; event_data?: CalendarEvent; payment_data?: Record<string, unknown>; expense_data?: Record<string, unknown>; sortType?: string }>>([])
   const [dayEventsDate, setDayEventsDate] = useState('')
   const [dayEventsLoading, setDayEventsLoading] = useState(false)
 
@@ -183,7 +183,7 @@ export default function Dashboard({ profile, initialSchedules }: { profile: Prof
     return `${month}.${day} ${hour}:${minute}`
   }
 
-  const handleViewAll = async (date: Date, schedules: Schedule[]) => {
+  const handleViewAll = async (date: Date, _schedules: Schedule[]) => {
     const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000)
     const dayStr = localDate.toISOString().split('T')[0]
     setDayEventsDate(dayStr)
@@ -192,7 +192,7 @@ export default function Dashboard({ profile, initialSchedules }: { profile: Prof
       // 1) unified calendar events for the day
       const calRes = await fetch(`/api/admin/calendar?start_date=${dayStr}&end_date=${dayStr}`)
       const calJson = await calRes.json()
-      const calendarEvents = (calJson.data || []).map((ev: any) => {
+      const calendarEvents = (calJson.data || []).map((ev: CalendarEvent) => {
         const time = ev.event_time && ev.event_time !== '00:00' ? ev.event_time : ''
         const eventType = ev.event_type === 'COURT_HEARING'
           ? 'court'
@@ -218,32 +218,45 @@ export default function Dashboard({ profile, initialSchedules }: { profile: Prof
       // 2) payments for the day
       const payRes = await fetch(`/api/admin/payments?from_date=${dayStr}&to_date=${dayStr}`)
       const payJson = await payRes.json()
-      const payments = (payJson.data || []).map((p: any) => ({
+      const payments = (payJson.data || []).map((p: { id: string; case_name?: string; depositor_name?: string; payment_category?: string; amount?: number }) => ({
         id: p.id,
         type: 'payment',
         time: '',
         title: `[입금] ${p.case_name || p.depositor_name || '입금'} (${p.payment_category})`,
         amount: p.amount,
-        payment_data: p
+        payment_data: p as Record<string, unknown>
       }))
 
       // 3) expenses for the day
       const expRes = await fetch(`/api/admin/expenses?startDate=${dayStr}&endDate=${dayStr}`)
       const expJson = await expRes.json()
-      const expenses = (expJson.expenses || []).map((e: any) => ({
+      const expenses = (expJson.expenses || []).map((e: { id: string; expense_category?: string; subcategory?: string; vendor_name?: string; amount?: number }) => ({
         id: e.id,
         type: 'expense',
         time: '',
         title: `[지출] ${e.expense_category}${e.subcategory ? `/${e.subcategory}` : ''}${e.vendor_name ? ` - ${e.vendor_name}` : ''}`,
         amount: e.amount,
-        expense_data: e
+        expense_data: e as Record<string, unknown>
       }))
+
+      interface DayEventItem {
+        id?: string;
+        type: string;
+        time: string;
+        title: string;
+        amount?: number;
+        sortType?: string;
+        event_type?: string;
+        event_data?: CalendarEvent;
+        payment_data?: Record<string, unknown>;
+        expense_data?: Record<string, unknown>;
+      }
 
       const combined = [
         ...calendarEvents,
         ...payments,
         ...expenses,
-      ].map((item: any) => ({
+      ].map((item: DayEventItem) => ({
         id: item.id,
         type: item.type,
         time: parseTime(item.time),
@@ -378,20 +391,32 @@ export default function Dashboard({ profile, initialSchedules }: { profile: Prof
                   onClick={async () => {
                     // 입금 클릭
                     if (item.type === 'payment' && item.payment_data) {
-                      const p = item.payment_data
+                      const p = item.payment_data as {
+                        id?: string;
+                        payment_date?: string;
+                        depositor_name?: string;
+                        amount?: number;
+                        payment_category?: string;
+                        office_location?: string;
+                        case_id?: string;
+                        case_name?: string;
+                        consultation_id?: string;
+                        memo?: string;
+                        receipt_type?: string;
+                      }
                       setEditScheduleData({
-                        id: p.id,
+                        id: p.id as string,
                         event_type: 'PAYMENT',
-                        payment_date: p.payment_date,
-                        depositor_name: p.depositor_name,
-                        amount: p.amount,
-                        payment_category: p.payment_category,
-                        office_location: p.office_location,
-                        case_id: p.case_id,
-                        case_name: p.case_name,
-                        consultation_id: p.consultation_id,
-                        memo: p.memo,
-                        receipt_type: p.receipt_type,
+                        payment_date: p.payment_date as string | undefined,
+                        depositor_name: p.depositor_name as string | undefined,
+                        amount: p.amount as number | undefined,
+                        payment_category: p.payment_category as string | undefined,
+                        office_location: p.office_location as string | undefined,
+                        case_id: p.case_id as string | undefined,
+                        case_name: p.case_name as string | undefined,
+                        consultation_id: p.consultation_id as string | undefined,
+                        memo: p.memo as string | undefined,
+                        receipt_type: p.receipt_type as string | undefined,
                       })
                       setUnifiedModalTab('payment')
                       setShowUnifiedModal(true)
@@ -399,18 +424,28 @@ export default function Dashboard({ profile, initialSchedules }: { profile: Prof
                     }
                     // 지출 클릭
                     if (item.type === 'expense' && item.expense_data) {
-                      const e = item.expense_data
+                      const e = item.expense_data as {
+                        id?: string;
+                        expense_date?: string;
+                        amount?: number;
+                        expense_category?: string;
+                        subcategory?: string;
+                        office_location?: string;
+                        vendor_name?: string;
+                        memo?: string;
+                        payment_method?: string;
+                      }
                       setEditScheduleData({
-                        id: e.id,
+                        id: e.id as string,
                         event_type: 'EXPENSE',
-                        expense_date: e.expense_date,
-                        amount: e.amount,
-                        expense_category: e.expense_category,
-                        subcategory: e.subcategory,
-                        office_location: e.office_location,
-                        vendor_name: e.vendor_name,
-                        memo: e.memo,
-                        payment_method: e.payment_method,
+                        expense_date: e.expense_date as string | undefined,
+                        amount: e.amount as number | undefined,
+                        expense_category: e.expense_category as string | undefined,
+                        subcategory: e.subcategory as string | undefined,
+                        office_location: e.office_location as string | undefined,
+                        vendor_name: e.vendor_name as string | undefined,
+                        memo: e.memo as string | undefined,
+                        payment_method: e.payment_method as string | undefined,
                       })
                       setUnifiedModalTab('expense')
                       setShowUnifiedModal(true)

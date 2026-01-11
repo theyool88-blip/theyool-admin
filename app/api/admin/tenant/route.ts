@@ -3,7 +3,7 @@
  * 현재 테넌트 정보 조회 및 수정
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withTenant } from '@/lib/api/with-tenant';
 

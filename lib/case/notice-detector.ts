@@ -497,13 +497,19 @@ function detectClientRoleConfirm(params: NoticeDetectorParams): CaseNotice | nul
 
   // 의뢰인/상대방 이름
   const clientName = params.clientName || '의뢰인'
+  const opponentNameMissing = !params.opponentName
   const opponentName = params.opponentName || '상대방'
+
+  // 상대방 이름 미입력 시 다른 메시지 표시
+  const description = opponentNameMissing
+    ? `현재 ${clientName}님이 "${roleLabel}"으로 임시 지정되어 있습니다. 상대방 이름을 입력하고 역할을 확정해주세요.`
+    : `현재 ${clientName}님이 "${roleLabel}"으로 임시 지정되어 있습니다. (상대방: ${opponentName})`
 
   return {
     id: `client_role_confirm_${params.caseId}`,
     category: 'client_role_confirm',
     title: '의뢰인 역할 확인 필요',
-    description: `현재 ${clientName}님이 "${roleLabel}"으로 임시 지정되어 있습니다. (상대방: ${opponentName})`,
+    description,
     actions: [
       { label: '원고측 확정', type: 'confirm_plaintiff' },
       { label: '피고측으로 변경', type: 'confirm_defendant' },
@@ -512,6 +518,7 @@ function detectClientRoleConfirm(params: NoticeDetectorParams): CaseNotice | nul
       currentRole,
       clientName,
       opponentName,
+      opponentNameMissing: opponentNameMissing ? 'true' : undefined,
     },
   }
 }

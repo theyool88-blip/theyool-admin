@@ -5,16 +5,18 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { withTenant } from '@/lib/api/with-tenant'
-import type { StandardCaseRow, ImportOptions, ImportResult } from '@/types/onboarding'
+import type { StandardCaseRow, ImportOptions } from '@/types/onboarding'
 import { createCasesBatch } from '@/lib/onboarding/batch-case-creator'
 import { generateImportReport } from '@/lib/onboarding/import-report-generator'
 import { convertToStandardRow } from '@/lib/onboarding/csv-schema'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getScourtApiClient } from '@/lib/scourt/api-client'
-import { saveEncCsNoToCase } from '@/lib/scourt/case-storage'
+import { saveEncCsNoToCase, saveSnapshot } from '@/lib/scourt/case-storage'
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
+import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/lib/scourt/related-case-linker'
+import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
-import { inferClientRoleFromGeneralData } from '@/lib/scourt/party-role'
+import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 
 // 딜레이 유틸리티
 function delay(ms: number): Promise<void> {
@@ -127,10 +129,11 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
             const parsed = parseCaseNumber(row.court_case_number!)
             if (parsed.valid) {
               const partyName = row.client_name || row.opponent_name
+              const normalizedCourtName = getCourtFullName(row.court_name || '', parsed.caseType)
 
               if (partyName) {
                 const searchResult = await apiClient.searchAndRegisterCase({
-                  cortCd: row.court_name!,
+                  cortCd: normalizedCourtName,
                   csYr: parsed.year,
                   csDvsCd: parsed.caseType,
                   csSerial: parsed.serial,
@@ -143,25 +146,100 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
                     encCsNo: searchResult.encCsNo,
                     wmonid: searchResult.wmonid!,
                     caseNumber: row.court_case_number!,
-                    courtName: row.court_name!,
+                    courtName: normalizedCourtName,
                   })
                   result.scourtLinked = true
                   result.encCsNo = searchResult.encCsNo
-                }
 
-                if (!row.client_role && searchResult.generalData) {
-                  inferredRole = inferClientRoleFromGeneralData(searchResult.generalData, partyName)
-                  if (inferredRole) {
-                    const { error: roleError } = await adminClient
-                      .from('legal_cases')
-                      .update({ client_role: inferredRole })
-                      .eq('id', result.created.caseId)
-                    if (roleError) {
+                  // 스냅샷 저장 및 연관사건 연결
+                  if (searchResult.generalData) {
+                    type GeneralDataType = {
+                      hearings?: unknown[];
+                      lowerCourtCases?: Array<{
+                        userCsNo: string;
+                        cortNm?: string;
+                        ultmtDvsNm?: string;
+                        ultmtYmd?: string;
+                        encCsNo?: string;
+                      }>;
+                      relatedCases?: Array<{
+                        userCsNo: string;
+                        reltCsCortNm?: string;
+                        reltCsDvsNm?: string;
+                        encCsNo?: string;
+                      }>;
+                      documents?: unknown[];
+                    }
+                    const generalData = searchResult.generalData as GeneralDataType
+
+                    // 연관사건/심급 데이터 변환
+                    const lowerCourtData: LowerCourtData[] = (generalData?.lowerCourtCases || []).map(lc => ({
+                      caseNo: lc.userCsNo,
+                      courtName: lc.cortNm,
+                      result: lc.ultmtDvsNm,
+                      resultDate: lc.ultmtYmd,
+                      encCsNo: lc.encCsNo || null,
+                    }))
+
+                    const relatedCasesData: RelatedCaseData[] = (generalData?.relatedCases || []).map(rc => ({
+                      caseNo: rc.userCsNo,
+                      caseName: rc.reltCsCortNm,
+                      relation: rc.reltCsDvsNm,
+                      encCsNo: rc.encCsNo || null,
+                    }))
+
+                    try {
+                      await saveSnapshot({
+                        legalCaseId: result.created.caseId,
+                        caseNumber: row.court_case_number!,
+                        courtCode: normalizedCourtName,
+                        basicInfo: generalData as Record<string, unknown>,
+                        hearings: (generalData?.hearings || []) as unknown[],
+                        progress: (searchResult.progressData || []) as unknown[],
+                        documents: (generalData?.documents || []) as unknown[],
+                        lowerCourt: lowerCourtData,
+                        relatedCases: relatedCasesData,
+                      })
+
+                      // 연관사건/심급 자동 연결
+                      if (lowerCourtData.length > 0 || relatedCasesData.length > 0) {
+                        await linkRelatedCases({
+                          supabase: adminClient,
+                          legalCaseId: result.created.caseId,
+                          tenantId: tenant.tenantId!,
+                          caseNumber: row.court_case_number!,
+                          caseType: parsed.caseType,
+                          relatedCases: relatedCasesData,
+                          lowerCourt: lowerCourtData,
+                        })
+                      }
+                    } catch (snapshotError) {
+                      console.error('스냅샷/연관사건 처리 실패:', snapshotError)
                       result.warnings.push({
-                        field: 'client_role',
-                        message: `의뢰인 역할 저장 실패: ${roleError.message}`
+                        field: 'snapshot',
+                        message: '스냅샷/연관사건 처리 실패 (사건은 정상 등록됨)'
                       })
                     }
+                  }
+                }
+
+                // 기본값 'plaintiff'로 지정 (공통 유틸리티로 status 결정)
+                if (!row.client_role) {
+                  inferredRole = 'plaintiff'
+                  const roleStatus = determineClientRoleStatus({
+                    explicitClientRole: null,
+                    clientName: row.client_name,
+                    opponentName: row.opponent_name
+                  })
+                  const { error: roleError } = await adminClient
+                    .from('legal_cases')
+                    .update({ client_role: 'plaintiff', client_role_status: roleStatus })
+                    .eq('id', result.created.caseId)
+                  if (roleError) {
+                    result.warnings.push({
+                      field: 'client_role',
+                      message: `의뢰인 역할 저장 실패: ${roleError.message}`
+                    })
                   }
                 }
               }

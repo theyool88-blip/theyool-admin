@@ -252,7 +252,7 @@ export function resolveDataListXmlPath(params: {
       ((params.apiData?.dma_csBasCtt ||
         params.apiData?.dma_csBsCtt ||
         params.apiData?.dma_gnrlCtt ||
-        params.apiData) as Record<string, any>) || {};
+        params.apiData) as Record<string, unknown>) || {};
     const code = getCaseTypeCodeFromData(source);
     if (code && INSOLVENCY_PARTY_WITH_ULTMT_CODES.has(code)) {
       return "ssgo003/SSGO003F64.xml";
@@ -668,7 +668,7 @@ function hasData(data: unknown): boolean {
  * XML 파일 경로에서 데이터 리스트 ID 추출
  */
 export function getDataListIdFromXmlPath(xmlPath: string): DataListId | null {
-  for (const [caseType, mapping] of Object.entries(CASE_TYPE_XML_MAP)) {
+  for (const [_caseType, mapping] of Object.entries(CASE_TYPE_XML_MAP)) {
     for (const [dataListId, path] of Object.entries(mapping)) {
       if (path === xmlPath) {
         return dataListId as DataListId;
@@ -762,7 +762,7 @@ export function getViewFieldMapping(
  */
 export const ROW_VISIBILITY_RULES: Record<
   string,
-  (data: Record<string, any>) => boolean
+  (data: Record<string, unknown>) => boolean
 > = {
   // 상소제기내용: 대법원(000100)이 아닐 때만 표시
   // XML 로직: if("000100" !== dma_csBasCtt.get("cortCd")) { tr_aplPrpndCtt.show(""); }
@@ -809,7 +809,7 @@ export const ROW_VISIBILITY_RULES: Record<
 const INSOLVENCY_DVS1_CODES = new Set(["253"]); // 개회
 const INSOLVENCY_DVS2_CODES = new Set(["254", "255", "290"]); // 개확/개보/개기
 
-function getCaseTypeCodeFromData(data: Record<string, any>): string | null {
+function getCaseTypeCodeFromData(data: Record<string, unknown>): string | null {
   const csNoValue = data.csNo;
   const csNo = typeof csNoValue === "number" ? String(csNoValue) : csNoValue;
   if (typeof csNo === "string" && /^\d{14}$/.test(csNo)) {
@@ -841,17 +841,17 @@ function getCaseTypeCodeFromData(data: Record<string, any>): string | null {
   return null;
 }
 
-function isInsolvencyDvs1(data: Record<string, any>): boolean {
+function isInsolvencyDvs1(data: Record<string, unknown>): boolean {
   const code = getCaseTypeCodeFromData(data);
   return code ? INSOLVENCY_DVS1_CODES.has(code) : false;
 }
 
-function isInsolvencyDvs2(data: Record<string, any>): boolean {
+function isInsolvencyDvs2(data: Record<string, unknown>): boolean {
   const code = getCaseTypeCodeFromData(data);
   return code ? INSOLVENCY_DVS2_CODES.has(code) : false;
 }
 
-function isInsolvencyDvs3(data: Record<string, any>): boolean {
+function isInsolvencyDvs3(data: Record<string, unknown>): boolean {
   const code = getCaseTypeCodeFromData(data);
   if (!code) return false;
   return !INSOLVENCY_DVS1_CODES.has(code) && !INSOLVENCY_DVS2_CODES.has(code);
@@ -866,7 +866,7 @@ function isInsolvencyDvs3(data: Record<string, any>): boolean {
  */
 export function checkRowVisibility(
   rowId: string | undefined,
-  data: Record<string, any>
+  data: Record<string, unknown>
 ): boolean | null {
   if (!rowId) return null; // 규칙 없음 - 항상 표시
 

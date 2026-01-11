@@ -23,7 +23,7 @@ export class VisionCaptchaSolver {
 
   constructor() {
     try {
-      let credentials: any = null;
+      let credentials: { project_id: string; [key: string]: unknown } | null = null;
 
       // 방법 1: GOOGLE_VISION_CREDENTIALS 환경변수
       if (process.env.GOOGLE_VISION_CREDENTIALS) {

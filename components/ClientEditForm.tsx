@@ -25,7 +25,7 @@ interface Profile {
   role: string
 }
 
-export default function ClientEditForm({ profile, clientData }: { profile: Profile, clientData: Client }) {
+export default function ClientEditForm({ profile: _profile, clientData }: { profile: Profile, clientData: Client }) {
   const router = useRouter()
   const [saving, setSaving] = useState(false)
 

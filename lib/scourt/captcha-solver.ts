@@ -146,7 +146,7 @@ except Exception as e:
       error += data.toString();
     });
 
-    python.on('close', (code) => {
+    python.on('close', (_code) => {
       const result = output.trim();
 
       // 6자리 숫자인지 확인

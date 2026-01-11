@@ -228,6 +228,57 @@ export function isApplicationCaseType(
 }
 
 /**
+ * 형사사건 여부 판별
+ *
+ * 형사사건은 상대방이 없음 (검사 vs 피고인)
+ * 사건번호 또는 사건유형으로 판별
+ *
+ * @param caseType - 사건유형 (예: '형사')
+ * @param caseNumber - 사건번호 (예: '2024고단12345')
+ * @returns 형사사건이면 true
+ */
+export function isCriminalCase(
+  caseType: string | null | undefined,
+  caseNumber: string | null | undefined
+): boolean {
+  // 사건유형으로 판별
+  if (caseType) {
+    if (caseType === '형사' || caseType.includes('형사')) {
+      return true
+    }
+  }
+
+  // 사건번호로 판별 (형사 사건 코드)
+  if (caseNumber) {
+    const match = caseNumber.match(/\d{4}([가-힣]+)\d+/)
+    if (match) {
+      const caseCode = match[1]
+      // 형사 사건 코드들
+      const criminalCodes = [
+        '고단', '고합', '고약', '고약전', '고정',  // 형사 1심
+        '노',  // 형사 항소
+        '도',  // 형사 상고
+        '로', '모', '오',  // 형사 항고/재항고
+        '초', '초기', '초보', '초사', '초재', '초적', '초치',  // 형사 기타
+        '감고', '감노', '감도', '감로', '감모', '감오', '감초',  // 감형
+        '보', '보고', '보노', '보도', '보로', '보모', '보오', '보초',  // 보호관찰
+        '전고', '전노', '전도', '전로', '전모', '전오', '전초',  // 전속형사
+        '치고', '치노', '치도', '치로', '치모', '치오', '치초',  // 치료감호
+        '동고', '동노', '동도', '동오', '동초',  // 동반형사
+        '재고단', '재고약', '재고정', '재고합', '재감고', '재감노', '재감도', '재노', '재도', '재무', '재수',  // 재심 형사
+        '무', '수', '수흐', '과',  // 기타 형사 관련
+      ]
+
+      if (criminalCodes.some(code => caseCode === code || caseCode.startsWith(code))) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
+/**
  * 사건유형에서 그룹 추출
  */
 export function getCaseTypeGroup(caseType: string | null | undefined): CaseTypeGroup | null {

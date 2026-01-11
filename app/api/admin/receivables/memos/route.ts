@@ -3,7 +3,7 @@
  * 미수금 메모 관리 API (테넌트 격리 적용)
  */
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant } from '@/lib/api/with-tenant'
 import { canAccessAccountingWithContext } from '@/lib/auth/permissions'

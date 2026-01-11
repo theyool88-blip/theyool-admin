@@ -3,7 +3,7 @@
  * 테넌트 로고 업로드
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withTenant } from '@/lib/api/with-tenant';
 

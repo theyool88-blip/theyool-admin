@@ -10,7 +10,6 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   getCachedXml,
-  fetchXml,
   downloadXmlFromScourt,
   saveCachedXml,
 } from "@/lib/scourt/xml-fetcher";

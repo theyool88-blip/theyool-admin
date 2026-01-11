@@ -20,6 +20,7 @@ import { getStoredEncCsNo, updateSyncStatus } from '@/lib/scourt/case-storage';
 import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync';
 import { transformHearings, transformProgress } from '@/lib/scourt/field-transformer';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getCourtFullName } from '@/lib/scourt/court-codes';
 
 // 사건번호 파싱 (예: 2024드단26718 → { year: 2024, type: 드단, serial: 26718 })
 function parseCaseNumber(caseNumber: string): {
@@ -89,6 +90,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     const courtName = caseData?.court_name || '서울가정법원';
+    const normalizedCourtName = getCourtFullName(courtName, parsed.type);
 
     console.log(`📍 일반내용 조회 시작: ${caseNumber} (캡챠 불필요)`);
     console.log(`  encCsNo: ${stored.encCsNo.substring(0, 20)}...`);
@@ -102,7 +104,7 @@ export async function POST(request: NextRequest) {
       stored.wmonid,
       stored.encCsNo,
       {
-        cortCd: courtName,
+        cortCd: normalizedCourtName,
         csYear: parsed.year,
         csDvsCd: parsed.type,
         csSerial: parsed.serial,
@@ -132,7 +134,20 @@ export async function POST(request: NextRequest) {
         console.log(`📅 기일 정보 ${hearings.length}건 → court_hearings 동기화`);
 
         // SCOURT 필드를 표준 필드로 변환
-        const transformedHearings = hearings.map((h: any) => ({
+        interface ScourtHearing {
+          trmDt?: string;
+          date?: string;
+          trmHm?: string;
+          time?: string;
+          trmNm?: string;
+          type?: string;
+          trmPntNm?: string;
+          location?: string;
+          rslt?: string;
+          result?: string;
+        }
+
+        const transformedHearings = hearings.map((h: ScourtHearing) => ({
           date: h.trmDt || h.date || '',
           time: h.trmHm || h.time || '',
           type: h.trmNm || h.type || '',

@@ -52,7 +52,7 @@ export interface ConsultationActivity {
   actor_name?: string | null;
 
   // Metadata
-  metadata?: Record<string, any> | null;
+  metadata?: Record<string, unknown> | null;
   is_system_generated: boolean;
 }
 
@@ -80,7 +80,7 @@ export interface CreateActivityInput {
   actor_type?: ActorType;
   actor_id?: string;
   actor_name?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 /**

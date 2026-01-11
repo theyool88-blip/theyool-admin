@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isAuthenticated } from '@/lib/auth/auth'
+import { getCourtFullName } from '@/lib/scourt/court-codes'
+import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
 
 /**
  * PATCH /api/admin/cases/[id]
@@ -36,6 +38,16 @@ export async function PATCH(
       )
     }
 
+    const parsedCourtNumber = body.court_case_number
+      ? parseCaseNumber(body.court_case_number)
+      : null
+    const resolvedCourtName = body.court_name
+      ? getCourtFullName(
+          body.court_name,
+          parsedCourtNumber?.valid ? parsedCourtNumber.caseType : undefined
+        )
+      : null
+
     // 2. legal_cases 업데이트
     const { data, error } = await adminClient
       .from('legal_cases')
@@ -51,7 +63,7 @@ export async function PATCH(
         success_fee_agreement: body.success_fee_agreement || null,
         calculated_success_fee: body.calculated_success_fee,
         court_case_number: body.court_case_number || null,
-        court_name: body.court_name || null,
+        court_name: resolvedCourtName,
         case_type: body.case_type || null,
         application_type: body.application_type || null,
         judge_name: body.judge_name || null,
@@ -260,6 +272,96 @@ export async function GET(
     })
   } catch (error) {
     console.error('Error in GET /api/admin/cases/[id]:', error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    return NextResponse.json(
+      { error: message },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/admin/cases/[id]
+ * Delete a legal case and all related data
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const authenticated = await isAuthenticated()
+    if (!authenticated) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const { id } = await params
+    const adminClient = createAdminClient()
+
+    // 1. 사건 존재 여부 확인
+    const { data: existingCase, error: fetchError } = await adminClient
+      .from('legal_cases')
+      .select('id, case_name')
+      .eq('id', id)
+      .single()
+
+    if (fetchError || !existingCase) {
+      return NextResponse.json(
+        { error: '사건을 찾을 수 없습니다' },
+        { status: 404 }
+      )
+    }
+
+    // 2. 관련 데이터 삭제 (순서 중요 - FK 제약조건)
+    // 2a. case_parties 삭제
+    await adminClient.from('case_parties').delete().eq('case_id', id)
+
+    // 2b. case_representatives 삭제
+    await adminClient.from('case_representatives').delete().eq('case_id', id)
+
+    // 2c. case_deadlines 삭제
+    await adminClient.from('case_deadlines').delete().eq('case_id', id)
+
+    // 2d. court_hearings 삭제
+    await adminClient.from('court_hearings').delete().eq('case_id', id)
+
+    // 2e. payments 삭제
+    await adminClient.from('payments').delete().eq('case_id', id)
+
+    // 2f. case_relations 삭제 (양방향)
+    await adminClient.from('case_relations').delete().eq('case_id', id)
+    await adminClient.from('case_relations').delete().eq('related_case_id', id)
+
+    // 2g. scourt_case_snapshots 삭제
+    await adminClient.from('scourt_case_snapshots').delete().eq('case_id', id)
+
+    // 2h. scourt_case_updates 삭제
+    await adminClient.from('scourt_case_updates').delete().eq('case_id', id)
+
+    // 2i. case_notices 삭제
+    await adminClient.from('case_notices').delete().eq('case_id', id)
+
+    // 3. 사건 삭제
+    const { error: deleteError } = await adminClient
+      .from('legal_cases')
+      .delete()
+      .eq('id', id)
+
+    if (deleteError) {
+      console.error('Error deleting case:', deleteError)
+      return NextResponse.json(
+        { error: `사건 삭제 실패: ${deleteError.message}` },
+        { status: 500 }
+      )
+    }
+
+    console.log(`Case deleted: ${id} (${existingCase.case_name})`)
+
+    return NextResponse.json({
+      success: true,
+      message: '사건이 삭제되었습니다'
+    })
+  } catch (error) {
+    console.error('Error in DELETE /api/admin/cases/[id]:', error)
     const message = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json(
       { error: message },

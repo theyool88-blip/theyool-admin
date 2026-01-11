@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { ConsultationActivity, GroupedActivity, ActivitySummary } from '@/types/consultation-activity';
+import type { ConsultationActivity, ActivitySummary } from '@/types/consultation-activity';
 import {
   groupActivitiesByDate,
   formatActivityTime,
@@ -33,6 +33,7 @@ export default function ConsultationActivityTimeline({
 
   useEffect(() => {
     fetchActivities();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consultationId]);
 
   const fetchActivities = async () => {
@@ -89,9 +90,6 @@ export default function ConsultationActivityTimeline({
       </div>
     );
   }
-
-  // Group activities by date
-  const groupedActivities = groupActivitiesByDate(activities);
 
   // Limit items if maxItems is set
   const displayActivities = maxItems && !showAll

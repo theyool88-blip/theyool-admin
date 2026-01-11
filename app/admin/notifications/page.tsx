@@ -9,10 +9,6 @@ import type {
   NotificationChannel,
   TemplateCategory,
   NotificationStatus,
-  CATEGORY_LABELS,
-  CHANNEL_LABELS,
-  STATUS_LABELS,
-  STATUS_COLORS,
 } from '@/types/notification';
 
 // 상수 정의
@@ -49,7 +45,7 @@ export default function NotificationsPage() {
   const [templates, setTemplates] = useState<NotificationTemplate[]>([]);
   const [logs, setLogs] = useState<NotificationLog[]>([]);
   const [schedules, setSchedules] = useState<NotificationSchedule[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // 템플릿 편집 상태
@@ -80,7 +76,7 @@ export default function NotificationsPage() {
       if (data.success) {
         setTemplates(data.data);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('템플릿 조회 실패');
     } finally {
       setLoading(false);
@@ -97,7 +93,7 @@ export default function NotificationsPage() {
         setLogs(data.data);
         setLogTotal(data.pagination.total);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('발송 이력 조회 실패');
     } finally {
       setLoading(false);
@@ -113,7 +109,7 @@ export default function NotificationsPage() {
       if (data.success) {
         setSchedules(data.data);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('설정 조회 실패');
     } finally {
       setLoading(false);
@@ -159,7 +155,7 @@ export default function NotificationsPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('템플릿 저장 실패');
     } finally {
       setLoading(false);
@@ -180,7 +176,7 @@ export default function NotificationsPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('템플릿 삭제 실패');
     }
   };
@@ -227,7 +223,7 @@ export default function NotificationsPage() {
       } else {
         setError(data.error || data.message);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('발송 실패');
     } finally {
       setSending(false);
@@ -249,7 +245,7 @@ export default function NotificationsPage() {
       } else {
         setError(data.error);
       }
-    } catch (err) {
+    } catch (_err) {
       setError('설정 저장 실패');
     }
   };

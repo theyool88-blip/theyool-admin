@@ -7,7 +7,7 @@
  * 쓰기 기능은 /api/admin/court-hearings/sync-to-calendar 사용
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 const DEPRECATION_MESSAGE = {
   deprecated: true,
@@ -17,7 +17,7 @@ const DEPRECATION_MESSAGE = {
 };
 
 // POST: 수동 동기화 실행 (비활성화)
-export async function POST(request: NextRequest) {
+export async function POST() {
   return NextResponse.json(DEPRECATION_MESSAGE, { status: 410 });  // 410 Gone
 }
 
@@ -27,11 +27,11 @@ export async function GET() {
 }
 
 // PUT: Push Watch 등록 (비활성화)
-export async function PUT(request: NextRequest) {
+export async function PUT() {
   return NextResponse.json(DEPRECATION_MESSAGE, { status: 410 });
 }
 
 // DELETE: Push Watch 해제 (비활성화)
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   return NextResponse.json(DEPRECATION_MESSAGE, { status: 410 });
 }

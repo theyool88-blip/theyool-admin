@@ -26,6 +26,25 @@ import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber, type Scour
 import { normalizeCaseNumber } from '@/lib/scourt/case-number-utils'
 import { isMaskedPartyName, normalizePartyLabel } from '@/types/case-party'
 
+/**
+ * 당사자 유형 정렬 순서 (법적 표시 순서)
+ * 원고측/검찰측 → 피고측 순서로 표시
+ */
+const PARTY_TYPE_ORDER: Record<string, number> = {
+  // 원고측 (민사), 검찰측 (형사)
+  'plaintiff': 1,
+  'creditor': 2,
+  'applicant': 3,
+  'actor': 4,        // 피해자 (형사)
+  // 피고측 (민사), 피고인측 (형사)
+  'defendant': 10,
+  'debtor': 11,
+  'respondent': 12,
+  'accused': 13,     // 피고인 (형사) - 피고측
+  'juvenile': 14,    // 소년부 - 피고측
+  'third_debtor': 15, // 제3채무자
+}
+
 interface Client {
   id: string
   name: string
@@ -341,7 +360,14 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       const res = await fetch(`/api/admin/cases/${caseData.id}/parties`)
       const data = await res.json()
       if (data.parties) {
-        setCaseParties(data.parties)
+        // 법적 표시 순서로 정렬 (원고측 → 피고측)
+        const sortedParties = [...data.parties].sort((a: typeof data.parties[0], b: typeof data.parties[0]) => {
+          const orderA = PARTY_TYPE_ORDER[a.party_type] ?? 99
+          const orderB = PARTY_TYPE_ORDER[b.party_type] ?? 99
+          if (orderA !== orderB) return orderA - orderB
+          return (a.party_order ?? 0) - (b.party_order ?? 0)
+        })
+        setCaseParties(sortedParties)
       }
       setCaseRepresentatives(data.representatives || [])
     } catch (error) {
@@ -2044,11 +2070,15 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             {/* 알림 섹션 */}
             <CaseNoticeSection notices={filteredNotices} onAction={handleNoticeAction} onDismiss={handleDismissNotice} />
 
-            {/* 심급내용 (원심) - SCOURT */}
+            {/* 심급내용 (원심) - SCOURT + case_relations */}
             {(() => {
-              const linkedCaseIds = new Set((caseData.case_relations || []).map(r => r.related_case_id))
+              // case_relations에서 심급 관계 (appeal 타입) 추출
+              const appealRelations = (caseData.case_relations || []).filter(
+                r => r.relation_type_code === 'appeal'
+              )
+              const linkedCaseIds = new Set(appealRelations.map(r => r.related_case_id))
               const linkedCaseNumbers = new Set(
-                (caseData.case_relations || [])
+                appealRelations
                   .map(r => r.related_case?.court_case_number)
                   .filter(Boolean)
               )
@@ -2067,7 +2097,10 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               // 미연동 심급사건 목록 (모두연결용)
               const unlinkdLowerCourt = filteredLowerCourt.filter((item: LowerCourtItem) => !item.linkedCaseId)
 
-              return filteredLowerCourt.length > 0 && (
+              // 스냅샷이 비어있어도 case_relations에 심급 관계가 있으면 표시
+              const hasAppealData = filteredLowerCourt.length > 0 || appealRelations.length > 0
+
+              return hasAppealData && (
                 <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   <div className="px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -2100,6 +2133,30 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
+                      {/* case_relations에서 가져온 이미 연결된 심급사건 */}
+                      {appealRelations.map((rel) => (
+                        <tr key={`appeal-rel-${rel.id}`} className="hover:bg-gray-50 bg-sage-50/30">
+                          <td className="px-5 py-3 text-sm text-gray-700">
+                            {rel.related_case?.case_level || rel.relation_type || '-'}
+                          </td>
+                          <td className="px-5 py-3 text-sm">
+                            <button
+                              onClick={() => router.push(`/cases/${rel.related_case_id}`)}
+                              className="text-sage-600 hover:text-sage-700 font-medium flex items-center gap-1"
+                            >
+                              {rel.related_case?.court_case_number || rel.related_case?.case_name || '-'}
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                              </svg>
+                            </button>
+                          </td>
+                          <td className="px-5 py-3 text-sm text-gray-600">
+                            {rel.related_case?.case_result || rel.related_case?.status || '-'}
+                          </td>
+                        </tr>
+                      ))}
+                      {/* 스냅샷에서 가져온 미연결 심급사건 */}
                       {filteredLowerCourt.map((item: LowerCourtItem, idx: number) => (
                         <tr key={`lower-${idx}`} className="hover:bg-gray-50">
                           <td className="px-5 py-3 text-sm text-gray-700">{item.courtName || item.court || '-'}</td>

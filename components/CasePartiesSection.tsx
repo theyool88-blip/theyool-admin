@@ -6,8 +6,7 @@ import type {
   CaseRepresentative,
   PartyType,
 } from '@/types/case-party'
-import { PARTY_TYPE_LABELS, getOppositePartyType, isMaskedPartyName, normalizePartyLabel } from '@/types/case-party'
-import { getPartyLabels } from '@/lib/scourt/party-labels'
+import { PARTY_TYPE_LABELS, getOppositePartyType, isMaskedPartyName, normalizePartyLabel, getPartyLabels } from '@/types/case-party'
 
 interface Client {
   id: string

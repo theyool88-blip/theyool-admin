@@ -92,10 +92,10 @@ async function verifyCase(client: any, tc: TestCase): Promise<VerificationResult
       return result;
     }
 
-    const data = apiResult.generalData.raw.data;
+    const data = apiResult.generalData.raw.data as Record<string, unknown>;
 
     // 1. 일반내용 검증
-    const caseInfo = data.dma_csBasCtt || {};
+    const caseInfo = (data.dma_csBasCtt || {}) as Record<string, unknown>;
     const fields = Object.keys(caseInfo).filter(k => {
       const v = caseInfo[k];
       return v !== null && v !== undefined && v !== '';
@@ -124,8 +124,8 @@ async function verifyCase(client: any, tc: TestCase): Promise<VerificationResult
         plaintiff: caseInfo.titRprsPtnr || caseInfo.rprsClmntNm ? '원고' : '-',
         defendant: caseInfo.titRprsRqstr || caseInfo.rprsAcsdNm ? '피고' : '-',
       };
-      if (caseInfo.titRprsPtnr) result.partyLabels.plaintiff = caseInfo.titRprsPtnr;
-      if (caseInfo.titRprsRqstr) result.partyLabels.defendant = caseInfo.titRprsRqstr;
+      if (caseInfo.titRprsPtnr) result.partyLabels.plaintiff = String(caseInfo.titRprsPtnr);
+      if (caseInfo.titRprsRqstr) result.partyLabels.defendant = String(caseInfo.titRprsRqstr);
     }
 
     // 2. LIST 필드 검증

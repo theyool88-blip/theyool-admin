@@ -22,8 +22,6 @@ import type {
   RiskFlag,
   RecommendedAction,
   CaseData,
-  HearingInfo,
-  DeadlineInfo,
   PriorityListRequest,
 } from './types';
 
@@ -331,8 +329,8 @@ export class PriorityScorer {
    */
   private generateRiskFlags(
     caseData: CaseData,
-    urgency: ScoreDetail,
-    risk: ScoreDetail
+    _urgency: ScoreDetail,
+    _risk: ScoreDetail
   ): RiskFlag[] {
     const flags: RiskFlag[] = [];
 

@@ -212,6 +212,10 @@ export interface CourtHearing {
   status: HearingStatus;
   created_at: string;
   updated_at: string;
+  // SCOURT 원본 데이터 (나의사건검색 동일 표시용)
+  scourt_type_raw: string | null;    // SCOURT 원본 기일명 (예: "제1회 변론기일")
+  scourt_result_raw: string | null;  // SCOURT 원본 결과 (예: "다음기일지정(2025.02.15)")
+  hearing_sequence: number | null;   // 기일 회차 (1, 2, 3...)
 }
 
 /**

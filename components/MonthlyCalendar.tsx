@@ -39,6 +39,10 @@ interface UnifiedSchedule {
   event_subtype?: string // consultation의 경우 pending_visit, confirmed_visit 등
   attending_lawyer_id?: string // 출석변호사 ID
   attending_lawyer_name?: string // 출석변호사 이름
+  // SCOURT 원본 데이터 (나의사건검색 동일 표시용)
+  scourt_type_raw?: string // 원본 기일명 (예: "제1회 변론기일")
+  scourt_result_raw?: string // 원본 결과 (예: "다음기일지정(2025.02.15)")
+  hearing_sequence?: number // 기일 회차
 }
 
 interface TenantMember {
@@ -173,6 +177,9 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
           status?: string | null
           attending_lawyer_id?: string | null
           attending_lawyer_name?: string | null
+          scourt_type_raw?: string | null
+          scourt_result_raw?: string | null
+          hearing_sequence?: number | null
         }) => {
           let scheduleType: ScheduleType
           let hearing_type: string | undefined
@@ -200,7 +207,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
           unifiedSchedules.push({
             id: event.id,
             type: scheduleType,
-            title: event.title, // 이미 "(변론기일) 김OO 이혼사건" 형식
+            title: event.title, // 이미 "(제1회 변론기일) 김OO 이혼사건" 형식
             date: event.event_date,
             time: event.event_time === '00:00' ? undefined : (event.event_time ?? undefined),
             location: event.location ?? undefined,
@@ -214,6 +221,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             event_subtype: event.event_subtype ?? undefined, // pending_visit, confirmed_callback 등
             attending_lawyer_id: event.attending_lawyer_id ?? undefined,
             attending_lawyer_name: event.attending_lawyer_name ?? undefined,
+            // SCOURT 원본 데이터
+            scourt_type_raw: event.scourt_type_raw ?? undefined,
+            scourt_result_raw: event.scourt_result_raw ?? undefined,
+            hearing_sequence: event.hearing_sequence ?? undefined,
           })
         })
       }
@@ -1022,7 +1033,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   >
                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/90 shadow-sm">
-                        {getScheduleTypeLabel(schedule.type, schedule.location)}
+                        {/* 법원기일: scourt_type_raw 우선 표시 (예: "제1회 변론기일") */}
+                        {schedule.type === 'court_hearing' && schedule.scourt_type_raw
+                          ? schedule.scourt_type_raw
+                          : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>
                       {schedule.time && (
                         <span className="text-[10px] font-semibold text-gray-700">
@@ -1055,6 +1069,15 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         <span className="truncate">{schedule.location}</span>
+                      </p>
+                    )}
+                    {/* SCOURT 기일 결과 표시 (예: "다음기일지정(2025.02.15)", "변론종결") */}
+                    {schedule.type === 'court_hearing' && schedule.scourt_result_raw && (
+                      <p className="text-[10px] text-sage-600 flex items-center gap-1 mt-0.5">
+                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="truncate">결과: {schedule.scourt_result_raw}</span>
                       </p>
                     )}
                     {/* 출석변호사 표시 및 변경 (법원기일만) */}

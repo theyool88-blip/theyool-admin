@@ -218,6 +218,17 @@ export function generateHearingHash(hearing: HearingInfo): string {
 }
 
 /**
+ * 기일명에서 회차 추출
+ * "제1회 변론기일" → 1
+ * "제2회 변론준비기일" → 2
+ * "조정기일" → null
+ */
+export function extractHearingSequence(typeName: string): number | null {
+  const match = typeName.match(/제(\d+)회/);
+  return match ? parseInt(match[1]) : null;
+}
+
+/**
  * 기일 상태 결정
  */
 function determineHearingStatus(hearing: HearingInfo): HearingStatus {
@@ -290,16 +301,19 @@ export async function syncHearingsToCourtHearings(
       // 기존 기일 확인 (case_id + 해시로 검색)
       const { data: existing } = await supabase
         .from('court_hearings')
-        .select('id, result, status')
+        .select('id, result, status, scourt_type_raw, scourt_result_raw')
         .eq('case_id', caseId)
         .eq('scourt_hearing_hash', hash)
         .single();
 
       if (existing) {
-        // 기존 기일이 있으면 결과/상태만 업데이트 (변경된 경우만)
+        // 기존 기일이 있으면 결과/상태 및 SCOURT 원본 데이터 업데이트
+        // scourt_type_raw가 null인 경우 채워주기 (마이그레이션 전 데이터 대응)
         const needsUpdate =
           (hearingResult && existing.result !== hearingResult) ||
-          (hearingStatus !== existing.status);
+          (hearingStatus !== existing.status) ||
+          (!existing.scourt_type_raw && hearing.type) ||
+          (hearing.result && existing.scourt_result_raw !== hearing.result);
 
         if (needsUpdate) {
           const updateData: Record<string, unknown> = {};
@@ -308,6 +322,14 @@ export async function syncHearingsToCourtHearings(
           }
           if (hearingStatus !== existing.status) {
             updateData.status = hearingStatus;
+          }
+          // SCOURT 원본 데이터 업데이트
+          if (!existing.scourt_type_raw && hearing.type) {
+            updateData.scourt_type_raw = hearing.type;
+            updateData.hearing_sequence = extractHearingSequence(hearing.type);
+          }
+          if (hearing.result && existing.scourt_result_raw !== hearing.result) {
+            updateData.scourt_result_raw = hearing.result;
           }
 
           const { error: updateError } = await supabase
@@ -334,7 +356,11 @@ export async function syncHearingsToCourtHearings(
           status: hearingStatus,
           source: 'scourt',
           scourt_hearing_hash: hash,
-          notes: `SCOURT 동기화: ${hearing.type}`,
+          // SCOURT 원본 데이터 저장 (나의사건검색 동일 표시용)
+          scourt_type_raw: hearing.type || null,              // "제1회 변론기일"
+          scourt_result_raw: hearing.result || null,          // "다음기일지정(2025.02.15)"
+          hearing_sequence: extractHearingSequence(hearing.type || ''),
+          notes: null,  // 원본은 scourt_type_raw에 저장
         };
 
         const { error: insertError } = await supabase

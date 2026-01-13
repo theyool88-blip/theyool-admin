@@ -345,6 +345,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   } | null>(null)
   const [editPartyNameInput, setEditPartyNameInput] = useState('')
   const [editPartyPrimaryInput, setEditPartyPrimaryInput] = useState(false)
+  const [editPartyIsOurClient, setEditPartyIsOurClient] = useState(false)
+  const [editPartyClientId, setEditPartyClientId] = useState<string | null>(null)
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([])
   const [pendingPartyEdits, setPendingPartyEdits] = useState<Record<string, {
     partyId: string
     partyLabel: string
@@ -548,9 +551,14 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     const nameWithoutNumber = currentName.replace(/^\d+\.\s*/, '')
     const existingParty = casePartiesWithPending.find(party => party.id === partyId)
     const isPrimary = existingParty?.is_primary || false
+    const isOurClient = existingParty?.is_our_client || false
+    const clientId = existingParty?.client_id || null
+
     setEditingPartyFromGeneral({ partyId, partyLabel, partyName: currentName, isPrimary })
     setEditPartyNameInput(nameWithoutNumber)
     setEditPartyPrimaryInput(isPrimary)
+    setEditPartyIsOurClient(isOurClient)
+    setEditPartyClientId(clientId)
   }, [casePartiesWithPending])
 
   // 일반 탭 당사자 이름 저장 (즉시 반영)
@@ -579,6 +587,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     setEditingPartyFromGeneral(null)
     setEditPartyNameInput('')
     setEditPartyPrimaryInput(false)
+    setEditPartyIsOurClient(false)
+    setEditPartyClientId(null)
     setSavingPartyFromGeneral(true)
 
     try {
@@ -589,6 +599,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           partyId,
           party_name: newPartyName,
           is_primary: nextIsPrimary,
+          is_our_client: editPartyIsOurClient,
+          client_id: editPartyIsOurClient ? editPartyClientId : null,
         }),
       })
 
@@ -615,12 +627,36 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     } finally {
       setSavingPartyFromGeneral(false)
     }
-  }, [editingPartyFromGeneral, editPartyNameInput, editPartyPrimaryInput, caseData.id, router])
+  }, [editingPartyFromGeneral, editPartyNameInput, editPartyPrimaryInput, editPartyIsOurClient, editPartyClientId, caseData.id, router])
 
   const pendingPartyEditList = useMemo(
     () => Object.values(pendingPartyEdits),
     [pendingPartyEdits]
   )
+
+  // 반대측에 기존 의뢰인이 있는지 감지 (경고 표시용, 차단하지 않음)
+  const isOppositeSideClient = useMemo(() => {
+    if (!editingPartyFromGeneral) return false
+    const currentParty = casePartiesWithPending.find(p => p.id === editingPartyFromGeneral.partyId)
+    if (!currentParty) return false
+
+    const existingClientParty = casePartiesWithPending.find(
+      p => p.is_our_client && p.id !== editingPartyFromGeneral.partyId
+    )
+    if (!existingClientParty) return false  // 기존 의뢰인 없으면 반대측 아님
+
+    // 같은 측인지 확인 (plaintiff/defendant 구분)
+    const PLAINTIFF_SIDE = new Set(['plaintiff', 'creditor', 'applicant', 'actor'])
+    const DEFENDANT_SIDE = new Set(['defendant', 'debtor', 'respondent', 'third_debtor', 'accused', 'juvenile'])
+
+    const currentSide = PLAINTIFF_SIDE.has(currentParty.party_type) ? 'plaintiff'
+                      : DEFENDANT_SIDE.has(currentParty.party_type) ? 'defendant' : null
+    const existingSide = PLAINTIFF_SIDE.has(existingClientParty.party_type) ? 'plaintiff'
+                       : DEFENDANT_SIDE.has(existingClientParty.party_type) ? 'defendant' : null
+
+    // 다른 측이면 true (경고 표시)
+    return currentSide !== existingSide
+  }, [editingPartyFromGeneral, casePartiesWithPending])
 
   const handleSaveAllPartyEdits = useCallback(async () => {
     if (pendingPartyEditList.length === 0) return
@@ -1015,6 +1051,22 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   useEffect(() => {
     fetchTenantMembers()
   }, [fetchTenantMembers])
+
+  // 의뢰인 목록 조회 (당사자 수정 모달용)
+  useEffect(() => {
+    const fetchClients = async () => {
+      try {
+        const res = await fetch('/api/admin/clients')
+        const data = await res.json()
+        if (data.clients && Array.isArray(data.clients)) {
+          setClients(data.clients)
+        }
+      } catch (err) {
+        console.error('의뢰인 목록 조회 실패:', err)
+      }
+    }
+    fetchClients()
+  }, [])
 
   useEffect(() => {
     const fetchPayments = async () => {
@@ -3034,6 +3086,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   setEditingPartyFromGeneral(null)
                   setEditPartyNameInput('')
                   setEditPartyPrimaryInput(false)
+                  setEditPartyIsOurClient(false)
+                  setEditPartyClientId(null)
                 }}
                 className="p-1 text-gray-400 hover:text-gray-600 transition-colors"
               >
@@ -3043,6 +3097,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               </button>
             </div>
             <div className="p-6 space-y-4">
+              {/* 이름 수정 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {editingPartyFromGeneral.partyLabel}
@@ -3059,6 +3114,51 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   autoFocus
                 />
               </div>
+
+              {/* 의뢰인 설정 */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="party-is-our-client"
+                    type="checkbox"
+                    checked={editPartyIsOurClient}
+                    onChange={(e) => {
+                      setEditPartyIsOurClient(e.target.checked)
+                      if (!e.target.checked) {
+                        setEditPartyClientId(null)
+                      }
+                    }}
+                    className="h-4 w-4 rounded border-gray-300 text-sage-600 focus:ring-sage-500"
+                  />
+                  <label htmlFor="party-is-our-client" className="text-sm text-gray-700">
+                    의뢰인으로 설정
+                  </label>
+                </div>
+                {isOppositeSideClient && !editPartyIsOurClient && (
+                  <p className="text-xs text-amber-600 ml-6">
+                    ⚠️ 현재 반대측 당사자가 의뢰인으로 설정되어 있습니다.
+                    이 당사자를 의뢰인으로 설정하면 기존 의뢰인 설정이 해제됩니다.
+                  </p>
+                )}
+
+                {editPartyIsOurClient && (
+                  <div className="ml-6">
+                    <label className="block text-xs text-gray-500 mb-1">의뢰인 연결</label>
+                    <select
+                      value={editPartyClientId || ''}
+                      onChange={(e) => setEditPartyClientId(e.target.value || null)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                    >
+                      <option value="">선택...</option>
+                      {clients.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* 대표 당사자 설정 */}
               <div>
                 <div className="flex items-center gap-2">
                   <input
@@ -3080,6 +3180,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   setEditingPartyFromGeneral(null)
                   setEditPartyNameInput('')
                   setEditPartyPrimaryInput(false)
+                  setEditPartyIsOurClient(false)
+                  setEditPartyClientId(null)
                 }}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
               >

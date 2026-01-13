@@ -574,10 +574,10 @@ function PartyTableRow({
   const [newClientPhone, setNewClientPhone] = useState('')
   const [creatingClient, setCreatingClient] = useState(false)
 
-  // 현재 의뢰인이 설정된 측 확인 (같은 측만 추가 가능)
+  // 반대측에 기존 의뢰인이 있는지 확인 (경고 표시용, 차단하지 않음)
   const existingClientParty = allParties.find(p => p.is_our_client && p.id !== party.id)
   const clientSide = existingClientParty?.party_type
-  const canSetAsClient = !clientSide || party.party_type === clientSide
+  const isOppositeSide = clientSide && party.party_type !== clientSide
 
   // 새 의뢰인 생성
   const handleCreateClient = async () => {
@@ -668,22 +668,33 @@ function PartyTableRow({
             </div>
 
             {/* 의뢰인 설정 체크박스 */}
-            <div className="flex items-center gap-3">
-              <div className="w-20 flex-shrink-0" />
-              <label className={`flex items-center gap-2 cursor-pointer ${!canSetAsClient ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={editData.is_our_client}
-                  onChange={(e) => setEditData({ ...editData, is_our_client: e.target.checked })}
-                  disabled={!canSetAsClient}
-                  className="w-4 h-4 rounded border-gray-300 text-sage-600 focus:ring-sage-500 disabled:cursor-not-allowed"
-                />
-                <span className="text-sm text-gray-700">의뢰인으로 설정</span>
-              </label>
-              {!canSetAsClient && (
-                <span className="text-xs text-red-500 ml-2">
-                  (반대측이 이미 의뢰인으로 설정됨)
-                </span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-3">
+                <div className="w-20 flex-shrink-0" />
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editData.is_our_client}
+                    onChange={(e) => {
+                      const checked = e.target.checked
+                      setEditData({
+                        ...editData,
+                        is_our_client: checked,
+                        client_id: checked ? editData.client_id : null,  // 해제 시 client_id도 초기화
+                      })
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-sage-600 focus:ring-sage-500"
+                  />
+                  <span className="text-sm text-gray-700">의뢰인으로 설정</span>
+                </label>
+              </div>
+              {isOppositeSide && !editData.is_our_client && (
+                <div className="ml-[calc(5rem+0.75rem)]">
+                  <p className="text-xs text-amber-600">
+                    ⚠️ 현재 반대측 당사자가 의뢰인으로 설정되어 있습니다.
+                    이 당사자를 의뢰인으로 설정하면 기존 의뢰인 설정이 해제됩니다.
+                  </p>
+                </div>
               )}
             </div>
 

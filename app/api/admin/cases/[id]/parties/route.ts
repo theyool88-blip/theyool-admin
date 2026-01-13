@@ -333,12 +333,38 @@ export async function PATCH(
 
         const isOurClient = payload.is_our_client === true;
         const clientId = typeof payload.client_id === "string" ? payload.client_id : null;
-        if (isOurClient && clientId) {
+        if (isOurClient) {
           const updatedPartyType = (payload.party_type as string) || data.party_type;
+          const currentSide = getPartySide(updatedPartyType);
+
+          // 반대측 의뢰인 해제 (같은 측은 복수 의뢰인 허용)
+          if (currentSide) {
+            const oppositeSideTypes = currentSide === "plaintiff"
+              ? Array.from(DEFENDANT_SIDE_TYPES)
+              : Array.from(PLAINTIFF_SIDE_TYPES);
+
+            const { error: unsetError } = await adminClient
+              .from("case_parties")
+              .update({
+                is_our_client: false,
+                client_id: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("case_id", caseId)
+              .neq("id", update.partyId)
+              .eq("is_our_client", true)
+              .in("party_type", oppositeSideTypes);
+
+            if (unsetError) {
+              console.error("반대측 의뢰인 해제 오류:", unsetError);
+            }
+          }
+
+          // legal_cases 동기화 (client_id 유무와 관계없이 client_role 업데이트)
           const { error: caseUpdateError } = await adminClient
             .from("legal_cases")
             .update({
-              client_id: clientId,
+              client_id: clientId,  // null이면 null로 설정
               client_role: updatedPartyType,
               updated_at: new Date().toISOString(),
             })
@@ -346,6 +372,39 @@ export async function PATCH(
 
           if (caseUpdateError) {
             console.error("legal_cases 동기화 오류:", caseUpdateError);
+          }
+        }
+
+        // 의뢰인 해제 시 legal_cases 동기화 (다른 의뢰인이 있으면 그 정보로, 없으면 null)
+        if (payload.is_our_client === false) {
+          const { data: otherClients } = await adminClient
+            .from("case_parties")
+            .select("client_id, party_type, is_primary")
+            .eq("case_id", caseId)
+            .eq("is_our_client", true)
+            .neq("id", update.partyId)
+            .order("is_primary", { ascending: false })
+            .limit(1);
+
+          if (otherClients && otherClients.length > 0) {
+            const otherClient = otherClients[0];
+            await adminClient
+              .from("legal_cases")
+              .update({
+                client_id: otherClient.client_id,
+                client_role: otherClient.party_type,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", caseId);
+          } else {
+            await adminClient
+              .from("legal_cases")
+              .update({
+                client_id: null,
+                client_role: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", caseId);
           }
         }
       }
@@ -423,12 +482,38 @@ export async function PATCH(
 
     const isOurClient = payload.is_our_client === true;
     const clientId = typeof payload.client_id === "string" ? payload.client_id : null;
-    if (isOurClient && clientId) {
+    if (isOurClient) {
       const updatedPartyType = (payload.party_type as string) || data.party_type;
+      const currentSide = getPartySide(updatedPartyType);
+
+      // 반대측 의뢰인 해제 (같은 측은 복수 의뢰인 허용)
+      if (currentSide) {
+        const oppositeSideTypes = currentSide === "plaintiff"
+          ? Array.from(DEFENDANT_SIDE_TYPES)
+          : Array.from(PLAINTIFF_SIDE_TYPES);
+
+        const { error: unsetError } = await adminClient
+          .from("case_parties")
+          .update({
+            is_our_client: false,
+            client_id: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("case_id", caseId)
+          .neq("id", partyId)
+          .eq("is_our_client", true)
+          .in("party_type", oppositeSideTypes);
+
+        if (unsetError) {
+          console.error("반대측 의뢰인 해제 오류:", unsetError);
+        }
+      }
+
+      // legal_cases 동기화 (client_id 유무와 관계없이 client_role 업데이트)
       const { error: caseUpdateError } = await adminClient
         .from("legal_cases")
         .update({
-          client_id: clientId,
+          client_id: clientId,  // null이면 null로 설정
           client_role: updatedPartyType,
           updated_at: new Date().toISOString(),
         })
@@ -436,6 +521,42 @@ export async function PATCH(
 
       if (caseUpdateError) {
         console.error("legal_cases 동기화 오류:", caseUpdateError);
+      }
+    }
+
+    // 의뢰인 해제 시 legal_cases 동기화 (다른 의뢰인이 있으면 그 정보로, 없으면 null)
+    if (payload.is_our_client === false) {
+      // 다른 의뢰인 당사자 찾기 (is_primary 우선)
+      const { data: otherClients } = await adminClient
+        .from("case_parties")
+        .select("client_id, party_type, is_primary")
+        .eq("case_id", caseId)
+        .eq("is_our_client", true)
+        .neq("id", partyId)
+        .order("is_primary", { ascending: false })
+        .limit(1);
+
+      if (otherClients && otherClients.length > 0) {
+        // 다른 의뢰인이 있으면 그 정보로 업데이트
+        const otherClient = otherClients[0];
+        await adminClient
+          .from("legal_cases")
+          .update({
+            client_id: otherClient.client_id,
+            client_role: otherClient.party_type,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", caseId);
+      } else {
+        // 다른 의뢰인이 없으면 null로 설정
+        await adminClient
+          .from("legal_cases")
+          .update({
+            client_id: null,
+            client_role: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", caseId);
       }
     }
 

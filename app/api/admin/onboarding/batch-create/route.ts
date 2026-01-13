@@ -17,6 +17,7 @@ import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/l
 import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
+import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync'
 
 // 딜레이 유틸리티
 function delay(ms: number): Promise<void> {
@@ -212,6 +213,23 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
                           relatedCases: relatedCasesData,
                           lowerCourt: lowerCourtData,
                         })
+                      }
+
+                      // 기일 동기화
+                      if (generalData?.hearings && generalData.hearings.length > 0) {
+                        type HearingType = { trmDt?: string; trmHm?: string; trmNm?: string; trmPntNm?: string; rslt?: string }
+                        const hearingsForSync = (generalData.hearings as HearingType[]).map((h) => ({
+                          date: h.trmDt || '',
+                          time: h.trmHm || '',
+                          type: h.trmNm || '',
+                          location: h.trmPntNm || '',
+                          result: h.rslt || '',
+                        }))
+                        await syncHearingsToCourtHearings(
+                          result.created.caseId,
+                          row.court_case_number!,
+                          hearingsForSync
+                        )
                       }
                     } catch (snapshotError) {
                       console.error('스냅샷/연관사건 처리 실패:', snapshotError)

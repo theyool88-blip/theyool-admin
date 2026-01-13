@@ -21,6 +21,7 @@ import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/l
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync'
+import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync'
 
 // 딜레이 유틸리티
 function delay(ms: number): Promise<void> {
@@ -544,6 +545,34 @@ export async function POST(request: NextRequest) {
                   warnings.push({
                     field: 'party_sync',
                     message: '당사자 동기화 실패 (사건은 정상 등록됨)'
+                  })
+                }
+              }
+            }
+
+            // 4-6. SCOURT 기일 동기화 (대법원 연동 성공 시에만)
+            if (scourtLinked && scourtResult && scourtResult.generalData) {
+              type HearingType = { trmDt?: string; trmHm?: string; trmNm?: string; trmPntNm?: string; rslt?: string }
+              const generalData = scourtResult.generalData as { hearings?: HearingType[] }
+              if (generalData.hearings && generalData.hearings.length > 0) {
+                try {
+                  const hearingsForSync = generalData.hearings.map((h) => ({
+                    date: h.trmDt || '',
+                    time: h.trmHm || '',
+                    type: h.trmNm || '',
+                    location: h.trmPntNm || '',
+                    result: h.rslt || '',
+                  }))
+                  await syncHearingsToCourtHearings(
+                    newCase.id,
+                    row.court_case_number!,
+                    hearingsForSync
+                  )
+                } catch (syncError) {
+                  console.error('기일 동기화 실패:', syncError)
+                  warnings.push({
+                    field: 'hearing_sync',
+                    message: '기일 동기화 실패 (사건은 정상 등록됨)'
                   })
                 }
               }

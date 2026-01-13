@@ -61,30 +61,34 @@ export async function GET(
     };
 
     // 재판기일 조회
+    // 스키마: hearing_date(timestamptz), location, result, report
     const { data: hearings, error: _hearingsError } = await supabase
       .from('court_hearings')
       .select(`
         id,
         hearing_date,
-        hearing_time,
-        court_name,
+        location,
         hearing_type,
-        hearing_result,
+        result,
         judge_name,
-        hearing_report
+        report,
+        scourt_type_raw,
+        scourt_result_raw
       `)
       .eq('case_id', caseId)
       .order('hearing_date', { ascending: false });
 
     // 기한 조회
+    // 스키마: notes(not description), status(not is_completed)
     const { data: deadlines, error: _deadlinesError } = await supabase
       .from('case_deadlines')
       .select(`
         id,
         deadline_date,
         deadline_type,
-        description,
-        is_completed
+        trigger_date,
+        notes,
+        status
       `)
       .eq('case_id', caseId)
       .order('deadline_date', { ascending: true });

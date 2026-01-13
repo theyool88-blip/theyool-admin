@@ -5,7 +5,7 @@ import { SCOURT_RELATION_MAP, determineRelationDirection } from '@/lib/scourt/ca
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 import { getCourtFullName } from '@/lib/scourt/court-codes'
-import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
+import { parseCaseNumber, stripCourtPrefix } from '@/lib/scourt/case-number-utils'
 
 /**
  * GET /api/admin/cases
@@ -280,8 +280,13 @@ export const POST = withTenant(async (request, { tenant }) => {
       clientName: clientNameForStatus,
       opponentName: resolvedOpponentName
     })
-    const parsedCourtNumber = body.court_case_number
-      ? parseCaseNumber(body.court_case_number)
+
+    // 사건번호 정제 (법원명 접두사 제거)
+    const cleanedCaseNumber = body.court_case_number
+      ? stripCourtPrefix(body.court_case_number)
+      : null
+    const parsedCourtNumber = cleanedCaseNumber
+      ? parseCaseNumber(cleanedCaseNumber)
       : null
     const resolvedCourtName = body.court_name
       ? getCourtFullName(
@@ -289,6 +294,24 @@ export const POST = withTenant(async (request, { tenant }) => {
           parsedCourtNumber?.valid ? parsedCourtNumber.caseType : undefined
         )
       : null
+
+    // 중복 사건 검사 (정제된 사건번호 + 정규화된 법원명으로 검색)
+    if (cleanedCaseNumber && resolvedCourtName) {
+      const { data: existingCase } = await adminClient
+        .from('legal_cases')
+        .select('id, case_name')
+        .eq('tenant_id', tenant.tenantId)
+        .eq('court_case_number', cleanedCaseNumber)
+        .eq('court_name', resolvedCourtName)
+        .maybeSingle()
+
+      if (existingCase) {
+        return NextResponse.json({
+          error: '이미 등록된 사건입니다',
+          existingCase: { id: existingCase.id, name: existingCase.case_name }
+        }, { status: 409 })
+      }
+    }
 
     // Create the case (테넌트 ID 포함)
     const { data: newCase, error } = await adminClient
@@ -304,7 +327,7 @@ export const POST = withTenant(async (request, { tenant }) => {
         retainer_fee: body.retainer_fee || null,
         success_fee_agreement: body.success_fee_agreement || null,
         notes: body.notes || null,
-        court_case_number: body.court_case_number || null,
+        court_case_number: cleanedCaseNumber,
         court_name: resolvedCourtName,
         judge_name: body.judge_name || null,
         client_role: resolvedClientRole,
@@ -382,7 +405,7 @@ export const POST = withTenant(async (request, { tenant }) => {
           clientName: clientNameForParty,
           opponentName: resolvedOpponentName,
           clientRole: resolvedClientRole,
-          caseNumber: body.court_case_number,
+          caseNumber: cleanedCaseNumber,
           clientId: clientId,
         })
 

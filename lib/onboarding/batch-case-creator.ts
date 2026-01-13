@@ -16,6 +16,7 @@ import { validateRow, applyDefaults } from './csv-schema'
 import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { parseCaseNumber, stripCourtPrefix } from '@/lib/scourt/case-number-utils'
 import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
+import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 
 // 테넌트 컨텍스트
 interface TenantContext {
@@ -386,7 +387,42 @@ async function createSingleCase(
       }
     }
 
-    // 7. SCOURT 연동은 API 라우트에서 처리 (Node.js 전용 모듈 사용)
+    // 7. case_parties 생성 (스트림 임포트와 일관성 유지)
+    const partySeeds = buildManualPartySeeds({
+      clientName: row.client_name,
+      opponentName: caseData.opponent_name,
+      clientRole: caseData.client_role || 'plaintiff',
+      caseNumber: cleanedCaseNumber,
+      clientId,
+    })
+
+    if (partySeeds.length > 0) {
+      const payload = partySeeds.map((seed, index) => ({
+        tenant_id: tenant.tenantId,
+        case_id: newCase.id,
+        party_name: seed.party_name,
+        party_type: seed.party_type,
+        party_type_label: seed.party_type_label || null,
+        party_order: index + 1,
+        is_our_client: seed.is_our_client,
+        client_id: seed.client_id || null,
+        manual_override: false,
+        scourt_synced: false,
+      }))
+
+      const { error: partyError } = await adminClient
+        .from('case_parties')
+        .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
+
+      if (partyError) {
+        warnings.push({
+          field: 'party',
+          message: `당사자 정보 저장 실패: ${partyError.message}`
+        })
+      }
+    }
+
+    // 8. SCOURT 연동은 API 라우트에서 처리 (Node.js 전용 모듈 사용)
     const scourtLinked = false
     const encCsNo: string | undefined = undefined
 

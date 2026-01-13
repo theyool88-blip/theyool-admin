@@ -59,11 +59,11 @@ export async function GET(_request: NextRequest) {
     futureDate.setDate(futureDate.getDate() + 30);
     const futureDateStr = futureDate.toISOString().split('T')[0];
 
+    // 스키마: hearing_date(timestamptz - 시간 포함), location(not court_name)
     let upcomingHearings: Array<{
       id: string;
       hearing_date: string;
-      hearing_time: string;
-      court_name: string;
+      location: string;
       case_number: string;
       case_name: string;
     }> = [];
@@ -74,8 +74,7 @@ export async function GET(_request: NextRequest) {
         .select(`
           id,
           hearing_date,
-          hearing_time,
-          court_name,
+          location,
           case_number,
           legal_cases (
             case_name
@@ -91,8 +90,7 @@ export async function GET(_request: NextRequest) {
         upcomingHearings = hearings.map((h) => ({
           id: h.id,
           hearing_date: h.hearing_date,
-          hearing_time: h.hearing_time || '',
-          court_name: h.court_name || '',
+          location: h.location || '',
           case_number: h.case_number || '',
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           case_name: (h.legal_cases as any)?.case_name || '',

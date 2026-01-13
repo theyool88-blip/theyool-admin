@@ -16,7 +16,8 @@ import { generateImportReport } from '@/lib/onboarding/import-report-generator'
 import { convertToStandardRow, applyDefaults } from '@/lib/onboarding/csv-schema'
 import { getScourtApiClient } from '@/lib/scourt/api-client'
 import { saveSnapshot } from '@/lib/scourt/case-storage'
-import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
+import { parseCaseNumber, stripCourtPrefix } from '@/lib/scourt/case-number-utils'
+import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/lib/scourt/related-case-linker'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
@@ -131,8 +132,10 @@ export async function POST(request: NextRequest) {
               caseName: row.court_case_number || `행 ${i + 1}`
             })
 
-            // 1. 사건번호 파싱
-            const parsed = parseCaseNumber(row.court_case_number!)
+            // 1. 사건번호 파싱 및 정제
+            // 법원명 접두사 제거 (예: "평택지원2023타경864" → "2023타경864")
+            const cleanedCaseNumber = stripCourtPrefix(row.court_case_number!)
+            const parsed = parseCaseNumber(cleanedCaseNumber)
             if (!parsed.valid) {
               results.push({
                 rowIndex: i,
@@ -157,13 +160,19 @@ export async function POST(request: NextRequest) {
               continue
             }
 
-            // 2. 중복 체크
+            // 법원명 정규화 (배치 임포트와 일관성 유지)
+            const normalizedCourtName = getCourtFullName(
+              row.court_name!,
+              parsed.caseType
+            )
+
+            // 2. 중복 체크 (정제된 사건번호, 정규화된 법원명으로 검색)
             const { data: existingCase } = await adminClient
               .from('legal_cases')
               .select('id, case_name')
               .eq('tenant_id', tenant.tenantId)
-              .eq('court_case_number', row.court_case_number!)
-              .eq('court_name', row.court_name!)
+              .eq('court_case_number', cleanedCaseNumber)
+              .eq('court_name', normalizedCourtName)
               .single()
 
             if (existingCase) {
@@ -356,16 +365,18 @@ export async function POST(request: NextRequest) {
               opponentName: row.opponent_name
             })
 
+            // 정제된 사건번호, 정규화된 법원명 사용
+            // opponent_name은 case_parties에서 관리하므로 null로 설정
             const caseData: Record<string, unknown> = {
               tenant_id: tenant.tenantId,
-              case_name: row.case_name || row.court_case_number,
+              case_name: row.case_name || cleanedCaseNumber,
               case_type: (row as { case_type?: string }).case_type || '기타',
-              court_case_number: row.court_case_number,
-              court_name: row.court_name,
+              court_case_number: cleanedCaseNumber,
+              court_name: normalizedCourtName,
               client_id: clientId,
               client_role: resolvedClientRole,
               client_role_status: resolvedClientRoleStatus,
-              opponent_name: row.opponent_name || null,
+              opponent_name: null,  // case_parties로 관리
               assigned_to: assignedTo,
               status: '진행중',
               contract_date: row.contract_date,
@@ -417,7 +428,7 @@ export async function POST(request: NextRequest) {
               clientName: row.client_name,
               opponentName: row.opponent_name,
               clientRole: resolvedClientRole,
-              caseNumber: row.court_case_number,
+              caseNumber: cleanedCaseNumber,
               clientId,
             })
 
@@ -487,8 +498,8 @@ export async function POST(request: NextRequest) {
 
                 await saveSnapshot({
                   legalCaseId: newCase.id,
-                  caseNumber: row.court_case_number!,
-                  courtCode: row.court_name!,
+                  caseNumber: cleanedCaseNumber,
+                  courtCode: normalizedCourtName,
                   basicInfo: (generalData || {}) as Record<string, unknown>,
                   hearings: ((generalData?.hearings as unknown[]) || []),
                   progress: (scourtResult.progressData || []) as unknown[],
@@ -504,7 +515,7 @@ export async function POST(request: NextRequest) {
                       supabase: adminClient,
                       legalCaseId: newCase.id,
                       tenantId: tenant.tenantId,
-                      caseNumber: row.court_case_number!,
+                      caseNumber: cleanedCaseNumber,
                       caseType: parsed.caseType,
                       relatedCases: relatedCasesData,
                       lowerCourt: lowerCourtData,
@@ -565,7 +576,7 @@ export async function POST(request: NextRequest) {
                   }))
                   await syncHearingsToCourtHearings(
                     newCase.id,
-                    row.court_case_number!,
+                    cleanedCaseNumber,
                     hearingsForSync
                   )
                 } catch (syncError) {

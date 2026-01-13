@@ -80,6 +80,38 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
     }
   }
 
+  // 법원명을 축약형으로 변환 (장소 뒷부분은 유지)
+  // "수원가정법원 평택지원 제21호 법정" → "평택지원 제21호 법정"
+  const shortenCourtLocation = (location?: string | null): string => {
+    if (!location) return '-'
+
+    // 1. OO지원 패턴 (평택지원, 안산지원, 천안지원)
+    const jiwonMatch = location.match(/[가-힣]+법원\s+([가-힣]{2,4}지원)\s+(.+)/)
+    if (jiwonMatch) {
+      return `${jiwonMatch[1]} ${jiwonMatch[2]}`
+    }
+
+    // 2. 고등법원
+    const goMatch = location.match(/([가-힣]{2,3})고등법원\s+(.+)/)
+    if (goMatch) {
+      return `${goMatch[1]}고법 ${goMatch[2]}`
+    }
+
+    // 3. 가정법원 본원
+    const gaMatch = location.match(/([가-힣]{2,3})가정법원\s+(.+)/)
+    if (gaMatch) {
+      return `${gaMatch[1]}가정 ${gaMatch[2]}`
+    }
+
+    // 4. 지방법원 본원
+    const jiMatch = location.match(/([가-힣]{2,3})지방법원\s+(.+)/)
+    if (jiMatch) {
+      return `${jiMatch[1]}지법 ${jiMatch[2]}`
+    }
+
+    return location
+  }
+
   const formatDate = (date: string) => {
     const d = new Date(date)
     const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -203,7 +235,7 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="text-sm text-sage-600">
-                        {schedule.location || '-'}
+                        {shortenCourtLocation(schedule.location)}
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">

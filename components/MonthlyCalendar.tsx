@@ -344,7 +344,57 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
     return location.slice(0, 2)
   }
 
-  const getScheduleTypeColor = (type: ScheduleType, hearingType?: string, eventSubtype?: string) => {
+  // 법원명을 축약형으로 변환 (장소 뒷부분은 유지)
+  // "수원가정법원 평택지원 제21호 법정" → "평택지원 제21호 법정"
+  // "수원고등법원 제804호 법정" → "수원고법 제804호 법정"
+  const shortenCourtLocation = (location?: string): string => {
+    if (!location) return ''
+
+    // 1. OO지원 패턴 (평택지원, 안산지원, 천안지원)
+    // "수원가정법원 평택지원 제21호 법정" → "평택지원 제21호 법정"
+    const jiwonMatch = location.match(/[가-힣]+법원\s+([가-힣]{2,4}지원)\s+(.+)/)
+    if (jiwonMatch) {
+      return `${jiwonMatch[1]} ${jiwonMatch[2]}`
+    }
+
+    // 2. 고등법원
+    // "수원고등법원 제804호 법정" → "수원고법 제804호 법정"
+    const goMatch = location.match(/([가-힣]{2,3})고등법원\s+(.+)/)
+    if (goMatch) {
+      return `${goMatch[1]}고법 ${goMatch[2]}`
+    }
+
+    // 3. 가정법원 본원
+    // "수원가정법원 본관 401호 법정" → "수원가정 본관 401호 법정"
+    const gaMatch = location.match(/([가-힣]{2,3})가정법원\s+(.+)/)
+    if (gaMatch) {
+      return `${gaMatch[1]}가정 ${gaMatch[2]}`
+    }
+
+    // 4. 지방법원 본원
+    // "수원지방법원 제101호 법정" → "수원지법 제101호 법정"
+    const jiMatch = location.match(/([가-힣]{2,3})지방법원\s+(.+)/)
+    if (jiMatch) {
+      return `${jiMatch[1]}지법 ${jiMatch[2]}`
+    }
+
+    // 못 찾으면 원본 반환
+    return location
+  }
+
+  // 기일 연기/변경 여부 확인
+  const isPostponedHearing = (result?: string): boolean => {
+    if (!result) return false
+    const keywords = ['기일변경', '연기', '취하', '취소', '변경지정']
+    return keywords.some(kw => result.includes(kw))
+  }
+
+  const getScheduleTypeColor = (type: ScheduleType, hearingType?: string, eventSubtype?: string, scourt_result_raw?: string) => {
+    // 연기된 기일: amber 색상 (기일변경, 연기, 취하, 취소 등)
+    if (type === 'court_hearing' && isPostponedHearing(scourt_result_raw)) {
+      return 'bg-amber-50 text-amber-700 border-l-amber-500'
+    }
+
     // 변호사미팅은 청록색(teal)으로 구분
     if (type === 'court_hearing' && hearingType === 'HEARING_LAWYER_MEETING') {
       return 'bg-teal-50 text-teal-700 border-l-teal-500'
@@ -720,7 +770,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                     {daySchedules.slice(0, 4).map((schedule) => (
                       <div
                         key={schedule.id}
-                        className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype)} leading-tight cursor-pointer`}
+                        className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} leading-tight cursor-pointer`}
                         title={`${schedule.time?.slice(0, 5) || ''} ${schedule.title} ${schedule.location ? '- ' + schedule.location : ''}`}
                         onClick={(e) => {
                           e.stopPropagation()
@@ -833,7 +883,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                       {daySchedules.slice(0, 2).map((schedule) => (
                         <div
                           key={schedule.id}
-                          className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype)} leading-tight`}
+                          className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} leading-tight`}
                           title={`${schedule.time?.slice(0, 5) || ''} ${schedule.title} ${schedule.location ? '- ' + schedule.location : ''}`}
                         >
                           <div className="font-medium truncate">
@@ -900,7 +950,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                 return (
                   <div
                     key={schedule.id}
-                    className={`p-2.5 rounded-lg border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype)} hover:shadow-md transition-all cursor-pointer border border-gray-100 focus:outline-none focus:ring-2 focus:ring-sage-400`}
+                    className={`p-2.5 rounded-lg border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} hover:shadow-md transition-all cursor-pointer border border-gray-100 focus:outline-none focus:ring-2 focus:ring-sage-400`}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -1033,10 +1083,12 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   >
                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/90 shadow-sm">
-                        {/* 법원기일: scourt_type_raw 우선 표시 (예: "제1회 변론기일") */}
-                        {schedule.type === 'court_hearing' && schedule.scourt_type_raw
-                          ? schedule.scourt_type_raw
-                          : getScheduleTypeLabel(schedule.type, schedule.location)}
+                        {/* 법원기일: 연기시 "기일연기", 아니면 scourt_type_raw 우선 표시 */}
+                        {schedule.type === 'court_hearing' && isPostponedHearing(schedule.scourt_result_raw)
+                          ? '기일연기'
+                          : schedule.type === 'court_hearing' && schedule.scourt_type_raw
+                            ? schedule.scourt_type_raw
+                            : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>
                       {schedule.time && (
                         <span className="text-[10px] font-semibold text-gray-700">
@@ -1068,7 +1120,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
-                        <span className="truncate">{schedule.location}</span>
+                        <span className="truncate">{shortenCourtLocation(schedule.location)}</span>
                       </p>
                     )}
                     {/* SCOURT 기일 결과 표시 (예: "다음기일지정(2025.02.15)", "변론종결") */}

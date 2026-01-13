@@ -1,6 +1,6 @@
 # 캘린더 시스템
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2026-01-13
 
 법무법인 더율의 모든 일정을 통합 관리하는 캘린더 시스템입니다.
 
@@ -192,6 +192,61 @@ GOOGLE_CALENDAR_ID=...
   </div>
   <p className="text-gray-600 font-medium">등록된 일정이 없습니다.</p>
 </div>
+```
+
+---
+
+## 법원 지역 표시 로직
+
+### getShortCourt 함수
+
+월간 캘린더에서 법원 지역을 축약형으로 표시합니다.
+
+```typescript
+// components/MonthlyCalendar.tsx
+const getShortCourt = (location?: string) => {
+  if (!location) return ''
+
+  // 1. "OO지원" 패턴 우선 (예: "대전가정법원 서산지원" → "서산")
+  const jiwonMatch = location.match(/([가-힣]{2,4})지원/)
+  if (jiwonMatch) return jiwonMatch[1]
+
+  // 2. "OO시법원" 패턴 (예: "수원지방법원 안성시법원" → "안성")
+  const siMatch = location.match(/([가-힣]{2,4})시법원/)
+  if (siMatch) return siMatch[1]
+
+  // 3. 주요 법원명 배열에서 매칭
+  const courtNames = ['서울', '수원', '평택', '천안', '대전', ...]
+  for (const name of courtNames) {
+    if (location.includes(name)) return name
+  }
+
+  return location.slice(0, 2)
+}
+```
+
+### 변환 예시
+
+| 입력 (location) | 출력 |
+|-----------------|------|
+| `대전가정법원 서산지원 제21호 법정` | **서산** |
+| `수원가정법원 평택지원 제402호 법정` | **평택** |
+| `수원지방법원 안성시법원` | **안성** |
+| `대전가정법원` | **대전** |
+| `서울가정법원 본관 401호 법정` | **서울** |
+
+### 데이터 흐름
+
+```
+SCOURT API (cortNm)
+       ↓
+legal_cases.court_name ("대전가정법원 서산지원")
+       ↓
+unified_calendar VIEW (court_name + location)
+       ↓
+"대전가정법원 서산지원 제21호 법정"
+       ↓
+getShortCourt() → "서산"
 ```
 
 ---

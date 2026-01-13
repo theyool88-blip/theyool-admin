@@ -1,6 +1,6 @@
 # 법원기일 및 법정기간 관리 시스템
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2026-01-13
 
 법원 기일과 법정 기간(불변기간)을 통합 관리하는 시스템입니다.
 
@@ -57,6 +57,11 @@ CREATE TABLE court_hearings (
   result TEXT,
   report TEXT,
   status TEXT DEFAULT 'SCHEDULED',
+  -- SCOURT 원본 데이터 (2026-01-13 추가)
+  scourt_type_raw TEXT,       -- 원본 기일명 (예: "제1회 변론기일")
+  scourt_result_raw TEXT,     -- 원본 결과 (예: "다음기일지정(2025.02.15)")
+  hearing_sequence INTEGER,   -- 기일 회차 (1, 2, 3...)
+  scourt_hearing_hash TEXT,   -- 중복 방지용 해시
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -71,6 +76,72 @@ WHERE status = 'SCHEDULED'
   AND hearing_date <= NOW() + INTERVAL '30 days'
 ORDER BY hearing_date ASC;
 ```
+
+### SCOURT 원본 데이터 필드 (2026-01-13 추가)
+
+SCOURT(나의사건검색) 데이터의 기일 정보를 원본 그대로 저장합니다.
+
+| 필드 | 설명 | 예시 |
+|------|------|------|
+| `scourt_type_raw` | 원본 기일명 | "제1회 변론기일", "조정기일" |
+| `scourt_result_raw` | 원본 결과 | "다음기일지정(2025.02.15)", "변론종결" |
+| `hearing_sequence` | 기일 회차 | 1, 2, 3... (제N회에서 추출) |
+| `scourt_hearing_hash` | 중복 방지 해시 | 날짜+시간+기일명 기반 SHA256 |
+
+#### 회차 추출 로직
+
+```typescript
+// lib/scourt/hearing-sync.ts
+export function extractHearingSequence(typeName: string): number | null {
+  const match = typeName.match(/제(\d+)회/);
+  return match ? parseInt(match[1]) : null;
+}
+
+// 예시
+extractHearingSequence("제1회 변론기일")  // → 1
+extractHearingSequence("제2회 변론준비기일")  // → 2
+extractHearingSequence("조정기일")  // → null
+```
+
+#### 캘린더 표시
+
+`unified_calendar` 뷰와 `MonthlyCalendar`에서 SCOURT 원본 기일명 우선 표시:
+
+```
+기존: "(변론기일) 김OO 이혼사건"
+수정: "(제1회 변론기일) 김OO 이혼사건"
+```
+
+#### 배치 임포트 연동
+
+`batch-create-stream` API에서 SCOURT 연동 시 기일 데이터도 자동 동기화:
+
+```typescript
+// 사건 생성 후 SCOURT 데이터 조회 시
+if (scourtLinked && generalData.hearings) {
+  await syncHearingsToCourtHearings(
+    newCase.id,
+    caseNumber,
+    generalData.hearings.map(h => ({
+      date: h.trmDt,
+      time: h.trmHm,
+      type: h.trmNm,        // → scourt_type_raw
+      location: h.trmPntNm,
+      result: h.rslt,       // → scourt_result_raw
+    }))
+  )
+}
+```
+
+#### 관련 파일
+
+| 파일 | 역할 |
+|------|------|
+| `lib/scourt/hearing-sync.ts` | 기일 동기화 로직 |
+| `components/MonthlyCalendar.tsx` | 캘린더 UI |
+| `supabase/migrations/20260111_hearing_scourt_raw_fields.sql` | DB 마이그레이션 |
+| `supabase/migrations/20260111_update_unified_calendar_scourt_raw.sql` | 뷰 업데이트 |
+| `scripts/backfill-court-hearings.ts` | 기존 데이터 백필 스크립트 |
 
 ---
 
@@ -293,6 +364,10 @@ interface CourtHearing {
   status: HearingStatus
   created_at: string
   updated_at: string
+  // SCOURT 원본 데이터 (2026-01-13 추가)
+  scourt_type_raw: string | null     // 원본 기일명 (예: "제1회 변론기일")
+  scourt_result_raw: string | null   // 원본 결과 (예: "다음기일지정(2025.02.15)")
+  hearing_sequence: number | null    // 기일 회차 (1, 2, 3...)
 }
 
 // 데드라인

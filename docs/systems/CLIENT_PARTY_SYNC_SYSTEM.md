@@ -1,6 +1,6 @@
 # 의뢰인/당사자 동기화 시스템
 
-**Last Updated**: 2026-01-10
+**Last Updated**: 2026-01-13
 
 ## 개요
 
@@ -310,6 +310,75 @@ SCOURT 라벨 기반으로 당사자를 표시합니다.
 
 ---
 
+---
+
+## 일반탭 당사자 수정 모달에서 의뢰인 설정
+
+**2026-01-13 추가**
+
+### 개요
+
+일반탭(`ScourtGeneralInfoXml`)에서 당사자 수정 시 의뢰인 설정(`is_our_client`, `client_id`)도 함께 변경할 수 있습니다.
+
+### 기능
+
+| 항목 | 설명 |
+|------|------|
+| 이름 수정 | 마스킹된 이름을 실제 이름으로 변경 |
+| 대표 설정 | `is_primary` 토글 |
+| **의뢰인 설정** | `is_our_client` 체크박스 + `client_id` 드롭다운 |
+
+### 반대측 의뢰인 경고 및 자동 해제
+
+같은 사건에서 **원고측**과 **피고측** 당사자가 동시에 의뢰인이 될 수 없습니다.
+
+#### 측 분류
+
+```typescript
+const PLAINTIFF_SIDE = ['plaintiff', 'creditor', 'applicant', 'actor']
+const DEFENDANT_SIDE = ['defendant', 'debtor', 'respondent', 'third_debtor', 'accused', 'juvenile']
+```
+
+#### 동작
+
+1. **경고 표시**: 반대측에 기존 의뢰인이 있으면 경고 메시지 표시 (차단하지 않음)
+2. **저장 시 자동 해제**: 반대측 당사자를 의뢰인으로 설정하면 기존 반대측 의뢰인 자동 해제
+
+```
+사용자: 피고측 당사자를 의뢰인으로 설정
+    ↓
+API: 기존 원고측 의뢰인 조회
+    ↓
+    ├─ 있음 → is_our_client=false, client_id=null 설정
+    └─ 없음 → 그대로 진행
+    ↓
+새 당사자에 is_our_client=true 설정
+    ↓
+legal_cases.client_id, client_role 동기화
+```
+
+#### 같은 측 복수 의뢰인
+
+같은 측 당사자는 **여러 명이 동시에 의뢰인**이 될 수 있습니다 (공동원고 등).
+`legal_cases.client_id`는 마지막으로 설정된 의뢰인으로 갱신됩니다.
+
+### 의뢰인 해제 시 동기화
+
+의뢰인 체크박스를 해제하면:
+
+1. `case_parties`: `is_our_client=false`, `client_id=null`
+2. `legal_cases`: 다른 의뢰인이 있으면 해당 정보로 갱신, 없으면 `client_id=null`, `client_role=null`
+
+### 관련 파일
+
+| 파일 | 역할 |
+|------|------|
+| `components/CaseDetail.tsx` | 일반탭 모달 UI, `isOppositeSideClient` 감지 |
+| `components/CasePartiesSection.tsx` | 알림탭 의뢰인 설정 UI |
+| `app/api/admin/cases/[id]/parties/route.ts` | 반대측 자동 해제, legal_cases 동기화 |
+
+---
+
 ## 주의사항
 
 1. **manual_override 보호**: 사용자가 직접 수정한 당사자는 자동 동기화되지 않음
@@ -317,3 +386,4 @@ SCOURT 라벨 기반으로 당사자를 표시합니다.
 3. **삭제 제한**: 사건에서 사용 중인 의뢰인은 삭제 불가
 4. **테넌트 격리**: 모든 API는 테넌트 컨텍스트 내에서만 동작
 5. **SCOURT 라벨 우선**: 당사자 지위명은 SCOURT 원본(`party_type_label`)을 사용, 사건번호 기반 추론 사용 안함
+6. **반대측 의뢰인 자동 해제**: 반대측 당사자를 의뢰인으로 설정 시 기존 반대측 의뢰인 자동 해제

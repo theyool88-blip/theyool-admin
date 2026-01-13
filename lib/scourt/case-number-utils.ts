@@ -7,7 +7,7 @@
 /**
  * 사건번호에서 법원명 접두사 제거
  *
- * 입력된 사건번호가 "서울가정법원 2024드합12345" 형태인 경우
+ * 입력된 사건번호가 "서울가정법원 2024드합12345" 또는 "평택지원2023타경864" 형태인 경우
  * 법원명 부분을 제거하고 순수 사건번호만 반환
  *
  * @example
@@ -15,23 +15,36 @@
  * stripCourtPrefix("인천지방법원 2024가단123") // "2024가단123"
  * stripCourtPrefix("서울중앙지방법원부천지원 2024나1234") // "2024나1234"
  * stripCourtPrefix("서울중앙지방법원 부천지원 2024나1234") // "2024나1234"
+ * stripCourtPrefix("평택지원2023타경864") // "2023타경864" (공백 없는 경우도 처리)
+ * stripCourtPrefix("평택가정2024드단25547") // "2024드단25547" (법원/지원 외 패턴)
  * stripCourtPrefix("2024가단12345") // "2024가단12345" (변화 없음)
  */
 export function stripCourtPrefix(caseNumber: string): string {
-  // 법원명 패턴: 한글로 시작하여 "법원" 또는 "지원"으로 끝나는 부분
-  // 여러 번 반복될 수 있음 (예: "서울중앙지방법원 부천지원")
-  // 반복적으로 제거하여 모든 법원명/지원 접두사 처리
-  let result = caseNumber
-  const courtPrefixPattern = /^[가-힣]+(?:법원|지원)\s*/
+  let result = caseNumber.trim()
+
+  // 1. 기존 패턴: 법원/지원 + 공백
+  // "서울가정법원 2024드합12345" → "2024드합12345"
+  const courtWithSpacePattern = /^[가-힣]+(?:법원|지원)\s+/
 
   // 최대 3번까지 반복 (법원 + 지원 + 추가)
   for (let i = 0; i < 3; i++) {
-    const newResult = result.replace(courtPrefixPattern, '').trim()
-    if (newResult === result) break  // 더 이상 변화 없으면 종료
+    const newResult = result.replace(courtWithSpacePattern, '').trim()
+    if (newResult === result) break
     result = newResult
   }
 
-  return result
+  // 2. 새 패턴: 법원/지원 뒤에 바로 숫자(연도)가 오는 경우
+  // "평택지원2023타경864" → "2023타경864"
+  const courtNoSpacePattern = /^[가-힣]+(?:법원|지원)(?=\d{4})/
+  result = result.replace(courtNoSpacePattern, '')
+
+  // 3. 일반 한글 접두사 + 숫자 패턴 (법원/지원 외: 평택가정, 수원고법 등)
+  // "평택가정2024드단25547" → "2024드단25547"
+  // 단, 사건번호 패턴(연도4자리+한글+숫자)이 확인되는 경우만
+  const generalCourtPattern = /^[가-힣]+(?=\d{4}[가-힣]+\d+$)/
+  result = result.replace(generalCourtPattern, '')
+
+  return result.trim()
 }
 
 export interface ParsedCaseNumber {

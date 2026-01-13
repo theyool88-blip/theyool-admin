@@ -14,7 +14,7 @@ import type {
 } from '@/types/onboarding'
 import { validateRow, applyDefaults } from './csv-schema'
 import { getCourtFullName } from '@/lib/scourt/court-codes'
-import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
+import { parseCaseNumber, stripCourtPrefix } from '@/lib/scourt/case-number-utils'
 import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 
 // 테넌트 컨텍스트
@@ -41,8 +41,12 @@ export async function generatePreview(
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     const validation = validateRow(row, i)
-    const parsedCourtNumber = row.court_case_number
-      ? parseCaseNumber(row.court_case_number)
+    // 법원명 접두사 제거 (예: "평택지원2023타경864" → "2023타경864")
+    const cleanedCaseNumber = row.court_case_number
+      ? stripCourtPrefix(row.court_case_number)
+      : null
+    const parsedCourtNumber = cleanedCaseNumber
+      ? parseCaseNumber(cleanedCaseNumber)
       : null
     const normalizedCourtName = row.court_name
       ? getCourtFullName(
@@ -51,14 +55,14 @@ export async function generatePreview(
         )
       : row.court_name
 
-    // 기존 사건 확인
+    // 기존 사건 확인 (정제된 사건번호로 검색)
     let existingCase: { id: string; caseName: string } | undefined
-    if (row.court_case_number && normalizedCourtName) {
+    if (cleanedCaseNumber && normalizedCourtName) {
       const { data: existing } = await adminClient
         .from('legal_cases')
         .select('id, case_name')
         .eq('tenant_id', tenant.tenantId)
-        .eq('court_case_number', row.court_case_number)
+        .eq('court_case_number', cleanedCaseNumber)
         .eq('court_name', normalizedCourtName)
         .single()
 
@@ -157,8 +161,12 @@ async function createSingleCase(
   const errors: ImportError[] = []
   const warnings: ImportWarning[] = []
   const originalData = { ...row } as Record<string, string>
-  const parsedCourtNumber = row.court_case_number
-    ? parseCaseNumber(row.court_case_number)
+  // 법원명 접두사 제거 (예: "평택지원2023타경864" → "2023타경864")
+  const cleanedCaseNumber = row.court_case_number
+    ? stripCourtPrefix(row.court_case_number)
+    : null
+  const parsedCourtNumber = cleanedCaseNumber
+    ? parseCaseNumber(cleanedCaseNumber)
     : null
   const normalizedCourtName = row.court_name
     ? getCourtFullName(
@@ -195,12 +203,12 @@ async function createSingleCase(
   }
 
   try {
-    // 2. 중복 사건 확인
+    // 2. 중복 사건 확인 (정제된 사건번호로 검색)
     const { data: existingCase } = await adminClient
       .from('legal_cases')
       .select('id, case_name')
       .eq('tenant_id', tenant.tenantId)
-      .eq('court_case_number', row.court_case_number!)
+      .eq('court_case_number', cleanedCaseNumber!)
       .eq('court_name', normalizedCourtName!)
       .single()
 
@@ -347,7 +355,7 @@ async function createSingleCase(
         tenant_id: tenant.tenantId,
         case_name: caseData.case_name,
         case_type: caseData.case_type,
-        court_case_number: caseData.court_case_number,
+        court_case_number: cleanedCaseNumber,  // 정제된 사건번호 사용
         court_name: resolvedCourtName,
         client_id: clientId,
         client_role: caseData.client_role || null,

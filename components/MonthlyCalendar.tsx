@@ -331,9 +331,23 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
   }
 
   // 법원명 짧게 (예: "평택가정법원 제21호 법정" → "평택")
+  // 지원이 있는 경우 지원명 우선 (예: "대전지방법원 서산지원" → "서산")
   const getShortCourt = (location?: string) => {
     if (!location) return ''
-    // 주요 법원명 추출
+
+    // 1. "OO지원" 패턴이 있으면 지원명 추출 (예: "대전지방법원 서산지원" → "서산")
+    const jiwonMatch = location.match(/([가-힣]{2,4})지원/)
+    if (jiwonMatch) {
+      return jiwonMatch[1]
+    }
+
+    // 2. "OO시법원" 패턴이 있으면 시법원명 추출 (예: "수원지방법원 안성시법원" → "안성")
+    const siMatch = location.match(/([가-힣]{2,4})시법원/)
+    if (siMatch) {
+      return siMatch[1]
+    }
+
+    // 3. 주요 법원명 추출
     const courtNames = ['서울', '수원', '평택', '천안', '대전', '대구', '부산', '광주', '인천', '울산', '창원', '청주', '전주', '춘천', '제주', '의정부', '고양', '성남', '안산', '안양', '용인', '화성', '서산', '아산', '세종']
     for (const name of courtNames) {
       if (location.includes(name)) {

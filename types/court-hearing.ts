@@ -82,22 +82,22 @@ export const HEARING_TYPE_LABELS: Record<HearingType, string> = {
 };
 
 export const DEADLINE_TYPE_LABELS: Record<DeadlineType, string> = {
-  // 상소기간
-  DL_APPEAL: '민사/가사 상소기간',
-  DL_CRIMINAL_APPEAL: '형사 상소기간',
-  DL_FAMILY_NONLIT: '가사비송 즉시항고',
-  DL_IMM_APPEAL: '즉시항고기간',
+  // 상소기간 (판결/심판에 대한 불복)
+  DL_APPEAL: '항소기간',              // 민사/가사소송 1심→2심 (14일)
+  DL_CRIMINAL_APPEAL: '형사항소기간',   // 형사 1심→2심 (7일)
+  DL_FAMILY_NONLIT: '항고기간',        // 가사비송 즉시항고 (14일)
+  DL_IMM_APPEAL: '즉시항고기간',        // 민사 결정/명령 불복 (7일)
 
-  // 항소이유서/상고이유서
-  DL_APPEAL_BRIEF: '민사 항소이유서 제출',
-  DL_CRIMINAL_APPEAL_BRIEF: '형사 항소이유서 제출',
-  DL_FINAL_APPEAL_BRIEF: '민사 상고이유서 제출',
-  DL_CRIMINAL_FINAL_BRIEF: '형사 상고이유서 제출',
+  // 항소이유서/상고이유서 제출기한
+  DL_APPEAL_BRIEF: '항소이유서제출기한',          // 민사 (40일)
+  DL_CRIMINAL_APPEAL_BRIEF: '형사항소이유서제출기한', // 형사 (20일)
+  DL_FINAL_APPEAL_BRIEF: '상고이유서제출기한',     // 민사 (20일)
+  DL_CRIMINAL_FINAL_BRIEF: '형사상고이유서제출기한', // 형사 (20일)
 
   // 기타
-  DL_MEDIATION_OBJ: '조정·화해 이의기간',
-  DL_RETRIAL: '재심의 소 제기기한',
-  DL_PAYMENT_ORDER: '지급명령 이의신청',
+  DL_MEDIATION_OBJ: '조정이의기간',      // 조정·화해 이의 (14일)
+  DL_RETRIAL: '재심기한',              // 재심의 소 제기
+  DL_PAYMENT_ORDER: '지급명령이의기간',  // 지급명령 이의신청 (14일)
 };
 
 export const HEARING_STATUS_LABELS: Record<HearingStatus, string> = {
@@ -241,6 +241,11 @@ export interface CourtHearing {
  * 자동 계산: trigger_date와 deadline_type만 제공하면
  *           deadline_date와 deadline_datetime이 트리거로 자동 계산됨
  */
+/**
+ * 당사자 측 구분 타입
+ */
+export type PartySide = 'plaintiff_side' | 'defendant_side' | null;
+
 export interface CaseDeadline {
   id: string;
   case_id: string; // 사건 ID (legal_cases 참조, 필수)
@@ -254,6 +259,9 @@ export interface CaseDeadline {
   completed_at: string | null;
   created_at: string;
   updated_at: string;
+  // 당사자별 기한 지원 (2026-01-14 추가)
+  party_id: string | null; // 연관 당사자 ID (NULL이면 사건 전체 적용)
+  party_side: PartySide; // 당사자 측: plaintiff_side(원고측), defendant_side(피고측)
 }
 
 // =====================================================
@@ -289,6 +297,9 @@ export interface CreateCaseDeadlineRequest {
   notes?: string;
   status?: DeadlineStatus; // 기본값: PENDING
   is_electronic_service?: boolean; // 0시 도달 여부 (전자송달 의제/공시송달)
+  // 당사자별 기한 지원
+  party_id?: string; // 연관 당사자 ID
+  party_side?: PartySide; // 당사자 측
 }
 
 export interface UpdateCaseDeadlineRequest {
@@ -298,7 +309,18 @@ export interface UpdateCaseDeadlineRequest {
   notes?: string;
   status?: DeadlineStatus;
   completed_at?: string | null;
+  // 당사자별 기한 지원
+  party_id?: string | null;
+  party_side?: PartySide;
 }
+
+/**
+ * 당사자 측 라벨
+ */
+export const PARTY_SIDE_LABELS: Record<string, string> = {
+  plaintiff_side: '원고측',
+  defendant_side: '피고측',
+};
 
 // =====================================================
 // VIEW 타입 (upcoming_hearings, urgent_deadlines)

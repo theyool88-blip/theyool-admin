@@ -17,6 +17,7 @@ import {
   normalizePartyNameForMatch,
   preservePrefix,
 } from "@/types/case-party";
+import { updatePartyDeadline } from "./deadline-auto-register";
 
 // 의뢰인 정보를 이전하면 안 되는 당사자 유형 (사건본인, 제3자 등)
 const NON_CLIENT_PARTY_LABELS = [
@@ -74,6 +75,7 @@ interface ExistingPartyRecord {
   scourt_party_index?: number | null;
   manual_override?: boolean;
   is_primary?: boolean;
+  adjdoc_rch_ymd?: string | null; // 판결도달일
 }
 
 /**
@@ -92,7 +94,7 @@ export async function syncPartiesFromScourt(
   try {
     const { data: existingParties } = await supabase
       .from("case_parties")
-      .select("id, party_name, party_type, is_our_client, client_id, scourt_party_index, manual_override, is_primary")
+      .select("id, party_name, party_type, is_our_client, client_id, scourt_party_index, manual_override, is_primary, adjdoc_rch_ymd")
       .eq("case_id", legalCaseId);
 
     interface PartyRecord {
@@ -104,6 +106,7 @@ export async function syncPartiesFromScourt(
       scourt_party_index?: number | null;
       manual_override?: boolean;
       is_primary?: boolean;
+      adjdoc_rch_ymd?: string | null;
     }
 
     const partiesByIndex = new Map<number, PartyRecord>();
@@ -268,8 +271,15 @@ export async function syncPartiesFromScourtServer(
     // 0. 기존 당사자 조회 (마이그레이션 + SCOURT 모두)
     const { data: existingParties } = await supabase
       .from("case_parties")
-      .select("id, party_name, party_type, party_type_label, is_our_client, client_id, fee_allocation_amount, scourt_synced, scourt_party_index, manual_override, is_primary, scourt_label_raw, scourt_name_raw")
+      .select("id, party_name, party_type, party_type_label, is_our_client, client_id, fee_allocation_amount, scourt_synced, scourt_party_index, manual_override, is_primary, scourt_label_raw, scourt_name_raw, adjdoc_rch_ymd")
       .eq("case_id", legalCaseId);
+
+    // 판결도달일 변경 추적용
+    const adjdocRchYmdChanges: Array<{
+      partyId: string;
+      oldValue: string | null;
+      newValue: string;
+    }> = [];
 
     const allExistingParties = (existingParties || []) as ExistingPartyRecord[];
     const existingMigrationParties = allExistingParties.filter(
@@ -361,7 +371,15 @@ export async function syncPartiesFromScourtServer(
           manualOverride = true;
         }
 
-        const { error } = await supabase.from("case_parties").upsert(
+        // 판결도달일 변경 감지
+        // - null → 값: 새 기한 생성
+        // - 값 → 다른값: 기한 업데이트
+        // - 값 → null: 현재는 무시 (실제로 거의 발생하지 않음)
+        const newAdjdocRchYmd = party.adjdocRchYmd || null;
+        const oldAdjdocRchYmd = existingParty?.adjdoc_rch_ymd || null;
+        const adjdocRchYmdChanged = newAdjdocRchYmd !== null && newAdjdocRchYmd !== oldAdjdocRchYmd;
+
+        const { data: upsertedParty, error } = await supabase.from("case_parties").upsert(
           {
             tenant_id: tenantId,
             case_id: legalCaseId,
@@ -378,19 +396,42 @@ export async function syncPartiesFromScourtServer(
             fee_allocation_amount: feeAllocationAmount,
             manual_override: manualOverride,
             is_primary: isPrimary,
-            adjdoc_rch_ymd: party.adjdocRchYmd || null,
+            adjdoc_rch_ymd: newAdjdocRchYmd,
             indvd_cfmtn_ymd: party.indvdCfmtnYmd || null,
           },
           {
             onConflict: "case_id,scourt_party_index",
             ignoreDuplicates: false,
           }
-        );
+        )
+        .select('id')
+        .single();
 
         if (error) {
           console.error(`당사자 upsert 오류 (${party.btprNm}):`, error.message);
         } else {
           partiesUpserted++;
+
+          // 판결도달일이 변경되었으면 기한 업데이트 예약
+          if (adjdocRchYmdChanged && upsertedParty?.id) {
+            adjdocRchYmdChanges.push({
+              partyId: upsertedParty.id,
+              oldValue: oldAdjdocRchYmd,
+              newValue: newAdjdocRchYmd,
+            });
+          }
+        }
+      }
+
+      // 판결도달일 변경된 당사자들의 기한 업데이트
+      for (const change of adjdocRchYmdChanges) {
+        const result = await updatePartyDeadline(change.partyId, change.newValue, tenantId);
+        if (result.error) {
+          console.error(`기한 업데이트 오류 (${change.partyId}):`, result.error);
+        } else if (result.created) {
+          console.log(`  📅 당사자 기한 생성: ${change.partyId} (${change.newValue})`);
+        } else if (result.updated) {
+          console.log(`  📅 당사자 기한 업데이트: ${change.partyId} (${change.oldValue} → ${change.newValue})`);
         }
       }
 

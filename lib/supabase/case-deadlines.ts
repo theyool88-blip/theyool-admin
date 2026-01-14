@@ -176,6 +176,9 @@ export async function createCaseDeadline(
     status: request.status || 'PENDING',
     tenant_id: tenantId || null,
     is_electronic_service: request.is_electronic_service || false,
+    // 당사자별 기한 지원
+    party_id: request.party_id || null,
+    party_side: request.party_side || null,
   };
 
   const { data, error } = await supabase
@@ -211,6 +214,9 @@ export async function updateCaseDeadline(
   if (request.notes !== undefined) updateData.notes = request.notes;
   if (request.status !== undefined) updateData.status = request.status;
   if (request.completed_at !== undefined) updateData.completed_at = request.completed_at;
+  // 당사자별 기한 지원
+  if (request.party_id !== undefined) updateData.party_id = request.party_id;
+  if (request.party_side !== undefined) updateData.party_side = request.party_side;
 
   const { data, error } = await supabase
     .from('case_deadlines')

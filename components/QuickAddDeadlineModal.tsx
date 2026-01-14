@@ -4,8 +4,18 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
   DeadlineType,
-  DeadlineTypeMaster
+  DeadlineTypeMaster,
+  PartySide,
+  PARTY_SIDE_LABELS
 } from '@/types/court-hearing'
+import type { PartyType } from '@/types/case-party'
+
+interface PartyOption {
+  id: string
+  party_name: string
+  party_type: PartyType
+  party_type_label: string | null
+}
 import {
   calculateLegalDeadline,
   isNonBusinessDay
@@ -35,6 +45,7 @@ export default function QuickAddDeadlineModal({
   const [caseOptions, setCaseOptions] = useState<CaseOption[]>([])
   const [showDropdown, setShowDropdown] = useState(false)
   const [deadlineTypes, setDeadlineTypes] = useState<DeadlineTypeMaster[]>([])
+  const [caseParties, setCaseParties] = useState<PartyOption[]>([])
 
   const [formData, setFormData] = useState({
     case_id: '', // 사건 ID (필수)
@@ -43,7 +54,9 @@ export default function QuickAddDeadlineModal({
     deadline_type: '' as DeadlineType | '',
     trigger_date: '',
     notes: '',
-    is_electronic_service: false // 전자송달(0시 의제) 여부
+    is_electronic_service: false, // 전자송달(0시 의제) 여부
+    party_id: '' as string, // 당사자 ID (선택)
+    party_side: null as PartySide // 당사자 측 (자동 설정)
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -168,15 +181,55 @@ export default function QuickAddDeadlineModal({
     }
   }, [formData.deadline_type, formData.trigger_date, formData.is_electronic_service, deadlineTypes])
 
-  const handleSelectCase = (option: CaseOption) => {
+  const handleSelectCase = async (option: CaseOption) => {
     setFormData(prev => ({
       ...prev,
-      case_id: option.id, // DB에 필요한 사건 ID
+      case_id: option.id,
       case_number: option.case_number,
-      case_name: option.case_name
+      case_name: option.case_name,
+      party_id: '',
+      party_side: null
     }))
     setSearchTerm(option.case_number)
     setShowDropdown(false)
+
+    // 해당 사건의 당사자 목록 조회
+    try {
+      const { data: parties, error } = await supabase
+        .from('case_parties')
+        .select('id, party_name, party_type, party_type_label')
+        .eq('case_id', option.id)
+        .order('party_order', { ascending: true })
+
+      if (error) throw error
+      setCaseParties(parties || [])
+    } catch (error) {
+      console.error('당사자 조회 실패:', error)
+      setCaseParties([])
+    }
+  }
+
+  // 당사자 선택 시 party_side 자동 설정
+  const handleSelectParty = (partyId: string) => {
+    const selectedParty = caseParties.find(p => p.id === partyId)
+    let partySide: PartySide = null
+
+    if (selectedParty) {
+      const plaintiffTypes = ['plaintiff', 'creditor', 'applicant', 'actor', 'investigator', 'accused']
+      const defendantTypes = ['defendant', 'debtor', 'respondent', 'third_debtor', 'victim', 'juvenile', 'crime_victim', 'assistant']
+
+      if (plaintiffTypes.includes(selectedParty.party_type)) {
+        partySide = 'plaintiff_side'
+      } else if (defendantTypes.includes(selectedParty.party_type)) {
+        partySide = 'defendant_side'
+      }
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      party_id: partyId,
+      party_side: partySide
+    }))
   }
 
   const validate = () => {
@@ -208,7 +261,9 @@ export default function QuickAddDeadlineModal({
           trigger_date: formData.trigger_date,
           is_electronic_service: formData.is_electronic_service,
           notes: formData.notes || null,
-          status: 'PENDING'
+          status: 'PENDING',
+          party_id: formData.party_id || null,
+          party_side: formData.party_side
         })
 
       if (error) throw error
@@ -233,11 +288,14 @@ export default function QuickAddDeadlineModal({
       deadline_type: '',
       trigger_date: '',
       notes: '',
-      is_electronic_service: false
+      is_electronic_service: false,
+      party_id: '',
+      party_side: null
     })
     setSearchTerm('')
     setErrors({})
     setPreview({ days: 0, deadline_date: '', deadline_datetime: '', wasExtended: false })
+    setCaseParties([])
     onClose()
   }
 
@@ -363,6 +421,38 @@ export default function QuickAddDeadlineModal({
               </p>
             )}
           </div>
+
+          {/* 당사자 선택 (선택 사항) */}
+          {caseParties.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-sage-700 mb-2">
+                당사자 지정 <span className="text-sage-500">(선택)</span>
+              </label>
+              <select
+                value={formData.party_id}
+                onChange={(e) => handleSelectParty(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-sage-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-sage-500 focus:ring-sage-500"
+              >
+                <option value="">전체 사건 (당사자 무관)</option>
+                {caseParties.map((party) => (
+                  <option key={party.id} value={party.id}>
+                    {party.party_type_label || party.party_type} - {party.party_name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-sm text-sage-600">
+                특정 당사자의 송달일 기준으로 기한을 관리하려면 선택하세요.
+              </p>
+              {formData.party_side && (
+                <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-sage-100 text-sage-700 text-xs font-medium rounded-full">
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
+                  {PARTY_SIDE_LABELS[formData.party_side]}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 기산일 (트리거 날짜) */}
           <div>

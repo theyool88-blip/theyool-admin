@@ -14,7 +14,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { createCaseDeadline } from '@/lib/supabase/case-deadlines';
 import type { CaseUpdate, UpdateType } from './change-detector';
 import { getCaseTypeByCode, type CaseCategory } from './case-types';
-import type { DeadlineType } from '@/types/court-hearing';
+import type { DeadlineType, PartySide } from '@/types/court-hearing';
+import type { CaseParty, PartyType } from '@/types/case-party';
 
 // ============================================================
 // 타입 정의
@@ -128,6 +129,24 @@ function getDeadlineMappingForUpdate(
     case 'result_announced':
       // 판결/결정 선고 → 상소기간 등록
       // 형사: 선고일 기준, 민사/가사: 송달일 기준 (extractTriggerDate에서 처리)
+
+      // 방어적 검증: 실제 판결/결정인지 확인
+      // "기일", "예정", "준비" 등이 포함된 경우 상소기간 등록하지 않음
+      const resultContent = (details?.content as string | undefined) || '';
+      const resultSummary = (details?.updateSummary as string | undefined) || '';
+      const combinedText = `${resultContent} ${resultSummary}`;
+
+      // 기일 관련 또는 미래형 표현이면 무시
+      if (
+        combinedText.includes('기일') ||
+        combinedText.includes('예정') ||
+        combinedText.includes('준비') ||
+        combinedText.includes('작성')
+      ) {
+        console.log(`[SCOURT] 상소기간 등록 스킵 - 실제 판결 아님: ${combinedText.substring(0, 50)}`);
+        return null;
+      }
+
       return getAppealDeadlineMapping(caseNumber, category);
 
     case 'served':
@@ -492,4 +511,256 @@ export function getCaseTypeInfo(caseNumber: string): {
     category,
     appealDeadline,
   };
+}
+
+// ============================================================
+// 당사자별 기한 관리
+// ============================================================
+
+/**
+ * PartyType에서 PartySide 결정
+ *
+ * 원고측: plaintiff, creditor, applicant, actor, investigator, accused
+ * 피고측: defendant, debtor, respondent, victim, juvenile, crime_victim
+ */
+export function getPartySideFromType(partyType: PartyType): PartySide {
+  const plaintiffSideTypes: PartyType[] = [
+    'plaintiff',
+    'creditor',
+    'applicant',
+    'actor',
+    'investigator',
+    'accused',
+  ];
+
+  const defendantSideTypes: PartyType[] = [
+    'defendant',
+    'debtor',
+    'respondent',
+    'third_debtor',
+    'victim',
+    'juvenile',
+    'crime_victim',
+    'assistant',
+  ];
+
+  if (plaintiffSideTypes.includes(partyType)) {
+    return 'plaintiff_side';
+  }
+
+  if (defendantSideTypes.includes(partyType)) {
+    return 'defendant_side';
+  }
+
+  // 'related' 등 기타 → null (측 미지정)
+  return null;
+}
+
+/**
+ * 당사자별 상소기간 기한 생성
+ *
+ * case_parties에서 adjdoc_rch_ymd(판결도달일)가 있는 당사자들을 조회하고
+ * 각 당사자별로 개별 deadline을 생성합니다.
+ *
+ * @param caseId - 사건 ID (legal_cases.id)
+ * @param caseNumber - 사건번호
+ * @param tenantId - 테넌트 ID
+ * @returns 생성된 기한 수
+ */
+export async function createPartySpecificDeadlines(
+  caseId: string,
+  caseNumber: string,
+  tenantId: string
+): Promise<{
+  created: number;
+  skipped: number;
+  errors: string[];
+}> {
+  const result = { created: 0, skipped: 0, errors: [] as string[] };
+  const supabase = createAdminClient();
+
+  // 1. 해당 사건의 당사자들 중 adjdoc_rch_ymd가 있는 당사자 조회
+  const { data: parties, error: partiesError } = await supabase
+    .from('case_parties')
+    .select('id, party_name, party_type, party_type_label, adjdoc_rch_ymd')
+    .eq('case_id', caseId)
+    .not('adjdoc_rch_ymd', 'is', null)
+    .order('party_order', { ascending: true });
+
+  if (partiesError) {
+    result.errors.push(`당사자 조회 실패: ${partiesError.message}`);
+    return result;
+  }
+
+  if (!parties || parties.length === 0) {
+    console.log(`[SCOURT] 판결도달일이 있는 당사자 없음: ${caseNumber}`);
+    return result;
+  }
+
+  // 2. 사건 유형에 따른 기한 타입 결정
+  const category = getCaseCategoryFromNumber(caseNumber);
+  const deadlineMapping = getAppealDeadlineMapping(caseNumber, category);
+
+  if (!deadlineMapping) {
+    console.log(`[SCOURT] 상소기간 해당 없는 사건유형: ${caseNumber}`);
+    return result;
+  }
+
+  // 3. 각 당사자별로 개별 기한 생성
+  for (const party of parties) {
+    const triggerDate = normalizeDate(party.adjdoc_rch_ymd);
+    if (!triggerDate) {
+      result.errors.push(`날짜 형식 오류: ${party.party_name} - ${party.adjdoc_rch_ymd}`);
+      continue;
+    }
+
+    // 당사자 측 결정
+    const partySide = getPartySideFromType(party.party_type as PartyType);
+
+    // 중복 체크 (party_id + deadline_type + trigger_date)
+    const { data: existing } = await supabase
+      .from('case_deadlines')
+      .select('id')
+      .eq('party_id', party.id)
+      .eq('deadline_type', deadlineMapping.deadlineType)
+      .eq('trigger_date', triggerDate)
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      result.skipped++;
+      console.log(`[SCOURT] 기존 기한 존재 - 스킵: ${party.party_name}`);
+      continue;
+    }
+
+    // 기한 생성
+    try {
+      await createCaseDeadline({
+        case_id: caseId,
+        case_number: caseNumber,
+        deadline_type: deadlineMapping.deadlineType,
+        trigger_date: triggerDate,
+        notes: `[SCOURT 자동등록] ${party.party_type_label || party.party_type} ${party.party_name} - ${deadlineMapping.triggerEvent} 기준`,
+        party_id: party.id,
+        party_side: partySide,
+      }, tenantId);
+
+      result.created++;
+      console.log(
+        `[SCOURT] 당사자별 기한 생성: ${caseNumber} - ${party.party_name} (${deadlineMapping.deadlineType}, 기산일: ${triggerDate})`
+      );
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      result.errors.push(`${party.party_name}: ${errorMsg}`);
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 특정 당사자의 판결도달일 변경 시 기한 업데이트/생성
+ *
+ * party-sync.ts에서 adjdoc_rch_ymd 변경 감지 시 호출
+ *
+ * @param partyId - 당사자 ID
+ * @param newTriggerDate - 새 판결도달일 (YYYY-MM-DD)
+ * @param tenantId - 테넌트 ID
+ */
+export async function updatePartyDeadline(
+  partyId: string,
+  newTriggerDate: string,
+  tenantId: string
+): Promise<{ updated: boolean; created: boolean; error?: string }> {
+  const supabase = createAdminClient();
+
+  // 1. 당사자 정보 조회
+  const { data: party, error: partyError } = await supabase
+    .from('case_parties')
+    .select(`
+      id,
+      party_name,
+      party_type,
+      party_type_label,
+      case_id,
+      legal_cases!inner (
+        court_case_number
+      )
+    `)
+    .eq('id', partyId)
+    .single();
+
+  if (partyError || !party) {
+    return { updated: false, created: false, error: `당사자 조회 실패: ${partyError?.message}` };
+  }
+
+  // Supabase의 !inner 조인 결과 타입 추출
+  const legalCases = party.legal_cases as unknown as { court_case_number: string } | null;
+  if (!legalCases) {
+    return { updated: false, created: false, error: '사건 정보 없음' };
+  }
+  const caseNumber = legalCases.court_case_number;
+
+  // 2. 기한 타입 결정
+  const category = getCaseCategoryFromNumber(caseNumber);
+  const deadlineMapping = getAppealDeadlineMapping(caseNumber, category);
+
+  if (!deadlineMapping) {
+    return { updated: false, created: false, error: '상소기간 해당 없는 사건유형' };
+  }
+
+  // 3. 해당 당사자의 기존 기한 조회
+  const { data: existingDeadlines } = await supabase
+    .from('case_deadlines')
+    .select('id, trigger_date')
+    .eq('party_id', partyId)
+    .eq('deadline_type', deadlineMapping.deadlineType)
+    .limit(1);
+
+  const partySide = getPartySideFromType(party.party_type as PartyType);
+
+  // 4. 기존 기한이 있으면 업데이트, 없으면 새로 생성
+  if (existingDeadlines && existingDeadlines.length > 0) {
+    const existing = existingDeadlines[0];
+
+    // 기산일이 동일하면 스킵
+    if (existing.trigger_date === newTriggerDate) {
+      return { updated: false, created: false };
+    }
+
+    // 기산일 업데이트 (deadline_date는 트리거로 자동 계산됨)
+    const { error: updateError } = await supabase
+      .from('case_deadlines')
+      .update({
+        trigger_date: newTriggerDate,
+        notes: `[SCOURT 자동등록] ${party.party_type_label || party.party_type} ${party.party_name} - ${deadlineMapping.triggerEvent} 기준 (업데이트됨)`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existing.id);
+
+    if (updateError) {
+      return { updated: false, created: false, error: updateError.message };
+    }
+
+    console.log(`[SCOURT] 당사자 기한 업데이트: ${caseNumber} - ${party.party_name} (${existing.trigger_date} → ${newTriggerDate})`);
+    return { updated: true, created: false };
+  }
+
+  // 새 기한 생성
+  try {
+    await createCaseDeadline({
+      case_id: party.case_id,
+      case_number: caseNumber,
+      deadline_type: deadlineMapping.deadlineType,
+      trigger_date: newTriggerDate,
+      notes: `[SCOURT 자동등록] ${party.party_type_label || party.party_type} ${party.party_name} - ${deadlineMapping.triggerEvent} 기준`,
+      party_id: partyId,
+      party_side: partySide,
+    }, tenantId);
+
+    console.log(`[SCOURT] 당사자 기한 생성: ${caseNumber} - ${party.party_name} (${newTriggerDate})`);
+    return { updated: false, created: true };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    return { updated: false, created: false, error: errorMsg };
+  }
 }

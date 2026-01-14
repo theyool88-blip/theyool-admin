@@ -44,6 +44,10 @@ interface CourtHearing {
     id: string;
     court_case_number: string;
     tenant_id: string;
+  }[] | {
+    id: string;
+    court_case_number: string;
+    tenant_id: string;
   };
 }
 
@@ -218,8 +222,12 @@ async function backfillDeadlines(options: {
       continue;
     }
 
-    // legal_cases에서 정보 추출
-    const caseNumber = hearing.legal_cases.court_case_number;
+    // legal_cases에서 정보 추출 (배열 또는 단일 객체)
+    const legalCase = Array.isArray(hearing.legal_cases)
+      ? hearing.legal_cases[0]
+      : hearing.legal_cases;
+    if (!legalCase) continue;
+    const caseNumber = legalCase.court_case_number;
 
     // 2-2. 불변기한 타입 결정
     const deadlineInfo = getDeadlineType(caseNumber);

@@ -285,14 +285,11 @@ export class CaseChangeDetector {
       };
     }
 
-    // 판결/결정
-    if (
-      content.includes('판결') ||
-      content.includes('결정') ||
-      content.includes('선고')
-    ) {
+    // 기일 관련 (판결/결정 체크보다 먼저!)
+    // "선고기일 지정", "변론기일 추후지정" 등은 기일 변경으로 분류
+    if (content.includes('기일')) {
       return {
-        updateType: 'result_announced',
+        updateType: 'hearing_changed',
         updateSummary: content,
         details: item,
         importance: 'high',
@@ -309,10 +306,14 @@ export class CaseChangeDetector {
       };
     }
 
-    // 기일 관련
-    if (content.includes('기일')) {
+    // 판결/결정 - 실제 판결/결정 이벤트만 분류
+    // 제외: "예정", "준비", "작성" 등 미래형/진행형 표현
+    const hasJudgmentKeyword = content.includes('판결') || content.includes('결정') || content.includes('선고');
+    const isNotActualJudgment = content.includes('예정') || content.includes('준비') || content.includes('작성');
+
+    if (hasJudgmentKeyword && !isNotActualJudgment) {
       return {
-        updateType: 'hearing_changed',
+        updateType: 'result_announced',
         updateSummary: content,
         details: item,
         importance: 'high',

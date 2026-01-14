@@ -41,24 +41,43 @@
 
 ### 일정 유형별 색상
 
-| 유형 | 색상 | 클래스 |
-|------|------|--------|
-| 변론 (trial) | 보라 | `bg-purple-50 text-purple-700 border-l-purple-400` |
-| 상담 (consultation) | 파랑 | `bg-blue-50 text-blue-700 border-l-blue-400` |
-| 회의 (meeting) | 초록 | `bg-emerald-50 text-emerald-700 border-l-emerald-400` |
-| 법원기일 (court_hearing) | 빨강 | `bg-red-50 text-red-700 border-l-red-400` |
-| 데드라인 (deadline) | 주황 | `bg-orange-50 text-orange-700 border-l-orange-400` |
+| 유형 | 상태 | 색상 | 클래스 |
+|------|------|------|--------|
+| 법원기일 | 일반 | Sage | `bg-sage-50 text-sage-700 border-l-sage-500` |
+| | 변호사미팅 | Teal | `bg-teal-50 text-teal-700 border-l-teal-500` |
+| | 연기됨 | Gray (흐림) | `bg-gray-100 text-gray-400 border-l-gray-300` |
+| | 참석불필요 | Gray | `bg-gray-50 text-gray-600 border-l-gray-400` |
+| 상담 | 확정 | Blue | `bg-blue-50 text-blue-700 border-l-blue-500` |
+| | 미확정 | Blue + 점선 | `bg-blue-50 text-blue-700 border-l-blue-400 border-dashed` |
+| 회의 | - | Gray | `bg-gray-50 text-gray-600 border-l-gray-400` |
+| 데드라인 | - | Orange | `bg-orange-50 text-orange-700 border-l-orange-500` |
+
+### 특수 조건
+
+- **연기된 기일**: scourt_result_raw에 "기일변경", "연기", "취하", "취소" 포함 시
+- **참석불필요 기일**: HEARING_JUDGMENT, HEARING_INVESTIGATION, HEARING_PARENTING
+- **미확정 상담**: event_subtype이 `pending_`으로 시작
+
+### 정렬 규칙
+
+- **데드라인 최상단**: 같은 날짜 내에서 데드라인이 가장 위에 표시됨
 
 ### 도트 인디케이터
 
 ```tsx
-const getScheduleTypeDot = (type: string) => {
+const getScheduleTypeDot = (type: ScheduleType, hearingType?: string) => {
+  if (type === 'court_hearing' && hearingType === 'HEARING_LAWYER_MEETING') {
+    return 'bg-teal-500'
+  }
+  if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING')) {
+    return 'bg-gray-400'
+  }
   switch (type) {
-    case 'trial': return 'bg-purple-400'
-    case 'consultation': return 'bg-blue-400'
-    case 'meeting': return 'bg-emerald-400'
-    case 'court_hearing': return 'bg-red-400'
-    case 'deadline': return 'bg-orange-400'
+    case 'trial': return 'bg-sage-500'
+    case 'consultation': return 'bg-blue-500'
+    case 'meeting': return 'bg-gray-400'
+    case 'court_hearing': return 'bg-sage-500'
+    case 'deadline': return 'bg-orange-500'
     default: return 'bg-gray-400'
   }
 }

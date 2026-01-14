@@ -251,7 +251,17 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
         })
       }
 
-        setAllSchedules(unifiedSchedules)
+        // 데드라인을 해당 날짜의 최상단으로 정렬
+        const sortedSchedules = [...unifiedSchedules].sort((a, b) => {
+          if (a.date === b.date) {
+            // 같은 날짜 내에서 deadline을 최상단으로
+            if (a.type === 'deadline' && b.type !== 'deadline') return -1
+            if (a.type !== 'deadline' && b.type === 'deadline') return 1
+          }
+          return 0 // 기존 정렬(날짜순) 유지
+        })
+
+        setAllSchedules(sortedSchedules)
         if (!selectedDate) {
           setSelectedDate(new Date())
         }
@@ -426,9 +436,9 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
   }
 
   const getScheduleTypeColor = (type: ScheduleType, hearingType?: string, eventSubtype?: string, scourt_result_raw?: string) => {
-    // 연기된 기일: amber 색상 (기일변경, 연기, 취하, 취소 등)
+    // 연기된 기일: 흐린 회색 (기일변경, 연기, 취하, 취소 등 - 비활성 느낌)
     if (type === 'court_hearing' && isPostponedHearing(scourt_result_raw)) {
-      return 'bg-amber-50 text-amber-700 border-l-amber-500'
+      return 'bg-gray-100 text-gray-400 border-l-gray-300'
     }
 
     // 변호사미팅은 청록색(teal)으로 구분

@@ -65,6 +65,13 @@ interface Holiday {
   year: number
 }
 
+// 변호사 출석 불필요 기일 유형 (선고기일, 조사기일, 상담/교육 기일)
+const NO_LAWYER_ATTENDANCE_TYPES = [
+  'HEARING_JUDGMENT',      // 선고기일: 판결 선고만 이루어짐
+  'HEARING_INVESTIGATION', // 조사기일: 당사자만 참석 (가사조사관 면담)
+  'HEARING_PARENTING',     // 상담/교육 기일: 당사자만 참석 (부모교육 등)
+] as const
+
 export default function MonthlyCalendar({ profile: _profile }: { profile: Profile }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [schedules, setSchedules] = useState<UnifiedSchedule[]>([])
@@ -1146,8 +1153,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         <span className="truncate">결과: {schedule.scourt_result_raw}</span>
                       </p>
                     )}
-                    {/* 출석변호사 표시 및 변경 (법원기일만) */}
-                    {schedule.type === 'court_hearing' && tenantMembers.length > 0 && (
+                    {/* 출석변호사 표시 및 변경 (법원기일만, 선고/조사/상담교육 기일 제외) */}
+                    {schedule.type === 'court_hearing' &&
+                     tenantMembers.length > 0 &&
+                     !NO_LAWYER_ATTENDANCE_TYPES.includes(schedule.hearing_type as typeof NO_LAWYER_ATTENDANCE_TYPES[number]) && (
                       <div
                         className="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2"
                         onClick={(e) => e.stopPropagation()}

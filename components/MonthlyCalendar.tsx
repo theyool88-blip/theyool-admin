@@ -45,6 +45,7 @@ interface UnifiedSchedule {
   hearing_sequence?: number // 기일 회차
   // 화상 참여자 정보
   video_participant_side?: string // 화상 참여자 측: plaintiff_side, defendant_side, both, null
+  our_client_side?: string // 의뢰인 측: plaintiff_side, defendant_side
 }
 
 interface TenantMember {
@@ -205,6 +206,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
           scourt_result_raw?: string | null
           hearing_sequence?: number | null
           video_participant_side?: string | null
+          our_client_side?: string | null
         }) => {
           let scheduleType: ScheduleType
           let hearing_type: string | undefined
@@ -252,6 +254,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             hearing_sequence: event.hearing_sequence ?? undefined,
             // 화상 참여자 정보
             video_participant_side: event.video_participant_side ?? undefined,
+            our_client_side: event.our_client_side ?? undefined,
           })
         })
       }
@@ -356,23 +359,28 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
   }
 
   // 화상기일 배지 정보 반환
-  const getVideoBadgeInfo = (scourtTypeRaw?: string, videoParticipantSide?: string): { show: boolean; label: string; color: string } | null => {
-    // 쌍방 화상기일
+  // 우리(의뢰인)가 화상일 때만 [화상] 배지 표시
+  const getVideoBadgeInfo = (scourtTypeRaw?: string, videoParticipantSide?: string, ourClientSide?: string): { show: boolean; label: string; color: string } | null => {
+    // 쌍방 화상기일 → 우리도 화상이므로 표시
     if (scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치') || videoParticipantSide === 'both') {
       return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
     }
-    // 일방 화상기일 - 원고측
-    if (videoParticipantSide === 'plaintiff_side') {
-      return { show: true, label: '원고화상', color: 'bg-orange-100 text-orange-700' }
+
+    // 일방 화상기일
+    if (videoParticipantSide && ourClientSide) {
+      // 우리(의뢰인)가 화상일 때만 표시
+      if (videoParticipantSide === ourClientSide) {
+        return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
+      }
+      // 상대방만 화상이면 표시 안 함
+      return null
     }
-    // 일방 화상기일 - 피고측
-    if (videoParticipantSide === 'defendant_side') {
-      return { show: true, label: '피고화상', color: 'bg-sky-100 text-sky-700' }
-    }
-    // 일방 화상기일이지만 참여자 정보가 없는 경우
+
+    // 일방 화상기일이지만 참여자 정보가 없는 경우 (판단 불가)
     if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
-      return { show: true, label: '일방화상', color: 'bg-gray-100 text-gray-600' }
+      return { show: true, label: '화상', color: 'bg-gray-100 text-gray-600' }
     }
+
     return null
   }
 
@@ -868,7 +876,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         <div className="font-medium truncate">
                           {schedule.time?.slice(0, 5)}
                           {(() => {
-                            const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side)
+                            const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side, schedule.our_client_side)
                             return badge ? (
                               <span className={`ml-0.5 px-1 py-0.5 ${badge.color} text-[8px] font-bold rounded`}>{badge.label}</span>
                             ) : null
@@ -1183,7 +1191,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                             : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>
                       {(() => {
-                        const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side)
+                        const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side, schedule.our_client_side)
                         return badge ? (
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${badge.color}`}>
                             {badge.label}

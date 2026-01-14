@@ -68,14 +68,20 @@ SELECT
   NULL::TEXT AS deadline_party_name,
   NULL::TEXT AS deadline_party_type_label,
   -- 화상 참여자 정보 (COURT_HEARING 전용)
-  ch.video_participant_side::TEXT AS video_participant_side
+  ch.video_participant_side::TEXT AS video_participant_side,
+  -- 의뢰인 측 정보 (원고측/피고측 판단용)
+  CASE
+    WHEN client_party.party_type_label ILIKE '%원고%' OR client_party.party_type_label ILIKE '%청구인%' OR client_party.party_type_label ILIKE '%신청인%' THEN 'plaintiff_side'
+    WHEN client_party.party_type_label ILIKE '%피고%' OR client_party.party_type_label ILIKE '%상대방%' OR client_party.party_type_label ILIKE '%피신청인%' THEN 'defendant_side'
+    ELSE NULL
+  END::TEXT AS our_client_side
 FROM court_hearings ch
 LEFT JOIN legal_cases lc ON ch.case_id = lc.id
 LEFT JOIN tenant_members tm_attending ON ch.attending_lawyer_id = tm_attending.id
 LEFT JOIN tenant_members tm_assigned ON lc.assigned_to = tm_assigned.id
 -- 의뢰인 (is_our_client = true, is_primary 우선)
 LEFT JOIN LATERAL (
-  SELECT party_name FROM case_parties cp
+  SELECT party_name, party_type_label FROM case_parties cp
   WHERE cp.case_id = ch.case_id AND cp.is_our_client = TRUE
   ORDER BY cp.is_primary DESC NULLS LAST, cp.party_order ASC
   LIMIT 1
@@ -147,7 +153,8 @@ SELECT
   deadline_party.party_name::TEXT AS deadline_party_name,
   deadline_party.party_type_label::TEXT AS deadline_party_type_label,
   -- 화상 참여자 정보 (DEADLINE은 NULL)
-  NULL::TEXT AS video_participant_side
+  NULL::TEXT AS video_participant_side,
+  NULL::TEXT AS our_client_side
 FROM case_deadlines cd
 LEFT JOIN legal_cases lc ON cd.case_id = lc.id
 LEFT JOIN tenant_members tm_assigned ON lc.assigned_to = tm_assigned.id
@@ -202,7 +209,8 @@ SELECT
   NULL::TEXT AS deadline_party_name,
   NULL::TEXT AS deadline_party_type_label,
   -- 화상 참여자 정보 (CONSULTATION은 NULL)
-  NULL::TEXT AS video_participant_side
+  NULL::TEXT AS video_participant_side,
+  NULL::TEXT AS our_client_side
 FROM consultations c
 WHERE c.preferred_date IS NOT NULL;
 

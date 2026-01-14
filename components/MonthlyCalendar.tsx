@@ -43,6 +43,8 @@ interface UnifiedSchedule {
   scourt_type_raw?: string // 원본 기일명 (예: "제1회 변론기일")
   scourt_result_raw?: string // 원본 결과 (예: "다음기일지정(2025.02.15)")
   hearing_sequence?: number // 기일 회차
+  // 화상 참여자 정보
+  video_participant_side?: string // 화상 참여자 측: plaintiff_side, defendant_side, both, null
 }
 
 interface TenantMember {
@@ -202,6 +204,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
           scourt_type_raw?: string | null
           scourt_result_raw?: string | null
           hearing_sequence?: number | null
+          video_participant_side?: string | null
         }) => {
           let scheduleType: ScheduleType
           let hearing_type: string | undefined
@@ -247,6 +250,8 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             scourt_type_raw: event.scourt_type_raw ?? undefined,
             scourt_result_raw: event.scourt_result_raw ?? undefined,
             hearing_sequence: event.hearing_sequence ?? undefined,
+            // 화상 참여자 정보
+            video_participant_side: event.video_participant_side ?? undefined,
           })
         })
       }
@@ -350,7 +355,28 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
     return text.replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, '').trim()
   }
 
-  // 쌍방 화상장치 여부 확인
+  // 화상기일 배지 정보 반환
+  const getVideoBadgeInfo = (scourtTypeRaw?: string, videoParticipantSide?: string): { show: boolean; label: string; color: string } | null => {
+    // 쌍방 화상기일
+    if (scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치') || videoParticipantSide === 'both') {
+      return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
+    }
+    // 일방 화상기일 - 원고측
+    if (videoParticipantSide === 'plaintiff_side') {
+      return { show: true, label: '원고화상', color: 'bg-orange-100 text-orange-700' }
+    }
+    // 일방 화상기일 - 피고측
+    if (videoParticipantSide === 'defendant_side') {
+      return { show: true, label: '피고화상', color: 'bg-sky-100 text-sky-700' }
+    }
+    // 일방 화상기일이지만 참여자 정보가 없는 경우
+    if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
+      return { show: true, label: '일방화상', color: 'bg-gray-100 text-gray-600' }
+    }
+    return null
+  }
+
+  // 쌍방 화상장치 여부 확인 (하위호환)
   const isBilateralVideoHearing = (scourtTypeRaw?: string) => {
     return scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치')
   }
@@ -841,9 +867,12 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                       >
                         <div className="font-medium truncate">
                           {schedule.time?.slice(0, 5)}
-                          {isBilateralVideoHearing(schedule.scourt_type_raw) && (
-                            <span className="ml-0.5 px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded">화상</span>
-                          )}
+                          {(() => {
+                            const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side)
+                            return badge ? (
+                              <span className={`ml-0.5 px-1 py-0.5 ${badge.color} text-[8px] font-bold rounded`}>{badge.label}</span>
+                            ) : null
+                          })()}
                           {schedule.location && (
                             <span className="ml-0.5 text-gray-500 font-normal">{getShortCourt(schedule.location)}</span>
                           )}
@@ -1153,11 +1182,14 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                             ? removeVideoDeviceText(schedule.scourt_type_raw)
                             : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>
-                      {isBilateralVideoHearing(schedule.scourt_type_raw) && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
-                          화상
-                        </span>
-                      )}
+                      {(() => {
+                        const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side)
+                        return badge ? (
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${badge.color}`}>
+                            {badge.label}
+                          </span>
+                        ) : null
+                      })()}
                       {schedule.time && (
                         <span className="text-[10px] font-semibold text-gray-700">
                           {schedule.time.slice(0, 5)}

@@ -102,8 +102,30 @@ const SCOURT_RESULT_MAP: Record<string, HearingResult> = {
 };
 
 // ============================================================
+// 화상 참여자 타입
+// ============================================================
+
+export type VideoParticipantSide = 'plaintiff_side' | 'defendant_side' | 'both' | null;
+
+// ============================================================
 // 유틸리티 함수
 // ============================================================
+
+/**
+ * SCOURT 기일명에서 화상 참여자 측 추출
+ * - 쌍방 화상장치 → 'both'
+ * - 일방 화상장치 → raw_data에서 추출 필요 (이 함수에서는 'unknown' placeholder)
+ * - 화상 아님 → null
+ */
+export function extractVideoTypeFromScourtType(scourtType: string): 'both' | 'one_way' | null {
+  if (scourtType.includes('쌍방 화상장치') || scourtType.includes('쌍방화상장치')) {
+    return 'both';
+  }
+  if (scourtType.includes('일방 화상장치') || scourtType.includes('일방화상장치')) {
+    return 'one_way';
+  }
+  return null;
+}
 
 /**
  * SCOURT 기일명 → HearingType 변환
@@ -258,6 +280,75 @@ function determineHearingStatus(hearing: HearingInfo): HearingStatus {
 }
 
 // ============================================================
+// 화상 참여자 추출 (raw_data에서)
+// ============================================================
+
+interface AgentInfo {
+  agntNm?: string;       // 대리인명 (예: "법무법인 정향 (...) [화상장치]")
+  agntDvsNm?: string;    // 대리인구분명 (예: "피고 소송대리인")
+  btprNm?: string;       // 당사자명
+  btprDvsNm?: string;    // 당사자구분명
+}
+
+/**
+ * SCOURT raw_data에서 화상 참여자 측 추출
+ * @param caseNumber 사건번호
+ * @param supabase Supabase 클라이언트
+ * @returns 화상 참여자 측 ('plaintiff_side' | 'defendant_side' | null)
+ */
+async function extractVideoParticipantFromRawData(
+  caseNumber: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any
+): Promise<VideoParticipantSide> {
+  try {
+    const { data: snapshot } = await supabase
+      .from('scourt_case_snapshots')
+      .select('raw_data')
+      .eq('case_number', caseNumber)
+      .order('scraped_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!snapshot?.raw_data) {
+      return null;
+    }
+
+    const rawStr = JSON.stringify(snapshot.raw_data as Record<string, unknown>);
+
+    // [화상장치] 마커가 포함된 대리인/당사자 찾기
+    const videoMarkerMatches = rawStr.match(/"agntNm":"[^"]*\[화상장치\][^"]*"/g);
+
+    if (!videoMarkerMatches || videoMarkerMatches.length === 0) {
+      return null;
+    }
+
+    // 해당 대리인의 구분(원고/피고) 확인
+    for (const match of videoMarkerMatches) {
+      const idx = rawStr.indexOf(match);
+      // 주변 컨텍스트에서 agntDvsNm 추출
+      const context = rawStr.substring(idx, Math.min(rawStr.length, idx + match.length + 100));
+      const dvsMatch = context.match(/"agntDvsNm":"([^"]*)"/);
+
+      if (dvsMatch) {
+        const dvsNm = dvsMatch[1];
+        if (dvsNm.includes('원고')) {
+          return 'plaintiff_side';
+        }
+        if (dvsNm.includes('피고')) {
+          return 'defendant_side';
+        }
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('[extractVideoParticipantFromRawData] Error:', error);
+    return null;
+  }
+}
+
+// ============================================================
 // 동기화 서비스
 // ============================================================
 
@@ -345,6 +436,17 @@ export async function syncHearingsToCourtHearings(
           result.skipped++;
         }
       } else {
+        // 화상 참여자 정보 추출
+        let videoParticipantSide: VideoParticipantSide = null;
+        const videoType = extractVideoTypeFromScourtType(hearing.type || '');
+
+        if (videoType === 'both') {
+          videoParticipantSide = 'both';
+        } else if (videoType === 'one_way') {
+          // 일방 화상기일인 경우 raw_data에서 참여자 측 추출
+          videoParticipantSide = await extractVideoParticipantFromRawData(caseNumber, supabase);
+        }
+
         // 새 기일 생성
         const insertData = {
           case_id: caseId,              // UUID (필수)
@@ -361,6 +463,8 @@ export async function syncHearingsToCourtHearings(
           scourt_result_raw: hearing.result || null,          // "다음기일지정(2025.02.15)"
           hearing_sequence: extractHearingSequence(hearing.type || ''),
           notes: null,  // 원본은 scourt_type_raw에 저장
+          // 화상 참여자 정보
+          video_participant_side: videoParticipantSide,
         };
 
         const { error: insertError } = await supabase

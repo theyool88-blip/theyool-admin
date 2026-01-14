@@ -92,6 +92,29 @@ interface UnifiedSchedule {
 }
 ```
 
+### 일정 Title 표시 형식
+
+캘린더에 표시되는 일정 제목은 다음 형식을 따릅니다:
+
+```
+(기일명) 의뢰인v상대방(사건명)
+```
+
+**예시:**
+- `(제1회 변론기일) 김철수v이영희(이혼)`
+- `(조정기일) 박민수v최지연(양육권)`
+- `(상소기간) 홍길동v김영수(재산분할)`
+
+**당사자 선택 우선순위:**
+1. `is_primary = true` 인 당사자 우선
+2. `party_order` 순서대로
+3. 의뢰인: `is_our_client = true`
+4. 상대방: `is_our_client = false`
+
+**폴백 로직:**
+- 당사자 정보 없으면 → `case_name` 표시
+- `case_name`도 없으면 → `case_number` 표시
+
 ---
 
 ## Google Calendar 동기화

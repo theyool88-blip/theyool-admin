@@ -345,9 +345,16 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
     }
   }
 
+  // 화상장치 관련 텍스트 제거 (예: "[일방 화상장치]", "[쌍방 화상장치]", "제1회 변론기일 [일방 화상장치]")
+  const removeVideoDeviceText = (text: string) => {
+    return text.replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, '').trim()
+  }
+
   // 캘린더 셀용 짧은 제목 (예: "(변론기일) 김OO" → "(변론) 김OO")
   const getShortTitle = (title: string) => {
     return title
+      // 화상장치 관련 텍스트 제거 (예: "[일방 화상장치]", "[쌍방 화상장치]")
+      .replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, ' ')
       .replace('변론기일', '변론')
       .replace('조정기일', '조정')
       .replace('선고기일', '선고')
@@ -360,6 +367,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
       .replace('즉시항고', '즉항')
       .replace('항소이유서', '항소이유')
       .replace('지급명령이의', '지명이의')
+      .trim()
   }
 
   // 법원명 짧게 (예: "평택가정법원 제21호 법정" → "평택")
@@ -446,8 +454,8 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
       return 'bg-teal-50 text-teal-700 border-l-teal-500'
     }
 
-    // 참석하지 않는 법원기일은 회색으로 표시
-    if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING')) {
+    // 참석하지 않는 법원기일은 회색으로 표시 (선고, 양육상담, 면접조사)
+    if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING' || hearingType === 'HEARING_INVESTIGATION')) {
       return 'bg-gray-50 text-gray-600 border-l-gray-400'
     }
 
@@ -472,8 +480,8 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
       return 'bg-teal-500'
     }
 
-    // 참석하지 않는 법원기일은 회색 점
-    if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING')) {
+    // 참석하지 않는 법원기일은 회색 점 (선고, 양육상담, 면접조사)
+    if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING' || hearingType === 'HEARING_INVESTIGATION')) {
       return 'bg-gray-400'
     }
 
@@ -1129,11 +1137,11 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   >
                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/90 shadow-sm">
-                        {/* 법원기일: 연기시 "기일연기", 아니면 scourt_type_raw 우선 표시 */}
+                        {/* 법원기일: 연기시 "기일연기", 아니면 scourt_type_raw 우선 표시 (화상장치 텍스트 제거) */}
                         {schedule.type === 'court_hearing' && isPostponedHearing(schedule.scourt_result_raw)
                           ? '기일연기'
                           : schedule.type === 'court_hearing' && schedule.scourt_type_raw
-                            ? schedule.scourt_type_raw
+                            ? removeVideoDeviceText(schedule.scourt_type_raw)
                             : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>
                       {schedule.time && (

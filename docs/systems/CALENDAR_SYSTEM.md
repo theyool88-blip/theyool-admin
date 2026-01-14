@@ -1,6 +1,6 @@
 # 캘린더 시스템
 
-**Last Updated**: 2026-01-13
+**Last Updated**: 2026-01-14
 
 법무법인 더율의 모든 일정을 통합 관리하는 캘린더 시스템입니다.
 
@@ -270,6 +270,59 @@ unified_calendar VIEW (court_name + location)
 "대전가정법원 서산지원 제21호 법정"
        ↓
 getShortCourt() → "서산"
+```
+
+---
+
+## 출석 변호사 필드
+
+### 개요
+
+법원 기일(court_hearing)에만 출석 변호사를 지정할 수 있습니다. 단, 변호사 출석이 불필요한 기일 유형에서는 해당 필드가 표시되지 않습니다.
+
+### 변호사 출석 불필요 기일
+
+| 유형 | 코드 | 이유 |
+|------|------|------|
+| 선고기일 | `HEARING_JUDGMENT` | 판결 선고만 이루어짐 |
+| 조사기일 | `HEARING_INVESTIGATION` | 당사자만 참석 (가사조사관 면담) |
+| 상담/교육 기일 | `HEARING_PARENTING` | 당사자만 참석 (부모교육 등) |
+| 조정조치기일 | `scourt_type_raw`에 "조정조치" 포함 | 당사자만 참석 |
+
+### 구현 코드
+
+```typescript
+// components/MonthlyCalendar.tsx
+
+// 기일 유형으로 체크
+const NO_LAWYER_ATTENDANCE_TYPES = [
+  'HEARING_JUDGMENT',
+  'HEARING_INVESTIGATION',
+  'HEARING_PARENTING',
+] as const
+
+// 키워드로 체크 (조정조치기일 등)
+const NO_LAWYER_ATTENDANCE_KEYWORDS = ['조정조치']
+
+function isNoLawyerAttendanceRequired(schedule: UnifiedSchedule): boolean {
+  if (NO_LAWYER_ATTENDANCE_TYPES.includes(schedule.hearing_type)) {
+    return true
+  }
+  if (schedule.scourt_type_raw?.includes('조정조치')) {
+    return true
+  }
+  return false
+}
+```
+
+### 렌더링 조건
+
+```tsx
+{schedule.type === 'court_hearing' &&
+ tenantMembers.length > 0 &&
+ !isNoLawyerAttendanceRequired(schedule) && (
+  <div>출석 변호사 드롭다운</div>
+)}
 ```
 
 ---

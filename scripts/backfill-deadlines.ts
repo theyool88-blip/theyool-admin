@@ -220,7 +220,6 @@ async function backfillDeadlines(options: {
 
     // legal_cases에서 정보 추출
     const caseNumber = hearing.legal_cases.court_case_number;
-    const tenantId = hearing.legal_cases.tenant_id;
 
     // 2-2. 불변기한 타입 결정
     const deadlineInfo = getDeadlineType(caseNumber);
@@ -257,7 +256,6 @@ async function backfillDeadlines(options: {
         .insert({
           case_id: hearing.case_id,
           case_number: caseNumber,
-          tenant_id: tenantId,
           deadline_type: deadlineInfo.type,
           trigger_date: triggerDate,
           notes: '[백필] 기존 선고 기일 기반 자동 생성',

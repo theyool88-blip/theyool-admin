@@ -350,6 +350,11 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
     return text.replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, '').trim()
   }
 
+  // 쌍방 화상장치 여부 확인
+  const isBilateralVideoHearing = (scourtTypeRaw?: string) => {
+    return scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치')
+  }
+
   // 캘린더 셀용 짧은 제목 (예: "(변론기일) 김OO" → "(변론) 김OO")
   const getShortTitle = (title: string) => {
     return title
@@ -836,6 +841,9 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                       >
                         <div className="font-medium truncate">
                           {schedule.time?.slice(0, 5)}
+                          {isBilateralVideoHearing(schedule.scourt_type_raw) && (
+                            <span className="ml-0.5 px-1 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-bold rounded">화상</span>
+                          )}
                           {schedule.location && (
                             <span className="ml-0.5 text-gray-500 font-normal">{getShortCourt(schedule.location)}</span>
                           )}
@@ -1145,6 +1153,11 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                             ? removeVideoDeviceText(schedule.scourt_type_raw)
                             : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>
+                      {isBilateralVideoHearing(schedule.scourt_type_raw) && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">
+                          화상
+                        </span>
+                      )}
                       {schedule.time && (
                         <span className="text-[10px] font-semibold text-gray-700">
                           {schedule.time.slice(0, 5)}

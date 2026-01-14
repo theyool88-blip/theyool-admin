@@ -45,9 +45,12 @@ export const GET = withTenant(async (request, { tenant }) => {
       offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0,
     };
 
+    // 자동등록 기한 필터 (SCOURT 자동등록된 기한만 조회)
+    const autoRegistered = searchParams.get('auto_registered') === 'true';
+
     // 테넌트 ID 전달
     const tenantId = tenant.isSuperAdmin ? undefined : tenant.tenantId;
-    const { data, count } = await getCaseDeadlines(filters, tenantId);
+    const { data, count } = await getCaseDeadlines(filters, tenantId, autoRegistered);
 
     const response: ApiListResponse<CaseDeadline> = {
       success: true,

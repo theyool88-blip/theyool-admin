@@ -22,10 +22,12 @@ import type {
  * 사건 데드라인 목록 조회 (필터링 및 페이지네이션 지원, 테넌트 격리)
  * @param filters 필터 조건 (case_id 또는 case_number로 필터링)
  * @param tenantId 테넌트 ID (슈퍼 어드민은 undefined로 전달하여 전체 조회)
+ * @param autoRegistered SCOURT 자동등록 기한만 조회 여부
  */
 export async function getCaseDeadlines(
   filters?: CaseDeadlineListQuery,
-  tenantId?: string
+  tenantId?: string,
+  autoRegistered?: boolean
 ): Promise<{ data: CaseDeadline[]; count: number }> {
   const supabase = createAdminClient();
   let query = supabase.from('case_deadlines').select('*', { count: 'exact' });
@@ -33,6 +35,11 @@ export async function getCaseDeadlines(
   // 테넌트 격리 필터
   if (tenantId) {
     query = query.eq('tenant_id', tenantId);
+  }
+
+  // SCOURT 자동등록 기한만 필터링
+  if (autoRegistered) {
+    query = query.ilike('notes', '%[SCOURT 자동등록]%');
   }
 
   if (filters) {
@@ -168,6 +175,7 @@ export async function createCaseDeadline(
     notes: request.notes || null,
     status: request.status || 'PENDING',
     tenant_id: tenantId || null,
+    is_electronic_service: request.is_electronic_service || false,
   };
 
   const { data, error } = await supabase

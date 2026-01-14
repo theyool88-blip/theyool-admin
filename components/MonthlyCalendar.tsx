@@ -72,6 +72,21 @@ const NO_LAWYER_ATTENDANCE_TYPES = [
   'HEARING_PARENTING',     // 상담/교육 기일: 당사자만 참석 (부모교육 등)
 ] as const
 
+// 변호사 출석 불필요 여부 체크 (scourt_type_raw 기반 추가 체크)
+const NO_LAWYER_ATTENDANCE_KEYWORDS = ['조정조치'] // 조정조치기일: 당사자만 참석
+
+function isNoLawyerAttendanceRequired(schedule: UnifiedSchedule): boolean {
+  // 1. 기일 유형으로 체크
+  if (NO_LAWYER_ATTENDANCE_TYPES.includes(schedule.hearing_type as typeof NO_LAWYER_ATTENDANCE_TYPES[number])) {
+    return true
+  }
+  // 2. scourt_type_raw에 특정 키워드 포함 체크 (조정조치기일 등)
+  if (schedule.scourt_type_raw) {
+    return NO_LAWYER_ATTENDANCE_KEYWORDS.some(keyword => schedule.scourt_type_raw!.includes(keyword))
+  }
+  return false
+}
+
 export default function MonthlyCalendar({ profile: _profile }: { profile: Profile }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [schedules, setSchedules] = useState<UnifiedSchedule[]>([])
@@ -1153,10 +1168,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         <span className="truncate">결과: {schedule.scourt_result_raw}</span>
                       </p>
                     )}
-                    {/* 출석변호사 표시 및 변경 (법원기일만, 선고/조사/상담교육 기일 제외) */}
+                    {/* 출석변호사 표시 및 변경 (법원기일만, 변호사 출석 불필요 기일 제외) */}
                     {schedule.type === 'court_hearing' &&
                      tenantMembers.length > 0 &&
-                     !NO_LAWYER_ATTENDANCE_TYPES.includes(schedule.hearing_type as typeof NO_LAWYER_ATTENDANCE_TYPES[number]) && (
+                     !isNoLawyerAttendanceRequired(schedule) && (
                       <div
                         className="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2"
                         onClick={(e) => e.stopPropagation()}

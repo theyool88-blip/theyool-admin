@@ -117,6 +117,79 @@ calculateLegalDeadline(new Date('2025-04-08'), 14, true)
 - SCOURT 자동등록 시: "0시 도달" 패턴 자동 감지, `is_electronic_service = true` 설정
 - 수동 등록 시: "전자송달 (0시 의제)" 체크박스 선택
 
+## 당사자별 기한 관리 (2026-01-14 추가)
+
+### 개념
+
+민사/가사 사건에서는 원고와 피고에게 판결문이 각각 다른 날짜에 송달될 수 있습니다. 따라서 상소기간도 당사자별로 다르게 관리해야 합니다.
+
+```
+예시: 2024드단12345 사건
+├── 원고 김OO: 판결도달일 2026-01-10 → 항소기간 만료 2026-01-24
+└── 피고 이OO: 판결도달일 2026-01-12 → 항소기간 만료 2026-01-26
+```
+
+### 스키마 변경
+
+`case_deadlines` 테이블에 당사자 연결 컬럼 추가:
+
+```sql
+-- 당사자 직접 연결
+party_id UUID REFERENCES case_parties(id) ON DELETE SET NULL
+
+-- 당사자 측 구분
+party_side VARCHAR(30) -- 'plaintiff_side' | 'defendant_side' | NULL
+```
+
+### 판결도달일 (adjdoc_rch_ymd)
+
+SCOURT API에서 당사자별 판결도달일을 제공합니다:
+
+| 필드명 | 테이블 | 설명 |
+|--------|--------|------|
+| `adjdoc_rch_ymd` | `case_parties` | 해당 당사자에게 판결문이 도달한 날짜 |
+
+### 자동 기한 생성 흐름
+
+```
+SCOURT API (당사자별 adjdocRchYmd)
+        ↓
+party-sync.ts (adjdoc_rch_ymd 변경 감지)
+        ↓
+deadline-auto-register.ts (updatePartyDeadline)
+        ↓
+case_deadlines (party_id, party_side 연결)
+        ↓
+unified_calendar VIEW (캘린더 표시)
+```
+
+### 캘린더 표시 형식
+
+| party_side | 표시 형식 |
+|------------|----------|
+| `plaintiff_side` | `[기한/원고] 항소기간 - 김OO v 이OO(이혼사건)` |
+| `defendant_side` | `[기한/피고] 항소기간 - 김OO v 이OO(이혼사건)` |
+| `NULL` (전체) | `[기한] 항소기간 - 김OO v 이OO(이혼사건)` |
+
+### 기한 유형 라벨
+
+| deadline_type | 라벨 | 설명 |
+|---------------|------|------|
+| `DL_APPEAL` | 항소기간 | 민사/가사소송 1심→2심 (14일) |
+| `DL_FAMILY_NONLIT` | 항고기간 | 가사비송 즉시항고 (14일) |
+| `DL_CRIMINAL_APPEAL` | 형사항소기간 | 형사 (7일) |
+| `DL_IMM_APPEAL` | 즉시항고기간 | 민사 결정/명령 (7일) |
+| `DL_APPEAL_BRIEF` | 항소이유서제출기한 | 민사 (40일) |
+| `DL_MEDIATION_OBJ` | 조정이의기간 | 조정·화해 이의 (14일) |
+| `DL_PAYMENT_ORDER` | 지급명령이의기간 | 지급명령 (14일) |
+
+### UI 지원
+
+**QuickAddDeadlineModal.tsx**:
+- 사건 선택 후 당사자 목록 표시
+- 당사자 선택 시 해당 당사자에게 기한 연결
+- 선택하지 않으면 사건 전체에 적용
+
 ## 시스템 아키텍처
 
 ```
@@ -125,11 +198,18 @@ calculateLegalDeadline(new Date('2025-04-08'), 14, true)
 ├─────────────────────────────────────────────────────────────┤
 │  QuickAddDeadlineModal.tsx    CaseDetail.tsx                │
 │  └── calculateLegalDeadline()  └── 기한 표시                │
+│  └── 당사자 선택 UI                                         │
 ├─────────────────────────────────────────────────────────────┤
 │                      Business Logic                          │
 ├─────────────────────────────────────────────────────────────┤
 │  lib/scourt/deadline-auto-register.ts                       │
 │  └── SCOURT 업데이트 감지 시 자동 기한 등록                 │
+│  └── updatePartyDeadline() - 당사자별 기한 생성/수정        │
+│  └── createPartySpecificDeadlines() - 사건 전체 당사자 처리 │
+│                                                              │
+│  lib/scourt/party-sync.ts                                   │
+│  └── adjdoc_rch_ymd 변경 감지                               │
+│  └── 변경 시 updatePartyDeadline() 호출                     │
 │                                                              │
 │  lib/utils/korean-legal-dates.ts                            │
 │  └── calculateLegalDeadline() - 민법 제161조 적용           │
@@ -139,7 +219,9 @@ calculateLegalDeadline(new Date('2025-04-08'), 14, true)
 │                      Database Layer                          │
 ├─────────────────────────────────────────────────────────────┤
 │  deadline_types (마스터)     case_deadlines (트랜잭션)       │
-│  korean_public_holidays      calculate_deadline_dates()     │
+│  korean_public_holidays      └── party_id (당사자 연결)      │
+│                              └── party_side (당사자 측)      │
+│                              calculate_deadline_dates()     │
 │                              └── DB 트리거 (자동 계산)       │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -296,6 +378,11 @@ npm run test:ui
 
 | 날짜 | 변경 내용 |
 |------|----------|
+| 2026-01-14 | 당사자별 불변기한 관리 기능 추가 (party_id, party_side 컬럼) |
+| 2026-01-14 | 판결도달일(adjdoc_rch_ymd) 변경 감지 및 기한 자동 생성 |
+| 2026-01-14 | 캘린더 표시 형식 개선: [기한/원고], [기한/피고] 형식 |
+| 2026-01-14 | 기한 유형 라벨 정확화: 상소기간→항소기간, 가사비송즉시항고→항고기간 |
+| 2026-01-14 | QuickAddDeadlineModal에 당사자 선택 UI 추가 |
 | 2026-01-14 | SCOURT 자동등록 기한 관리 페이지 추가 (/admin/scourt/deadlines) |
 | 2026-01-14 | auto_registered 필터 파라미터 추가 (자동등록 기한 조회) |
 | 2026-01-14 | 조정·화해 이의 기산일 수정 (성립일 → 결정서 송달일) |

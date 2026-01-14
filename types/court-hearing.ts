@@ -20,13 +20,21 @@ export const HEARING_TYPES = {
 export type HearingType = keyof typeof HEARING_TYPES;
 
 export const DEADLINE_TYPES = {
-  DL_APPEAL: 'DL_APPEAL',                       // 민사/가사소송 상소기간 (14일)
-  DL_MEDIATION_OBJ: 'DL_MEDIATION_OBJ',         // 조정·화해 이의기간 (14일)
-  DL_IMM_APPEAL: 'DL_IMM_APPEAL',               // 민사 즉시항고기간 (7일)
-  DL_APPEAL_BRIEF: 'DL_APPEAL_BRIEF',           // 항소이유서 제출기한 (40일)
-  DL_RETRIAL: 'DL_RETRIAL',                     // 재심의 소 제기기한 (30일)
+  // 상소기간
+  DL_APPEAL: 'DL_APPEAL',                       // 민사/가사소송 상소기간 (14일) - 민소법 §396
   DL_CRIMINAL_APPEAL: 'DL_CRIMINAL_APPEAL',     // 형사 상소기간 (7일) - 형소법 §358
   DL_FAMILY_NONLIT: 'DL_FAMILY_NONLIT',         // 가사비송 즉시항고 (14일) - 가사소송법
+  DL_IMM_APPEAL: 'DL_IMM_APPEAL',               // 민사 즉시항고기간 (7일) - 민소법 §444
+
+  // 항소이유서/상고이유서 제출기한
+  DL_APPEAL_BRIEF: 'DL_APPEAL_BRIEF',           // 민사 항소이유서 제출기한 (40일) - 민소법 §402의2 (2025.3.1 시행)
+  DL_CRIMINAL_APPEAL_BRIEF: 'DL_CRIMINAL_APPEAL_BRIEF', // 형사 항소이유서 제출기한 (20일) - 형소법 §361의3
+  DL_FINAL_APPEAL_BRIEF: 'DL_FINAL_APPEAL_BRIEF', // 민사 상고이유서 제출기한 (20일) - 민소법 §427
+  DL_CRIMINAL_FINAL_BRIEF: 'DL_CRIMINAL_FINAL_BRIEF', // 형사 상고이유서 제출기한 (20일) - 형소법 §379
+
+  // 기타 불변기간
+  DL_MEDIATION_OBJ: 'DL_MEDIATION_OBJ',         // 조정·화해 이의기간 (14일)
+  DL_RETRIAL: 'DL_RETRIAL',                     // 재심의 소 제기기한 (30일) - 민소법 §456
   DL_PAYMENT_ORDER: 'DL_PAYMENT_ORDER',         // 지급명령 이의신청 (14일) - 민소법 §470
 } as const;
 
@@ -74,13 +82,21 @@ export const HEARING_TYPE_LABELS: Record<HearingType, string> = {
 };
 
 export const DEADLINE_TYPE_LABELS: Record<DeadlineType, string> = {
-  DL_APPEAL: '상소기간',
-  DL_MEDIATION_OBJ: '조정·화해 이의기간',
-  DL_IMM_APPEAL: '즉시항고기간',
-  DL_APPEAL_BRIEF: '항소이유서 제출기한',
-  DL_RETRIAL: '재심의 소 제기기한',
+  // 상소기간
+  DL_APPEAL: '민사/가사 상소기간',
   DL_CRIMINAL_APPEAL: '형사 상소기간',
   DL_FAMILY_NONLIT: '가사비송 즉시항고',
+  DL_IMM_APPEAL: '즉시항고기간',
+
+  // 항소이유서/상고이유서
+  DL_APPEAL_BRIEF: '민사 항소이유서 제출',
+  DL_CRIMINAL_APPEAL_BRIEF: '형사 항소이유서 제출',
+  DL_FINAL_APPEAL_BRIEF: '민사 상고이유서 제출',
+  DL_CRIMINAL_FINAL_BRIEF: '형사 상고이유서 제출',
+
+  // 기타
+  DL_MEDIATION_OBJ: '조정·화해 이의기간',
+  DL_RETRIAL: '재심의 소 제기기한',
   DL_PAYMENT_ORDER: '지급명령 이의신청',
 };
 
@@ -272,6 +288,7 @@ export interface CreateCaseDeadlineRequest {
   trigger_date: string; // ISO 8601 date (YYYY-MM-DD)
   notes?: string;
   status?: DeadlineStatus; // 기본값: PENDING
+  is_electronic_service?: boolean; // 0시 도달 여부 (전자송달 의제/공시송달)
 }
 
 export interface UpdateCaseDeadlineRequest {

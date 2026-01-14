@@ -6,6 +6,10 @@ import {
   DeadlineType,
   DeadlineTypeMaster
 } from '@/types/court-hearing'
+import {
+  calculateLegalDeadline,
+  isNonBusinessDay
+} from '@/lib/utils/korean-legal-dates'
 
 interface QuickAddDeadlineModalProps {
   isOpen: boolean
@@ -33,18 +37,21 @@ export default function QuickAddDeadlineModal({
   const [deadlineTypes, setDeadlineTypes] = useState<DeadlineTypeMaster[]>([])
 
   const [formData, setFormData] = useState({
+    case_id: '', // 사건 ID (필수)
     case_number: '',
     case_name: '',
     deadline_type: '' as DeadlineType | '',
     trigger_date: '',
-    notes: ''
+    notes: '',
+    is_electronic_service: false // 전자송달(0시 의제) 여부
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [preview, setPreview] = useState({
     days: 0,
     deadline_date: '',
-    deadline_datetime: ''
+    deadline_datetime: '',
+    wasExtended: false // 민법 제161조로 연장되었는지 여부
   })
 
   const supabase = createClient()
@@ -117,34 +124,54 @@ export default function QuickAddDeadlineModal({
     return () => clearTimeout(debounce)
   }, [searchTerm, supabase])
 
-  // 미리보기 계산
+  // 미리보기 계산 (민법 제157조, 제161조 적용)
   useEffect(() => {
     if (formData.deadline_type && formData.trigger_date) {
       const selectedType = deadlineTypes.find(t => t.type === formData.deadline_type)
       if (selectedType) {
-        const triggerDate = new Date(formData.trigger_date)
-        triggerDate.setHours(0, 0, 0, 0)
+        const triggerDate = new Date(formData.trigger_date + 'T00:00:00')
 
-        const deadlineDate = new Date(triggerDate)
-        deadlineDate.setDate(deadlineDate.getDate() + selectedType.days)
+        // 민법 제157조, 제161조 적용
+        // 전자송달(0시 의제)인 경우 초일산입 적용 (1일 단축)
+        const deadlineDate = calculateLegalDeadline(
+          triggerDate,
+          selectedType.days,
+          formData.is_electronic_service // 전자송달 여부 전달
+        )
+
+        // 연장 여부 확인: 원래 날짜가 비영업일이었는지 체크
+        const effectiveDays = formData.is_electronic_service
+          ? selectedType.days - 1
+          : selectedType.days
+        const originalDeadline = new Date(triggerDate)
+        originalDeadline.setDate(originalDeadline.getDate() + effectiveDays)
+        const wasExtended = isNonBusinessDay(originalDeadline)
+
+        // 로컬 날짜 형식으로 변환 (타임존 문제 방지)
+        const year = deadlineDate.getFullYear()
+        const month = String(deadlineDate.getMonth() + 1).padStart(2, '0')
+        const day = String(deadlineDate.getDate()).padStart(2, '0')
+        const deadlineDateStr = `${year}-${month}-${day}`
 
         const deadlineDatetime = new Date(deadlineDate)
-        deadlineDatetime.setHours(24, 0, 0, 0) // 자정
+        deadlineDatetime.setHours(23, 59, 59, 999) // 당일 자정 직전
 
         setPreview({
           days: selectedType.days,
-          deadline_date: deadlineDate.toISOString().split('T')[0],
-          deadline_datetime: deadlineDatetime.toISOString()
+          deadline_date: deadlineDateStr,
+          deadline_datetime: deadlineDatetime.toISOString(),
+          wasExtended
         })
       }
     } else {
-      setPreview({ days: 0, deadline_date: '', deadline_datetime: '' })
+      setPreview({ days: 0, deadline_date: '', deadline_datetime: '', wasExtended: false })
     }
-  }, [formData.deadline_type, formData.trigger_date, deadlineTypes])
+  }, [formData.deadline_type, formData.trigger_date, formData.is_electronic_service, deadlineTypes])
 
   const handleSelectCase = (option: CaseOption) => {
     setFormData(prev => ({
       ...prev,
+      case_id: option.id, // DB에 필요한 사건 ID
       case_number: option.case_number,
       case_name: option.case_name
     }))
@@ -155,7 +182,8 @@ export default function QuickAddDeadlineModal({
   const validate = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.case_number) newErrors.case_number = '사건번호를 선택하세요'
+    if (!formData.case_id) newErrors.case_number = '사건을 목록에서 선택하세요'
+    else if (!formData.case_number) newErrors.case_number = '사건번호를 선택하세요'
     if (!formData.deadline_type) newErrors.deadline_type = '데드라인 유형을 선택하세요'
     if (!formData.trigger_date) newErrors.trigger_date = '기산일을 입력하세요'
 
@@ -174,9 +202,11 @@ export default function QuickAddDeadlineModal({
       const { error } = await supabase
         .from('case_deadlines')
         .insert({
+          case_id: formData.case_id, // 필수 필드
           case_number: formData.case_number,
           deadline_type: formData.deadline_type,
           trigger_date: formData.trigger_date,
+          is_electronic_service: formData.is_electronic_service,
           notes: formData.notes || null,
           status: 'PENDING'
         })
@@ -197,15 +227,17 @@ export default function QuickAddDeadlineModal({
 
   const handleClose = () => {
     setFormData({
+      case_id: '',
       case_number: '',
       case_name: '',
       deadline_type: '',
       trigger_date: '',
-      notes: ''
+      notes: '',
+      is_electronic_service: false
     })
     setSearchTerm('')
     setErrors({})
-    setPreview({ days: 0, deadline_date: '', deadline_datetime: '' })
+    setPreview({ days: 0, deadline_date: '', deadline_datetime: '', wasExtended: false })
     onClose()
   }
 
@@ -251,7 +283,7 @@ export default function QuickAddDeadlineModal({
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value)
-                setFormData(prev => ({ ...prev, case_number: '', case_name: '' }))
+                setFormData(prev => ({ ...prev, case_id: '', case_number: '', case_name: '' }))
               }}
               onFocus={() => {
                 if (caseOptions.length > 0) setShowDropdown(true)
@@ -361,6 +393,29 @@ export default function QuickAddDeadlineModal({
             </p>
           </div>
 
+          {/* 전자송달 여부 */}
+          <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <input
+              type="checkbox"
+              id="is_electronic_service"
+              checked={formData.is_electronic_service}
+              onChange={(e) => setFormData(prev => ({
+                ...prev,
+                is_electronic_service: e.target.checked
+              }))}
+              className="mt-0.5 w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+            />
+            <div>
+              <label htmlFor="is_electronic_service" className="text-sm font-medium text-amber-800 cursor-pointer">
+                전자송달 (0시 의제)
+              </label>
+              <p className="text-xs text-amber-700 mt-1">
+                전자소송에서 미열람 7일 후 자정(0시)에 송달 의제된 경우 체크하세요.
+                민법 제157조 단서에 따라 초일산입 적용되어 기한이 1일 단축됩니다.
+              </p>
+            </div>
+          </div>
+
           {/* 자동 계산 미리보기 */}
           {preview.deadline_date && (
             <div className="p-4 bg-sage-50 border border-sage-200 rounded-lg">
@@ -373,15 +428,28 @@ export default function QuickAddDeadlineModal({
                 <div>
                   <p className="text-sage-600 font-medium">만료일</p>
                   <p className="text-sage-800 font-semibold">{formatDateKR(preview.deadline_date)}</p>
+                  {preview.wasExtended && (
+                    <p className="text-xs text-amber-600 mt-0.5">* 토/공휴일로 연장됨</p>
+                  )}
                 </div>
                 <div className="col-span-2">
-                  <p className="text-sage-600 font-medium">만료 일시 (자정)</p>
-                  <p className="text-sage-800 font-semibold">{formatDatetimeKR(preview.deadline_datetime)}</p>
+                  <p className="text-sage-600 font-medium">만료 일시</p>
+                  <p className="text-sage-800 font-semibold">{formatDateKR(preview.deadline_date)} 23:59</p>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-sage-500">
-                데드라인은 자동으로 계산되어 저장됩니다.
-              </p>
+              <div className="mt-3 space-y-1">
+                {formData.is_electronic_service && (
+                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    전자송달(0시 의제) 적용: 초일산입으로 1일 단축됨
+                  </p>
+                )}
+                <p className="text-xs text-sage-500">
+                  민법 제161조에 따라 말일이 토요일 또는 공휴일이면 익일로 연장됩니다.
+                </p>
+              </div>
             </div>
           )}
 

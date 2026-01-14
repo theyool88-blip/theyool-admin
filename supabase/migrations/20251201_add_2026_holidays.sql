@@ -7,8 +7,10 @@ INSERT INTO korean_public_holidays (holiday_date, holiday_name) VALUES
   ('2026-02-17', '설날'),
   ('2026-02-18', '설날 연휴'),
   ('2026-03-01', '삼일절'),
+  ('2026-03-02', '삼일절 대체공휴일'),  -- 삼일절이 일요일
   ('2026-05-05', '어린이날'),
-  ('2026-05-25', '부처님오신날'),
+  ('2026-05-24', '부처님오신날'),        -- 음력 4월 8일 = 2026년 5월 24일(일)
+  ('2026-05-25', '부처님오신날 대체공휴일'), -- 부처님오신날이 일요일
   ('2026-06-06', '현충일'),
   ('2026-08-15', '광복절'),
   ('2026-09-24', '추석 연휴'),
@@ -18,9 +20,3 @@ INSERT INTO korean_public_holidays (holiday_date, holiday_name) VALUES
   ('2026-10-09', '한글날'),
   ('2026-12-25', '성탄절')
 ON CONFLICT (holiday_date) DO NOTHING;
-
--- 대체공휴일은 정부 발표 후 수동 추가 필요
--- 예시:
--- INSERT INTO korean_public_holidays (holiday_date, holiday_name) VALUES
---   ('2026-03-02', '삼일절 대체공휴일')
--- ON CONFLICT (holiday_date) DO NOTHING;

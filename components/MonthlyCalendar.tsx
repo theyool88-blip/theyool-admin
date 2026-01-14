@@ -358,6 +358,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
       .replace('변론기일', '변론')
       .replace('조정기일', '조정')
       .replace('선고기일', '선고')
+      .replace('판결선고', '판결')
       .replace('심문기일', '심문')
       .replace('양육상담', '양육')
       .replace('중간심문', '중간')

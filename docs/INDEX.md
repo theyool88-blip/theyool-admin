@@ -15,6 +15,7 @@
 | [MULTI_TENANT_SYSTEM.md](systems/MULTI_TENANT_SYSTEM.md) | 멀티테넌트 아키텍처, RLS 정책 |
 | [GOOGLE_INTEGRATION.md](systems/GOOGLE_INTEGRATION.md) | Google Calendar/Drive OAuth 연동 |
 | [PAYMENT_SYSTEM.md](systems/PAYMENT_SYSTEM.md) | 입금/지출 관리, 5:5 파트너십 정산 |
+| [RECEIVABLES_SYSTEM.md](systems/RECEIVABLES_SYSTEM.md) | 미수금 관리, 등급/메모/포기 처리 |
 | [CONSULTATION_SYSTEM.md](systems/CONSULTATION_SYSTEM.md) | 상담 관리 (4유형, 9상태), 리드 스코어링 |
 | [COURT_HEARING_SYSTEM.md](systems/COURT_HEARING_SYSTEM.md) | 법원기일, 불변기간 데드라인 자동 계산 |
 | [CALENDAR_SYSTEM.md](systems/CALENDAR_SYSTEM.md) | 통합 캘린더, Google Calendar 연동 |

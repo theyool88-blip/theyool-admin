@@ -52,3 +52,6 @@ supabase/.temp/
 proxy.ts
 apply-sage-theme.sh
 data/scourt-profiles/
+
+# test data files
+*.xlsx

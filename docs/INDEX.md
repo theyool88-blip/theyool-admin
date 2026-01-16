@@ -1,6 +1,6 @@
 # 문서 인덱스
 
-**Last Updated**: 2026-01-10
+**Last Updated**: 2026-01-16
 
 법무법인 더율 관리자 시스템 (theyool-admin) 문서 목록입니다.
 
@@ -86,6 +86,7 @@ archived/
 | `lib/scourt/` | 대법원 연동 함수 |
 | `types/` | TypeScript 타입 정의 |
 | `components/` | React 컴포넌트 |
+| `scripts/` | 유틸리티 스크립트 (데드라인 관리, 백필 등) |
 
 ### 데이터베이스
 

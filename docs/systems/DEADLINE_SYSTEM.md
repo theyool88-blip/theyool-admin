@@ -374,10 +374,40 @@ npm run test:ui
 - getCaseCategoryFromNumber: 사건 유형 판별 테스트
 - getCaseTypeInfo: 사건 유형 정보 조회 테스트
 
+## 유틸리티 스크립트
+
+### 데드라인 조회/관리 스크립트
+
+| 스크립트 | 설명 | 사용법 |
+|---------|------|-------|
+| `check-specific-case-deadline.ts` | 특정 사건의 데드라인 조회 | `npx tsx scripts/check-specific-case-deadline.ts` |
+| `cleanup-incorrect-appeal-deadlines.ts` | 잘못 등록된 상소기간 정리 | `npx tsx scripts/cleanup-incorrect-appeal-deadlines.ts [--delete]` |
+| `delete-backfill-deadlines.ts` | 백필로 생성된 데드라인 삭제 | `npx tsx scripts/delete-backfill-deadlines.ts [--delete]` |
+| `find-incorrect-appeal-deadlines.sql` | 잘못된 데드라인 조회 SQL | Supabase SQL Editor에서 실행 |
+
+### 잘못된 상소기간 데드라인 정리
+
+SCOURT 자동등록 시 "선고기일 지정" 같은 진행내용이 "result_announced"로 잘못 분류되어 상소기간이 미리 등록되는 경우가 있습니다.
+
+```bash
+# 조회만 (안전)
+npx tsx scripts/cleanup-incorrect-appeal-deadlines.ts
+
+# 삭제 실행 (위험 - 확인 후 실행)
+npx tsx scripts/cleanup-incorrect-appeal-deadlines.ts --delete
+```
+
+**의심 케이스 조건:**
+- SCOURT 자동등록된 상소기간
+- 해당 사건의 `종국결과`가 NULL (아직 판결 전 상태)
+
+---
+
 ## 변경 이력
 
 | 날짜 | 변경 내용 |
 |------|----------|
+| 2026-01-16 | 유틸리티 스크립트 문서화 (cleanup, backfill 스크립트) |
 | 2026-01-14 | 당사자별 불변기한 관리 기능 추가 (party_id, party_side 컬럼) |
 | 2026-01-14 | 판결도달일(adjdoc_rch_ymd) 변경 감지 및 기한 자동 생성 |
 | 2026-01-14 | 캘린더 표시 형식 개선: [기한/원고], [기한/피고] 형식 |

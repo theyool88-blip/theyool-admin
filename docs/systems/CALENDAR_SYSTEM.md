@@ -1,6 +1,6 @@
 # 캘린더 시스템
 
-**Last Updated**: 2026-01-14
+**Last Updated**: 2026-01-16
 
 법무법인 더율의 모든 일정을 통합 관리하는 캘린더 시스템입니다.
 
@@ -289,6 +289,89 @@ unified_calendar VIEW (court_name + location)
 "대전가정법원 서산지원 제21호 법정"
        ↓
 getShortCourt() → "서산"
+```
+
+---
+
+## 화상기일 배지 (2026-01-16 추가)
+
+### 개요
+
+SCOURT에서 "화상장치" 기일 정보를 추출하여 캘린더에 [화상] 배지를 표시합니다. 의뢰인(우리 측)이 화상으로 참여하는 경우에만 배지가 표시됩니다.
+
+### 화상기일 유형
+
+| 유형 | SCOURT 표시 | video_participant_side | 배지 표시 |
+|------|------------|----------------------|----------|
+| 쌍방 화상 | `쌍방 화상장치` | `both` | ✅ [화상] |
+| 우리측 화상 | `일방 화상장치` + 원고측/피고측 | `plaintiff_side` or `defendant_side` | ✅ [화상] (우리 측일 때만) |
+| 상대방만 화상 | `일방 화상장치` + 상대방측 | `plaintiff_side` or `defendant_side` | ❌ (표시 안 함) |
+
+### 데이터 흐름
+
+```
+SCOURT API (btprAgntList[].agntNm에 [화상장치] 마커)
+        ↓
+hearing-sync.ts (extractVideoParticipantFromRawData)
+        ↓
+court_hearings.video_participant_side
+        ↓
+unified_calendar VIEW (video_participant_side, our_client_side)
+        ↓
+MonthlyCalendar.tsx (getVideoBadgeInfo)
+```
+
+### 우리 측 판단 로직
+
+```typescript
+// unified_calendar VIEW의 our_client_side 컬럼
+CASE
+  WHEN party_type_label ILIKE '%원고%' OR '%청구인%' OR '%신청인%'
+    THEN 'plaintiff_side'  -- 원고 측
+  WHEN party_type_label ILIKE '%피고%' OR '%상대방%' OR '%피신청인%'
+    THEN 'defendant_side'  -- 피고 측
+END
+```
+
+### 배지 표시 로직
+
+```typescript
+// components/MonthlyCalendar.tsx
+const getVideoBadgeInfo = (
+  scourtTypeRaw?: string,
+  videoParticipantSide?: string,
+  ourClientSide?: string
+) => {
+  // 쌍방 화상 → 우리도 화상이므로 표시
+  if (videoParticipantSide === 'both') {
+    return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
+  }
+
+  // 일방 화상 - 우리(의뢰인)가 화상일 때만 표시
+  if (videoParticipantSide && ourClientSide) {
+    if (videoParticipantSide === ourClientSide) {
+      return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
+    }
+    return null  // 상대방만 화상이면 표시 안 함
+  }
+
+  return null
+}
+```
+
+### 관련 마이그레이션
+
+| 파일 | 설명 |
+|------|------|
+| `20260114_court_hearings_video_participant.sql` | `video_participant_side` 컬럼 추가 |
+| `20260114_unified_calendar_video_participant.sql` | VIEW에 `our_client_side` 컬럼 추가 |
+
+### 백필 스크립트
+
+기존 화상기일 데이터의 `video_participant_side`를 채우는 스크립트:
+
+```bash
+npx tsx scripts/backfill-video-participant.ts
 ```
 
 ---

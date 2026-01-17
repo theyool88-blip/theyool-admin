@@ -1,6 +1,7 @@
 /**
  * SCOURT 당사자/대리인 동기화 모듈
- * SCOURT API에서 가져온 당사자/대리인 데이터를 case_parties, case_representatives 테이블에 저장
+ * SCOURT API에서 가져온 당사자/대리인 데이터를 case_parties 테이블에 저장
+ * 대리인은 case_parties.representatives JSONB에 저장
  */
 
 import { createClient } from "@/lib/supabase/client";
@@ -8,7 +9,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CaseGeneralData } from "./api-client";
 import type {
   CaseParty,
-  CaseRepresentative,
+  PartyRepresentative,
   PartyType,
 } from "@/types/case-party";
 import {
@@ -80,6 +81,7 @@ interface ExistingPartyRecord {
 
 /**
  * SCOURT 당사자 데이터를 case_parties 테이블에 동기화
+ * 대리인은 case_parties.representatives JSONB에 저장
  */
 export async function syncPartiesFromScourt(
   params: PartySyncParams
@@ -89,24 +91,22 @@ export async function syncPartiesFromScourt(
 
   let partiesUpserted = 0;
   let representativesUpserted = 0;
-  const manualRepresentativeKeys = new Set<string>();
 
   try {
     const { data: existingParties } = await supabase
       .from("case_parties")
-      .select("id, party_name, party_type, is_our_client, client_id, scourt_party_index, manual_override, is_primary, adjdoc_rch_ymd")
+      .select("id, party_name, party_type, scourt_party_index, manual_override, is_primary, adjdoc_rch_ymd, representatives")
       .eq("case_id", legalCaseId);
 
     interface PartyRecord {
       id: string;
       party_name: string;
       party_type: PartyType;
-      is_our_client?: boolean;
-      client_id?: string | null;
       scourt_party_index?: number | null;
       manual_override?: boolean;
       is_primary?: boolean;
       adjdoc_rch_ymd?: string | null;
+      representatives?: PartyRepresentative[];
     }
 
     const partiesByIndex = new Map<number, PartyRecord>();
@@ -121,16 +121,14 @@ export async function syncPartiesFromScourt(
       }
     });
 
-    const { data: manualRepresentatives } = await supabase
-      .from("case_representatives")
-      .select("representative_type_label, representative_name")
-      .eq("case_id", legalCaseId)
-      .eq("manual_override", true);
-
-    interface RepresentativeRecord { representative_type_label?: string; representative_name: string; }
-    (manualRepresentatives || []).forEach((rep: RepresentativeRecord) => {
-      manualRepresentativeKeys.add(`${rep.representative_type_label || ""}:${rep.representative_name}`);
-    });
+    // 대리인 데이터를 JSONB 배열로 변환
+    const representativesJsonb: PartyRepresentative[] = (representatives || []).map(rep => ({
+      name: rep.agntNm,
+      type_label: rep.agntDvsNm || null,
+      law_firm: rep.jdafrCorpNm || null,
+      is_our_firm: false, // 기본값, 사용자가 수동 설정
+      scourt_synced: true,
+    }));
 
     // 1. 당사자 동기화
     if (parties && parties.length > 0) {
@@ -157,6 +155,10 @@ export async function syncPartiesFromScourt(
           primarySides.add(side);
         }
 
+        // 기존 대리인 보존 (is_our_firm 설정 유지)
+        const existingReps = existingParty?.representatives || [];
+        const mergedReps = mergeRepresentatives(existingReps, representativesJsonb);
+
         const { error } = await supabase.from("case_parties").upsert(
           {
             tenant_id: tenantId,
@@ -169,11 +171,11 @@ export async function syncPartiesFromScourt(
             scourt_party_index: i,
             scourt_label_raw: scourtLabel,
             scourt_name_raw: scourtName,
-            is_our_client: existingParty?.is_our_client || false,
-            client_id: existingParty?.client_id || null,
             is_primary: isPrimary,
             adjdoc_rch_ymd: party.adjdocRchYmd || null,
             indvd_cfmtn_ymd: party.indvdCfmtnYmd || null,
+            // 대리인 JSONB (첫 번째 당사자에만 저장)
+            representatives: i === 0 ? mergedReps : (existingParty?.representatives || []),
           },
           {
             onConflict: "case_id,scourt_party_index",
@@ -187,41 +189,9 @@ export async function syncPartiesFromScourt(
           partiesUpserted++;
         }
       }
-    }
 
-    // 2. 대리인 동기화
-    if (representatives && representatives.length > 0) {
-      for (const rep of representatives) {
-        const repKey = `${rep.agntDvsNm || ""}:${rep.agntNm}`;
-        if (manualRepresentativeKeys.has(repKey)) {
-          continue;
-        }
-
-        const { error } = await supabase.from("case_representatives").upsert(
-          {
-            tenant_id: tenantId,
-            case_id: legalCaseId,
-            representative_name: rep.agntNm,
-            representative_type_label: rep.agntDvsNm,
-            law_firm_name: rep.jdafrCorpNm || null,
-            scourt_synced: true,
-            // is_our_firm는 유지 (사용자가 수동 설정)
-          },
-          {
-            onConflict: "case_id,representative_type_label,representative_name",
-            ignoreDuplicates: false,
-          }
-        );
-
-        if (error) {
-          console.error(
-            `대리인 upsert 오류 (${rep.agntNm}):`,
-            error.message
-          );
-        } else {
-          representativesUpserted++;
-        }
-      }
+      // 대리인 수 카운트 (첫 당사자에 저장된 대리인 기준)
+      representativesUpserted = representativesJsonb.length;
     }
 
     return {
@@ -243,9 +213,33 @@ export async function syncPartiesFromScourt(
 }
 
 /**
+ * 기존 대리인과 새 대리인 병합 (is_our_firm 설정 유지)
+ */
+function mergeRepresentatives(
+  existing: PartyRepresentative[],
+  incoming: PartyRepresentative[]
+): PartyRepresentative[] {
+  // 기존 대리인의 is_our_firm 설정을 키로 보관
+  const existingOurFirmMap = new Map<string, boolean>();
+  existing.forEach(rep => {
+    const key = `${rep.type_label || ''}:${rep.name}`;
+    existingOurFirmMap.set(key, rep.is_our_firm);
+  });
+
+  // 새 대리인에 기존 is_our_firm 설정 적용
+  return incoming.map(rep => {
+    const key = `${rep.type_label || ''}:${rep.name}`;
+    return {
+      ...rep,
+      is_our_firm: existingOurFirmMap.get(key) || rep.is_our_firm,
+    };
+  });
+}
+
+/**
  * 서버 사이드용 당사자 동기화 (service role 사용)
  * - 기존 마이그레이션 데이터(scourt_synced=false)와 중복 방지
- * - 의뢰인 정보는 SCOURT 레코드로 이전 후 기존 레코드 삭제
+ * - 대리인은 case_parties.representatives JSONB에 저장
  */
 export async function syncPartiesFromScourtServer(
   supabase: SupabaseClient,
@@ -257,21 +251,17 @@ export async function syncPartiesFromScourtServer(
   let representativesUpserted = 0;
   const legacyOverridesByIndex = new Map<number, {
     party_name: string;
-    is_our_client?: boolean;
-    client_id?: string | null;
-    fee_allocation_amount?: number | null;
     manual_override?: boolean;
   }>();
   const legacyPartyIdsToDelete = new Set<string>();
   const existingByIndex = new Map<number, ExistingPartyRecord>();
   const primarySides = new Set<'plaintiff' | 'defendant'>();
-  const manualRepresentativeKeys = new Set<string>();
 
   try {
     // 0. 기존 당사자 조회 (마이그레이션 + SCOURT 모두)
     const { data: existingParties } = await supabase
       .from("case_parties")
-      .select("id, party_name, party_type, party_type_label, is_our_client, client_id, fee_allocation_amount, scourt_synced, scourt_party_index, manual_override, is_primary, scourt_label_raw, scourt_name_raw, adjdoc_rch_ymd")
+      .select("id, party_name, party_type, party_type_label, scourt_synced, scourt_party_index, manual_override, is_primary, scourt_label_raw, scourt_name_raw, adjdoc_rch_ymd, representatives")
       .eq("case_id", legalCaseId);
 
     // 판결도달일 변경 추적용
@@ -295,6 +285,15 @@ export async function syncPartiesFromScourtServer(
         primarySides.add(side);
       }
     });
+
+    // 대리인 데이터를 JSONB 배열로 변환
+    const representativesJsonb: PartyRepresentative[] = (representatives || []).map(rep => ({
+      name: rep.agntNm,
+      type_label: rep.agntDvsNm || null,
+      law_firm: rep.jdafrCorpNm || null,
+      is_our_firm: false, // 기본값
+      scourt_synced: true,
+    }));
 
     // 1. 당사자 동기화
     if (parties && parties.length > 0) {
@@ -328,9 +327,6 @@ export async function syncPartiesFromScourtServer(
 
         legacyOverridesByIndex.set(targetIndex, {
           party_name: migParty.party_name,
-          is_our_client: migParty.is_our_client,
-          client_id: migParty.client_id,
-          fee_allocation_amount: migParty.fee_allocation_amount,
           manual_override: migParty.manual_override,
         });
         legacyPartyIdsToDelete.add(migParty.id);
@@ -355,11 +351,6 @@ export async function syncPartiesFromScourtServer(
           ? preservePrefix(scourtName, candidateName)
           : scourtName;
 
-        const isOurClient = legacyOverride?.is_our_client ?? existingParty?.is_our_client ?? false;
-        const clientId = legacyOverride?.client_id ?? existingParty?.client_id ?? null;
-        const feeAllocationAmount =
-          legacyOverride?.fee_allocation_amount ?? existingParty?.fee_allocation_amount ?? null;
-
         let isPrimary = existingParty?.is_primary || false;
         if (!isPrimary && side && !primarySides.has(side)) {
           isPrimary = true;
@@ -372,12 +363,13 @@ export async function syncPartiesFromScourtServer(
         }
 
         // 판결도달일 변경 감지
-        // - null → 값: 새 기한 생성
-        // - 값 → 다른값: 기한 업데이트
-        // - 값 → null: 현재는 무시 (실제로 거의 발생하지 않음)
         const newAdjdocRchYmd = party.adjdocRchYmd || null;
         const oldAdjdocRchYmd = existingParty?.adjdoc_rch_ymd || null;
         const adjdocRchYmdChanged = newAdjdocRchYmd !== null && newAdjdocRchYmd !== oldAdjdocRchYmd;
+
+        // 기존 대리인 보존 (is_our_firm 설정 유지) - 첫 번째 당사자에만 저장
+        const existingReps = (existingParty as ExistingPartyRecord & { representatives?: PartyRepresentative[] })?.representatives || [];
+        const mergedReps = i === 0 ? mergeRepresentatives(existingReps, representativesJsonb) : existingReps;
 
         const { data: upsertedParty, error } = await supabase.from("case_parties").upsert(
           {
@@ -391,13 +383,12 @@ export async function syncPartiesFromScourtServer(
             scourt_party_index: i,
             scourt_label_raw: scourtLabel,
             scourt_name_raw: scourtName,
-            is_our_client: isOurClient,
-            client_id: clientId,
-            fee_allocation_amount: feeAllocationAmount,
             manual_override: manualOverride,
             is_primary: isPrimary,
             adjdoc_rch_ymd: newAdjdocRchYmd,
             indvd_cfmtn_ymd: party.indvdCfmtnYmd || null,
+            // 대리인 JSONB
+            representatives: mergedReps,
           },
           {
             onConflict: "case_id,scourt_party_index",
@@ -423,6 +414,9 @@ export async function syncPartiesFromScourtServer(
         }
       }
 
+      // 대리인 수 카운트
+      representativesUpserted = representativesJsonb.length;
+
       // 판결도달일 변경된 당사자들의 기한 업데이트
       for (const change of adjdocRchYmdChanges) {
         const result = await updatePartyDeadline(change.partyId, change.newValue, tenantId);
@@ -440,52 +434,6 @@ export async function syncPartiesFromScourtServer(
           .from("case_parties")
           .delete()
           .in("id", Array.from(legacyPartyIdsToDelete));
-      }
-    }
-
-    const { data: existingRepresentatives } = await supabase
-      .from("case_representatives")
-      .select("representative_type_label, representative_name, manual_override")
-      .eq("case_id", legalCaseId);
-
-    interface ExistingRep { representative_type_label?: string; representative_name: string; manual_override?: boolean; }
-    (existingRepresentatives || []).forEach((rep: ExistingRep) => {
-      if (!rep.manual_override) return;
-      manualRepresentativeKeys.add(`${rep.representative_type_label || ""}:${rep.representative_name}`);
-    });
-
-    // 2. 대리인 동기화
-    if (representatives && representatives.length > 0) {
-      for (const rep of representatives) {
-        const repKey = `${rep.agntDvsNm || ""}:${rep.agntNm}`;
-        if (manualRepresentativeKeys.has(repKey)) {
-          console.log(`  ✋ 수동 수정 대리인 보존: ${rep.agntNm} (${rep.agntDvsNm})`);
-          continue;
-        }
-
-        const { error } = await supabase.from("case_representatives").upsert(
-          {
-            tenant_id: tenantId,
-            case_id: legalCaseId,
-            representative_name: rep.agntNm,
-            representative_type_label: rep.agntDvsNm,
-            law_firm_name: rep.jdafrCorpNm || null,
-            scourt_synced: true,
-          },
-          {
-            onConflict: "case_id,representative_type_label,representative_name",
-            ignoreDuplicates: false,
-          }
-        );
-
-        if (error) {
-          console.error(
-            `대리인 upsert 오류 (${rep.agntNm}):`,
-            error.message
-          );
-        } else {
-          representativesUpserted++;
-        }
       }
     }
 
@@ -509,98 +457,43 @@ export async function syncPartiesFromScourtServer(
 
 /**
  * 사건의 당사자 목록 조회
+ * 대리인은 각 당사자의 representatives JSONB 필드에 포함
  */
 export async function getCaseParties(
   supabase: SupabaseClient,
   caseId: string
 ): Promise<{
   parties: CaseParty[];
-  representatives: CaseRepresentative[];
 }> {
   const { data: parties, error: partiesError } = await supabase
     .from("case_parties")
-    .select(
-      `
-      *,
-      clients (
-        id,
-        name,
-        phone,
-        email
-      )
-    `
-    )
+    .select("*")
     .eq("case_id", caseId)
     .order("party_type")
     .order("party_order");
 
-  const { data: representatives, error: repsError } = await supabase
-    .from("case_representatives")
-    .select("*")
-    .eq("case_id", caseId)
-    .order("representative_type_label");
-
   if (partiesError) {
     console.error("당사자 조회 오류:", partiesError.message);
-  }
-  if (repsError) {
-    console.error("대리인 조회 오류:", repsError.message);
   }
 
   return {
     parties: parties || [],
-    representatives: representatives || [],
   };
 }
 
 /**
- * 의뢰인 당사자만 조회 (is_our_client = true)
+ * 당사자 이름 업데이트 (마스킹 해제)
  */
-export async function getClientParties(
-  supabase: SupabaseClient,
-  caseId: string
-): Promise<CaseParty[]> {
-  const { data, error } = await supabase
-    .from("case_parties")
-    .select(
-      `
-      *,
-      clients (
-        id,
-        name,
-        phone,
-        email
-      )
-    `
-    )
-    .eq("case_id", caseId)
-    .eq("is_our_client", true)
-    .order("party_order");
-
-  if (error) {
-    console.error("의뢰인 당사자 조회 오류:", error.message);
-    return [];
-  }
-
-  return data || [];
-}
-
-/**
- * 당사자 의뢰인 상태 업데이트
- */
-export async function updatePartyClientStatus(
+export async function updatePartyName(
   supabase: SupabaseClient,
   partyId: string,
-  isOurClient: boolean,
-  clientId: string | null,
-  feeAllocationAmount: number | null
+  partyName: string
 ): Promise<{ success: boolean; error?: string }> {
   const { error } = await supabase
     .from("case_parties")
     .update({
-      is_our_client: isOurClient,
-      client_id: clientId,
-      fee_allocation_amount: feeAllocationAmount,
+      party_name: partyName,
+      manual_override: true,
       updated_at: new Date().toISOString(),
     })
     .eq("id", partyId);

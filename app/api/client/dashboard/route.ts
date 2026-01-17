@@ -19,11 +19,33 @@ export async function GET(_request: NextRequest) {
     const clientId = session.user.id;
     const supabase = await createClient();
 
-    // 의뢰인의 사건 목록 조회 (opponent_name은 case_parties에서 별도 조회)
+    // 의뢰인의 사건 목록 조회 (case_clients를 통해 연결된 사건)
+    // 1. case_clients에서 이 의뢰인이 연결된 사건 ID 조회
+    const { data: caseClientLinks, error: linksError } = await supabase
+      .from('case_clients')
+      .select('case_id')
+      .eq('client_id', clientId);
+
+    if (linksError) {
+      console.error('case_clients 조회 오류:', linksError);
+    }
+
+    const linkedCaseIds = (caseClientLinks || []).map((link) => link.case_id);
+
+    // 2. 연결된 사건이 없으면 빈 배열 반환
+    if (linkedCaseIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        cases: [],
+        upcomingHearings: [],
+      });
+    }
+
+    // 3. legal_cases에서 사건 정보 조회
     const { data: casesRaw, error: casesError } = await supabase
       .from('legal_cases')
       .select('id, case_name, case_number, case_type, status, office_location, created_at')
-      .eq('client_id', clientId)
+      .in('id', linkedCaseIds)
       .order('created_at', { ascending: false });
 
     if (casesError) {
@@ -32,15 +54,15 @@ export async function GET(_request: NextRequest) {
 
     const caseIds = (casesRaw || []).map((c) => c.id);
 
-    // case_parties에서 상대방(is_our_client=false, is_primary=true) 이름 조회
+    // case_parties에서 상대방(is_primary=false) 이름 조회
     let opponentMap = new Map<string, string>();
     if (caseIds.length > 0) {
       const { data: opponents } = await supabase
         .from('case_parties')
         .select('case_id, party_name')
         .in('case_id', caseIds)
-        .eq('is_our_client', false)
-        .eq('is_primary', true);
+        .eq('is_primary', false)
+        .order('party_order', { ascending: true });
 
       if (opponents) {
         opponentMap = new Map(opponents.map(o => [o.case_id, o.party_name]));

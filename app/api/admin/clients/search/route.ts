@@ -90,7 +90,7 @@ export const GET = withTenant(async (request, { tenant }) => {
       // 사건 조회 실패해도 의뢰인 정보는 반환
     }
 
-    // case_parties에서 상대방 이름 조회 (opponent_name은 case_parties로 관리)
+    // case_parties에서 상대방 이름 조회 (is_primary=false가 상대방)
     const caseIds = (casesRaw || []).map(c => c.id);
     let opponentMap = new Map<string, string>();
     if (caseIds.length > 0) {
@@ -98,8 +98,8 @@ export const GET = withTenant(async (request, { tenant }) => {
         .from('case_parties')
         .select('case_id, party_name')
         .in('case_id', caseIds)
-        .eq('is_our_client', false)
-        .eq('is_primary', true);
+        .eq('is_primary', false)
+        .order('party_order', { ascending: true });
 
       if (opponents) {
         opponentMap = new Map(opponents.map(o => [o.case_id, o.party_name]));

@@ -16,7 +16,6 @@ import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
 import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/lib/scourt/related-case-linker'
 import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
-import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync'
 
 // 딜레이 유틸리티
@@ -49,6 +48,7 @@ async function upsertManualParties({
 
   if (seeds.length === 0) return null
 
+  // case_parties 생성 (is_our_client → is_primary로 변경, client_id 제거)
   const payload = seeds.map((seed, index) => ({
     tenant_id: tenantId,
     case_id: caseId,
@@ -56,17 +56,35 @@ async function upsertManualParties({
     party_type: seed.party_type,
     party_type_label: seed.party_type_label || null,
     party_order: index + 1,
-    is_our_client: seed.is_our_client,
-    client_id: seed.client_id || null,
+    is_primary: seed.is_our_client,  // is_our_client → is_primary
+    representatives: [],
     manual_override: true,
     scourt_synced: false,
   }))
 
-  const { error } = await adminClient
+  const { data: insertedParties, error } = await adminClient
     .from('case_parties')
     .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
+    .select('id, is_primary')
 
-  return error?.message || null
+  if (error) return error.message
+
+  // case_clients 생성 (의뢰인 연결)
+  if (clientId) {
+    const clientParty = insertedParties?.find(p => p.is_primary)
+    await adminClient
+      .from('case_clients')
+      .upsert({
+        tenant_id: tenantId,
+        case_id: caseId,
+        client_id: clientId,
+        linked_party_id: clientParty?.id || null,
+        is_primary_client: true,
+        retainer_fee: row.retainer_fee ? Number(row.retainer_fee) : null,
+      }, { onConflict: 'case_id,client_id' })
+  }
+
+  return null
 }
 
 export const POST = withTenant(async (request: NextRequest, { tenant }) => {
@@ -241,24 +259,11 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
                   }
                 }
 
-                // 기본값 'plaintiff'로 지정 (공통 유틸리티로 status 결정)
+                // 기본값 'plaintiff'로 지정 (case_parties의 is_primary로 관리)
                 if (!row.client_role) {
                   inferredRole = 'plaintiff'
-                  const roleStatus = determineClientRoleStatus({
-                    explicitClientRole: null,
-                    clientName: row.client_name,
-                    opponentName: row.opponent_name
-                  })
-                  const { error: roleError } = await adminClient
-                    .from('legal_cases')
-                    .update({ client_role: 'plaintiff', client_role_status: roleStatus })
-                    .eq('id', result.created.caseId)
-                  if (roleError) {
-                    result.warnings.push({
-                      field: 'client_role',
-                      message: `의뢰인 역할 저장 실패: ${roleError.message}`
-                    })
-                  }
+                  // client_role은 더 이상 legal_cases에 저장하지 않음
+                  // case_parties.is_primary와 party_type으로 관리됨
                 }
               }
             }

@@ -23,10 +23,10 @@ export async function PATCH(
 
     const adminClient = createAdminClient()
 
-    // 1. 기존 사건 정보 조회 (변경 감지용)
+    // 1. 기존 사건 정보 조회 (변경 감지용, tenant_id 포함)
     const { data: existingCase, error: fetchError } = await adminClient
       .from('legal_cases')
-      .select('client_id, client_role')
+      .select('id, tenant_id, primary_client_id')
       .eq('id', id)
       .single()
 
@@ -48,17 +48,15 @@ export async function PATCH(
         )
       : null
 
-    // 2. legal_cases 업데이트 (opponent_name은 case_parties로 관리하므로 저장하지 않음)
+    // 2. legal_cases 업데이트 (client_id, retainer_fee, client_role은 case_clients로 관리)
     const { data, error } = await adminClient
       .from('legal_cases')
       .update({
         contract_number: body.contract_number || null,
         case_name: body.case_name,
-        client_id: body.client_id,
         status: body.status,
         assigned_to: body.assigned_to || null,
         contract_date: body.contract_date || null,
-        retainer_fee: body.retainer_fee,
         total_received: body.total_received,
         success_fee_agreement: body.success_fee_agreement || null,
         calculated_success_fee: body.calculated_success_fee,
@@ -69,8 +67,6 @@ export async function PATCH(
         judge_name: body.judge_name || null,
         notes: body.notes || null,
         onedrive_folder_url: body.onedrive_folder_url || null,
-        client_role: body.client_role || null,
-        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
         enc_cs_no: body.enc_cs_no || null,
         scourt_case_name: body.scourt_case_name || null
       })
@@ -86,23 +82,21 @@ export async function PATCH(
       )
     }
 
-    // 3. client_id 변경 시 case_parties 동기화
-    if (body.client_id && body.client_id !== existingCase.client_id) {
-      // 4a. 기존 의뢰인 당사자의 is_our_client 해제 (manual_override=false인 경우만)
-      if (existingCase.client_id) {
+    // 3. client_id 변경 시 case_clients 동기화
+    if (body.client_id && body.client_id !== existingCase.primary_client_id) {
+      // 3a. 기존 primary 의뢰인 해제
+      if (existingCase.primary_client_id) {
         await adminClient
-          .from('case_parties')
+          .from('case_clients')
           .update({
-            is_our_client: false,
-            client_id: null,
+            is_primary_client: false,
             updated_at: new Date().toISOString()
           })
           .eq('case_id', id)
-          .eq('client_id', existingCase.client_id)
-          .eq('manual_override', false)
+          .eq('client_id', existingCase.primary_client_id)
       }
 
-      // 4b. 새 의뢰인 정보 조회
+      // 3b. 새 의뢰인 정보 조회
       const { data: newClient } = await adminClient
         .from('clients')
         .select('name')
@@ -110,40 +104,58 @@ export async function PATCH(
         .single()
 
       if (newClient) {
-        // 4c. 이 사건에서 새 의뢰인과 이름이 일치하는 당사자가 있는지 확인
-        const { data: matchingParty } = await adminClient
-          .from('case_parties')
-          .select('id, party_name')
+        // 3c. case_clients에 이미 있는지 확인
+        const { data: existingCaseClient } = await adminClient
+          .from('case_clients')
+          .select('id')
           .eq('case_id', id)
-          .eq('manual_override', false)
-          .ilike('party_name', `%${newClient.name}%`)
+          .eq('client_id', body.client_id)
           .maybeSingle()
 
-        if (matchingParty) {
-          // 기존 당사자를 의뢰인으로 업데이트
+        if (existingCaseClient) {
+          // 기존 연결을 primary로 설정
           await adminClient
-            .from('case_parties')
+            .from('case_clients')
             .update({
-              is_our_client: true,
-              client_id: body.client_id,
+              is_primary_client: true,
+              retainer_fee: body.retainer_fee || null,
               updated_at: new Date().toISOString()
             })
-            .eq('id', matchingParty.id)
+            .eq('id', existingCaseClient.id)
         } else {
-          // 일치하는 당사자가 없으면 새 의뢰인 당사자 생성
-          const clientRole = body.client_role || existingCase.client_role || 'plaintiff'
-          await adminClient
+          // 3d. 이 사건에서 새 의뢰인과 이름이 일치하는 당사자가 있는지 확인
+          const { data: matchingParty } = await adminClient
             .from('case_parties')
+            .select('id, party_name')
+            .eq('case_id', id)
+            .eq('manual_override', false)
+            .ilike('party_name', `%${newClient.name}%`)
+            .maybeSingle()
+
+          // 새 case_clients 레코드 생성 (tenant_id 필수)
+          const { data: newCaseClient } = await adminClient
+            .from('case_clients')
             .insert({
+              tenant_id: existingCase.tenant_id,
               case_id: id,
-              party_name: newClient.name,
-              party_type: clientRole,
-              is_our_client: true,
               client_id: body.client_id,
-              party_order: 1,
-              manual_override: false,
-              scourt_synced: false
+              linked_party_id: matchingParty?.id || null,
+              is_primary_client: true,
+              retainer_fee: body.retainer_fee || null,
             })
+            .select('id')
+            .single()
+
+          // 일치하는 당사자가 있으면 is_primary 설정
+          if (matchingParty) {
+            await adminClient
+              .from('case_parties')
+              .update({
+                is_primary: true,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', matchingParty.id)
+          }
         }
       }
     }
@@ -153,17 +165,18 @@ export async function PATCH(
       const opponentName = (body.opponent_name || '').trim()
 
       if (opponentName) {
-        // 4a. 상대방측 primary 당사자 찾기
+        // 4a. 상대방측 당사자 찾기 (is_primary=false)
         const { data: opponentParty } = await adminClient
           .from('case_parties')
           .select('id, party_name')
           .eq('case_id', id)
-          .eq('is_our_client', false)
-          .eq('is_primary', true)
+          .eq('is_primary', false)
+          .order('party_order', { ascending: true })
+          .limit(1)
           .maybeSingle()
 
         if (opponentParty) {
-          // 기존 primary 상대방 이름 업데이트 (prefix 보존)
+          // 기존 상대방 이름 업데이트 (prefix 보존)
           const currentName = opponentParty.party_name || ''
           const numberPrefixMatch = currentName.match(/^(\d+\.\s*)/)
           const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
@@ -177,50 +190,31 @@ export async function PATCH(
             })
             .eq('id', opponentParty.id)
         } else {
-          // primary 상대방이 없으면 is_our_client=false, manual_override=false인 당사자 중 첫 번째 찾기
-          const { data: anyOpponent } = await adminClient
+          // 상대방 당사자가 없으면 새로 생성
+          // 의뢰인 당사자의 party_type으로 상대방 타입 결정
+          const { data: clientParty } = await adminClient
             .from('case_parties')
-            .select('id, party_name')
+            .select('party_type')
             .eq('case_id', id)
-            .eq('is_our_client', false)
-            .eq('manual_override', false)
-            .order('party_order', { ascending: true })
-            .limit(1)
+            .eq('is_primary', true)
             .maybeSingle()
 
-          if (anyOpponent) {
-            // 기존 상대방 이름 업데이트 (prefix 보존)
-            const currentName = anyOpponent.party_name || ''
-            const numberPrefixMatch = currentName.match(/^(\d+\.\s*)/)
-            const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
-            const newName = `${numberPrefix}${opponentName}`
+          const clientRole = clientParty?.party_type || 'plaintiff'
+          const opponentRole = clientRole === 'plaintiff' ? 'defendant' : 'plaintiff'
 
-            await adminClient
-              .from('case_parties')
-              .update({
-                party_name: newName,
-                is_primary: true,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', anyOpponent.id)
-          } else {
-            // 상대방 당사자가 없으면 새로 생성
-            const clientRole = body.client_role || existingCase.client_role || 'plaintiff'
-            const opponentRole = clientRole === 'plaintiff' ? 'defendant' : 'plaintiff'
-
-            await adminClient
-              .from('case_parties')
-              .insert({
-                case_id: id,
-                party_name: opponentName,
-                party_type: opponentRole,
-                is_our_client: false,
-                is_primary: true,
-                party_order: 1,
-                manual_override: false,
-                scourt_synced: false
-              })
-          }
+          await adminClient
+            .from('case_parties')
+            .insert({
+              tenant_id: existingCase.tenant_id,
+              case_id: id,
+              party_name: opponentName,
+              party_type: opponentRole,
+              is_primary: false,
+              party_order: 2,
+              manual_override: false,
+              scourt_synced: false,
+              representatives: []
+            })
         }
       }
     }
@@ -256,12 +250,12 @@ export async function GET(
     const { id } = await params
     const adminClient = createAdminClient()
 
-    // 사건 기본 정보 조회
+    // 사건 기본 정보 조회 (primary_client_id FK 사용)
     const { data, error } = await adminClient
       .from('legal_cases')
       .select(`
         *,
-        client:clients (
+        client:clients!primary_client_id (
           id,
           name,
           phone
@@ -270,6 +264,17 @@ export async function GET(
           id,
           display_name,
           role
+        ),
+        case_assignees (
+          id,
+          member_id,
+          is_primary,
+          member:tenant_members (
+            id,
+            display_name,
+            role,
+            title
+          )
         )
       `)
       .eq('id', id)
@@ -310,9 +315,28 @@ export async function GET(
       .eq('status', 'SCHEDULED')
       .order('hearing_date', { ascending: true })
 
+    // Transform case_assignees to a more usable format
+    const assignees = (data.case_assignees as Array<{
+      id: string
+      member_id: string
+      is_primary: boolean
+      member: { id: string; display_name: string; role: string; title?: string } | null
+    }> | undefined)?.map(a => ({
+      id: a.id,
+      memberId: a.member_id,
+      isPrimary: a.is_primary,
+      displayName: a.member?.display_name,
+      role: a.member?.role,
+      title: a.member?.title
+    })) || []
+
+    // Remove case_assignees from data to avoid duplication
+    const { case_assignees: _, ...caseData } = data
+
     return NextResponse.json({
       success: true,
-      data,
+      data: caseData,
+      assignees,  // Transformed assignees list
       deadlines: deadlines || [],
       hearings: hearings || [],
       allHearings: allHearings || [],
@@ -359,11 +383,14 @@ export async function DELETE(
     }
 
     // 2. 관련 데이터 삭제 (순서 중요 - FK 제약조건)
-    // 2a. case_parties 삭제
-    await adminClient.from('case_parties').delete().eq('case_id', id)
+    // 2a. case_assignees 삭제 (담당변호사/담당직원)
+    await adminClient.from('case_assignees').delete().eq('case_id', id)
 
-    // 2b. case_representatives 삭제
-    await adminClient.from('case_representatives').delete().eq('case_id', id)
+    // 2b. case_clients 삭제 (의뢰인 연결)
+    await adminClient.from('case_clients').delete().eq('case_id', id)
+
+    // 2c. case_parties 삭제 (당사자)
+    await adminClient.from('case_parties').delete().eq('case_id', id)
 
     // 2c. case_deadlines 삭제
     await adminClient.from('case_deadlines').delete().eq('case_id', id)

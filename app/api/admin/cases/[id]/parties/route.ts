@@ -32,11 +32,8 @@ const PARTY_UPDATE_FIELDS = [
   "party_type",
   "party_type_label",
   "party_order",
-  "client_id",
-  "is_our_client",
   "is_primary",
-  "fee_allocation_amount",
-  "success_fee_terms",
+  "representatives",  // JSONB field for representatives
   "notes",
 ];
 
@@ -57,7 +54,8 @@ function buildPartyUpdatePayload(updateData: Record<string, unknown>) {
 
 /**
  * GET /api/admin/cases/[id]/parties
- * 사건의 당사자/대리인 목록 조회
+ * 사건의 당사자/의뢰인 연결 목록 조회
+ * 대리인은 각 당사자의 representatives JSONB에 포함
  */
 export async function GET(
   request: NextRequest,
@@ -72,20 +70,10 @@ export async function GET(
     const { id: caseId } = await params;
     const adminClient = createAdminClient();
 
-    // 당사자 조회
+    // 당사자 조회 (대리인은 representatives JSONB에 포함)
     const { data: parties, error: partiesError } = await adminClient
       .from("case_parties")
-      .select(
-        `
-        *,
-        clients (
-          id,
-          name,
-          phone,
-          email
-        )
-      `
-      )
+      .select("*")
       .eq("case_id", caseId)
       .order("party_type")
       .order("party_order");
@@ -98,24 +86,39 @@ export async function GET(
       );
     }
 
-    // 대리인 조회
-    const { data: representatives, error: repsError } = await adminClient
-      .from("case_representatives")
-      .select("*")
+    // 의뢰인 연결 조회
+    const { data: caseClients, error: clientsError } = await adminClient
+      .from("case_clients")
+      .select(`
+        *,
+        client:clients!client_id (
+          id,
+          name,
+          phone,
+          email
+        ),
+        linked_party:case_parties!linked_party_id (
+          id,
+          party_name,
+          party_type,
+          scourt_party_index
+        )
+      `)
       .eq("case_id", caseId)
-      .order("representative_type_label");
+      .order("is_primary_client", { ascending: false })
+      .order("created_at");
 
-    if (repsError) {
-      console.error("대리인 조회 오류:", repsError);
+    if (clientsError) {
+      console.error("의뢰인 연결 조회 오류:", clientsError);
       return NextResponse.json(
-        { error: `대리인 조회 실패: ${repsError.message}` },
+        { error: `의뢰인 연결 조회 실패: ${clientsError.message}` },
         { status: 500 }
       );
     }
 
     return NextResponse.json({
       parties: parties || [],
-      representatives: representatives || [],
+      caseClients: caseClients || [],
     });
   } catch (error) {
     console.error("GET /api/admin/cases/[id]/parties 오류:", error);
@@ -157,7 +160,7 @@ export async function POST(
 
     const tenantId = legalCase.tenant_id;
 
-    // 당사자 추가
+    // 당사자 추가 (의뢰인 연결은 case_clients로 분리됨)
     const { data, error } = await adminClient
       .from("case_parties")
       .insert({
@@ -167,10 +170,8 @@ export async function POST(
         party_type: body.party_type,
         party_type_label: body.party_type_label || null,
         party_order: body.party_order || 1,
-        client_id: body.client_id || null,
-        is_our_client: body.is_our_client || false,
         is_primary: body.is_primary ?? false,
-        fee_allocation_amount: body.fee_allocation_amount || null,
+        representatives: body.representatives || [],
         notes: body.notes || null,
         scourt_synced: false,
         manual_override: true,
@@ -198,9 +199,11 @@ export async function POST(
 
 /**
  * PATCH /api/admin/cases/[id]/parties
- * 당사자 또는 대리인 정보 수정
+ * 당사자 정보 수정 (대리인은 representatives JSONB 필드로 관리)
  * - partyId: 당사자 수정
- * - representativeId: 대리인 수정
+ * - partyUpdates: 여러 당사자 일괄 수정
+ *
+ * NOTE: 의뢰인 연결은 case_clients API를 통해 관리
  */
 export async function PATCH(
   request: NextRequest,
@@ -214,54 +217,11 @@ export async function PATCH(
 
     const { id: caseId } = await params;
     const body = await request.json();
-    const { partyId, representativeId, partyUpdates, ...updateData } = body;
+    const { partyId, partyUpdates, ...updateData } = body;
 
     const adminClient = createAdminClient();
 
-    // 대리인 수정
-    if (representativeId) {
-      if (partyUpdates) {
-        return NextResponse.json(
-          { error: "partyUpdates and representativeId cannot be used together" },
-          { status: 400 }
-        );
-      }
-      const representativeUpdate: Record<string, unknown> = {
-        manual_override: true,
-      };
-
-      if (Object.prototype.hasOwnProperty.call(updateData, "representative_name")) {
-        representativeUpdate.representative_name = updateData.representative_name;
-      }
-      if (Object.prototype.hasOwnProperty.call(updateData, "is_our_firm")) {
-        representativeUpdate.is_our_firm = updateData.is_our_firm;
-      }
-      if (Object.prototype.hasOwnProperty.call(updateData, "law_firm_name")) {
-        representativeUpdate.law_firm_name = updateData.law_firm_name;
-      }
-      if (Object.prototype.hasOwnProperty.call(updateData, "representative_type_label")) {
-        representativeUpdate.representative_type_label = updateData.representative_type_label;
-      }
-
-      const { data, error } = await adminClient
-        .from("case_representatives")
-        .update(representativeUpdate)
-        .eq("id", representativeId)
-        .eq("case_id", caseId)
-        .select()
-        .single();
-
-      if (error) {
-        console.error("대리인 수정 오류:", error);
-        return NextResponse.json(
-          { error: `대리인 수정 실패: ${error.message}` },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({ success: true, data });
-    }
-
+    // 여러 당사자 일괄 수정
     if (partyUpdates !== undefined) {
       if (!Array.isArray(partyUpdates) || partyUpdates.length === 0) {
         return NextResponse.json(
@@ -302,6 +262,7 @@ export async function PATCH(
         partyTypeById.set(party.id, party.party_type);
       });
 
+      // is_primary 처리: 같은 측에서 한 명만 primary 가능
       const primaryTargets = new Map<"plaintiff" | "defendant", string>();
       partyUpdates.forEach((update: { partyId?: string; party_type?: string; is_primary?: boolean }) => {
         if (!update.partyId || !update.is_primary) return;
@@ -312,16 +273,15 @@ export async function PATCH(
         }
       });
 
+      // 각 당사자 업데이트
       for (const update of partyUpdates) {
         if (!update?.partyId) continue;
         const payload = buildPartyUpdatePayload(update);
-        const { data, error } = await adminClient
+        const { error } = await adminClient
           .from("case_parties")
           .update(payload)
           .eq("id", update.partyId)
-          .eq("case_id", caseId)
-          .select("id, party_type")
-          .single();
+          .eq("case_id", caseId);
 
         if (error) {
           console.error("당사자 수정 오류:", error);
@@ -330,85 +290,9 @@ export async function PATCH(
             { status: 500 }
           );
         }
-
-        const isOurClient = payload.is_our_client === true;
-        const clientId = typeof payload.client_id === "string" ? payload.client_id : null;
-        if (isOurClient) {
-          const updatedPartyType = (payload.party_type as string) || data.party_type;
-          const currentSide = getPartySide(updatedPartyType);
-
-          // 반대측 의뢰인 해제 (같은 측은 복수 의뢰인 허용)
-          if (currentSide) {
-            const oppositeSideTypes = currentSide === "plaintiff"
-              ? Array.from(DEFENDANT_SIDE_TYPES)
-              : Array.from(PLAINTIFF_SIDE_TYPES);
-
-            const { error: unsetError } = await adminClient
-              .from("case_parties")
-              .update({
-                is_our_client: false,
-                client_id: null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("case_id", caseId)
-              .neq("id", update.partyId)
-              .eq("is_our_client", true)
-              .in("party_type", oppositeSideTypes);
-
-            if (unsetError) {
-              console.error("반대측 의뢰인 해제 오류:", unsetError);
-            }
-          }
-
-          // legal_cases 동기화 (client_id 유무와 관계없이 client_role 업데이트)
-          const { error: caseUpdateError } = await adminClient
-            .from("legal_cases")
-            .update({
-              client_id: clientId,  // null이면 null로 설정
-              client_role: updatedPartyType,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", caseId);
-
-          if (caseUpdateError) {
-            console.error("legal_cases 동기화 오류:", caseUpdateError);
-          }
-        }
-
-        // 의뢰인 해제 시 legal_cases 동기화 (다른 의뢰인이 있으면 그 정보로, 없으면 null)
-        if (payload.is_our_client === false) {
-          const { data: otherClients } = await adminClient
-            .from("case_parties")
-            .select("client_id, party_type, is_primary")
-            .eq("case_id", caseId)
-            .eq("is_our_client", true)
-            .neq("id", update.partyId)
-            .order("is_primary", { ascending: false })
-            .limit(1);
-
-          if (otherClients && otherClients.length > 0) {
-            const otherClient = otherClients[0];
-            await adminClient
-              .from("legal_cases")
-              .update({
-                client_id: otherClient.client_id,
-                client_role: otherClient.party_type,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", caseId);
-          } else {
-            await adminClient
-              .from("legal_cases")
-              .update({
-                client_id: null,
-                client_role: null,
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", caseId);
-          }
-        }
       }
 
+      // is_primary 처리: 같은 측의 다른 당사자는 is_primary=false
       for (const [side, primaryId] of primaryTargets.entries()) {
         const sideTypes = side === "plaintiff"
           ? Array.from(PLAINTIFF_SIDE_TYPES)
@@ -435,25 +319,20 @@ export async function PATCH(
           .eq("id", primaryId);
       }
 
-      // 업데이트된 당사자들 조회하여 반환 (낙관적 업데이트용)
+      // 업데이트된 당사자들 조회하여 반환
       const { data: updatedParties } = await adminClient
         .from("case_parties")
-        .select(`
-          id, party_name, party_type, party_type_label, party_order,
-          is_our_client, is_primary, manual_override, client_id,
-          scourt_party_index, scourt_label_raw, scourt_name_raw,
-          clients:client_id(id, name)
-        `)
+        .select("*")
         .eq("case_id", caseId)
         .in("id", partyIds);
 
       return NextResponse.json({ success: true, updatedParties: updatedParties || [] });
     }
 
-    // 당사자 수정
+    // 단일 당사자 수정
     if (!partyId) {
       return NextResponse.json(
-        { error: "partyId or representativeId is required" },
+        { error: "partyId is required" },
         { status: 400 }
       );
     }
@@ -464,12 +343,7 @@ export async function PATCH(
       .update(payload)
       .eq("id", partyId)
       .eq("case_id", caseId)
-      .select(`
-        id, party_name, party_type, party_type_label, party_order,
-        is_our_client, is_primary, manual_override, client_id,
-        scourt_party_index, scourt_label_raw, scourt_name_raw,
-        clients:client_id(id, name)
-      `)
+      .select("*")
       .single();
 
     if (error) {
@@ -480,86 +354,7 @@ export async function PATCH(
       );
     }
 
-    const isOurClient = payload.is_our_client === true;
-    const clientId = typeof payload.client_id === "string" ? payload.client_id : null;
-    if (isOurClient) {
-      const updatedPartyType = (payload.party_type as string) || data.party_type;
-      const currentSide = getPartySide(updatedPartyType);
-
-      // 반대측 의뢰인 해제 (같은 측은 복수 의뢰인 허용)
-      if (currentSide) {
-        const oppositeSideTypes = currentSide === "plaintiff"
-          ? Array.from(DEFENDANT_SIDE_TYPES)
-          : Array.from(PLAINTIFF_SIDE_TYPES);
-
-        const { error: unsetError } = await adminClient
-          .from("case_parties")
-          .update({
-            is_our_client: false,
-            client_id: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("case_id", caseId)
-          .neq("id", partyId)
-          .eq("is_our_client", true)
-          .in("party_type", oppositeSideTypes);
-
-        if (unsetError) {
-          console.error("반대측 의뢰인 해제 오류:", unsetError);
-        }
-      }
-
-      // legal_cases 동기화 (client_id 유무와 관계없이 client_role 업데이트)
-      const { error: caseUpdateError } = await adminClient
-        .from("legal_cases")
-        .update({
-          client_id: clientId,  // null이면 null로 설정
-          client_role: updatedPartyType,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", caseId);
-
-      if (caseUpdateError) {
-        console.error("legal_cases 동기화 오류:", caseUpdateError);
-      }
-    }
-
-    // 의뢰인 해제 시 legal_cases 동기화 (다른 의뢰인이 있으면 그 정보로, 없으면 null)
-    if (payload.is_our_client === false) {
-      // 다른 의뢰인 당사자 찾기 (is_primary 우선)
-      const { data: otherClients } = await adminClient
-        .from("case_parties")
-        .select("client_id, party_type, is_primary")
-        .eq("case_id", caseId)
-        .eq("is_our_client", true)
-        .neq("id", partyId)
-        .order("is_primary", { ascending: false })
-        .limit(1);
-
-      if (otherClients && otherClients.length > 0) {
-        // 다른 의뢰인이 있으면 그 정보로 업데이트
-        const otherClient = otherClients[0];
-        await adminClient
-          .from("legal_cases")
-          .update({
-            client_id: otherClient.client_id,
-            client_role: otherClient.party_type,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", caseId);
-      } else {
-        // 다른 의뢰인이 없으면 null로 설정
-        await adminClient
-          .from("legal_cases")
-          .update({
-            client_id: null,
-            client_role: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", caseId);
-      }
-    }
-
+    // is_primary 처리: 같은 측의 다른 당사자는 is_primary=false
     if (payload.is_primary === true) {
       const updatedPartyType = (payload.party_type as string) || data.party_type;
       const side = getPartySide(updatedPartyType);

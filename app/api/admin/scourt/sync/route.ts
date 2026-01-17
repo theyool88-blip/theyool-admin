@@ -94,15 +94,15 @@ export async function POST(request: NextRequest) {
 
       const { data: parties } = await supabase
         .from('case_parties')
-        .select('party_name, is_our_client, manual_override')
+        .select('party_name, is_primary, manual_override')
         .eq('case_id', legalCaseId)
-        .order('is_our_client', { ascending: false })
+        .order('is_primary', { ascending: false })
         .order('party_order', { ascending: true });
 
       const unmaskedParties = (parties || []).filter(party => !isMaskedPartyName(party.party_name));
       const manualUnmaskedParties = unmaskedParties.filter(party => party.manual_override);
       const pickFrom = (list: typeof unmaskedParties) => {
-        const clientParty = list.find(party => party.is_our_client);
+        const clientParty = list.find(party => party.is_primary);
         return clientParty?.party_name || list[0]?.party_name || '';
       };
       const preferredPartyName = pickFrom(manualUnmaskedParties) || pickFrom(unmaskedParties);
@@ -111,21 +111,23 @@ export async function POST(request: NextRequest) {
         return resolvedPartyName;
       }
 
-      if (legalCase.client_id) {
+      // primary_client_name 캐시 필드 사용
+      if (legalCase.primary_client_name) {
+        resolvedPartyName = normalizePartyName(legalCase.primary_client_name);
+        return resolvedPartyName;
+      }
+
+      // primary_client_id로 clients 테이블 조회
+      if (legalCase.primary_client_id) {
         const { data: client } = await supabase
           .from('clients')
           .select('name')
-          .eq('id', legalCase.client_id)
+          .eq('id', legalCase.primary_client_id)
           .single();
         if (client?.name) {
           resolvedPartyName = normalizePartyName(client.name);
           return resolvedPartyName;
         }
-      }
-
-      if (legalCase.opponent_name) {
-        resolvedPartyName = normalizePartyName(legalCase.opponent_name);
-        return resolvedPartyName;
       }
 
       const fallbackPartyName = pickFrom(parties || []);

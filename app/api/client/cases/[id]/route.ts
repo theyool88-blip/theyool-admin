@@ -23,7 +23,19 @@ export async function GET(
     const { id: caseId } = await params;
     const supabase = await createClient();
 
-    // 사건 조회 (본인 사건인지 확인, opponent_name은 case_parties에서 별도 조회)
+    // 1. case_clients에서 본인 사건인지 확인
+    const { data: caseClientLink, error: linkError } = await supabase
+      .from('case_clients')
+      .select('case_id')
+      .eq('case_id', caseId)
+      .eq('client_id', clientId)
+      .maybeSingle();
+
+    if (linkError || !caseClientLink) {
+      return NextResponse.json({ error: '사건을 찾을 수 없습니다.' }, { status: 404 });
+    }
+
+    // 2. 사건 조회 (opponent_name은 case_parties에서 별도 조회)
     const { data: caseDetailRaw, error: caseError } = await supabase
       .from('legal_cases')
       .select(`
@@ -39,20 +51,20 @@ export async function GET(
         created_at
       `)
       .eq('id', caseId)
-      .eq('client_id', clientId)
       .single();
 
     if (caseError || !caseDetailRaw) {
       return NextResponse.json({ error: '사건을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // case_parties에서 상대방(is_our_client=false, is_primary=true) 이름 조회
+    // case_parties에서 상대방(is_primary=false) 이름 조회
     const { data: opponentParty } = await supabase
       .from('case_parties')
       .select('party_name')
       .eq('case_id', caseId)
-      .eq('is_our_client', false)
-      .eq('is_primary', true)
+      .eq('is_primary', false)
+      .order('party_order', { ascending: true })
+      .limit(1)
       .maybeSingle();
 
     const caseDetail = {

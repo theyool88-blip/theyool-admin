@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant, withTenantId } from '@/lib/api/with-tenant'
 import { SCOURT_RELATION_MAP, determineRelationDirection } from '@/lib/scourt/case-relations'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
-import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
+// determineClientRoleStatus removed - client_role now stored in case_parties
 import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { parseCaseNumber, stripCourtPrefix } from '@/lib/scourt/case-number-utils'
 
@@ -15,7 +15,7 @@ export const GET = withTenant(async (request, { tenant }) => {
   try {
     const adminClient = createAdminClient()
 
-    // 테넌트 격리된 사건 조회
+    // 테넌트 격리된 사건 조회 (primary_client_* 캐시 필드 사용)
     let query = adminClient
       .from('legal_cases')
       .select(`
@@ -23,20 +23,28 @@ export const GET = withTenant(async (request, { tenant }) => {
         contract_number,
         case_name,
         case_type,
-        client_id,
         status,
         contract_date,
         court_case_number,
         tenant_id,
         assigned_to,
-        client:clients (
-          id,
-          name
-        ),
+        primary_client_id,
+        primary_client_name,
         assigned_member:tenant_members!assigned_to (
           id,
           display_name,
           role
+        ),
+        case_assignees (
+          id,
+          member_id,
+          is_primary,
+          assignee_role,
+          member:tenant_members (
+            id,
+            display_name,
+            role
+          )
         )
       `)
       .order('created_at', { ascending: false })
@@ -58,7 +66,7 @@ export const GET = withTenant(async (request, { tenant }) => {
 
     // Fetch payment info for each case
     const casesWithPayments = await Promise.all(
-      (cases || []).map(async (legalCase) => {
+      (cases || []).map(async (legalCase: Record<string, unknown>) => {
         const { data: payments } = await adminClient
           .from('payments')
           .select('amount')
@@ -67,12 +75,35 @@ export const GET = withTenant(async (request, { tenant }) => {
         const totalAmount = payments?.reduce((sum, p) => sum + p.amount, 0) || 0
         const paymentCount = payments?.length || 0
 
-        // Supabase joins return arrays, extract first element
-        const clientData = Array.isArray(legalCase.client) ? legalCase.client[0] : legalCase.client
+        // Use cache fields for client info (no join needed)
+        const clientData = legalCase.primary_client_id
+          ? { id: legalCase.primary_client_id, name: legalCase.primary_client_name }
+          : null
+
+        // Extract case_assignees
+        const caseAssignees = legalCase.case_assignees as Array<{
+          id: string
+          member_id: string
+          is_primary: boolean
+          assignee_role: string
+          member: { id: string; display_name: string; role: string } | null
+        }> | undefined
+
+        // Remove case_assignees from response
+        const { case_assignees: _, ...caseWithoutAssignees } = legalCase
 
         return {
-          ...legalCase,
+          ...caseWithoutAssignees,
           client: clientData,
+          // Include assignees list (담당변호사/담당직원 목록)
+          assignees: caseAssignees?.map(a => ({
+            id: a.id,
+            memberId: a.member_id,
+            isPrimary: a.is_primary,
+            assigneeRole: a.assignee_role,
+            displayName: a.member?.display_name,
+            role: a.member?.role
+          })) || [],
           payment_info: {
             total_amount: totalAmount,
             payment_count: paymentCount
@@ -111,7 +142,11 @@ export const POST = withTenant(async (request, { tenant }) => {
         address?: string
         bank_account?: string // 의뢰인 계좌번호
       }
-      assigned_to?: string
+      assigned_to?: string  // 주 담당변호사 (레거시 호환)
+      assignees?: Array<{   // 담당변호사 목록 (다중 지정)
+        member_id: string
+        is_primary?: boolean
+      }>
       status?: string
       contract_date?: string
       retainer_fee?: number
@@ -146,28 +181,32 @@ export const POST = withTenant(async (request, { tenant }) => {
 
     const adminClient = createAdminClient()
     let sourceCase: {
-      client_role?: 'plaintiff' | 'defendant' | null
-      client_role_status?: 'provisional' | 'confirmed' | null
       case_level?: string | null
       court_case_number?: string | null
       main_case_id?: string | null
     } | null = null
+    let sourceClientRole: 'plaintiff' | 'defendant' | null = null  // case_clients + case_parties에서 조회
     let sourceOpponentName: string | null = null  // case_parties에서 조회
     let sourcePartyOverrides: Array<{
       party_name: string
       party_type: string
       party_type_label: string | null
       party_order: number | null
-      is_our_client: boolean
-      fee_allocation_amount: number | null
-      success_fee_terms: string | null
+      is_primary: boolean
       notes: string | null
     }> = []
+    let sourceClientInfo: {
+      client_id: string
+      retainer_fee: number | null
+      success_fee_terms: string | null
+      linked_party_id: string | null
+    } | null = null
 
     if (body.source_case_id) {
+      // legal_cases에서 기본 정보 조회 (client_role, client_role_status 제거됨)
       let sourceCaseQuery = adminClient
         .from('legal_cases')
-        .select('client_role, client_role_status, case_level, court_case_number, main_case_id')
+        .select('case_level, court_case_number, main_case_id')
         .eq('id', body.source_case_id)
 
       if (!tenant.isSuperAdmin && tenant.tenantId) {
@@ -185,9 +224,39 @@ export const POST = withTenant(async (request, { tenant }) => {
 
       sourceCase = sourceCaseData
 
+      // case_clients에서 의뢰인 정보 조회
+      const { data: sourceCaseClient } = await adminClient
+        .from('case_clients')
+        .select('client_id, retainer_fee, success_fee_terms, linked_party_id')
+        .eq('case_id', body.source_case_id)
+        .eq('is_primary_client', true)
+        .maybeSingle()
+
+      if (sourceCaseClient) {
+        sourceClientInfo = sourceCaseClient
+
+        // linked_party_id로 의뢰인 당사자의 party_type 조회
+        if (sourceCaseClient.linked_party_id) {
+          const { data: clientParty } = await adminClient
+            .from('case_parties')
+            .select('party_type')
+            .eq('id', sourceCaseClient.linked_party_id)
+            .maybeSingle()
+
+          if (clientParty?.party_type) {
+            const partyType = clientParty.party_type.toLowerCase()
+            if (partyType.includes('plaintiff') || partyType.includes('원고') || partyType.includes('신청인') || partyType.includes('채권자')) {
+              sourceClientRole = 'plaintiff'
+            } else if (partyType.includes('defendant') || partyType.includes('피고') || partyType.includes('피신청인') || partyType.includes('채무자')) {
+              sourceClientRole = 'defendant'
+            }
+          }
+        }
+      }
+
       const { data: sourcePartiesData, error: sourcePartiesError } = await adminClient
         .from('case_parties')
-        .select('party_name, party_type, party_type_label, party_order, is_our_client, fee_allocation_amount, success_fee_terms, notes')
+        .select('party_name, party_type, party_type_label, party_order, is_primary, notes')
         .eq('case_id', body.source_case_id)
         .eq('manual_override', true)
         .order('party_order', { ascending: true })
@@ -202,8 +271,8 @@ export const POST = withTenant(async (request, { tenant }) => {
 
       sourcePartyOverrides = sourcePartiesData || []
 
-      // sourcePartyOverrides에서 상대방 이름 추출
-      const opponentPartyFromOverrides = sourcePartyOverrides.find(p => !p.is_our_client)
+      // sourcePartyOverrides에서 상대방 이름 추출 (is_primary=false인 당사자)
+      const opponentPartyFromOverrides = sourcePartyOverrides.find(p => !p.is_primary)
       if (opponentPartyFromOverrides) {
         sourceOpponentName = opponentPartyFromOverrides.party_name
       } else {
@@ -212,8 +281,8 @@ export const POST = withTenant(async (request, { tenant }) => {
           .from('case_parties')
           .select('party_name')
           .eq('case_id', body.source_case_id)
-          .eq('is_our_client', false)
-          .eq('is_primary', true)
+          .eq('is_primary', false)
+          .limit(1)
           .maybeSingle()
 
         if (opponentParty) {
@@ -257,29 +326,9 @@ export const POST = withTenant(async (request, { tenant }) => {
       clientId = newClient.id
     }
 
-    // client_role: 명시적으로 지정된 경우 사용, 아니면 기본값 'plaintiff'
-    const resolvedClientRole = body.client_role ?? sourceCase?.client_role ?? 'plaintiff'
+    // client_role: 명시적으로 지정된 경우 사용, 아니면 sourceClientRole, 기본값 'plaintiff'
+    const resolvedClientRole = body.client_role ?? sourceClientRole ?? 'plaintiff'
     const resolvedOpponentName = body.opponent_name ?? sourceOpponentName ?? null
-
-    // client_role_status 결정 (공통 유틸리티 사용)
-    const clientNameForStatus = body.new_client?.name
-      || (clientId ? await (async () => {
-          const { data: client } = await adminClient
-            .from('clients')
-            .select('name')
-            .eq('id', clientId)
-            .single()
-          return client?.name
-        })()
-      : null)
-
-    const resolvedClientRoleStatus = determineClientRoleStatus({
-      explicitClientRole: body.client_role,
-      sourceClientRole: sourceCase?.client_role,
-      sourceClientRoleStatus: sourceCase?.client_role_status,
-      clientName: clientNameForStatus,
-      opponentName: resolvedOpponentName
-    })
 
     // 사건번호 정제 (법원명 접두사 제거)
     const cleanedCaseNumber = body.court_case_number
@@ -313,27 +362,32 @@ export const POST = withTenant(async (request, { tenant }) => {
       }
     }
 
+    // Determine primary assignee for backward compatibility
+    // Priority: 1. assignees with is_primary=true, 2. first assignee, 3. assigned_to
+    let primaryAssigneeId: string | null = null
+    if (body.assignees && body.assignees.length > 0) {
+      const primaryAssignee = body.assignees.find(a => a.is_primary) || body.assignees[0]
+      primaryAssigneeId = primaryAssignee.member_id
+    } else if (body.assigned_to) {
+      primaryAssigneeId = body.assigned_to
+    }
+
     // Create the case (테넌트 ID 포함)
+    // NOTE: 새 스키마에서 client_id, retainer_fee, client_role, opponent_name 제거됨
+    // 이들은 case_parties를 통해 관리됨
     const { data: newCase, error } = await adminClient
       .from('legal_cases')
       .insert([withTenantId({
         case_name: body.case_name,
-        client_id: clientId,
         case_type: body.case_type || '기타',
         contract_number: body.contract_number || null,
-        assigned_to: body.assigned_to || null,
-        status: body.status || '진행중',
+        assigned_to: primaryAssigneeId,  // Primary assignee for backward compatibility
+        status: body.status || 'active',
         contract_date: body.contract_date || new Date().toISOString().split('T')[0],
-        retainer_fee: body.retainer_fee || null,
-        success_fee_agreement: body.success_fee_agreement || null,
         notes: body.notes || null,
         court_case_number: cleanedCaseNumber,
         court_name: resolvedCourtName,
         judge_name: body.judge_name || null,
-        client_role: resolvedClientRole,
-        client_role_status: resolvedClientRoleStatus,
-        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
-        opponent_name: null
       }, tenant)])
       .select()
       .single()
@@ -346,7 +400,43 @@ export const POST = withTenant(async (request, { tenant }) => {
       )
     }
 
+    // Insert case_assignees (담당변호사 다중 지정)
+    if (body.assignees && body.assignees.length > 0) {
+      const assigneePayload = body.assignees.map((assignee, idx) => withTenantId({
+        case_id: newCase.id,
+        member_id: assignee.member_id,
+        is_primary: assignee.is_primary || (idx === 0 && !body.assignees?.some(a => a.is_primary))
+      }, tenant))
+
+      const { error: assigneeError } = await adminClient
+        .from('case_assignees')
+        .insert(assigneePayload)
+
+      if (assigneeError) {
+        console.error('Error inserting case_assignees:', assigneeError)
+        // Don't fail the whole request, just log the error
+      }
+    } else if (body.assigned_to) {
+      // Legacy: single assigned_to - insert into case_assignees
+      const { error: assigneeError } = await adminClient
+        .from('case_assignees')
+        .insert([withTenantId({
+          case_id: newCase.id,
+          member_id: body.assigned_to,
+          is_primary: true
+        }, tenant)])
+
+      if (assigneeError) {
+        console.error('Error inserting case_assignees (legacy):', assigneeError)
+      }
+    }
+
+    // 당사자 및 의뢰인 연결 생성
+    // 새 스키마: case_parties (당사자만), case_clients (의뢰인 연결)
+    let clientPartyId: string | null = null
+
     if (sourcePartyOverrides.length > 0) {
+      // 원본 사건에서 당사자 복사
       const seenKeys = new Set<string>()
       const partyInsertPayload = sourcePartyOverrides.reduce((acc, party, idx) => {
         const partyName = (party.party_name || '').trim()
@@ -361,10 +451,8 @@ export const POST = withTenant(async (request, { tenant }) => {
           party_type: party.party_type,
           party_type_label: party.party_type_label || null,
           party_order: party.party_order ?? idx + 1,
-          is_our_client: party.is_our_client,
-          client_id: party.is_our_client ? clientId : null,
-          fee_allocation_amount: party.fee_allocation_amount || null,
-          success_fee_terms: party.success_fee_terms || null,
+          is_primary: party.is_primary,  // 원본 사건의 is_primary 유지
+          representatives: [],  // JSONB
           notes: party.notes || null,
           scourt_synced: false,
           manual_override: true
@@ -373,25 +461,28 @@ export const POST = withTenant(async (request, { tenant }) => {
       }, [] as Array<Record<string, unknown>>)
 
       if (partyInsertPayload.length > 0) {
-        const { error: partyInsertError } = await adminClient
+        const { data: insertedParties, error: partyInsertError } = await adminClient
           .from('case_parties')
           .insert(partyInsertPayload)
+          .select('id, party_type, is_primary')
 
         if (partyInsertError) {
           console.error('Error copying case parties:', partyInsertError)
+        } else if (insertedParties) {
+          // 의뢰인 당사자 ID 찾기
+          const primaryParty = insertedParties.find(p => p.is_primary)
+          clientPartyId = primaryParty?.id || null
         }
       }
     } else {
-      // source_case_id가 없는 경우: 신규 사건 등록 시 case_parties 자동 생성
-      // 사건번호 또는 client_role이 있을 때만 생성 (정확한 지위 추론 가능)
+      // 신규 사건: 당사자 자동 생성
       const shouldCreateParties = body.court_case_number || body.client_role
 
-      // 의뢰인 이름 결정: 새 의뢰인이면 new_client.name, 기존 의뢰인이면 DB에서 조회
+      // 의뢰인 이름 결정
       let clientNameForParty: string | null = null
       if (body.new_client?.name) {
         clientNameForParty = body.new_client.name
       } else if (clientId) {
-        // 기존 의뢰인 이름 조회
         const { data: existingClient } = await adminClient
           .from('clients')
           .select('name')
@@ -415,21 +506,43 @@ export const POST = withTenant(async (request, { tenant }) => {
             party_name: seed.party_name,
             party_type: seed.party_type,
             party_type_label: seed.party_type_label,
-            is_our_client: seed.is_our_client,
-            client_id: seed.client_id || null,
+            is_primary: seed.is_our_client,  // seed의 is_our_client를 is_primary로 매핑
+            representatives: [],
             party_order: idx + 1,
             manual_override: false,
             scourt_synced: false,
           }, tenant))
 
-          const { error: seedError } = await adminClient
+          const { data: insertedParties, error: seedError } = await adminClient
             .from('case_parties')
             .insert(seedPayload)
+            .select('id, party_type, is_primary')
 
           if (seedError) {
             console.error('Error seeding case parties:', seedError)
+          } else if (insertedParties) {
+            const primaryParty = insertedParties.find(p => p.is_primary)
+            clientPartyId = primaryParty?.id || null
           }
         }
+      }
+    }
+
+    // case_clients 생성 (의뢰인 연결)
+    if (clientId) {
+      const { error: caseClientError } = await adminClient
+        .from('case_clients')
+        .insert([withTenantId({
+          case_id: newCase.id,
+          client_id: clientId,
+          linked_party_id: clientPartyId,
+          is_primary_client: true,
+          retainer_fee: body.retainer_fee || null,
+          success_fee_terms: body.success_fee_agreement || null,
+        }, tenant)])
+
+      if (caseClientError) {
+        console.error('Error creating case_client:', caseClientError)
       }
     }
 

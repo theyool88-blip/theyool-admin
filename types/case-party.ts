@@ -68,6 +68,15 @@ export const OPPOSITE_PARTY_TYPE: Record<PartyType, PartyType> = {
   related: "related",
 };
 
+// 대리인 (JSONB 내부 구조)
+export interface PartyRepresentative {
+  name: string;
+  type_label: string | null;  // "원고 소송대리인"
+  law_firm: string | null;
+  is_our_firm: boolean;
+  scourt_synced: boolean;
+}
+
 // 사건 당사자
 export interface CaseParty {
   id: string;
@@ -75,24 +84,19 @@ export interface CaseParty {
   case_id: string;
 
   // 당사자 정보
-  party_name: string;
+  party_name: string;              // 실명 (마스킹 해제)
   party_type: PartyType;
   party_type_label: string | null;
   party_order: number;
 
-  // 의뢰인 연결
-  client_id: string | null;
-  is_our_client: boolean;
-
-  // 수임료
-  fee_allocation_amount: number | null;  // 착수금 (원)
-  success_fee_terms: string | null;      // 성공보수 약정내용
+  // 대리인 (JSONB)
+  representatives: PartyRepresentative[];
 
   // SCOURT 연동
   scourt_synced: boolean;
   scourt_party_index: number | null;
   scourt_label_raw?: string | null;
-  scourt_name_raw?: string | null;
+  scourt_name_raw?: string | null;  // 마스킹된 원본 "홍○동"
   adjdoc_rch_ymd: string | null;   // 판결도달일
   indvd_cfmtn_ymd: string | null;  // 확정일
   manual_override: boolean;
@@ -101,17 +105,41 @@ export interface CaseParty {
   notes: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// 사건-의뢰인 연결
+export interface CaseClient {
+  id: string;
+  tenant_id: string;
+  case_id: string;
+  client_id: string;
+
+  linked_party_id: string | null;  // 연결된 당사자
+  is_primary_client: boolean;
+  retainer_fee: number | null;
+  success_fee_terms: string | null;
+
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
 
   // 조인 데이터
-  clients?: {
+  client?: {
     id: string;
     name: string;
     phone?: string;
     email?: string;
   } | null;
+  linked_party?: {
+    id: string;
+    party_name: string;
+    party_type: string;
+    scourt_party_index: number | null;
+  } | null;
 }
 
-// 사건 대리인
+// [DEPRECATED] CaseRepresentative - 대리인은 이제 case_parties.representatives JSONB로 관리
+// 이 인터페이스는 마이그레이션 호환성을 위해 유지됨
 export interface CaseRepresentative {
   id: string;
   tenant_id: string;
@@ -119,7 +147,7 @@ export interface CaseRepresentative {
   case_party_id: string | null;
 
   representative_name: string;
-  representative_type_label: string | null;  // '원고 소송대리인', '피고 소송대리인' 등
+  representative_type_label: string | null;
   law_firm_name: string | null;
   is_our_firm: boolean;
 
@@ -135,11 +163,8 @@ export interface CreateCasePartyRequest {
   party_type: PartyType;
   party_type_label?: string;
   party_order?: number;
-  client_id?: string | null;
-  is_our_client?: boolean;
   is_primary?: boolean;
-  fee_allocation_amount?: number | null;  // 착수금 (원)
-  success_fee_terms?: string | null;      // 성공보수 약정내용
+  representatives?: PartyRepresentative[];
   notes?: string;
 }
 
@@ -149,15 +174,32 @@ export interface UpdateCasePartyRequest {
   party_type?: PartyType;
   party_type_label?: string;
   party_order?: number;
-  client_id?: string | null;
-  is_our_client?: boolean;
   is_primary?: boolean;
-  fee_allocation_amount?: number | null;  // 착수금 (원)
-  success_fee_terms?: string | null;      // 성공보수 약정내용
+  representatives?: PartyRepresentative[];
   notes?: string;
 }
 
-// 대리인 생성 요청
+// 의뢰인 연결 생성 요청
+export interface CreateCaseClientRequest {
+  case_id: string;
+  client_id: string;
+  linked_party_id?: string | null;
+  is_primary_client?: boolean;
+  retainer_fee?: number | null;
+  success_fee_terms?: string | null;
+  notes?: string;
+}
+
+// 의뢰인 연결 수정 요청
+export interface UpdateCaseClientRequest {
+  linked_party_id?: string | null;
+  is_primary_client?: boolean;
+  retainer_fee?: number | null;
+  success_fee_terms?: string | null;
+  notes?: string;
+}
+
+// [DEPRECATED] 대리인 생성 요청 - 대리인은 이제 당사자의 representatives JSONB로 관리
 export interface CreateCaseRepresentativeRequest {
   case_id: string;
   case_party_id?: string | null;
@@ -184,7 +226,9 @@ export interface ScourtRepresentative {
 // 당사자 목록 응답
 export interface CasePartiesResponse {
   parties: CaseParty[];
-  representatives: CaseRepresentative[];
+  caseClients: CaseClient[];  // 의뢰인 연결 정보
+  // [DEPRECATED] representatives는 이제 각 party의 representatives JSONB에 포함
+  representatives?: CaseRepresentative[];
 }
 
 export function normalizePartyLabel(label?: string | null): string {

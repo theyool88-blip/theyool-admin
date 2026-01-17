@@ -59,30 +59,53 @@ export default async function NewCasePage({ searchParams }: PageProps) {
   let sourceCase: { client_role?: 'plaintiff' | 'defendant' | null; opponent_name?: string | null } | null = null
 
   if (params.sourceCaseId) {
-    let sourceCaseQuery = adminClient
-      .from('legal_cases')
-      .select('client_role')
-      .eq('id', params.sourceCaseId)
+    // case_clients + case_parties에서 client_role 조회
+    const { data: caseClient } = await adminClient
+      .from('case_clients')
+      .select('linked_party_id')
+      .eq('case_id', params.sourceCaseId)
+      .eq('is_primary_client', true)
+      .maybeSingle()
 
-    if (!tenantContext.isSuperAdmin && tenantContext.tenantId) {
-      sourceCaseQuery = sourceCaseQuery.eq('tenant_id', tenantContext.tenantId)
-    }
+    let clientRole: 'plaintiff' | 'defendant' | null = null
 
-    const { data: sourceCaseData, error: sourceCaseError } = await sourceCaseQuery.single()
-    if (!sourceCaseError && sourceCaseData) {
-      // case_parties에서 상대방(is_our_client=false, is_primary=true) 이름 조회
-      const { data: opponentParty } = await adminClient
+    if (caseClient?.linked_party_id) {
+      const { data: clientParty } = await adminClient
         .from('case_parties')
-        .select('party_name')
+        .select('party_type')
+        .eq('id', caseClient.linked_party_id)
+        .single()
+
+      if (clientParty) {
+        clientRole = clientParty.party_type === 'plaintiff' ? 'plaintiff' : 'defendant'
+      }
+    } else {
+      // linked_party_id가 없으면 is_primary=true인 당사자의 party_type 사용
+      const { data: primaryParty } = await adminClient
+        .from('case_parties')
+        .select('party_type')
         .eq('case_id', params.sourceCaseId)
-        .eq('is_our_client', false)
         .eq('is_primary', true)
         .maybeSingle()
 
-      sourceCase = {
-        client_role: sourceCaseData.client_role,
-        opponent_name: opponentParty?.party_name || null
+      if (primaryParty) {
+        clientRole = primaryParty.party_type === 'plaintiff' ? 'plaintiff' : 'defendant'
       }
+    }
+
+    // case_parties에서 상대방(is_primary=false) 이름 조회
+    const { data: opponentParty } = await adminClient
+      .from('case_parties')
+      .select('party_name')
+      .eq('case_id', params.sourceCaseId)
+      .eq('is_primary', false)
+      .order('party_order', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    sourceCase = {
+      client_role: clientRole,
+      opponent_name: opponentParty?.party_name || null
     }
   }
 

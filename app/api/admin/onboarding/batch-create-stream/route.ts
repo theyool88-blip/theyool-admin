@@ -433,6 +433,7 @@ export async function POST(request: NextRequest) {
             })
 
             if (partySeeds.length > 0) {
+              // case_parties 생성 (is_our_client → is_primary로 변경, client_id 제거)
               const payload = partySeeds.map((seed, index) => ({
                 tenant_id: tenant.tenantId,
                 case_id: newCase.id,
@@ -440,21 +441,37 @@ export async function POST(request: NextRequest) {
                 party_type: seed.party_type,
                 party_type_label: seed.party_type_label || null,
                 party_order: index + 1,
-                is_our_client: seed.is_our_client,
-                client_id: seed.client_id || null,
+                is_primary: seed.is_our_client,  // is_our_client → is_primary
+                representatives: [],
                 manual_override: true,
                 scourt_synced: false,
               }))
 
-              const { error: partyError } = await adminClient
+              const { data: insertedParties, error: partyError } = await adminClient
                 .from('case_parties')
                 .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
+                .select('id, is_primary')
 
               if (partyError) {
                 warnings.push({
                   field: 'party',
                   message: `당사자 정보 저장 실패: ${partyError.message}`
                 })
+              }
+
+              // case_clients 생성 (의뢰인 연결)
+              if (clientId && !partyError) {
+                const clientParty = insertedParties?.find(p => p.is_primary)
+                await adminClient
+                  .from('case_clients')
+                  .upsert({
+                    tenant_id: tenant.tenantId,
+                    case_id: newCase.id,
+                    client_id: clientId,
+                    linked_party_id: clientParty?.id || null,
+                    is_primary_client: true,
+                    retainer_fee: row.retainer_fee ? Number(row.retainer_fee) : null,
+                  }, { onConflict: 'case_id,client_id' })
               }
             }
 

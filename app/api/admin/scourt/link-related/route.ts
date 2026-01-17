@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // 원본 사건 정보 조회 (당사자 복사를 위해 client_role, clients 포함)
+    // 원본 사건 정보 조회
     const { data: sourceCase, error: sourceCaseError } = await supabase
       .from('legal_cases')
-      .select('id, tenant_id, client_id, case_level, court_case_number, main_case_id, client_role, clients(name)')
+      .select('id, tenant_id, case_level, court_case_number, main_case_id, primary_client_id, primary_client_name')
       .eq('id', sourceCaseId)
       .single();
 
@@ -67,13 +67,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // case_parties에서 상대방(is_our_client=false, is_primary=true) 이름 조회
+    // case_clients에서 주 의뢰인 정보 조회
+    const { data: sourceCaseClient } = await supabase
+      .from('case_clients')
+      .select('client_id, linked_party_id')
+      .eq('case_id', sourceCaseId)
+      .eq('is_primary_client', true)
+      .maybeSingle();
+
+    // case_parties에서 의뢰인 party_type 조회 (client_role 대체)
+    let sourceClientRole: 'plaintiff' | 'defendant' | null = null;
+    if (sourceCaseClient?.linked_party_id) {
+      const { data: clientParty } = await supabase
+        .from('case_parties')
+        .select('party_type')
+        .eq('id', sourceCaseClient.linked_party_id)
+        .single();
+      if (clientParty) {
+        sourceClientRole = clientParty.party_type === 'plaintiff' ? 'plaintiff' : 'defendant';
+      }
+    } else {
+      // linked_party_id 없으면 is_primary=true인 당사자의 party_type
+      const { data: primaryParty } = await supabase
+        .from('case_parties')
+        .select('party_type')
+        .eq('case_id', sourceCaseId)
+        .eq('is_primary', true)
+        .maybeSingle();
+      if (primaryParty) {
+        sourceClientRole = primaryParty.party_type === 'plaintiff' ? 'plaintiff' : 'defendant';
+      }
+    }
+
+    // case_parties에서 상대방(is_primary=false) 이름 조회
     const { data: opponentParty } = await supabase
       .from('case_parties')
       .select('party_name')
       .eq('case_id', sourceCaseId)
-      .eq('is_our_client', false)
-      .eq('is_primary', true)
+      .eq('is_primary', false)
+      .order('party_order', { ascending: true })
+      .limit(1)
       .maybeSingle();
 
     const sourceOpponentName = opponentParty?.party_name || '';
@@ -103,21 +136,21 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // 새 사건 생성 (원본 사건의 client_role 복사, opponent_name은 case_parties로 관리)
+      // 새 사건 생성 (의뢰인은 case_clients로 관리)
+      const resolvedClientId = clientId || sourceCaseClient?.client_id || null;
       const newCase = {
         tenant_id: sourceCase.tenant_id,
-        client_id: clientId || sourceCase.client_id,  // 지정된 의뢰인 또는 원본 사건 의뢰인
         court_case_number: relatedCaseInfo.caseNumber,
         court_name: relatedCaseInfo.courtName,
         case_name: `${relatedCaseInfo.relationType} 사건`,  // 임시 사건명
         status: '진행중',
         case_type: parsed.caseType,
         enc_cs_no: relatedCaseInfo.encCsNo || null,
-        client_role: sourceCase.client_role || null,  // 원본 사건의 의뢰인 지위 복사
-        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
-        opponent_name: null,
         // 연관관계 설명
         related_case_info: `${sourceCase.court_case_number}의 ${relatedCaseInfo.relationType}`,
+        // 캐시 필드 (트리거가 동기화하지만 초기값 설정)
+        primary_client_id: resolvedClientId,
+        primary_client_name: sourceCase.primary_client_name || null,
       };
 
       const { data: createdCase, error: createError } = await supabase
@@ -138,6 +171,18 @@ export async function POST(request: NextRequest) {
       newCaseCreated = true;
       console.log(`✅ 새 연관사건 생성: ${relatedCaseInfo.caseNumber} → ${targetCaseId}`);
 
+      // case_clients 생성 (의뢰인 연결)
+      if (resolvedClientId) {
+        await supabase
+          .from('case_clients')
+          .upsert({
+            tenant_id: sourceCase.tenant_id,
+            case_id: targetCaseId,
+            client_id: resolvedClientId,
+            is_primary_client: true,
+          }, { onConflict: 'case_id,client_id' });
+      }
+
       // ============================================================
       // 1-1. 당사자 복사/생성 (cases/route.ts 패턴 재사용)
       // ============================================================
@@ -145,10 +190,12 @@ export async function POST(request: NextRequest) {
       // 원본 사건의 manual_override=true 당사자 조회
       const { data: sourceParties } = await supabase
         .from('case_parties')
-        .select('party_name, party_type, party_type_label, party_order, is_our_client, client_id, fee_allocation_amount, success_fee_terms, notes')
+        .select('party_name, party_type, party_type_label, party_order, is_primary, representatives, notes')
         .eq('case_id', sourceCaseId)
         .eq('manual_override', true)
         .order('party_order', { ascending: true });
+
+      let primaryPartyId: string | null = null;
 
       if (sourceParties && sourceParties.length > 0) {
         // 원본 당사자 복사
@@ -159,33 +206,34 @@ export async function POST(request: NextRequest) {
           party_type: party.party_type,
           party_type_label: party.party_type_label,
           party_order: idx + 1,
-          is_our_client: party.is_our_client,
-          client_id: party.client_id || null,
-          fee_allocation_amount: party.fee_allocation_amount || null,
-          success_fee_terms: party.success_fee_terms || null,
+          is_primary: party.is_primary,
+          representatives: party.representatives || [],
           notes: party.notes || null,
           manual_override: true,  // 복사된 당사자도 수동 설정으로 표시
           scourt_synced: false,
         }));
 
-        const { error: partyInsertError } = await supabase
+        const { data: insertedParties, error: partyInsertError } = await supabase
           .from('case_parties')
-          .insert(partyInsertPayload);
+          .insert(partyInsertPayload)
+          .select('id, is_primary');
 
         if (partyInsertError) {
           console.error('당사자 복사 실패:', partyInsertError);
         } else {
           console.log(`✅ 원본 당사자 ${partyInsertPayload.length}명 복사 완료`);
+          // 의뢰인 당사자 ID 찾기
+          primaryPartyId = insertedParties?.find(p => p.is_primary)?.id || null;
         }
       } else {
         // 원본에 manual_override 당사자가 없으면 buildManualPartySeeds로 생성
-        const clientName = (sourceCase.clients as { name?: string } | null)?.name || '';
+        const clientName = sourceCase.primary_client_name || '';
         const partySeeds = buildManualPartySeeds({
           clientName,
           opponentName: sourceOpponentName || '',
-          clientRole: sourceCase.client_role as 'plaintiff' | 'defendant' | 'applicant' | 'respondent' | undefined,
+          clientRole: sourceClientRole as 'plaintiff' | 'defendant' | 'applicant' | 'respondent' | undefined,
           caseNumber: relatedCaseInfo.caseNumber,
-          clientId: clientId || sourceCase.client_id || undefined,
+          clientId: resolvedClientId || undefined,
         });
 
         if (partySeeds.length > 0) {
@@ -196,22 +244,33 @@ export async function POST(request: NextRequest) {
             party_type: seed.party_type,
             party_type_label: seed.party_type_label,
             party_order: idx + 1,
-            is_our_client: seed.is_our_client,
-            client_id: seed.client_id || null,
+            is_primary: seed.is_our_client,  // is_our_client → is_primary
+            representatives: [],
             manual_override: false,  // 자동 생성
             scourt_synced: false,
           }));
 
-          const { error: seedError } = await supabase
+          const { data: insertedSeeds, error: seedError } = await supabase
             .from('case_parties')
-            .insert(seedPayload);
+            .insert(seedPayload)
+            .select('id, is_primary');
 
           if (seedError) {
             console.error('당사자 시드 생성 실패:', seedError);
           } else {
             console.log(`✅ 당사자 시드 ${seedPayload.length}명 생성 완료`);
+            primaryPartyId = insertedSeeds?.find(p => p.is_primary)?.id || null;
           }
         }
+      }
+
+      // case_clients에 linked_party_id 연결
+      if (resolvedClientId && primaryPartyId) {
+        await supabase
+          .from('case_clients')
+          .update({ linked_party_id: primaryPartyId })
+          .eq('case_id', targetCaseId)
+          .eq('client_id', resolvedClientId);
       }
     }
     // ============================================================
@@ -359,7 +418,7 @@ export async function POST(request: NextRequest) {
     let syncResult = null;
     if (newCaseCreated && relatedCaseInfo.caseNumber) {
       try {
-        const clientName = (sourceCase.clients as { name?: string } | null)?.name || '';
+        const clientName = sourceCase.primary_client_name || '';
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
         console.log(`🔄 SCOURT sync 시작: ${relatedCaseInfo.caseNumber}`);

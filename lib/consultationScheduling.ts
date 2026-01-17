@@ -4,24 +4,21 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
-import type { LawyerName, OfficeLocation } from '@/types/consultation';
 
 export interface ScheduleConflict {
   id: string;
   name: string;
   phone: string;
-  confirmed_date: string;
-  confirmed_time: string;
-  assigned_lawyer?: LawyerName | null;
-  office_location?: OfficeLocation | null;
+  preferred_date: string;
+  preferred_time: string;
+  assigned_to?: string | null;
   status: string;
 }
 
 export interface CheckScheduleConflictsParams {
   date: string; // YYYY-MM-DD
   time: string; // HH:MM
-  lawyer?: LawyerName | null;
-  officeLocation?: OfficeLocation | null;
+  assignedTo?: string | null; // tenant_members.id
   excludeId?: string; // 업데이트 시 자기 자신은 제외
 }
 
@@ -31,17 +28,17 @@ export interface CheckScheduleConflictsParams {
 export async function checkScheduleConflicts(
   params: CheckScheduleConflictsParams
 ): Promise<ScheduleConflict[]> {
-  const { date, time, lawyer, officeLocation, excludeId } = params;
+  const { date, time, assignedTo, excludeId } = params;
 
   const supabase = await createClient();
 
   // 같은 날짜/시간의 기존 예약 조회
   let query = supabase
     .from('consultations')
-    .select('id, name, phone, confirmed_date, confirmed_time, assigned_lawyer, office_location, status')
-    .eq('confirmed_date', date)
-    .eq('confirmed_time', time)
-    .in('status', ['confirmed', 'in_progress']);
+    .select('id, name, phone, preferred_date, preferred_time, assigned_to, status')
+    .eq('preferred_date', date)
+    .eq('preferred_time', time)
+    .in('status', ['pending', 'in_progress']);
 
   // 자기 자신 제외
   if (excludeId) {
@@ -59,26 +56,13 @@ export async function checkScheduleConflicts(
     return [];
   }
 
-  // 변호사별 중복 체크
-  if (lawyer) {
-    const lawyerConflicts = existingBookings.filter(
-      (b) => b.assigned_lawyer === lawyer
+  // 담당자별 중복 체크
+  if (assignedTo) {
+    const assigneeConflicts = existingBookings.filter(
+      (b) => b.assigned_to === assignedTo
     );
-    if (lawyerConflicts.length > 0) {
-      return lawyerConflicts as ScheduleConflict[];
-    }
-  }
-
-  // 사무소별 중복 체크 (방문 상담)
-  if (officeLocation) {
-    const officeConflicts = existingBookings.filter(
-      (b) => b.office_location === officeLocation
-    );
-
-    // TODO: max_bookings_per_slot 체크 추가
-    // 현재는 간단하게 1개만 허용
-    if (officeConflicts.length > 0) {
-      return officeConflicts as ScheduleConflict[];
+    if (assigneeConflicts.length > 0) {
+      return assigneeConflicts as ScheduleConflict[];
     }
   }
 
@@ -110,22 +94,22 @@ export interface SendConfirmationSMSParams {
   name?: string;
   date: string;
   time: string;
-  office?: OfficeLocation;
+  officeLocation?: string;
   videoLink?: string;
 }
 
 export async function sendConfirmationSMS(
   params: SendConfirmationSMSParams
 ): Promise<void> {
-  const { phone, name, date, time, office, videoLink } = params;
+  const { phone, name, date, time, officeLocation, videoLink } = params;
 
   // TODO: SMS API 연동 (Supabase Edge Functions)
   console.log('[SMS] Sending confirmation to:', phone);
-  console.log('[SMS] Details:', { name, date, time, office, videoLink });
+  console.log('[SMS] Details:', { name, date, time, officeLocation, videoLink });
 
   // 임시 구현: 로그만 출력
-  const message = office
-    ? `${name}님, 상담이 확정되었습니다. 일시: ${date} ${time}, 장소: ${office} 사무소`
+  const message = officeLocation
+    ? `${name}님, 상담이 확정되었습니다. 일시: ${date} ${time}, 장소: ${officeLocation} 사무소`
     : videoLink
     ? `${name}님, 화상 상담이 확정되었습니다. 일시: ${date} ${time}, 링크: ${videoLink}`
     : `${name}님, 상담이 확정되었습니다. 일시: ${date} ${time}`;

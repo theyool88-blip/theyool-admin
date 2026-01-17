@@ -31,9 +31,10 @@ export default async function NewCasePage({ searchParams }: PageProps) {
   // 사용자 프로필 확인
   const adminClient = createAdminClient()
   const { data: profile } = await adminClient
-    .from('users_profiles')
+    .from('tenant_members')
     .select('*')
-    .eq('auth_user_id', user.id)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
     .single()
 
   if (!profile) {
@@ -85,7 +86,7 @@ export default async function NewCasePage({ searchParams }: PageProps) {
         .from('case_parties')
         .select('party_type')
         .eq('case_id', params.sourceCaseId)
-        .eq('is_primary', true)
+        .eq('is_our_client', true)
         .maybeSingle()
 
       if (primaryParty) {
@@ -98,7 +99,7 @@ export default async function NewCasePage({ searchParams }: PageProps) {
       .from('case_parties')
       .select('party_name')
       .eq('case_id', params.sourceCaseId)
-      .eq('is_primary', false)
+      .eq('is_our_client', false)
       .order('party_order', { ascending: true })
       .limit(1)
       .maybeSingle()

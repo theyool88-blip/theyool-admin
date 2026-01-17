@@ -1,14 +1,28 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { isAuthenticated } from '@/lib/auth/auth'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 
 export async function GET() {
-  const supabase = await createClient()
+  const authenticated = await isAuthenticated()
+  if (!authenticated) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const tenantContext = await getCurrentTenantContext()
+  const adminClient = createAdminClient()
 
   try {
-    // Fetch all legal cases with lawyer info
-    const { data: cases, error: casesError } = await supabase
+    // Fetch all legal cases
+    let casesQuery = adminClient
       .from('legal_cases')
-      .select('id, status, office, category, created_at, case_start_date, case_end_date, total_received, assigned_lawyer')
+      .select('id, status, case_type, created_at, assigned_to')
+
+    if (!tenantContext?.isSuperAdmin && tenantContext?.tenantId) {
+      casesQuery = casesQuery.eq('tenant_id', tenantContext.tenantId)
+    }
+
+    const { data: cases, error: casesError } = await casesQuery
 
     if (casesError) {
       throw new Error(`Failed to fetch cases: ${casesError.message}`)
@@ -19,25 +33,55 @@ export async function GET() {
     }
 
     const total = cases.length
+    const caseIds = cases.map(c => c.id)
 
-    // Status breakdown
+    // Get payments for revenue calculation
+    let paymentsQuery = adminClient
+      .from('payments')
+      .select('case_id, amount')
+      .in('case_id', caseIds)
+      .gt('amount', 0)
+
+    if (!tenantContext?.isSuperAdmin && tenantContext?.tenantId) {
+      paymentsQuery = paymentsQuery.eq('tenant_id', tenantContext.tenantId)
+    }
+
+    const { data: payments } = await paymentsQuery
+
+    // Calculate total received per case
+    const paymentsByCase = new Map<string, number>()
+    payments?.forEach(p => {
+      const current = paymentsByCase.get(p.case_id) || 0
+      paymentsByCase.set(p.case_id, current + (p.amount || 0))
+    })
+
+    // Get assigned member names
+    const assignedToIds = [...new Set(cases.map(c => c.assigned_to).filter(Boolean))]
+    const membersMap = new Map<string, string>()
+
+    if (assignedToIds.length > 0) {
+      const { data: members } = await adminClient
+        .from('tenant_members')
+        .select('id, display_name')
+        .in('id', assignedToIds)
+
+      members?.forEach(m => {
+        membersMap.set(m.id, m.display_name || '미배정')
+      })
+    }
+
+    // Status breakdown (use English status values from schema)
     const byStatus = {
-      active: cases.filter(c => c.status === '진행중').length,
-      completed: cases.filter(c => c.status === '완료').length,
-      suspended: cases.filter(c => c.status === '중단').length,
+      active: cases.filter(c => c.status === 'active').length,
+      completed: cases.filter(c => c.status === 'closed').length,
+      suspended: cases.filter(c => c.status === 'suspended').length,
     }
 
-    // Office distribution
-    const byOffice = {
-      pyeongtaek: cases.filter(c => c.office === '평택').length,
-      cheonan: cases.filter(c => c.office === '천안').length,
-    }
-
-    // Category distribution (top categories)
+    // Case type distribution (top categories)
     const categoryMap: Record<string, number> = {}
     cases.forEach(c => {
-      if (c.category) {
-        categoryMap[c.category] = (categoryMap[c.category] || 0) + 1
+      if (c.case_type) {
+        categoryMap[c.case_type] = (categoryMap[c.case_type] || 0) + 1
       }
     })
 
@@ -62,81 +106,44 @@ export async function GET() {
       monthlyTrend.push({
         month: `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}`,
         total: monthCases.length,
-        completed: monthCases.filter(c => c.status === '완료').length,
+        completed: monthCases.filter(c => c.status === 'closed').length,
       })
     }
 
-    // Average case duration (for completed cases)
-    const completedCases = cases.filter(
-      c => c.status === '완료' && c.case_start_date && c.case_end_date
-    )
-    let averageDuration = '계산 중'
-    if (completedCases.length > 0) {
-      const totalDays = completedCases.reduce((sum, c) => {
-        const start = new Date(c.case_start_date!).getTime()
-        const end = new Date(c.case_end_date!).getTime()
-        return sum + (end - start) / (1000 * 60 * 60 * 24)
-      }, 0)
-      const avgDays = totalDays / completedCases.length
-
-      if (avgDays < 30) {
-        averageDuration = `${Math.round(avgDays)}일`
-      } else if (avgDays < 365) {
-        averageDuration = `${(avgDays / 30).toFixed(1)}개월`
-      } else {
-        averageDuration = `${(avgDays / 365).toFixed(1)}년`
-      }
-    }
-
-    // Revenue statistics
-    const totalRevenue = cases.reduce((sum, c) => sum + (c.total_received || 0), 0)
+    // Revenue statistics (from payments)
+    let totalRevenue = 0
+    paymentsByCase.forEach(amount => {
+      totalRevenue += amount
+    })
     const averageRevenuePerCase = total > 0 ? Math.round(totalRevenue / total) : 0
 
-    // Lawyer performance comparison
-    const lawyerStats: Record<string, {
+    // Assignee performance comparison
+    const assigneeStats: Record<string, {
       active: number;
       completed: number;
       suspended: number;
       totalRevenue: number;
-      durations: number[];
-    }> = {
-      '육심원': { active: 0, completed: 0, suspended: 0, totalRevenue: 0, durations: [] },
-      '임은지': { active: 0, completed: 0, suspended: 0, totalRevenue: 0, durations: [] },
-    }
+    }> = {}
 
     cases.forEach(c => {
-      const lawyer = c.assigned_lawyer || '미배정'
-      if (lawyer === '육심원' || lawyer === '임은지') {
-        if (c.status === '진행중') lawyerStats[lawyer].active++
-        if (c.status === '완료') lawyerStats[lawyer].completed++
-        if (c.status === '중단') lawyerStats[lawyer].suspended++
-        lawyerStats[lawyer].totalRevenue += (c.total_received || 0)
+      const assigneeId = c.assigned_to
+      if (!assigneeId) return
 
-        // Calculate duration for completed cases
-        if (c.status === '완료' && c.case_start_date && c.case_end_date) {
-          const start = new Date(c.case_start_date).getTime()
-          const end = new Date(c.case_end_date).getTime()
-          const days = (end - start) / (1000 * 60 * 60 * 24)
-          lawyerStats[lawyer].durations.push(days)
-        }
+      const assigneeName = membersMap.get(assigneeId) || '미배정'
+
+      if (!assigneeStats[assigneeName]) {
+        assigneeStats[assigneeName] = { active: 0, completed: 0, suspended: 0, totalRevenue: 0 }
       }
+
+      if (c.status === 'active') assigneeStats[assigneeName].active++
+      if (c.status === 'closed') assigneeStats[assigneeName].completed++
+      if (c.status === 'suspended') assigneeStats[assigneeName].suspended++
+      assigneeStats[assigneeName].totalRevenue += (paymentsByCase.get(c.id) || 0)
     })
 
-    const byLawyer = Object.entries(lawyerStats).map(([lawyer, stats]) => {
+    const byLawyer = Object.entries(assigneeStats).map(([lawyer, stats]) => {
       const totalCases = stats.active + stats.completed + stats.suspended
       const avgRevenue = totalCases > 0 ? Math.round(stats.totalRevenue / totalCases) : 0
-
-      let avgDuration = '계산 중'
-      if (stats.durations.length > 0) {
-        const avgDays = stats.durations.reduce((a, b) => a + b, 0) / stats.durations.length
-        if (avgDays < 30) {
-          avgDuration = `${Math.round(avgDays)}일`
-        } else if (avgDays < 365) {
-          avgDuration = `${(avgDays / 30).toFixed(1)}개월`
-        } else {
-          avgDuration = `${(avgDays / 365).toFixed(1)}년`
-        }
-      }
 
       return {
         lawyer,
@@ -145,7 +152,6 @@ export async function GET() {
         suspended: stats.suspended,
         totalRevenue: stats.totalRevenue,
         avgRevenue,
-        avgDuration,
       }
     })
 
@@ -154,10 +160,8 @@ export async function GET() {
       data: {
         total,
         byStatus,
-        byOffice,
         byCategory,
         monthlyTrend,
-        averageDuration,
         totalRevenue,
         averageRevenuePerCase,
         byLawyer,

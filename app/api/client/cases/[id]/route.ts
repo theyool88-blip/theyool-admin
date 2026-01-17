@@ -41,13 +41,11 @@ export async function GET(
       .select(`
         id,
         case_name,
-        case_number,
+        court_case_number,
         case_type,
         status,
-        office_location,
         court_name,
-        lawyer_name,
-        description,
+        notes,
         created_at
       `)
       .eq('id', caseId)
@@ -57,12 +55,12 @@ export async function GET(
       return NextResponse.json({ error: '사건을 찾을 수 없습니다.' }, { status: 404 });
     }
 
-    // case_parties에서 상대방(is_primary=false) 이름 조회
+    // case_parties에서 상대방(is_our_client=false) 이름 조회
     const { data: opponentParty } = await supabase
       .from('case_parties')
       .select('party_name')
       .eq('case_id', caseId)
-      .eq('is_primary', false)
+      .eq('is_our_client', false)
       .order('party_order', { ascending: true })
       .limit(1)
       .maybeSingle();

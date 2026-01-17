@@ -104,14 +104,13 @@ export async function PATCH(
       const conflicts = await checkScheduleConflicts({
         date: input.confirmed_date,
         time: input.confirmed_time,
-        lawyer: input.assigned_lawyer || body.assigned_lawyer || null,
-        officeLocation: input.office_location || body.office_location || null,
+        assignedTo: input.assigned_lawyer || body.assigned_lawyer || null,
         excludeId: id, // Exclude current consultation from conflict check
       });
 
       if (conflicts.length > 0) {
         const conflictDetails = conflicts.map((c) =>
-          `${c.name} (${c.phone}) - ${c.assigned_lawyer || '담당자 미지정'}`
+          `${c.name} (${c.phone}) - ${c.assigned_to || '담당자 미지정'}`
         ).join(', ');
 
         return NextResponse.json(

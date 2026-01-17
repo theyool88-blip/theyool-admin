@@ -31,9 +31,10 @@ export default async function CaseEditPage({ params }: { params: Promise<{ id: s
   // 사용자 프로필 확인
   const adminClient = createAdminClient()
   const { data: profile } = await adminClient
-    .from('users_profiles')
+    .from('tenant_members')
     .select('*')
-    .eq('auth_user_id', user.id)
+    .eq('user_id', user.id)
+    .eq('status', 'active')
     .single()
 
   if (!profile) {

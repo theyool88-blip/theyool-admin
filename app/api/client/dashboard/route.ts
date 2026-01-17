@@ -44,7 +44,7 @@ export async function GET(_request: NextRequest) {
     // 3. legal_cases에서 사건 정보 조회
     const { data: casesRaw, error: casesError } = await supabase
       .from('legal_cases')
-      .select('id, case_name, case_number, case_type, status, office_location, created_at')
+      .select('id, case_name, court_case_number, case_type, status, created_at')
       .in('id', linkedCaseIds)
       .order('created_at', { ascending: false });
 
@@ -54,14 +54,14 @@ export async function GET(_request: NextRequest) {
 
     const caseIds = (casesRaw || []).map((c) => c.id);
 
-    // case_parties에서 상대방(is_primary=false) 이름 조회
+    // case_parties에서 상대방(is_our_client=false) 이름 조회
     let opponentMap = new Map<string, string>();
     if (caseIds.length > 0) {
       const { data: opponents } = await supabase
         .from('case_parties')
         .select('case_id, party_name')
         .in('case_id', caseIds)
-        .eq('is_primary', false)
+        .eq('is_our_client', false)
         .order('party_order', { ascending: true });
 
       if (opponents) {

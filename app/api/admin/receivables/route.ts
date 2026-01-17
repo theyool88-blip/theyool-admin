@@ -24,9 +24,7 @@ interface CaseReceivable {
   id: string
   case_name: string
   case_type: string
-  office: string
-  retainer_fee: number
-  calculated_success_fee: number
+  fee_allocation: number
   total_received: number
   outstanding: number
   grade: ReceivableGrade
@@ -36,8 +34,7 @@ interface ClientReceivable {
   client_id: string
   client_name: string
   case_count: number
-  total_retainer: number
-  total_success_fee: number
+  total_fee: number
   total_received: number
   outstanding: number
   highest_grade: ReceivableGrade
@@ -57,7 +54,6 @@ interface WriteOff {
 
 interface ReceivablesSummary {
   total_outstanding: number
-  by_office: Record<string, number>
   client_count: number
   case_count: number
   watch_count: number
@@ -122,7 +118,7 @@ export const PATCH = withTenant(async (request, { tenant }) => {
     // 테넌트 소속 사건 조회
     let fetchQuery = supabase
       .from('legal_cases')
-      .select('case_name, outstanding_balance, client_id, clients(name)')
+      .select('case_name')
       .eq('id', case_id)
 
     if (!tenant.isSuperAdmin && tenant.tenantId) {
@@ -135,16 +131,34 @@ export const PATCH = withTenant(async (request, { tenant }) => {
       return NextResponse.json({ error: '사건을 찾을 수 없습니다' }, { status: 404 })
     }
 
-    const clientData = Array.isArray(currentCase.clients) ? currentCase.clients[0] : currentCase.clients
+    // 의뢰인 정보 및 수임료 조회
+    const { data: partyInfo } = await supabase
+      .from('case_parties')
+      .select('party_name, fee_allocation_amount, client_id')
+      .eq('case_id', case_id)
+      .eq('is_our_client', true)
+      .limit(1)
+      .maybeSingle()
+
+    // 입금 합계 조회
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('amount')
+      .eq('case_id', case_id)
+      .gt('amount', 0)
+
+    const totalReceived = payments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0
+    const feeAllocation = partyInfo?.fee_allocation_amount || 0
+    const outstanding = Math.max(0, feeAllocation - totalReceived)
 
     // 포기 이력 저장
     try {
       await supabase.from('receivable_writeoffs').insert({
         case_id,
-        client_id: currentCase.client_id,
+        client_id: partyInfo?.client_id || null,
         case_name: currentCase.case_name,
-        client_name: clientData?.name || null,
-        original_amount: currentCase.outstanding_balance || 0,
+        client_name: partyInfo?.party_name || null,
+        original_amount: outstanding,
         reason: reason || null,
         written_off_at: new Date().toISOString(),
         tenant_id: tenant.tenantId,
@@ -153,27 +167,19 @@ export const PATCH = withTenant(async (request, { tenant }) => {
       // 테이블이 없어도 계속 진행
     }
 
-    // outstanding_balance를 0으로 설정
-    let updateQuery = supabase
-      .from('legal_cases')
-      .update({ outstanding_balance: 0 })
-      .eq('id', case_id)
-
-    if (!tenant.isSuperAdmin && tenant.tenantId) {
-      updateQuery = updateQuery.eq('tenant_id', tenant.tenantId)
-    }
-
-    const { error: updateError } = await updateQuery
-
-    if (updateError) {
-      console.error('[PATCH /api/admin/receivables] Update error:', updateError)
-      return NextResponse.json({ error: updateError.message }, { status: 500 })
+    // 수임료 배분 금액을 입금액과 동일하게 설정하여 미수금 0 처리
+    if (partyInfo) {
+      await supabase
+        .from('case_parties')
+        .update({ fee_allocation_amount: totalReceived })
+        .eq('case_id', case_id)
+        .eq('is_our_client', true)
     }
 
     return NextResponse.json({
       success: true,
       message: `${currentCase.case_name} 미수금 포기 처리 완료`,
-      written_off_amount: currentCase.outstanding_balance
+      written_off_amount: outstanding
     })
   } catch (error) {
     console.error('[PATCH /api/admin/receivables] Error:', error)
@@ -198,53 +204,98 @@ export const GET = withTenant(async (request, { tenant }) => {
     const supabase = createAdminClient()
     const { searchParams } = new URL(request.url)
 
-    const office = searchParams.get('office')
     const sortBy = searchParams.get('sort_by') || 'outstanding'
     const sortOrder = searchParams.get('sort_order') || 'desc'
     const minAmount = searchParams.get('min_amount')
     const gradeFilter = searchParams.get('grade') as ReceivableGrade | null
     const includeWriteoffs = searchParams.get('include_writeoffs') === 'true'
 
-    // 모든 사건과 의뢰인 정보 조회
-    let query = supabase
+    // 사건 기본 정보 조회
+    let casesQuery = supabase
       .from('legal_cases')
-      .select(`
-        id,
-        case_name,
-        case_type,
-        office,
-        retainer_fee,
-        calculated_success_fee,
-        total_received,
-        outstanding_balance,
-        receivable_grade,
-        client_id,
-        clients!inner(id, name)
-      `)
-      .not('client_id', 'is', null)
+      .select('id, case_name, case_type, receivable_grade')
+      .eq('status', 'active')
 
-    // 테넌트 필터 (슈퍼어드민 제외)
     if (!tenant.isSuperAdmin && tenant.tenantId) {
-      query = query.eq('tenant_id', tenant.tenantId)
-    }
-
-    if (office) {
-      query = query.eq('office', office)
+      casesQuery = casesQuery.eq('tenant_id', tenant.tenantId)
     }
 
     if (gradeFilter) {
-      query = query.eq('receivable_grade', gradeFilter)
+      casesQuery = casesQuery.eq('receivable_grade', gradeFilter)
     }
 
-    const { data: cases, error } = await query
+    const { data: cases, error: casesError } = await casesQuery
 
-    if (error) {
-      console.error('[GET /api/admin/receivables] Error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (casesError) {
+      console.error('[GET /api/admin/receivables] Cases error:', casesError)
+      return NextResponse.json({ error: casesError.message }, { status: 500 })
     }
+
+    if (!cases || cases.length === 0) {
+      return NextResponse.json({
+        total_outstanding: 0,
+        client_count: 0,
+        case_count: 0,
+        watch_count: 0,
+        collection_count: 0,
+        clients: [],
+      })
+    }
+
+    const caseIds = cases.map(c => c.id)
+
+    // case_parties에서 의뢰인(is_our_client=true) + 수임료 배분 정보 조회
+    let partiesQuery = supabase
+      .from('case_parties')
+      .select(`
+        case_id,
+        party_name,
+        fee_allocation_amount,
+        client_id
+      `)
+      .in('case_id', caseIds)
+      .eq('is_our_client', true)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      partiesQuery = partiesQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: parties } = await partiesQuery
+
+    // payments에서 사건별 입금 합계 조회
+    let paymentsQuery = supabase
+      .from('payments')
+      .select('case_id, amount')
+      .in('case_id', caseIds)
+      .gt('amount', 0)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      paymentsQuery = paymentsQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: payments } = await paymentsQuery
+
+    // 사건별 입금 합계 계산
+    const paymentsByCase = new Map<string, number>()
+    payments?.forEach(p => {
+      const current = paymentsByCase.get(p.case_id) || 0
+      paymentsByCase.set(p.case_id, current + (p.amount || 0))
+    })
+
+    // 사건별 의뢰인 정보 매핑
+    const partyByCase = new Map<string, { party_name: string; fee_allocation_amount: number; client_id: string | null }>()
+    parties?.forEach(p => {
+      if (!partyByCase.has(p.case_id)) {
+        partyByCase.set(p.case_id, {
+          party_name: p.party_name,
+          fee_allocation_amount: p.fee_allocation_amount || 0,
+          client_id: p.client_id
+        })
+      }
+    })
 
     // 의뢰인 ID 목록 추출
-    const clientIds = [...new Set(cases?.map(c => c.client_id).filter(Boolean) || [])]
+    const clientIds = [...new Set(parties?.map(p => p.client_id).filter(Boolean) || [])] as string[]
 
     // 의뢰인별 메모 조회
     const clientMemosMap = new Map<string, Memo[]>()
@@ -283,35 +334,31 @@ export const GET = withTenant(async (request, { tenant }) => {
     const clientMap = new Map<string, ClientReceivable>()
     let watchCount = 0
     let collectionCount = 0
-    const officeOutstanding: Record<string, number> = {}
+    let totalOutstanding = 0
 
-    cases?.forEach((c) => {
-      const clientId = c.client_id
-      const clientData = Array.isArray(c.clients) ? c.clients[0] : c.clients
-      const clientName = clientData?.name || '미지정'
+    cases.forEach((c) => {
+      const partyInfo = partyByCase.get(c.id)
+      if (!partyInfo) return // 의뢰인 정보가 없는 사건 제외
 
-      const retainer = c.retainer_fee || 0
-      const successFee = c.calculated_success_fee || 0
-      const received = c.total_received || 0
-      const outstanding = (c.outstanding_balance ?? 0) > 0 ? (c.outstanding_balance ?? 0) : 0
+      const clientId = partyInfo.client_id || c.id // client_id 없으면 case_id를 대용
+      const clientName = partyInfo.party_name || '미지정'
+
+      const feeAllocation = partyInfo.fee_allocation_amount || 0
+      const received = paymentsByCase.get(c.id) || 0
+      const outstanding = Math.max(0, feeAllocation - received)
       const grade: ReceivableGrade = c.receivable_grade || 'normal'
-      const caseOffice = c.office || '미지정'
 
       if (outstanding > 0) {
         if (grade === 'watch') watchCount++
         if (grade === 'collection') collectionCount++
-
-        // 사무소별 집계 (동적)
-        officeOutstanding[caseOffice] = (officeOutstanding[caseOffice] || 0) + outstanding
+        totalOutstanding += outstanding
       }
 
       const caseData: CaseReceivable = {
         id: c.id,
         case_name: c.case_name,
         case_type: c.case_type,
-        office: caseOffice,
-        retainer_fee: retainer,
-        calculated_success_fee: successFee,
+        fee_allocation: feeAllocation,
         total_received: received,
         outstanding: outstanding,
         grade: grade,
@@ -320,12 +367,10 @@ export const GET = withTenant(async (request, { tenant }) => {
       if (clientMap.has(clientId)) {
         const existing = clientMap.get(clientId)!
         existing.case_count++
-        existing.total_retainer += retainer
-        existing.total_success_fee += successFee
+        existing.total_fee += feeAllocation
         existing.total_received += received
         existing.outstanding += outstanding
         existing.cases.push(caseData)
-        // 가장 높은 등급 업데이트 (collection > watch > normal)
         if (gradeOrder[grade] < gradeOrder[existing.highest_grade]) {
           existing.highest_grade = grade
         }
@@ -334,8 +379,7 @@ export const GET = withTenant(async (request, { tenant }) => {
           client_id: clientId,
           client_name: clientName,
           case_count: 1,
-          total_retainer: retainer,
-          total_success_fee: successFee,
+          total_fee: feeAllocation,
           total_received: received,
           outstanding: outstanding,
           highest_grade: grade,
@@ -357,10 +401,8 @@ export const GET = withTenant(async (request, { tenant }) => {
     // 각 의뢰인의 사건들을 등급순으로 정렬
     clients.forEach(client => {
       client.cases.sort((a, b) => {
-        // 먼저 등급순으로
         const gradeCompare = gradeOrder[a.grade] - gradeOrder[b.grade]
         if (gradeCompare !== 0) return gradeCompare
-        // 같으면 금액순으로
         return b.outstanding - a.outstanding
       })
     })
@@ -380,12 +422,10 @@ export const GET = withTenant(async (request, { tenant }) => {
         aVal = a.case_count
         bVal = b.case_count
       } else if (sortBy === 'grade') {
-        // 등급순: 추심 > 관리 > 정상
         const aMinGrade = Math.min(...a.cases.map(c => gradeOrder[c.grade]))
         const bMinGrade = Math.min(...b.cases.map(c => gradeOrder[c.grade]))
         aVal = aMinGrade
         bVal = bMinGrade
-        // 등급순은 오름차순이 의미있음 (추심이 먼저)
         return aVal - bVal
       }
 
@@ -395,12 +435,8 @@ export const GET = withTenant(async (request, { tenant }) => {
       return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
     })
 
-    // 전체 합계 계산
-    const totalOutstanding = Object.values(officeOutstanding).reduce((a, b) => a + b, 0)
-
     const summary: ReceivablesSummary = {
       total_outstanding: totalOutstanding,
-      by_office: officeOutstanding,
       client_count: clients.length,
       case_count: clients.reduce((sum, c) => sum + c.case_count, 0),
       watch_count: watchCount,

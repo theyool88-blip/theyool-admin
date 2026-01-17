@@ -151,7 +151,7 @@ export async function PATCH(
             await adminClient
               .from('case_parties')
               .update({
-                is_primary: true,
+                is_our_client: true,
                 updated_at: new Date().toISOString()
               })
               .eq('id', matchingParty.id)
@@ -170,7 +170,7 @@ export async function PATCH(
           .from('case_parties')
           .select('id, party_name')
           .eq('case_id', id)
-          .eq('is_primary', false)
+          .eq('is_our_client', false)
           .order('party_order', { ascending: true })
           .limit(1)
           .maybeSingle()
@@ -196,7 +196,7 @@ export async function PATCH(
             .from('case_parties')
             .select('party_type')
             .eq('case_id', id)
-            .eq('is_primary', true)
+            .eq('is_our_client', true)
             .maybeSingle()
 
           const clientRole = clientParty?.party_type || 'plaintiff'

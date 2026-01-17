@@ -11,6 +11,14 @@ interface Client {
   name: string
 }
 
+interface CaseAssignee {
+  id: string
+  memberId: string
+  isPrimary: boolean
+  displayName: string
+  role: string
+}
+
 interface LegalCase {
   id: string
   contract_number: string
@@ -24,6 +32,7 @@ interface LegalCase {
     display_name: string
     role: string
   }
+  assignees?: CaseAssignee[]
   contract_date: string
   court_case_number: string | null
   onedrive_folder_url: string | null
@@ -194,9 +203,46 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-indigo-50 text-indigo-700">
-                        {legalCase.assigned_member?.display_name || '-'}
-                      </span>
+                      <div className="flex items-center gap-1 flex-wrap justify-center">
+                        {(() => {
+                          // 다중 담당자 표시: assignees가 있으면 사용, 없으면 레거시 assigned_member 사용
+                          const assignees = legalCase.assignees || []
+                          const primary = assignees.find(a => a.isPrimary)
+                          const others = assignees.filter(a => !a.isPrimary)
+
+                          if (assignees.length > 0) {
+                            return (
+                              <>
+                                {primary && (
+                                  <span
+                                    className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-sage-100 text-sage-700"
+                                    title={`주담당: ${primary.displayName}`}
+                                  >
+                                    {primary.displayName} ★
+                                  </span>
+                                )}
+                                {others.length > 0 && (
+                                  <span
+                                    className="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600 cursor-help"
+                                    title={others.map(a => a.displayName).join(', ')}
+                                  >
+                                    +{others.length}
+                                  </span>
+                                )}
+                              </>
+                            )
+                          }
+
+                          // 레거시 fallback
+                          return legalCase.assigned_member?.display_name ? (
+                            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-indigo-50 text-indigo-700">
+                              {legalCase.assigned_member.display_name}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )
+                        })()}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${getStatusStyle(legalCase.status)}`}>

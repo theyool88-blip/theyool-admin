@@ -232,6 +232,8 @@ export interface CourtHearing {
   scourt_type_raw: string | null;    // SCOURT 원본 기일명 (예: "제1회 변론기일")
   scourt_result_raw: string | null;  // SCOURT 원본 결과 (예: "다음기일지정(2025.02.15)")
   hearing_sequence: number | null;   // 기일 회차 (1, 2, 3...)
+  // 출석 변호사
+  attending_lawyer_id?: string | null; // 출석 변호사 ID (tenant_members 참조)
 }
 
 /**
@@ -287,6 +289,7 @@ export interface UpdateCourtHearingRequest {
   judge_name?: string;
   notes?: string;
   status?: HearingStatus;
+  attending_lawyer_id?: string | null; // 출석 변호사 ID
 }
 
 export interface CreateCaseDeadlineRequest {

@@ -226,6 +226,7 @@ export async function updateCourtHearing(
   if (request.judge_name !== undefined) updateData.judge_name = request.judge_name;
   if (request.notes !== undefined) updateData.notes = request.notes;
   if (request.status !== undefined) updateData.status = request.status;
+  if (request.attending_lawyer_id !== undefined) (updateData as Record<string, unknown>).attending_lawyer_id = request.attending_lawyer_id;
 
   const { data, error } = await supabase
     .from('court_hearings')

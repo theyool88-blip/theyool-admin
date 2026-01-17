@@ -1,6 +1,6 @@
 # 문서 인덱스
 
-**Last Updated**: 2026-01-16
+**Last Updated**: 2026-01-17
 
 법무법인 더율 관리자 시스템 (theyool-admin) 문서 목록입니다.
 
@@ -18,6 +18,7 @@
 | [RECEIVABLES_SYSTEM.md](systems/RECEIVABLES_SYSTEM.md) | 미수금 관리, 등급/메모/포기 처리 |
 | [CONSULTATION_SYSTEM.md](systems/CONSULTATION_SYSTEM.md) | 상담 관리 (4유형, 9상태), 리드 스코어링 |
 | [COURT_HEARING_SYSTEM.md](systems/COURT_HEARING_SYSTEM.md) | 법원기일, 불변기간 데드라인 자동 계산 |
+| [CASE_ASSIGNEES_SYSTEM.md](systems/CASE_ASSIGNEES_SYSTEM.md) | 사건 담당자 다중 지정 시스템 |
 | [CALENDAR_SYSTEM.md](systems/CALENDAR_SYSTEM.md) | 통합 캘린더, Google Calendar 연동 |
 | [CLIENT_PORTAL.md](systems/CLIENT_PORTAL.md) | 의뢰인 포털 미리보기 API |
 | [SCOURT_API_ANALYSIS.md](systems/SCOURT_API_ANALYSIS.md) | 대법원 나의사건검색 API 분석 |

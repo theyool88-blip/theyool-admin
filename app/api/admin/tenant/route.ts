@@ -15,6 +15,28 @@ export const GET = withTenant(async (request, { tenant }) => {
   try {
     const supabase = createAdminClient();
 
+    // 슈퍼 어드민이고 tenantId가 없는 경우 특별 응답
+    if (tenant.isSuperAdmin && !tenant.tenantId) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          tenant: null,
+          isSuperAdmin: true,
+          members: [],
+          stats: {
+            cases: 0,
+            clients: 0,
+            consultations: 0,
+            members: 0,
+          },
+          currentMember: {
+            id: 'super-admin',
+            role: 'owner',
+          },
+        },
+      });
+    }
+
     // 테넌트 정보 조회
     const { data: tenantData, error } = await supabase
       .from('tenants')

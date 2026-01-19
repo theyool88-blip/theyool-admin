@@ -37,7 +37,18 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        router.push('/')
+        // 슈퍼 어드민 체크
+        const { data: superAdmin } = await supabase
+          .from('super_admins')
+          .select('id')
+          .eq('user_id', data.user.id)
+          .single()
+
+        if (superAdmin) {
+          router.push('/superadmin')
+        } else {
+          router.push('/')
+        }
         router.refresh()
       }
     } catch {
@@ -52,22 +63,22 @@ export default function LoginPage() {
         {/* Login Card */}
         <div className="bg-white border border-gray-200 rounded-lg p-8">
           {/* Logo */}
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
+          <div className="text-center mb-10">
+            <div className="flex justify-center">
               <Image
                 src="/images/logo-horizontal.png"
-                alt="법무법인 더율"
-                width={140}
-                height={36}
-                className="h-6 w-auto"
+                alt="LUSEED"
+                width={320}
+                height={80}
+                className="h-24 w-auto"
                 style={{
                   filter: 'brightness(0) saturate(100%) invert(46%) sepia(13%) saturate(1243%) hue-rotate(118deg) brightness(93%) contrast(87%)'
                 }}
                 priority
               />
             </div>
-            <p className="text-xs text-gray-500">
-              관리자 시스템
+            <p className="text-xs text-gray-500 tracking-wide">
+              SEE Direction & Details
             </p>
           </div>
 
@@ -141,7 +152,7 @@ export default function LoginPage() {
             관리자 전용 시스템입니다
           </p>
           <p className="text-xs text-gray-400 mt-1">
-            &copy; 2025 법무법인 더율
+            &copy; 2025 LUSEED
           </p>
         </div>
       </div>

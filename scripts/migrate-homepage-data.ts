@@ -161,7 +161,7 @@ async function migrateBlogPosts() {
     tags: post.tags,
     meta_title: post.meta_title,
     meta_description: post.meta_description,
-    views: post.views || 0,
+    view_count: post.views || 0,
     status: post.status || 'published',
     published_at: post.published_at,
     created_at: post.created_at,
@@ -176,9 +176,15 @@ async function migrateBlogPosts() {
     return { migrated: mapped.length, errors: 0 };
   }
 
+  // 기존 데이터 삭제 후 insert (partial unique index는 upsert onConflict에서 사용 불가)
+  await targetClient
+    .from('homepage_blog_posts')
+    .delete()
+    .eq('tenant_id', THEYOOL_TENANT_ID);
+
   const { error: insertError } = await targetClient
     .from('homepage_blog_posts')
-    .upsert(mapped, { onConflict: 'tenant_id,notion_id' });
+    .insert(mapped);
 
   if (insertError) {
     console.error('❌ 블로그 삽입 실패:', insertError);
@@ -217,7 +223,7 @@ async function migrateCases() {
     notion_id: c.notion_id,
     notion_last_edited_time: c.notion_last_edited_time,
     title: c.title,
-    slug: c.slug,
+    slug: c.slug || c.notion_id || `case-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     content: c.content,
     summary: c.summary || c.excerpt,
     cover_image: c.cover_image,
@@ -228,7 +234,7 @@ async function migrateCases() {
     tags: c.tags,
     meta_title: c.meta_title,
     meta_description: c.meta_description,
-    views: c.views || 0,
+    view_count: c.views || 0,
     status: c.status || 'published',
     published_at: c.published_at,
     created_at: c.created_at,
@@ -243,9 +249,15 @@ async function migrateCases() {
     return { migrated: mapped.length, errors: 0 };
   }
 
+  // 기존 데이터 삭제 후 insert (partial unique index는 upsert onConflict에서 사용 불가)
+  await targetClient
+    .from('homepage_cases')
+    .delete()
+    .eq('tenant_id', THEYOOL_TENANT_ID);
+
   const { error: insertError } = await targetClient
     .from('homepage_cases')
-    .upsert(mapped, { onConflict: 'tenant_id,notion_id' });
+    .insert(mapped);
 
   if (insertError) {
     console.error('❌ 성공사례 삽입 실패:', insertError);
@@ -302,9 +314,15 @@ async function migrateFaqs() {
     return { migrated: mapped.length, errors: 0 };
   }
 
+  // 기존 데이터 삭제 후 insert (partial unique index는 upsert onConflict에서 사용 불가)
+  await targetClient
+    .from('homepage_faqs')
+    .delete()
+    .eq('tenant_id', THEYOOL_TENANT_ID);
+
   const { error: insertError } = await targetClient
     .from('homepage_faqs')
-    .upsert(mapped, { onConflict: 'tenant_id,notion_id' });
+    .insert(mapped);
 
   if (insertError) {
     console.error('❌ FAQ 삽입 실패:', insertError);
@@ -398,12 +416,12 @@ async function migrateTestimonials() {
 
   const mapped = testimonials.map((t) => ({
     tenant_id: THEYOOL_TENANT_ID,
-    client_name: t.client_name,
+    client_display_name: t.client_name || t.client_display_name || '익명',
     client_gender: t.client_gender,
     client_age_group: t.client_age_group,
-    case_type: t.case_type,
+    case_type: t.case_type || '이혼',
     case_summary: t.case_summary,
-    testimonial_text: t.testimonial_text || t.content,
+    testimonial_text: t.testimonial_text || t.content || '후기 내용 없음',
     rating: t.rating,
     lawyer_id: getLawyerId(t.lawyer_name),
     lawyer_name: t.lawyer_name,
@@ -414,7 +432,7 @@ async function migrateTestimonials() {
     status: t.status || 'published',
     published_at: t.published_at,
     sort_order: t.sort_order || 0,
-    is_featured: t.is_featured || false,
+    featured: t.is_featured || false,
     created_at: t.created_at,
     updated_at: t.updated_at,
   }));
@@ -468,7 +486,7 @@ async function migrateTestimonialPhotos() {
   const mapped = photos.map((photo) => ({
     tenant_id: THEYOOL_TENANT_ID,
     testimonial_id: photo.testimonial_id,
-    file_path: photo.file_path,
+    storage_path: photo.file_path,
     file_name: photo.file_name,
     file_size: photo.file_size,
     mime_type: photo.mime_type,
@@ -538,7 +556,7 @@ async function migrateConsultations() {
   // consultations 매핑
   const mappedConsultations = callbackConsultations.map((c) => ({
     tenant_id: THEYOOL_TENANT_ID,
-    client_name: c.client_name,
+    client_display_name: c.client_name,
     phone: c.phone,
     email: c.email,
     category: c.category,
@@ -556,7 +574,7 @@ async function migrateConsultations() {
   // bookings 매핑
   const mappedBookings = bookingConsultations.map((c) => ({
     tenant_id: THEYOOL_TENANT_ID,
-    client_name: c.client_name,
+    client_display_name: c.client_name,
     phone: c.phone,
     email: c.email,
     type: c.request_type === 'visit' ? 'visit' : 'video',

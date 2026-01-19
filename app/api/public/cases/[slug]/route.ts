@@ -60,12 +60,11 @@ function createHandler(slug: string) {
       }
 
       // 조회수 증가 (비동기로 처리)
-      supabase
+      void supabase
         .from('homepage_cases')
         .update({ views: (caseData.views || 0) + 1 })
         .eq('id', caseData.id)
-        .then(() => {})
-        .catch(console.error);
+        .then(() => {}, console.error);
 
       // 관련 사례 조회 (같은 카테고리)
       const { data: relatedCases } = await supabase

@@ -57,12 +57,11 @@ function createHandler(slug: string) {
       }
 
       // 조회수 증가 (비동기로 처리, 응답에 영향 없음)
-      supabase
+      void supabase
         .from('homepage_blog_posts')
         .update({ views: (post.views || 0) + 1 })
         .eq('id', post.id)
-        .then(() => {})
-        .catch(console.error);
+        .then(() => {}, console.error);
 
       // 관련 글 조회 (같은 카테고리)
       const { data: relatedPosts } = await supabase

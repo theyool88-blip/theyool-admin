@@ -1,7 +1,7 @@
 # 멀티테넌트 SaaS 시스템
 
 > **상태**: Phase 1-5 완료, Phase 6 (E2E 테스트) 진행 중
-> **마지막 업데이트**: 2025-12-31
+> **마지막 업데이트**: 2026-01-19
 > **검증 보고서**: [SAAS_VERIFICATION_REPORT.md](../SAAS_VERIFICATION_REPORT.md)
 
 ## 개요
@@ -43,6 +43,89 @@
 | **Admin** | 3 | 멤버 관리, 설정 변경 (Owner 제외) |
 | **Lawyer** | 2 | 사건 관리, 의뢰인 관리 |
 | **Staff** | 1 | 제한된 조회, 일부 수정 |
+
+## 슈퍼 어드민 로그인 플로우
+
+### 개요
+
+슈퍼 어드민은 특정 테넌트에 소속되지 않고 시스템 전체를 관리합니다. 로그인 시 자동으로 슈퍼 어드민 대시보드(`/superadmin`)로 리다이렉트됩니다.
+
+### 로그인 흐름
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  로그인 폼   │ ──▶ │ super_admins 체크 │ ──▶ │ 리다이렉트 결정  │
+└─────────────┘     └──────────────────┘     └─────────────────┘
+                                                      │
+                            ┌─────────────────────────┼─────────────────────────┐
+                            │                         │                         │
+                            ▼                         ▼                         ▼
+                    ┌───────────────┐         ┌───────────────┐         ┌───────────────┐
+                    │ 슈퍼 어드민   │         │ 일반 멤버     │         │ 비인가 사용자  │
+                    │ /superadmin   │         │ /             │         │ 에러 표시      │
+                    └───────────────┘         └───────────────┘         └───────────────┘
+```
+
+### 구현 상세
+
+**1. 로그인 페이지 (`app/login/page.tsx`)**
+
+```typescript
+// 로그인 성공 후 슈퍼 어드민 체크
+const { data: superAdmin } = await supabase
+  .from('super_admins')
+  .select('id')
+  .eq('user_id', data.user.id)
+  .single()
+
+if (superAdmin) {
+  router.push('/superadmin')  // 슈퍼 어드민 대시보드로
+} else {
+  router.push('/')            // 일반 대시보드로
+}
+```
+
+**2. Tenant API (`app/api/admin/tenant/route.ts`)**
+
+슈퍼 어드민이 tenantId 없이 접근할 때 특별 응답:
+
+```typescript
+if (tenant.isSuperAdmin && !tenant.tenantId) {
+  return NextResponse.json({
+    success: true,
+    data: {
+      tenant: null,
+      isSuperAdmin: true,
+      members: [],
+      stats: { cases: 0, clients: 0, consultations: 0, members: 0 },
+      currentMember: { id: 'super-admin', role: 'owner' },
+    },
+  });
+}
+```
+
+**3. 메인 페이지 (`app/page.tsx`)**
+
+슈퍼 어드민용 가상 프로필 생성:
+
+```typescript
+if (tenantContext.isSuperAdmin && !tenantContext.tenantId) {
+  profile = {
+    id: 'super-admin',
+    user_id: user.id,
+    role: 'owner',
+    display_name: 'Super Admin',
+    status: 'active'
+  }
+}
+```
+
+### 테스트 계정
+
+| 역할 | 이메일 | 비밀번호 | 리다이렉트 |
+|------|--------|----------|------------|
+| 슈퍼 어드민 | admin@luseed.com | rlagustjd1! | /superadmin |
+| 일반 멤버 | - | - | / |
 
 ## 권한 시스템
 

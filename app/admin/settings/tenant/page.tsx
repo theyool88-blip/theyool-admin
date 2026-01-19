@@ -32,6 +32,13 @@ import {
 import Image from 'next/image';
 import { TenantSettings, MemberRole, ROLE_DISPLAY_NAMES } from '@/types/tenant';
 import type { TenantIntegration, GoogleCalendarListItem, IntegrationProvider } from '@/types/integration';
+import StaffLawyerAssignments from '@/components/StaffLawyerAssignments';
+import HomepageSettings from '@/components/HomepageSettings';
+import ApiKeyManager from '@/components/ApiKeyManager';
+import HomepageMonitoring from '@/components/HomepageMonitoring';
+import AlertSettings from '@/components/AlertSettings';
+import DomainSettings from '@/components/DomainSettings';
+import AnalyticsDashboard from '@/components/AnalyticsDashboard';
 
 interface TenantData {
   id: string;
@@ -848,6 +855,27 @@ export default function TenantSettingsPage() {
                 ))}
               </div>
             </div>
+
+            {/* Staff-Lawyer Assignments */}
+            {canEdit && <StaffLawyerAssignments />}
+
+            {/* Domain Settings */}
+            {canEdit && <DomainSettings hasHomepage={info.tenant.has_homepage} />}
+
+            {/* Homepage Settings */}
+            {canEdit && <HomepageSettings hasHomepage={info.tenant.has_homepage} />}
+
+            {/* API Key Manager */}
+            {canEdit && <ApiKeyManager hasHomepage={info.tenant.has_homepage} />}
+
+            {/* Homepage Monitoring */}
+            {canEdit && <HomepageMonitoring hasHomepage={info.tenant.has_homepage} />}
+
+            {/* Alert Settings */}
+            {canEdit && <AlertSettings hasHomepage={info.tenant.has_homepage} />}
+
+            {/* Analytics Dashboard */}
+            {canEdit && <AnalyticsDashboard hasHomepage={info.tenant.has_homepage} />}
           </div>
 
           {/* Sidebar */}

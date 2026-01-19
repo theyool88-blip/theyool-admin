@@ -67,13 +67,9 @@ export const GET = withTenant(async (request, { tenant }) => {
       query = query.ilike('phone', `%${phone}%`)
     }
 
-    // 확인 상태 필터
-    const isConfirmed = searchParams.get('is_confirmed')
-    if (isConfirmed === 'true') {
-      query = query.eq('is_confirmed', true)
-    } else if (isConfirmed === 'false') {
-      query = query.eq('is_confirmed', false)
-    }
+    // NOTE: is_confirmed 컬럼이 스키마에서 제거됨
+    // 확인 상태 필터 비활성화
+    // const isConfirmed = searchParams.get('is_confirmed')
 
     // Sorting
     const sortBy = searchParams.get('sort_by') || 'payment_date'
@@ -139,8 +135,7 @@ export const POST = withTenant(async (request, { tenant }) => {
       }
     }
 
-    const shouldConfirm = !!(body.case_id || body.consultation_id || body.is_confirmed)
-    const confirmedBy = shouldConfirm ? (tenant.memberDisplayName || 'admin') : null
+    // NOTE: is_confirmed, confirmed_at, confirmed_by 컬럼이 스키마에서 제거됨
     const { data, error } = await supabase
       .from('payments')
       .insert([withTenantId({
@@ -157,9 +152,6 @@ export const POST = withTenant(async (request, { tenant }) => {
         memo: body.memo || null,
         admin_notes: body.admin_notes || null,
         imported_from_csv: false,
-        is_confirmed: shouldConfirm,
-        confirmed_at: shouldConfirm ? new Date().toISOString() : null,
-        confirmed_by: confirmedBy,
       }, tenant)])
       .select()
       .single()

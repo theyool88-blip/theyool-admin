@@ -32,21 +32,20 @@ export async function createPayment(
     const confirmedBy = userData?.user?.email || userData?.user?.id || null;
 
     let caseNameFromCase: string | null = null;
-    let clientIdFromCase: string | null = null;
+    // NOTE: legal_cases.client_id 컬럼은 case_clients 테이블로 이동됨
+    // 사건에서 client_id를 가져오려면 case_clients 조인 필요
     if (data.case_id) {
       const { data: caseRow, error: caseError } = await supabase
         .from('legal_cases')
-        .select('case_name, client_id')
+        .select('case_name')
         .eq('id', data.case_id)
         .single();
       if (!caseError) {
         caseNameFromCase = caseRow?.case_name || null;
-        clientIdFromCase = caseRow?.client_id || null;
       }
     }
 
-    const shouldConfirm = !!(data.case_id || data.consultation_id || data.is_confirmed);
-
+    // NOTE: is_confirmed, confirmed_at, confirmed_by 컬럼이 스키마에서 제거됨
     const { data: payment, error } = await supabase
       .from('payments')
       .insert({
@@ -56,16 +55,13 @@ export async function createPayment(
         payment_category: data.payment_category,
         case_id: data.case_id || null,
         case_name: data.case_name || caseNameFromCase || null,
-        client_id: data.client_id || clientIdFromCase || null,  // 의뢰인 직접 연결
+        client_id: data.client_id || null,  // client_id는 직접 전달받거나 null
         consultation_id: data.consultation_id || null,
         receipt_type: data.receipt_type || null,
         receipt_issued_at: data.receipt_issued_at || null,
         phone: data.phone || null,
         memo: data.memo || null,
         admin_notes: data.admin_notes || null,
-        is_confirmed: shouldConfirm,
-        confirmed_at: shouldConfirm ? new Date().toISOString() : null,
-        confirmed_by: shouldConfirm ? confirmedBy : null,
       })
       .select()
       .single();
@@ -265,31 +261,29 @@ export async function updatePayment(
     const confirmedBy = userData?.user?.email || userData?.user?.id || null;
 
     let caseNameFromCase: string | null | undefined = undefined;
-    let clientIdFromCase: string | null | undefined = undefined;
+    // NOTE: legal_cases.client_id 컬럼은 case_clients 테이블로 이동됨
     if (data.case_id) {
       const { data: caseRow } = await supabase
         .from('legal_cases')
-        .select('case_name, client_id')
+        .select('case_name')
         .eq('id', data.case_id)
         .single();
       caseNameFromCase = caseRow?.case_name || null;
-      clientIdFromCase = caseRow?.client_id || null;
     } else if (data.case_id === null) {
       caseNameFromCase = null;
-      // client_id는 case_id가 null이 되어도 유지 (직접 연결 유지)
     }
 
-    const shouldConfirm = !!(data.case_id || data.consultation_id || data.is_confirmed);
+    // NOTE: is_confirmed, confirmed_at, confirmed_by 컬럼이 스키마에서 제거됨
+    // 해당 필드들을 data 객체에서 제거
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { is_confirmed, confirmed_at, confirmed_by, ...cleanData } = data as Record<string, unknown>;
 
     const { data: payment, error } = await supabase
       .from('payments')
       .update({
-        ...data,
+        ...cleanData,
         case_name: data.case_name || caseNameFromCase || data.case_name,
-        client_id: data.client_id !== undefined ? data.client_id : (clientIdFromCase ?? undefined),
-        is_confirmed: shouldConfirm,
-        confirmed_at: shouldConfirm ? new Date().toISOString() : data.confirmed_at ?? null,
-        confirmed_by: shouldConfirm ? (confirmedBy || data.confirmed_by || null) : data.confirmed_by || null,
+        client_id: data.client_id !== undefined ? data.client_id : undefined,
       })
       .eq('id', id)
       .select()

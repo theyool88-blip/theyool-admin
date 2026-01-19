@@ -47,11 +47,12 @@ export async function GET(request: NextRequest) {
     targetDate.setDate(targetDate.getDate() + schedule.days_before);
     const targetDateStr = targetDate.toISOString().split('T')[0];
 
+    // 스키마에서 confirmed_date 컬럼이 없으므로 preferred_date 사용
     const { data: consultations, error } = await supabase
       .from('consultations')
       .select('*')
       .eq('status', 'confirmed')  // 확정된 상담만
-      .eq('confirmed_date', targetDateStr);
+      .eq('preferred_date', targetDateStr);
 
     if (error) {
       console.error('상담 조회 오류:', error);
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
 
       const result = await sendByCategory('consultation_reminder', consultation.phone, consultation.name, {
         이름: consultation.name,
-        상담일시: `${consultation.confirmed_date} ${consultation.confirmed_time || ''}`,
+        상담일시: `${consultation.preferred_date} ${consultation.preferred_time || ''}`,
         상담장소: location,
       }, {
         recipientType: 'consultation',

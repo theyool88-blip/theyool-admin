@@ -5,7 +5,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { isAuthenticated } from '@/lib/auth/auth';
-import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
  * GET /api/admin/holidays
@@ -21,24 +20,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const year = searchParams.get('year');
 
-    const supabase = createAdminClient();
-    let query = supabase
-      .from('korean_public_holidays')
-      .select('*')
-      .order('holiday_date', { ascending: true });
-
-    if (year) {
-      query = query.eq('year', parseInt(year));
-    }
-
-    const { data, error } = await query;
-
-    if (error) throw error;
+    // NOTE: korean_public_holidays 테이블이 스키마에서 제거됨
+    // 공휴일 기능이 필요하면 consultation_date_exceptions 테이블 사용 또는 외부 API 연동 필요
+    // 현재는 빈 배열 반환
+    console.log(`공휴일 조회 요청: year=${year || 'all'} (테이블 없음, 빈 응답 반환)`);
 
     return NextResponse.json({
       success: true,
-      data: data || [],
-      count: data?.length || 0
+      data: [],
+      count: 0,
+      message: 'korean_public_holidays 테이블이 스키마에서 제거되었습니다. consultation_date_exceptions 사용을 권장합니다.'
     });
   } catch (error) {
     console.error('GET /api/admin/holidays error:', error);
@@ -79,31 +70,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = createAdminClient();
-    const { data, error } = await supabase
-      .from('korean_public_holidays')
-      .insert({
-        holiday_date,
-        holiday_name
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (error.code === '23505') {
-        return NextResponse.json(
-          { error: '해당 날짜의 공휴일이 이미 존재합니다.' },
-          { status: 409 }
-        );
-      }
-      throw error;
-    }
+    // NOTE: korean_public_holidays 테이블이 스키마에서 제거됨
+    // 공휴일 추가 기능 비활성화
+    console.log(`공휴일 추가 시도: ${holiday_date} - ${holiday_name} (테이블 없음, 거부됨)`);
 
     return NextResponse.json({
-      success: true,
-      data,
-      message: '공휴일이 추가되었습니다.'
-    });
+      success: false,
+      error: 'korean_public_holidays 테이블이 스키마에서 제거되었습니다. consultation_date_exceptions 테이블을 사용하세요.',
+    }, { status: 501 });
   } catch (error) {
     console.error('POST /api/admin/holidays error:', error);
     const message = error instanceof Error ? error.message : '공휴일 추가 실패'

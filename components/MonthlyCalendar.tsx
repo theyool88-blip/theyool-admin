@@ -1075,6 +1075,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
 
                           if (response.ok && result.data) {
                             const consultation = result.data
+                            // 스키마에서 confirmed_date/time 컬럼이 없으므로 preferred_date/time만 사용
                             setEditingSchedule({
                               id: consultation.id,
                               event_type: 'CONSULTATION',
@@ -1082,17 +1083,15 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                               reference_id: null,
                               case_name: consultation.name,
                               case_id: null,
-                              event_date: consultation.confirmed_date || consultation.preferred_date || schedule.date,
-                              event_time: consultation.confirmed_time || consultation.preferred_time || null,
+                              event_date: consultation.preferred_date || schedule.date,
+                              event_time: consultation.preferred_time || null,
                               location: consultation.office_location || null,
                               description: consultation.message || null,
                               status: consultation.status,
                               preferred_date: consultation.preferred_date,
-                              preferred_time: consultation.preferred_time,
-                              confirmed_date: consultation.confirmed_date,
-                              confirmed_time: consultation.confirmed_time
+                              preferred_time: consultation.preferred_time
                             })
-                            setPrefilledDate(consultation.confirmed_date || consultation.preferred_date || schedule.date)
+                            setPrefilledDate(consultation.preferred_date || schedule.date)
                             setShowAddModal(true)
                           } else {
                             alert('상담 정보를 불러오는데 실패했습니다.')

@@ -85,9 +85,10 @@ export async function PATCH(
     const input: UpdateConsultationInput = {};
 
     if (body.status !== undefined) input.status = body.status;
-    if (body.assigned_lawyer !== undefined) input.assigned_lawyer = body.assigned_lawyer;
-    if (body.confirmed_date !== undefined) input.confirmed_date = body.confirmed_date || null;
-    if (body.confirmed_time !== undefined) input.confirmed_time = body.confirmed_time || null;
+    if (body.assigned_to !== undefined) input.assigned_to = body.assigned_to;
+    // preferred_date/time 사용 (confirmed_date/time은 스키마에 없음)
+    if (body.preferred_date !== undefined) input.preferred_date = body.preferred_date || null;
+    if (body.preferred_time !== undefined) input.preferred_time = body.preferred_time || null;
     if (body.video_link !== undefined) input.video_link = body.video_link;
     if (body.admin_notes !== undefined) input.admin_notes = body.admin_notes;
     if (body.cancellation_reason !== undefined) input.cancellation_reason = body.cancellation_reason;
@@ -99,12 +100,12 @@ export async function PATCH(
     if (body.case_id !== undefined) input.case_id = body.case_id;
     if (body.source !== undefined) input.source = body.source;
 
-    // Schedule conflict checking when confirmed_date and confirmed_time are being set
-    if (input.confirmed_date && input.confirmed_time) {
+    // Schedule conflict checking when preferred_date and preferred_time are being set
+    if (input.preferred_date && input.preferred_time) {
       const conflicts = await checkScheduleConflicts({
-        date: input.confirmed_date,
-        time: input.confirmed_time,
-        assignedTo: input.assigned_lawyer || body.assigned_lawyer || null,
+        date: input.preferred_date,
+        time: input.preferred_time,
+        assignedTo: input.assigned_to || body.assigned_to || null,
         excludeId: id, // Exclude current consultation from conflict check
       });
 

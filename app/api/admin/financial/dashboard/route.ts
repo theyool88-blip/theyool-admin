@@ -52,137 +52,31 @@ export async function GET(request: NextRequest) {
       .reduce((sum, e) => sum + (e.amount || 0), 0) || 0
 
     // 3. 현재 월 정산 데이터 (파트너 분배)
-    const { data: settlement } = await adminSupabase
-      .from('monthly_settlements')
-      .select('*')
-      .eq('settlement_month', currentMonth)
-      .single()
+    // NOTE: monthly_settlements 테이블이 스키마에서 제거됨 (SaaS 전환으로 불필요)
+    // 정산 기능이 필요하면 테넌트별 설정으로 재구현 필요
 
     // 4. 순이익 계산
     const totalRevenue = revenueData?.total_revenue || 0
     const netProfit = totalRevenue - totalExpenses
 
-    // 5. 파트너별 분배 (50:50)
-    const kimShare = settlement?.kim_share && settlement.kim_share > 0 ? settlement.kim_share : Math.floor(netProfit / 2)
-    const limShare = settlement?.lim_share && settlement.lim_share > 0 ? settlement.lim_share : Math.ceil(netProfit / 2)
-
-    // 6. 파트너별 인출 현황
-    const partnerNames = {
-      kim: ['김현성', '김현성 파트너', '김심원'],
-      lim: ['임은지', '임은지 파트너']
-    }
-
-    const normalizePartner = (p?: string | null) => {
-      if (!p) return ''
-      return p.replace('파트너', '').trim()
-    }
-
-    const normalizeAmount = (val: unknown) => {
-      if (typeof val === 'number') return val
-      if (typeof val === 'string') {
-        const num = Number(val.replace(/[^0-9.-]/g, ''))
-        return Number.isFinite(num) ? num : 0
-      }
-      return 0
-    }
-
-    const normalizeMonthKey = (value?: string | null) => {
-      if (!value) return ''
-      const cleaned = value.toString().replace(/\./g, '-').replace(/\s+/g, '').trim()
-      if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) return cleaned.slice(0, 7)
-      if (/^\d{4}-\d{2}$/.test(cleaned)) return cleaned
-      if (/^\d{6}$/.test(cleaned)) return `${cleaned.slice(0, 4)}-${cleaned.slice(4, 6)}`
-      return cleaned.slice(0, 7)
-    }
-
-    const sumByRows = (
-      rows: Array<{
-        amount: number
-        partner_name?: string | null
-        partner?: string | null
-        month_key?: string | null
-        withdrawal_date?: string | null
-      }>
-    ) => {
-      return rows.reduce(
-        (acc, w) => {
-          const name = normalizePartner(w.partner_name || w.partner)
-          const amount = normalizeAmount(w.amount)
-          if (partnerNames.kim.some(n => name === normalizePartner(n))) acc.kim += amount
-          if (partnerNames.lim.some(n => name === normalizePartner(n))) acc.lim += amount
-          return acc
-        },
-        { kim: 0, lim: 0 }
-      )
-    }
-
-    const targetMonth = normalizeMonthKey(currentMonth)
-
-    const { data: rangeWithdrawals } = await adminSupabase
-      .from('partner_withdrawals')
-      .select('amount, partner_name, partner, month_key, withdrawal_date')
-      .order('withdrawal_date', { ascending: true })
-
-    const monthFiltered = (rangeWithdrawals || []).filter((w) => {
-      const keyFromMonth = normalizeMonthKey(w.month_key)
-      const keyFromDate = normalizeMonthKey(
-        typeof w.withdrawal_date === 'string' ? w.withdrawal_date : null
-      )
-      const normalizedKey = keyFromMonth || keyFromDate
-      return normalizedKey === targetMonth
-    })
-
-    const rangeTotals = sumByRows(monthFiltered)
-    let kimWithdrawals = rangeTotals.kim
-    let limWithdrawals = rangeTotals.lim
-
-    // 그래도 0이면 전체 합계 폴백
-    let cumulativeClaims = { kim: 0, lim: 0 }
-    if (kimWithdrawals === 0 && limWithdrawals === 0) {
-      const { data: allWithdrawals } = await adminSupabase
-        .from('partner_withdrawals')
-        .select('amount, partner_name, partner')
-
-      const allTotals = sumByRows(allWithdrawals || [])
-      kimWithdrawals = allTotals.kim
-      limWithdrawals = allTotals.lim
-
-      const totalDiff = allTotals.kim - allTotals.lim
-      cumulativeClaims = {
-        kim: totalDiff < 0 ? Math.abs(totalDiff) : 0,
-        lim: totalDiff > 0 ? totalDiff : 0
-      }
-    }
-
-    // 정산 테이블 값이 있으면 우선
-    if (settlement?.kim_withdrawals !== null && settlement?.kim_withdrawals !== undefined && settlement.kim_withdrawals > 0) {
-      kimWithdrawals = settlement.kim_withdrawals
-    }
-    if (settlement?.lim_withdrawals !== null && settlement?.lim_withdrawals !== undefined && settlement.lim_withdrawals > 0) {
-      limWithdrawals = settlement.lim_withdrawals
-    }
-
-    // 전체 인출 기반 누적 채권 (월 관계없이)
-    const { data: allWithdrawalsForClaim } = await adminSupabase
-      .from('partner_withdrawals')
-      .select('amount, partner_name, partner')
-    const allTotalsClaim = sumByRows(allWithdrawalsForClaim || [])
-    const totalDiffClaim = allTotalsClaim.kim - allTotalsClaim.lim
-    cumulativeClaims = {
-      kim: totalDiffClaim < 0 ? Math.abs(totalDiffClaim) : cumulativeClaims.kim,
-      lim: totalDiffClaim > 0 ? totalDiffClaim : cumulativeClaims.lim
-    }
+    // 5. 파트너별 분배 (50:50) - 테이블 제거로 기본값 계산
+    // NOTE: monthly_settlements, partner_withdrawals 테이블이 스키마에서 제거됨
+    // SaaS 전환으로 더율 특화 기능 제거 - 파트너 정산 기능 비활성화
+    const kimShare = Math.floor(netProfit / 2)
+    const limShare = Math.ceil(netProfit / 2)
+    const kimWithdrawals = 0
+    const limWithdrawals = 0
+    const cumulativeClaims = { kim: 0, lim: 0 }
 
     // 7. 최근 6개월 추세 데이터
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    const startMonth = sixMonthsAgo.toISOString().slice(0, 7)
-
-    const { data: settlements } = await adminSupabase
-      .from('monthly_settlements')
-      .select('*')
-      .gte('settlement_month', startMonth)
-      .order('settlement_month', { ascending: true })
+    // NOTE: monthly_settlements 테이블이 스키마에서 제거됨
+    // 추세 데이터는 payments와 expenses에서 직접 집계하도록 변경 필요
+    const settlements: Array<{
+      settlement_month: string
+      total_revenue: number
+      total_expenses: number
+      net_profit: number
+    }> = []
 
     // 8. 카테고리별 지출 분석
     const expensesByCategory = expenses?.reduce<Record<string, number>>((acc, e) => {
@@ -243,19 +137,19 @@ export async function GET(request: NextRequest) {
           byCategory: expensesByCategory,
         },
 
-        // 파트너 분배
+        // 파트너 분배 (테이블 제거로 기본값 계산)
         partners: {
           kim: {
-            share: settlement?.kim_share ?? kimShare,
+            share: kimShare,
             withdrawals: kimWithdrawals,
             balance: kimShare - kimWithdrawals,
-            accumulatedDebt: settlement?.kim_accumulated_debt || cumulativeClaims.kim,
+            accumulatedDebt: cumulativeClaims.kim,
           },
           lim: {
-            share: settlement?.lim_share ?? limShare,
+            share: limShare,
             withdrawals: limWithdrawals,
             balance: limShare - limWithdrawals,
-            accumulatedDebt: settlement?.lim_accumulated_debt || cumulativeClaims.lim,
+            accumulatedDebt: cumulativeClaims.lim,
           },
         },
 

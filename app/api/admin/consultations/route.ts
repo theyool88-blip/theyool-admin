@@ -10,7 +10,6 @@ import type {
   ConsultationFilters,
   RequestType,
   ConsultationStatus,
-  LawyerName,
   OfficeLocation,
   PaymentStatus,
 } from '@/types/consultation';
@@ -24,10 +23,11 @@ export const GET = withTenant(async (request, { tenant }) => {
     const { searchParams } = new URL(request.url);
 
     // Extract filters from query params
+    // NOTE: assigned_to는 UUID 형식 (tenant_members.id)
     const filters: ConsultationFilters = {
       request_type: (searchParams.get('request_type') as RequestType) || undefined,
       status: (searchParams.get('status') as ConsultationStatus) || undefined,
-      assigned_lawyer: (searchParams.get('assigned_lawyer') as LawyerName) || undefined,
+      assigned_to: searchParams.get('assigned_to') || undefined,
       date_from: searchParams.get('date_from') || undefined,
       date_to: searchParams.get('date_to') || undefined,
       office_location: (searchParams.get('office_location') as OfficeLocation) || undefined,

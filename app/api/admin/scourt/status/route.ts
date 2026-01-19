@@ -24,22 +24,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // 사용자 설정 조회 (있으면)
-    let maxProfiles = DEFAULT_MAX_PROFILES;
-    let maxCasesPerProfile = DEFAULT_MAX_CASES_PER_PROFILE;
-
-    if (userId) {
-      const { data: userSettings } = await supabase
-        .from('scourt_user_settings')
-        .select('max_profiles, max_cases_per_profile')
-        .eq('lawyer_id', userId)
-        .single();
-
-      if (userSettings) {
-        maxProfiles = userSettings.max_profiles || DEFAULT_MAX_PROFILES;
-        maxCasesPerProfile = userSettings.max_cases_per_profile || DEFAULT_MAX_CASES_PER_PROFILE;
-      }
-    }
+    // 사용자 설정 조회
+    // NOTE: scourt_user_settings 테이블이 스키마에서 제거됨
+    // 기본값 사용 (향후 tenant_settings에서 조회하도록 개선 필요)
+    const maxProfiles = DEFAULT_MAX_PROFILES;
+    const maxCasesPerProfile = DEFAULT_MAX_CASES_PER_PROFILE;
 
     // 프로필 목록 조회
     let profileQuery = supabase

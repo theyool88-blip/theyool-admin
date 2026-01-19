@@ -70,8 +70,9 @@ export async function getConsultations(filters?: ConsultationFilters, tenantId?:
     query = query.eq('status', filters.status);
   }
 
-  if (filters?.assigned_lawyer) {
-    query = query.eq('assigned_lawyer', filters.assigned_lawyer);
+  // assigned_to는 UUID 컬럼 (assigned_lawyer 이름 대신 UUID 사용)
+  if (filters?.assigned_to) {
+    query = query.eq('assigned_to', filters.assigned_to);
   }
 
   if (filters?.office_location) {

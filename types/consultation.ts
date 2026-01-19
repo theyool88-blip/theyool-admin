@@ -235,10 +235,10 @@ export type CreateConsultationInput =
 
 export interface UpdateConsultationInput {
   status?: ConsultationStatus;
-  assigned_lawyer?: LawyerName;
+  assigned_to?: string;  // UUID (tenant_members.id 참조)
   case_id?: string | null;
-  confirmed_date?: string;
-  confirmed_time?: string;
+  preferred_date?: string | null;  // 스키마에서 confirmed_date 대신 preferred_date 사용
+  preferred_time?: string | null;  // 스키마에서 confirmed_time 대신 preferred_time 사용
   video_link?: string;
   admin_notes?: string;
   cancellation_reason?: string;
@@ -259,7 +259,7 @@ export interface UpdateConsultationInput {
 export interface ConsultationFilters {
   request_type?: RequestType;
   status?: ConsultationStatus;
-  assigned_lawyer?: LawyerName;
+  assigned_to?: string;  // UUID (tenant_members.id 참조) - 스키마에서 assigned_lawyer 대신 사용
   date_from?: string;  // ISO date string
   date_to?: string;    // ISO date string
   office_location?: OfficeLocation;

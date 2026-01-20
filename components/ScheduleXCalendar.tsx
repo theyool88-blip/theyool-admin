@@ -721,8 +721,9 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
       filtered = filtered.filter(e => e.attendingLawyerId === lawyerFilter)
     }
 
-    return filtered
-  }, [allEvents, filterType, lawyerFilter])
+    // Include holiday events
+    return [...holidayEvents, ...filtered]
+  }, [allEvents, filterType, lawyerFilter, holidayEvents])
 
   // Handle event update (drag and drop / resize)
   const handleEventUpdate = useCallback(async (updatedEvent: ScheduleXEvent) => {

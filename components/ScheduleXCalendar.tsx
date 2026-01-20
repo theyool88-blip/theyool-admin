@@ -6,7 +6,7 @@ if (typeof (globalThis as Record<string, unknown>).Temporal === 'undefined') {
   (globalThis as Record<string, unknown>).Temporal = Temporal
 }
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef, createContext, useContext } from 'react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, isSameDay } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { formatDaysUntil } from '@/types/court-hearing'
@@ -16,6 +16,7 @@ import { ScheduleXCalendar, useNextCalendarApp } from '@schedule-x/react'
 import { viewWeek, viewMonthGrid, viewDay } from '@schedule-x/calendar'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { createResizePlugin } from '@schedule-x/resize'
+import { createCurrentTimePlugin } from '@schedule-x/current-time'
 import '@schedule-x/theme-default/dist/index.css'
 
 // Custom components
@@ -60,6 +61,93 @@ interface Holiday {
   holiday_date: string
   holiday_name: string
   year: number
+}
+
+// Holiday Context for custom components to access holiday data
+const HolidayContext = createContext<Holiday[]>([])
+
+// Custom MonthGridDate Component - Shows holiday names and weekend colors
+function MonthGridDateComponent({ date }: { date: string }) {
+  const holidays = useContext(HolidayContext)
+  const jsDate = new Date(date)
+  const holiday = holidays.find(h => h.holiday_date === date)
+  const isSunday = jsDate.getDay() === 0
+  const isSaturday = jsDate.getDay() === 6
+
+  return (
+    <div className="flex items-center gap-1 px-1 py-0.5">
+      <span className={`text-sm font-medium ${
+        holiday ? 'text-red-500' :
+        isSunday ? 'text-red-400' :
+        isSaturday ? 'text-blue-500' :
+        'text-[var(--text-primary)]'
+      }`}>
+        {jsDate.getDate()}
+      </span>
+      {holiday && (
+        <span className="text-[10px] text-red-500 truncate max-w-[60px] font-medium">
+          {holiday.holiday_name}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// Custom MonthGridDayName Component - Shows weekend colors on day names
+function MonthGridDayNameComponent({ day }: { day: number }) {
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+  const isSunday = day === 0
+  const isSaturday = day === 6
+
+  return (
+    <span className={`text-xs font-medium ${
+      isSunday ? 'text-red-500' :
+      isSaturday ? 'text-blue-500' :
+      'text-[var(--text-secondary)]'
+    }`}>
+      {dayNames[day]}
+    </span>
+  )
+}
+
+// Custom WeekGridDate Component - Shows holidays and weekend colors in week view header
+function WeekGridDateComponent({ date }: { date: string }) {
+  const holidays = useContext(HolidayContext)
+  const jsDate = new Date(date)
+  const holiday = holidays.find(h => h.holiday_date === date)
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+  const isSunday = jsDate.getDay() === 0
+  const isSaturday = jsDate.getDay() === 6
+
+  return (
+    <div className={`flex flex-col items-center py-2 ${
+      holiday ? 'text-red-500' :
+      isSunday ? 'text-red-400' :
+      isSaturday ? 'text-blue-500' :
+      'text-[var(--text-primary)]'
+    }`}>
+      <span className="text-xs">{dayNames[jsDate.getDay()]}</span>
+      <span className="text-lg font-semibold">{jsDate.getDate()}</span>
+      {holiday && <span className="text-[9px] truncate max-w-[50px] font-medium">{holiday.holiday_name}</span>}
+    </div>
+  )
+}
+
+// Custom WeekGridHour Component - Highlights work hours and lunch time
+function WeekGridHourComponent({ hour }: { hour: string }) {
+  const hourNum = parseInt(hour.split(':')[0])
+  const isLunchTime = hourNum === 12
+  const isAfterHours = hourNum < 9 || hourNum >= 18
+
+  return (
+    <span className={`text-xs ${
+      isLunchTime ? 'text-orange-500 font-medium' :
+      isAfterHours ? 'text-[var(--text-muted)] opacity-50' :
+      'text-[var(--text-secondary)]'
+    }`}>
+      {hour}
+    </span>
+  )
 }
 
 interface TenantMember {
@@ -446,19 +534,7 @@ function CalendarInner({ events, onEventClick, onEventUpdate, onClickDate }: Cal
     views: [viewDay, viewWeek, viewMonthGrid],
     events: temporalEvents,
     calendars: {
-      holiday: {
-        colorName: 'holiday',
-        lightColors: {
-          main: '#EF4444',
-          container: 'rgba(239, 68, 68, 0.1)',
-          onContainer: '#EF4444',
-        },
-        darkColors: {
-          main: '#F87171',
-          container: 'rgba(248, 113, 113, 0.15)',
-          onContainer: '#F87171',
-        },
-      },
+      // Note: holiday calendar removed - holidays are now displayed in date headers
       court_hearing: {
         colorName: 'court_hearing',
         lightColors: {
@@ -536,6 +612,7 @@ function CalendarInner({ events, onEventClick, onEventUpdate, onClickDate }: Cal
   }, [
     createDragAndDropPlugin(15),
     createResizePlugin(15),
+    createCurrentTimePlugin(),
   ])
 
   // Update events dynamically without remounting the calendar
@@ -557,6 +634,10 @@ function CalendarInner({ events, onEventClick, onEventUpdate, onClickDate }: Cal
         timeGridEvent: ScheduleXEventCard,
         dateGridEvent: ScheduleXEventCard,
         monthGridEvent: ScheduleXEventChip,
+        monthGridDate: MonthGridDateComponent,
+        monthGridDayName: MonthGridDayNameComponent,
+        weekGridDate: WeekGridDateComponent,
+        weekGridHour: WeekGridHourComponent,
       }}
     />
   )
@@ -696,20 +777,11 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     fetchTenantMembers()
   }, [fetchTenantMembers])
 
-  // Convert holidays to Schedule-X events
-  // Use string format with time - Schedule-X will convert internally
-  const holidayEvents: ScheduleXEvent[] = useMemo(() => {
-    return holidays.map(holiday => ({
-      id: `holiday-${holiday.id}`,
-      start: `${holiday.holiday_date} 00:00`,
-      end: `${holiday.holiday_date} 23:59`,
-      title: holiday.holiday_name,
-      calendarId: 'holiday',
-      eventType: 'HOLIDAY',
-    }))
-  }, [holidays])
+  // Note: Holiday events are no longer converted to calendar events
+  // They are now displayed directly in the date headers using MonthGridDateComponent and WeekGridDateComponent
 
   // Apply filters using useMemo to avoid extra render cycles
+  // Note: Holiday events are no longer included as they are displayed in date headers
   const events = useMemo(() => {
     let filtered = allEvents
 
@@ -721,9 +793,8 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
       filtered = filtered.filter(e => e.attendingLawyerId === lawyerFilter)
     }
 
-    // Include holiday events
-    return [...holidayEvents, ...filtered]
-  }, [allEvents, filterType, lawyerFilter, holidayEvents])
+    return filtered
+  }, [allEvents, filterType, lawyerFilter])
 
   // Handle event update (drag and drop / resize)
   const handleEventUpdate = useCallback(async (updatedEvent: ScheduleXEvent) => {
@@ -1148,12 +1219,14 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
         <>
           {/* Schedule-X Calendar */}
           <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-default)] overflow-hidden">
-            <CalendarInner
-              events={events}
-              onEventClick={handleEventClick}
-              onEventUpdate={handleEventUpdate}
-              onClickDate={handleDateClick}
-            />
+            <HolidayContext.Provider value={holidays}>
+              <CalendarInner
+                events={events}
+                onEventClick={handleEventClick}
+                onEventUpdate={handleEventUpdate}
+                onClickDate={handleDateClick}
+              />
+            </HolidayContext.Provider>
           </div>
 
           {/* Selected date detail panel - Collapsible */}

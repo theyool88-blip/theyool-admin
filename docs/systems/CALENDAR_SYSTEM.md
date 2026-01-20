@@ -1,6 +1,6 @@
 # 캘린더 시스템
 
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-01-21
 
 법무법인 더율의 모든 일정을 통합 관리하는 캘린더 시스템입니다.
 
@@ -41,11 +41,87 @@
 
 ```json
 {
-  "@schedule-x/react": "^1.x",
-  "@schedule-x/calendar": "^1.x",
-  "@schedule-x/event-modal": "^1.x",
-  "@schedule-x/resize": "^1.x",
-  "@schedule-x/drag-and-drop": "^1.x"
+  "@schedule-x/react": "^4.x",
+  "@schedule-x/calendar": "^4.x",
+  "@schedule-x/event-modal": "^4.x",
+  "@schedule-x/resize": "^3.x",
+  "@schedule-x/drag-and-drop": "^3.x",
+  "@schedule-x/current-time": "^3.x"
+}
+```
+
+### 커스텀 컴포넌트 (2026-01-21 추가)
+
+Schedule-X 캘린더에 커스텀 컴포넌트를 적용하여 날짜/시간 표시를 개선했습니다.
+
+| 컴포넌트 | 용도 | 개선 사항 |
+|----------|------|----------|
+| `MonthGridDateComponent` | 월간 뷰 날짜 셀 | 공휴일 빨강+이름, 일요일 빨강, 토요일 파랑 |
+| `MonthGridDayNameComponent` | 월간 뷰 요일 헤더 | 일요일 빨강, 토요일 파랑 |
+| `WeekGridDateComponent` | 주간 뷰 날짜 헤더 | 공휴일/주말 색상 + 공휴일명 표시 |
+| `WeekGridHourComponent` | 주간 뷰 시간축 | 점심시간(12시) 강조, 업무외 시간(9시 전/18시 후) 흐림 |
+
+### 주말/공휴일 색상 코딩
+
+| 유형 | 색상 | Tailwind 클래스 |
+|------|------|-----------------|
+| 공휴일 | 빨강 | `text-red-500` |
+| 일요일 | 연빨강 | `text-red-400` |
+| 토요일 | 파랑 | `text-blue-500` |
+| 평일 | 기본 | `text-[var(--text-primary)]` |
+
+### 현재 시간 표시 플러그인
+
+`createCurrentTimePlugin()`을 사용하여 주간/일간 뷰에서 현재 시간을 빨간 선으로 표시합니다.
+
+```typescript
+import { createCurrentTimePlugin } from '@schedule-x/current-time'
+
+const calendar = useNextCalendarApp({
+  // ...config
+}, [
+  createDragAndDropPlugin(15),
+  createResizePlugin(15),
+  createCurrentTimePlugin(),  // 현재 시간 빨간 선
+])
+```
+
+### HolidayContext
+
+커스텀 컴포넌트에서 공휴일 데이터에 접근하기 위한 React Context:
+
+```typescript
+const HolidayContext = createContext<Holiday[]>([])
+
+// CalendarInner를 Provider로 감싸서 사용
+<HolidayContext.Provider value={holidays}>
+  <CalendarInner ... />
+</HolidayContext.Provider>
+```
+
+### 공휴일 표시 방식 변경
+
+- **이전**: 공휴일을 캘린더 이벤트로 표시 (중복 표시 문제)
+- **현재**: 날짜 헤더에 직접 공휴일명 표시 (이벤트 제거)
+
+```typescript
+// MonthGridDateComponent 예시
+function MonthGridDateComponent({ date }: { date: string }) {
+  const holidays = useContext(HolidayContext)
+  const holiday = holidays.find(h => h.holiday_date === date)
+
+  return (
+    <div className="flex items-center gap-1">
+      <span className={holiday ? 'text-red-500' : ''}>
+        {new Date(date).getDate()}
+      </span>
+      {holiday && (
+        <span className="text-[10px] text-red-500">
+          {holiday.holiday_name}
+        </span>
+      )}
+    </div>
+  )
 }
 ```
 
@@ -79,8 +155,15 @@
 ```
 components/
 ├── ScheduleXCalendar.tsx    # 메인 캘린더 컴포넌트
+│   ├── HolidayContext       # 공휴일 데이터 Context
+│   ├── MonthGridDateComponent    # 월간 날짜 커스텀
+│   ├── MonthGridDayNameComponent # 월간 요일 커스텀
+│   ├── WeekGridDateComponent     # 주간 날짜 헤더 커스텀
+│   ├── WeekGridHourComponent     # 주간 시간축 커스텀
+│   └── CalendarInner        # 실제 캘린더 렌더링
 └── calendar/
-    └── CustomEventRenderer.tsx  # 커스텀 이벤트 렌더링
+    ├── ScheduleXEventCard.tsx   # 이벤트 카드 컴포넌트
+    └── ScheduleXEventChip.tsx   # 이벤트 칩 컴포넌트 (월간 뷰)
 ```
 
 ---

@@ -1,6 +1,6 @@
 # 문서 인덱스
 
-**Last Updated**: 2026-01-20
+**Last Updated**: 2026-01-21
 
 법무법인 더율 관리자 시스템 (luseed) 문서 목록입니다.
 
@@ -19,6 +19,7 @@
 | [CONSULTATION_SYSTEM.md](systems/CONSULTATION_SYSTEM.md) | 상담 관리 (4유형, 9상태), 리드 스코어링 |
 | [COURT_HEARING_SYSTEM.md](systems/COURT_HEARING_SYSTEM.md) | 법원기일, 불변기간 데드라인 자동 계산 |
 | [CASE_ASSIGNEES_SYSTEM.md](systems/CASE_ASSIGNEES_SYSTEM.md) | 사건 담당자 다중 지정 시스템 |
+| [TEAM_MANAGEMENT_SYSTEM.md](systems/TEAM_MANAGEMENT_SYSTEM.md) | 팀원 관리, 모듈별 권한 시스템 |
 | [CALENDAR_SYSTEM.md](systems/CALENDAR_SYSTEM.md) | Schedule-X 캘린더, 공휴일 관리 (슈퍼어드민) |
 | [CLIENT_PORTAL.md](systems/CLIENT_PORTAL.md) | 의뢰인 포털 미리보기 API |
 | [SCOURT_API_ANALYSIS.md](systems/SCOURT_API_ANALYSIS.md) | 대법원 나의사건검색 API 분석 |
@@ -73,9 +74,10 @@ archived/
 
 1. **새 개발자**: [SETUP_GUIDE.md](guides/SETUP_GUIDE.md) 먼저 읽기
 2. **멀티테넌트**: [MULTI_TENANT_SYSTEM.md](systems/MULTI_TENANT_SYSTEM.md) 참조
-3. **Google 연동**: [GOOGLE_INTEGRATION.md](systems/GOOGLE_INTEGRATION.md) 참조
-4. **API 개발**: [API_REFERENCE.md](guides/API_REFERENCE.md) 참조
-5. **UI 작업**: [SAGE_GREEN_THEME.md](design/SAGE_GREEN_THEME.md) 참조
+3. **팀원/권한**: [TEAM_MANAGEMENT_SYSTEM.md](systems/TEAM_MANAGEMENT_SYSTEM.md) 참조
+4. **Google 연동**: [GOOGLE_INTEGRATION.md](systems/GOOGLE_INTEGRATION.md) 참조
+5. **API 개발**: [API_REFERENCE.md](guides/API_REFERENCE.md) 참조
+6. **UI 작업**: [SAGE_GREEN_THEME.md](design/SAGE_GREEN_THEME.md) 참조
 
 ### 코드 레퍼런스
 
@@ -88,8 +90,10 @@ archived/
 | `lib/api/with-tenant.ts` | 테넌트 미들웨어 |
 | `lib/google-calendar.ts` | Google OAuth 함수 |
 | `lib/scourt/` | 대법원 연동 함수 |
+| `lib/auth/permission-service.ts` | 모듈별 권한 검사 서비스 |
 | `types/` | TypeScript 타입 정의 |
 | `components/` | React 컴포넌트 |
+| `components/team/` | 팀원 관리 컴포넌트 |
 | `scripts/` | 유틸리티 스크립트 (데드라인 관리, 백필 등) |
 
 ### 데이터베이스
@@ -110,6 +114,8 @@ archived/
 | `scourt_profiles` | 대법원 프로필 |
 | `scourt_sessions` | 대법원 세션 |
 | `drive_file_classifications` | Google Drive 파일 분류 |
+| `role_permissions` | 역할별 기본 권한 |
+| `member_permissions` | 개별 멤버 권한 오버라이드 |
 
 ---
 

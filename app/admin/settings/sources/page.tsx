@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import AdminHeader from '@/components/AdminHeader';
+import Link from 'next/link';
 import type { ConsultationSource } from '@/types/consultation-source';
 import { SOURCE_COLORS, getSourceColorClass } from '@/types/consultation-source';
 
@@ -124,42 +124,78 @@ export default function ConsultationSourcesSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminHeader title="유입 경로 관리" />
+      <div className="min-h-screen bg-[var(--bg-primary)]">
         <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--border-default)] border-t-[var(--text-secondary)]"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="유입 경로 관리" />
+    <div className="min-h-screen bg-[var(--bg-primary)]">
+      <div className="max-w-5xl mx-auto pt-6 pb-8 px-4">
+        {/* 탭 네비게이션 */}
+        <div className="flex items-center gap-3 mb-5 text-sm">
+          <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-0.5">
+            <Link
+              href="/admin/settings"
+              className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              상담 시간
+            </Link>
+            <span className="px-3 py-1.5 rounded-md bg-[var(--bg-secondary)] shadow-sm font-medium text-[var(--text-primary)]">
+              유입 경로
+            </span>
+            <Link
+              href="/admin/settings/team"
+              className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              팀원 관리
+            </Link>
+            <Link
+              href="/admin/settings/alerts"
+              className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              알림
+            </Link>
+            <Link
+              href="/admin/settings/integrations"
+              className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              연동
+            </Link>
+            <Link
+              href="/admin/settings/tenant"
+              className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              사무소
+            </Link>
+          </div>
+        </div>
 
-      <div className="max-w-5xl mx-auto pt-20 pb-8 px-4">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-[var(--text-tertiary)]">
             총 {sources.length}개의 유입 경로
           </div>
           <button
             onClick={openAddModal}
-            className="px-3 py-1.5 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+            className="btn btn-primary"
           >
             + 새 유입 경로
           </button>
         </div>
 
         {/* Sources List */}
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="card">
           {sources.length === 0 ? (
-            <div className="py-12 text-center text-gray-400 text-sm">
+            <div className="py-12 text-center text-[var(--text-muted)] text-sm">
               유입 경로가 없습니다. 새로 추가해주세요.
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs">
+              <thead className="bg-[var(--bg-primary)] text-[var(--text-tertiary)] text-xs">
                 <tr>
                   <th className="px-4 py-2.5 text-left font-medium">이름</th>
                   <th className="px-4 py-2.5 text-left font-medium">색상</th>
@@ -169,13 +205,13 @@ export default function ConsultationSourcesSettingsPage() {
                   <th className="px-4 py-2.5 text-right font-medium">작업</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {sources.map((source) => (
-                  <tr key={source.id} className="hover:bg-gray-50">
+                  <tr key={source.id} className="hover:bg-[var(--bg-hover)]">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{source.name}</div>
+                      <div className="font-medium text-[var(--text-primary)]">{source.name}</div>
                       {source.description && (
-                        <div className="text-xs text-gray-500 mt-0.5">{source.description}</div>
+                        <div className="text-xs text-[var(--text-tertiary)] mt-0.5">{source.description}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -183,38 +219,38 @@ export default function ConsultationSourcesSettingsPage() {
                         {source.color}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-500">
+                    <td className="px-4 py-3 text-center text-[var(--text-tertiary)]">
                       {source.display_order}
                     </td>
                     <td className="px-4 py-3 text-center">
                       {source.is_active ? (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--color-success-muted)] text-[var(--color-success)]">
                           활성
                         </span>
                       ) : (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
                           비활성
                         </span>
                       )}
                       {source.is_default && (
-                        <span className="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                        <span className="inline-flex items-center ml-1 px-1.5 py-0.5 rounded text-xs font-medium bg-[var(--color-info-muted)] text-[var(--color-info)]">
                           기본
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center text-gray-500">
+                    <td className="px-4 py-3 text-center text-[var(--text-tertiary)]">
                       {source.usage_count}건
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => openEditModal(source)}
-                        className="text-sage-600 hover:text-sage-800 text-xs mr-3"
+                        className="text-[var(--sage-primary)] hover:opacity-80 text-xs mr-3"
                       >
                         수정
                       </button>
                       <button
                         onClick={() => handleDelete(source.id, source.name)}
-                        className="text-red-500 hover:text-red-700 text-xs"
+                        className="text-[var(--color-danger)] hover:opacity-80 text-xs"
                       >
                         삭제
                       </button>
@@ -230,38 +266,38 @@ export default function ConsultationSourcesSettingsPage() {
       {/* Add/Edit Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-sm">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-900">
+          <div className="card w-full max-w-sm">
+            <div className="px-5 py-4 border-b border-[var(--border-subtle)]">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">
                 {editingSource ? '유입 경로 수정' : '새 유입 경로 추가'}
               </h3>
             </div>
 
             <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
               {/* Name */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  이름 <span className="text-red-500">*</span>
+              <div className="form-group">
+                <label className="form-label">
+                  이름 <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  className="form-input"
                   placeholder="예: 인스타그램"
                   required
                 />
               </div>
 
               {/* Color */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              <div className="form-group">
+                <label className="form-label">
                   색상
                 </label>
                 <select
                   value={formData.color}
                   onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  className="form-input"
                 >
                   {SOURCE_COLORS.map((color) => (
                     <option key={color.value} value={color.value}>
@@ -277,29 +313,29 @@ export default function ConsultationSourcesSettingsPage() {
               </div>
 
               {/* Display Order */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              <div className="form-group">
+                <label className="form-label">
                   정렬 순서
                 </label>
                 <input
                   type="number"
                   value={formData.display_order}
                   onChange={(e) => setFormData({ ...formData, display_order: parseInt(e.target.value) || 0 })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                  className="form-input"
                   placeholder="0"
                 />
-                <p className="text-xs text-gray-400 mt-1">낮은 숫자가 먼저 표시됩니다</p>
+                <p className="text-caption mt-1">낮은 숫자가 먼저 표시됩니다</p>
               </div>
 
               {/* Description */}
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+              <div className="form-group">
+                <label className="form-label">
                   설명
                 </label>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent resize-none"
+                  className="form-input resize-none"
                   rows={2}
                   placeholder="선택사항"
                 />
@@ -312,18 +348,18 @@ export default function ConsultationSourcesSettingsPage() {
                     type="checkbox"
                     checked={formData.is_active}
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-sage-600 focus:ring-sage-500"
+                    className="w-4 h-4 rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
                   />
-                  <span className="ml-2 text-sm text-gray-700">활성화</span>
+                  <span className="ml-2 text-sm text-[var(--text-secondary)]">활성화</span>
                 </label>
                 <label className="flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.is_default}
                     onChange={(e) => setFormData({ ...formData, is_default: e.target.checked })}
-                    className="w-4 h-4 rounded border-gray-300 text-sage-600 focus:ring-sage-500"
+                    className="w-4 h-4 rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
                   />
-                  <span className="ml-2 text-sm text-gray-700">기본값으로 설정</span>
+                  <span className="ml-2 text-sm text-[var(--text-secondary)]">기본값으로 설정</span>
                 </label>
               </div>
 
@@ -336,13 +372,13 @@ export default function ConsultationSourcesSettingsPage() {
                     setEditingSource(null);
                     resetForm();
                   }}
-                  className="flex-1 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                  className="btn btn-secondary flex-1"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+                  className="btn btn-primary flex-1"
                 >
                   {editingSource ? '수정' : '추가'}
                 </button>

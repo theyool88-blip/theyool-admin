@@ -111,6 +111,7 @@ export interface TenantContext {
   memberRole: MemberRole;
   memberDisplayName?: string;
   isSuperAdmin: boolean;
+  isImpersonating?: boolean; // 슈퍼 어드민 대리 접속 여부
 }
 
 // 테넌트 초대

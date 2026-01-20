@@ -19,7 +19,7 @@
 | [CONSULTATION_SYSTEM.md](systems/CONSULTATION_SYSTEM.md) | 상담 관리 (4유형, 9상태), 리드 스코어링 |
 | [COURT_HEARING_SYSTEM.md](systems/COURT_HEARING_SYSTEM.md) | 법원기일, 불변기간 데드라인 자동 계산 |
 | [CASE_ASSIGNEES_SYSTEM.md](systems/CASE_ASSIGNEES_SYSTEM.md) | 사건 담당자 다중 지정 시스템 |
-| [CALENDAR_SYSTEM.md](systems/CALENDAR_SYSTEM.md) | 통합 캘린더, Google Calendar 연동 |
+| [CALENDAR_SYSTEM.md](systems/CALENDAR_SYSTEM.md) | Schedule-X 캘린더, 공휴일 관리 (슈퍼어드민) |
 | [CLIENT_PORTAL.md](systems/CLIENT_PORTAL.md) | 의뢰인 포털 미리보기 API |
 | [SCOURT_API_ANALYSIS.md](systems/SCOURT_API_ANALYSIS.md) | 대법원 나의사건검색 API 분석 |
 | [SCOURT_INTEGRATION.md](systems/SCOURT_INTEGRATION.md) | SCOURT 통합 시스템 (동기화, 필드매핑) |
@@ -83,6 +83,7 @@ archived/
 |------|------|
 | `app/api/admin/` | 관리자 API 엔드포인트 |
 | `app/api/admin/tenant/` | 테넌트 관리 API |
+| `app/api/superadmin/` | 슈퍼어드민 API (공휴일 등) |
 | `lib/supabase/` | Supabase 헬퍼 함수 |
 | `lib/api/with-tenant.ts` | 테넌트 미들웨어 |
 | `lib/google-calendar.ts` | Google OAuth 함수 |
@@ -105,6 +106,7 @@ archived/
 | `consultations` | 상담 |
 | `court_hearings` | 법원기일 |
 | `case_deadlines` | 데드라인 |
+| `holidays` | 공휴일 (슈퍼어드민 관리) |
 | `scourt_profiles` | 대법원 프로필 |
 | `scourt_sessions` | 대법원 세션 |
 | `drive_file_classifications` | Google Drive 파일 분류 |

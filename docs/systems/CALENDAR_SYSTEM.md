@@ -1,6 +1,6 @@
 # 캘린더 시스템
 
-**Last Updated**: 2026-01-16
+**Last Updated**: 2026-01-20
 
 법무법인 더율의 모든 일정을 통합 관리하는 캘린더 시스템입니다.
 
@@ -12,11 +12,76 @@
 
 | 기능 | 설명 |
 |------|------|
-| **월간/주간 캘린더** | 다양한 뷰 제공 |
-| **통합 일정 조회** | 3개 테이블 통합 (일정, 법원기일, 데드라인) |
+| **Schedule-X 캘린더** | 월간/주간/일간 뷰 지원 |
+| **통합 일정 조회** | 4개 테이블 통합 (일정, 법원기일, 데드라인, 상담) |
 | **Google Calendar 동기화** | 양방향 동기화 |
-| **공휴일 관리** | 한국 공휴일 자동 반영 |
+| **공휴일 표시** | 한국 공휴일 자동 반영 (슈퍼 어드민 관리) |
 | **색상 코딩** | 일정 유형별 구분 |
+| **반응형 레이아웃** | 브라우저 크기에 따라 자동 조정 |
+
+---
+
+## Schedule-X 캘린더 (2026-01-20 추가)
+
+### 도입 배경
+
+기존 커스텀 캘린더 컴포넌트(WeeklyCalendar, MonthlyCalendar)를 Schedule-X 라이브러리로 통합했습니다.
+
+### 장점
+
+| 항목 | 설명 |
+|------|------|
+| **통합 뷰** | 월/주/일 뷰를 하나의 컴포넌트로 관리 |
+| **드래그 앤 드롭** | 일정 이동 및 리사이즈 지원 |
+| **커스텀 이벤트 렌더링** | 법무 특화 정보 표시 (사건번호, 법원 등) |
+| **공휴일 통합** | 캘린더 내 공휴일 표시 |
+| **유지보수 용이** | 라이브러리 업데이트로 버그 수정 |
+
+### 사용 라이브러리
+
+```json
+{
+  "@schedule-x/react": "^1.x",
+  "@schedule-x/calendar": "^1.x",
+  "@schedule-x/event-modal": "^1.x",
+  "@schedule-x/resize": "^1.x",
+  "@schedule-x/drag-and-drop": "^1.x"
+}
+```
+
+### 반응형 크기 설정
+
+**너비**: `max-w-screen-2xl` (1536px)
+**높이**:
+- 월간 뷰 셀: 140px (모바일: 90px)
+- 캘린더 컨텐츠: 600px (lg: 750px)
+- 주간/일간 뷰: 700px (lg: 800px)
+
+```css
+/* app/globals.css */
+.sx__month-grid-day {
+  min-height: 140px;
+}
+
+.sx__calendar-content {
+  min-height: 600px;
+}
+
+@media (min-width: 1024px) {
+  .sx__calendar-content {
+    min-height: 750px;
+  }
+}
+```
+
+### 컴포넌트 구조
+
+```
+components/
+├── ScheduleXCalendar.tsx    # 메인 캘린더 컴포넌트
+└── calendar/
+    └── CustomEventRenderer.tsx  # 커스텀 이벤트 렌더링
+```
 
 ---
 
@@ -166,19 +231,58 @@ GOOGLE_CALENDAR_ID=...
 
 ## 공휴일 관리
 
+### 권한 구조 (2026-01-20 변경)
+
+| 역할 | 권한 |
+|------|------|
+| **슈퍼 어드민** | 공휴일 CRUD (추가, 수정, 삭제, 일괄 처리) |
+| **테넌트 어드민** | 공휴일 조회만 가능 (읽기 전용) |
+
 ### 기능
 
-- 한국 공휴일 자동 등록
-- 사용자 정의 휴일 추가
+- 한국 공휴일 등록/관리
 - 상담 예약 시 반영
+- 법정 기간 계산에 활용 (공휴일 제외)
+- 캘린더에 공휴일 표시
 
 ### API 엔드포인트
 
+**테넌트 어드민용 (읽기 전용)**
+
 | Method | Endpoint | 설명 |
 |--------|----------|------|
-| GET | `/api/admin/holidays` | 공휴일 목록 |
-| POST | `/api/admin/holidays` | 공휴일 추가 |
-| DELETE | `/api/admin/holidays/[id]` | 공휴일 삭제 |
+| GET | `/api/admin/holidays?year=2026` | 공휴일 목록 조회 |
+
+**슈퍼 어드민용 (CRUD)**
+
+| Method | Endpoint | 설명 |
+|--------|----------|------|
+| GET | `/api/superadmin/holidays` | 공휴일 목록 (페이징, 카운트) |
+| POST | `/api/superadmin/holidays` | 공휴일 추가 |
+| GET | `/api/superadmin/holidays/[id]` | 공휴일 상세 |
+| PATCH | `/api/superadmin/holidays/[id]` | 공휴일 수정 |
+| DELETE | `/api/superadmin/holidays/[id]` | 공휴일 삭제 |
+| POST | `/api/superadmin/holidays/bulk` | 공휴일 일괄 추가 |
+| DELETE | `/api/superadmin/holidays/bulk?year=2026` | 연도별 일괄 삭제 |
+
+### 데이터베이스 스키마
+
+```sql
+CREATE TABLE holidays (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  holiday_date DATE NOT NULL UNIQUE,
+  holiday_name TEXT NOT NULL,
+  year INTEGER GENERATED ALWAYS AS (EXTRACT(YEAR FROM holiday_date)) STORED,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- year 컬럼은 holiday_date에서 자동 계산 (트리거)
+```
+
+### UI 위치
+
+- **슈퍼 어드민**: `/superadmin/settings` → 공휴일 관리 섹션
+- **테넌트 어드민**: `/admin/settings` → 공휴일 탭 (조회만 가능)
 
 ---
 
@@ -432,21 +536,33 @@ function isNoLawyerAttendanceRequired(schedule: UnifiedSchedule): boolean {
 ## 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── components/
-│   ├── WeeklyCalendar.tsx
-│   ├── MonthlyCalendar.tsx
+│   ├── ScheduleXCalendar.tsx     # 메인 Schedule-X 캘린더
+│   ├── WeeklyCalendar.tsx        # 레거시 (참고용)
+│   ├── MonthlyCalendar.tsx       # 레거시 (참고용)
 │   ├── UnifiedScheduleModal.tsx
 │   └── ScheduleListView.tsx
 │
 ├── app/
 │   ├── schedules/
 │   │   └── page.tsx
+│   ├── admin/
+│   │   └── settings/
+│   │       └── HolidayManagement.tsx  # 테넌트용 (읽기 전용)
+│   ├── superadmin/
+│   │   └── settings/
+│   │       └── page.tsx              # 슈퍼어드민 공휴일 CRUD
 │   └── api/
-│       └── admin/
-│           ├── calendar/
-│           ├── google-calendar/
-│           └── holidays/
+│       ├── admin/
+│       │   ├── calendar/
+│       │   ├── google-calendar/
+│       │   └── holidays/             # GET only (읽기 전용)
+│       └── superadmin/
+│           └── holidays/             # 전체 CRUD
+│               ├── route.ts          # GET, POST
+│               ├── [id]/route.ts     # GET, PATCH, DELETE
+│               └── bulk/route.ts     # POST, DELETE (일괄 처리)
 │
 ├── lib/
 │   ├── google-calendar.ts

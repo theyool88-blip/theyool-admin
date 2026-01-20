@@ -4,6 +4,8 @@
  */
 
 import { createClient } from '@/lib/supabase/server';
+import { createClient as createAdminClient } from '@supabase/supabase-js';
+import { cookies } from 'next/headers';
 import type {
   TenantContext,
   Tenant,
@@ -15,10 +17,71 @@ import type {
 } from '@/types/tenant';
 
 /**
+ * 슈퍼 어드민 대리 접속 토큰 확인
+ */
+async function getImpersonationContext(): Promise<TenantContext | null> {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('sa_impersonate')?.value;
+
+    if (!token) {
+      return null;
+    }
+
+    const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+    const expiresAt = new Date(decoded.expiresAt);
+
+    if (expiresAt < new Date() || !decoded.tenantId) {
+      return null;
+    }
+
+    // Admin client로 테넌트 정보 조회
+    const supabaseAdmin = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { data: tenant, error } = await supabaseAdmin
+      .from('tenants')
+      .select('*')
+      .eq('id', decoded.tenantId)
+      .single();
+
+    if (error || !tenant) {
+      return null;
+    }
+
+    // 대리 접속 컨텍스트 반환 (슈퍼 어드민 + 테넌트 정보)
+    return {
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      tenantSlug: tenant.slug,
+      tenantType: tenant.type as TenantType,
+      hasHomepage: tenant.has_homepage,
+      plan: tenant.plan as SubscriptionPlan,
+      features: tenant.features as TenantFeatures,
+      memberId: 'impersonation',
+      memberRole: 'owner' as MemberRole,
+      memberDisplayName: '슈퍼 어드민 (대리 접속)',
+      isSuperAdmin: true,
+      isImpersonating: true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 현재 로그인한 사용자의 테넌트 컨텍스트 조회
  * @returns TenantContext | null
  */
 export async function getCurrentTenantContext(): Promise<TenantContext | null> {
+  // 먼저 대리 접속 확인
+  const impersonationContext = await getImpersonationContext();
+  if (impersonationContext) {
+    return impersonationContext;
+  }
+
   const supabase = await createClient();
 
   // 현재 사용자 확인

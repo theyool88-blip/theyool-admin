@@ -1,39 +1,18 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import ClientEditForm from '@/components/ClientEditForm'
 
 export default async function ClientEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // 사용자 프로필 확인
-  const adminClient = createAdminClient()
-  const { data: profile } = await adminClient
-    .from('tenant_members')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // 테넌트 컨텍스트 조회
+  // 테넌트 컨텍스트 조회 (impersonation 포함)
   const tenantContext = await getCurrentTenantContext()
   if (!tenantContext) {
     redirect('/login')
   }
+
+  const adminClient = createAdminClient()
 
   // 의뢰인 정보 가져오기 (테넌트 필터 적용)
   let clientQuery = adminClient
@@ -52,5 +31,13 @@ export default async function ClientEditPage({ params }: { params: Promise<{ id:
     redirect('/clients')
   }
 
-  return <ClientEditForm profile={profile} clientData={clientData} />
+  // ClientEditForm에 전달할 profile 형식으로 변환
+  const profile = {
+    id: tenantContext.memberId,
+    tenant_id: tenantContext.tenantId,
+    role: tenantContext.memberRole,
+    display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
+  }
+
+  return <ClientEditForm profile={profile as any} clientData={clientData} />
 }

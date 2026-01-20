@@ -596,3 +596,435 @@ select:focus-visible {
   font-size: 0.875rem;
   font-weight: 500;
 }
+
+/* ===== SUPERADMIN DESIGN SYSTEM ===== */
+/* Linear/Vercel/Stripe inspired dark theme for admin console */
+
+.superadmin-theme {
+  /* Core Colors - Dark Mode First */
+  --sa-bg-primary: #0a0a0b;
+  --sa-bg-secondary: #111113;
+  --sa-bg-tertiary: #18181b;
+  --sa-bg-elevated: #1c1c1f;
+  --sa-bg-hover: #232326;
+  --sa-bg-active: #2a2a2d;
+
+  /* Borders */
+  --sa-border-subtle: rgba(255, 255, 255, 0.06);
+  --sa-border-default: rgba(255, 255, 255, 0.08);
+  --sa-border-strong: rgba(255, 255, 255, 0.12);
+  --sa-border-focus: rgba(255, 255, 255, 0.24);
+
+  /* Text Colors */
+  --sa-text-primary: #fafafa;
+  --sa-text-secondary: #a1a1aa;
+  --sa-text-tertiary: #71717a;
+  --sa-text-muted: #52525b;
+
+  /* Accent Colors - Subtle, Low Saturation */
+  --sa-accent-blue: #3b82f6;
+  --sa-accent-blue-muted: rgba(59, 130, 246, 0.15);
+  --sa-accent-green: #22c55e;
+  --sa-accent-green-muted: rgba(34, 197, 94, 0.15);
+  --sa-accent-amber: #f59e0b;
+  --sa-accent-amber-muted: rgba(245, 158, 11, 0.15);
+  --sa-accent-red: #ef4444;
+  --sa-accent-red-muted: rgba(239, 68, 68, 0.15);
+  --sa-accent-violet: #8b5cf6;
+  --sa-accent-violet-muted: rgba(139, 92, 246, 0.15);
+
+  /* Gradients */
+  --sa-gradient-subtle: linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%);
+  --sa-gradient-glow: radial-gradient(600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(59, 130, 246, 0.06), transparent 40%);
+
+  /* Shadows - Minimal in Dark Mode */
+  --sa-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --sa-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --sa-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --sa-shadow-glow: 0 0 20px rgba(59, 130, 246, 0.15);
+
+  /* Spacing - Consistent Scale */
+  --sa-space-1: 4px;
+  --sa-space-2: 8px;
+  --sa-space-3: 12px;
+  --sa-space-4: 16px;
+  --sa-space-5: 20px;
+  --sa-space-6: 24px;
+  --sa-space-8: 32px;
+  --sa-space-10: 40px;
+  --sa-space-12: 48px;
+
+  /* Border Radius */
+  --sa-radius-sm: 6px;
+  --sa-radius-md: 8px;
+  --sa-radius-lg: 12px;
+  --sa-radius-xl: 16px;
+
+  /* Typography */
+  --sa-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, monospace;
+}
+
+/* Superadmin Base Styles */
+.superadmin-theme {
+  background: var(--sa-bg-primary);
+  color: var(--sa-text-primary);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+.superadmin-theme * {
+  color: inherit;
+  border-color: var(--sa-border-default);
+}
+
+/* Superadmin Card */
+.sa-card {
+  background: var(--sa-bg-secondary);
+  border: 1px solid var(--sa-border-subtle);
+  border-radius: var(--sa-radius-lg);
+  transition: all 0.15s ease;
+}
+
+.sa-card:hover {
+  border-color: var(--sa-border-default);
+  background: var(--sa-bg-tertiary);
+}
+
+.sa-card-elevated {
+  background: var(--sa-bg-elevated);
+  border: 1px solid var(--sa-border-default);
+  border-radius: var(--sa-radius-lg);
+  box-shadow: var(--sa-shadow-md);
+}
+
+/* Superadmin Button */
+.sa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: var(--sa-radius-md);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+.sa-btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--sa-bg-primary), 0 0 0 4px var(--sa-border-focus);
+}
+
+.sa-btn-primary {
+  background: var(--sa-text-primary);
+  color: var(--sa-bg-primary);
+}
+
+.sa-btn-primary:hover {
+  background: #e4e4e7;
+}
+
+.sa-btn-secondary {
+  background: var(--sa-bg-tertiary);
+  color: var(--sa-text-secondary);
+  border: 1px solid var(--sa-border-default);
+}
+
+.sa-btn-secondary:hover {
+  background: var(--sa-bg-hover);
+  color: var(--sa-text-primary);
+  border-color: var(--sa-border-strong);
+}
+
+.sa-btn-ghost {
+  background: transparent;
+  color: var(--sa-text-secondary);
+}
+
+.sa-btn-ghost:hover {
+  background: var(--sa-bg-hover);
+  color: var(--sa-text-primary);
+}
+
+/* Superadmin Input */
+.sa-input {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 13px;
+  background: var(--sa-bg-primary);
+  border: 1px solid var(--sa-border-default);
+  border-radius: var(--sa-radius-md);
+  color: var(--sa-text-primary);
+  transition: all 0.15s ease;
+}
+
+.sa-input::placeholder {
+  color: var(--sa-text-muted);
+}
+
+.sa-input:focus {
+  outline: none;
+  border-color: var(--sa-border-focus);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.05);
+}
+
+/* Superadmin Badge */
+.sa-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 9999px;
+  letter-spacing: 0.01em;
+}
+
+.sa-badge-default {
+  background: var(--sa-bg-hover);
+  color: var(--sa-text-secondary);
+}
+
+.sa-badge-blue {
+  background: var(--sa-accent-blue-muted);
+  color: var(--sa-accent-blue);
+}
+
+.sa-badge-green {
+  background: var(--sa-accent-green-muted);
+  color: var(--sa-accent-green);
+}
+
+.sa-badge-amber {
+  background: var(--sa-accent-amber-muted);
+  color: var(--sa-accent-amber);
+}
+
+.sa-badge-red {
+  background: var(--sa-accent-red-muted);
+  color: var(--sa-accent-red);
+}
+
+.sa-badge-violet {
+  background: var(--sa-accent-violet-muted);
+  color: var(--sa-accent-violet);
+}
+
+/* Superadmin Table */
+.sa-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sa-table thead {
+  background: var(--sa-bg-tertiary);
+  border-bottom: 1px solid var(--sa-border-default);
+}
+
+.sa-table th {
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sa-text-tertiary);
+  text-align: left;
+}
+
+.sa-table td {
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--sa-text-secondary);
+  border-bottom: 1px solid var(--sa-border-subtle);
+}
+
+.sa-table tbody tr {
+  transition: background 0.1s ease;
+}
+
+.sa-table tbody tr:hover {
+  background: var(--sa-bg-hover);
+}
+
+.sa-table tbody tr:hover td {
+  color: var(--sa-text-primary);
+}
+
+/* Superadmin Sidebar */
+.sa-sidebar {
+  background: var(--sa-bg-secondary);
+  border-right: 1px solid var(--sa-border-subtle);
+}
+
+.sa-sidebar-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--sa-text-tertiary);
+  border-radius: var(--sa-radius-md);
+  transition: all 0.1s ease;
+  cursor: pointer;
+}
+
+.sa-sidebar-item:hover {
+  background: var(--sa-bg-hover);
+  color: var(--sa-text-secondary);
+}
+
+.sa-sidebar-item.active {
+  background: var(--sa-bg-active);
+  color: var(--sa-text-primary);
+}
+
+.sa-sidebar-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 16px;
+  background: var(--sa-text-primary);
+  border-radius: 1px;
+}
+
+/* Status Indicator */
+.sa-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.sa-status-dot.healthy {
+  background: var(--sa-accent-green);
+  box-shadow: 0 0 6px var(--sa-accent-green);
+}
+
+.sa-status-dot.warning {
+  background: var(--sa-accent-amber);
+  box-shadow: 0 0 6px var(--sa-accent-amber);
+}
+
+.sa-status-dot.error {
+  background: var(--sa-accent-red);
+  box-shadow: 0 0 6px var(--sa-accent-red);
+}
+
+/* Superadmin Stat Card */
+.sa-stat-card {
+  background: var(--sa-bg-secondary);
+  border: 1px solid var(--sa-border-subtle);
+  border-radius: var(--sa-radius-lg);
+  padding: var(--sa-space-5);
+  position: relative;
+  overflow: hidden;
+}
+
+.sa-stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--sa-gradient-subtle);
+  pointer-events: none;
+}
+
+.sa-stat-value {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--sa-text-primary);
+}
+
+.sa-stat-label {
+  font-size: 13px;
+  color: var(--sa-text-tertiary);
+  margin-top: 4px;
+}
+
+.sa-stat-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.sa-stat-trend.positive {
+  color: var(--sa-accent-green);
+}
+
+.sa-stat-trend.negative {
+  color: var(--sa-accent-red);
+}
+
+/* Keyboard Shortcut */
+.sa-kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-family: var(--sa-font-mono);
+  color: var(--sa-text-tertiary);
+  background: var(--sa-bg-tertiary);
+  border: 1px solid var(--sa-border-default);
+  border-radius: 4px;
+}
+
+/* Progress Bar */
+.sa-progress {
+  height: 4px;
+  background: var(--sa-bg-hover);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.sa-progress-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.sa-progress-bar.blue {
+  background: var(--sa-accent-blue);
+}
+
+.sa-progress-bar.green {
+  background: var(--sa-accent-green);
+}
+
+.sa-progress-bar.violet {
+  background: var(--sa-accent-violet);
+}
+
+/* Divider */
+.sa-divider {
+  height: 1px;
+  background: var(--sa-border-subtle);
+  margin: var(--sa-space-4) 0;
+}
+
+/* Code/Mono Text */
+.sa-mono {
+  font-family: var(--sa-font-mono);
+  font-size: 12px;
+  color: var(--sa-text-secondary);
+}
+
+
+/* Impersonation Banner */
+.impersonation-wrapper:has(~ [class*="fixed"]:first-child) {
+  padding-top: 44px;
+}
+
+body:has(.impersonation-banner-active) .impersonation-wrapper {
+  padding-top: 44px;
+}
+

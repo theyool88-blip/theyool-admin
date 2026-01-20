@@ -1,25 +1,11 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
+import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import NewClientForm from '@/components/NewClientForm'
 
 export default async function NewClientPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  const adminClient = createAdminClient()
-  const { data: profile } = await adminClient
-    .from('tenant_members')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .single()
-
-  if (!profile) {
+  // 테넌트 컨텍스트 조회 (impersonation 포함)
+  const tenantContext = await getCurrentTenantContext()
+  if (!tenantContext) {
     redirect('/login')
   }
 

@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import Dashboard, { type Schedule } from '@/components/Dashboard'
@@ -18,33 +17,21 @@ type UnifiedCalendarRow = {
 }
 
 export default async function Home() {
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // 사용자 프로필 가져오기 (Service Role 사용)
-  const adminClient = createAdminClient()
-  const { data: profile } = await adminClient
-    .from('tenant_members')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // 테넌트 컨텍스트 조회
+  // 테넌트 컨텍스트 조회 (impersonation 포함)
   const tenantContext = await getCurrentTenantContext()
   if (!tenantContext) {
     redirect('/login')
+  }
+
+  const adminClient = createAdminClient()
+
+  // 프로필 생성 (impersonation이면 tenantContext에서 생성)
+  const profile = {
+    id: tenantContext.memberId || 'impersonation',
+    user_id: tenantContext.isImpersonating ? 'impersonation' : tenantContext.memberId,
+    role: tenantContext.memberRole,
+    display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
+    status: 'active'
   }
 
   // 이번 주 일정 가져오기 (통합 캘린더 사용)

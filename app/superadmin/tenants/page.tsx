@@ -10,11 +10,18 @@ import {
   Search,
   RefreshCw,
   AlertCircle,
-  Crown,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  ArrowUpRight,
   Filter,
   ArrowUpDown,
+  MoreHorizontal,
+  ExternalLink,
+  Trash2,
+  Edit3,
+  Eye,
+  Globe,
 } from 'lucide-react';
 import { TenantStatus, SubscriptionPlan, TenantType } from '@/types/tenant';
 
@@ -53,6 +60,7 @@ export default function TenantsListPage() {
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -120,27 +128,27 @@ export default function TenantsListPage() {
     return `${yy}.${mm}.${dd}`;
   };
 
-  const getPlanBadgeStyle = (plan: string) => {
+  const getPlanBadgeClass = (plan: string) => {
     switch (plan) {
       case 'enterprise':
-        return 'bg-purple-100 text-purple-700';
+        return 'sa-badge-violet';
       case 'professional':
-        return 'bg-blue-100 text-blue-700';
+        return 'sa-badge-blue';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'sa-badge-default';
     }
   };
 
-  const getStatusBadgeStyle = (status: string) => {
+  const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'active':
-        return 'bg-green-100 text-green-700';
+        return 'sa-badge-green';
       case 'suspended':
-        return 'bg-red-100 text-red-700';
+        return 'sa-badge-red';
       case 'cancelled':
-        return 'bg-gray-100 text-gray-600';
+        return 'sa-badge-default';
       default:
-        return 'bg-gray-100 text-gray-600';
+        return 'sa-badge-default';
     }
   };
 
@@ -169,210 +177,299 @@ export default function TenantsListPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="p-6 lg:p-8 max-w-[1400px] mx-auto">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/superadmin" className="text-gray-500 hover:text-gray-700">
-                <Crown className="w-6 h-6 text-amber-500" />
-              </Link>
-              <span className="text-gray-300">/</span>
-              <h1 className="text-lg font-bold text-gray-900">테넌트 관리</h1>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-[22px] font-semibold text-[--sa-text-primary] tracking-tight">
+            테넌트 관리
+          </h1>
+          <p className="text-[13px] text-[--sa-text-tertiary] mt-1">
+            전체 {pagination.total}개의 테넌트
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fetchTenants(pagination.page)}
+            className="sa-btn sa-btn-ghost"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+          <Link href="/superadmin/tenants/create" className="sa-btn sa-btn-primary">
+            <Plus className="w-4 h-4" />
+            테넌트 생성
+          </Link>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="sa-card p-4 mb-4">
+        <div className="flex flex-col md:flex-row gap-3">
+          {/* Search */}
+          <form onSubmit={handleSearch} className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[--sa-text-muted]" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="이름, 이메일, 슬러그로 검색..."
+                className="sa-input w-full pl-9"
+              />
             </div>
-            <button
-              onClick={() => fetchTenants(pagination.page)}
-              className="p-2 hover:bg-gray-100 rounded"
-              title="새로고침"
+          </form>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-[--sa-text-muted]" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="sa-input w-auto min-w-[120px]"
             >
-              <RefreshCw className={`w-4 h-4 text-gray-500 ${loading ? 'animate-spin' : ''}`} />
-            </button>
+              <option value="">전체 상태</option>
+              <option value="active">활성</option>
+              <option value="suspended">정지</option>
+              <option value="cancelled">해지</option>
+            </select>
           </div>
         </div>
-      </header>
+      </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Filters */}
-        <div className="bg-white border border-gray-200 rounded-lg p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <form onSubmit={handleSearch} className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="이름, 이메일, 슬러그로 검색"
-                  className="w-full h-10 pl-10 pr-4 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
-                />
-              </div>
-            </form>
+      {/* Error */}
+      {error && (
+        <div className="mb-4 p-3 bg-[--sa-accent-red-muted] border border-[--sa-accent-red]/20 rounded-lg flex items-center gap-3">
+          <AlertCircle className="w-4 h-4 text-[--sa-accent-red] flex-shrink-0" />
+          <p className="text-[12px] text-[--sa-accent-red]">{error}</p>
+        </div>
+      )}
 
-            {/* Status Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-gray-400" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500"
+      {/* Table */}
+      <div className="sa-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="sa-table">
+            <thead>
+              <tr>
+                <th className="w-[280px]">
+                  <button
+                    onClick={() => handleSort('name')}
+                    className="flex items-center gap-1.5 hover:text-[--sa-text-secondary] transition-colors"
+                  >
+                    테넌트
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th>유형</th>
+                <th>플랜</th>
+                <th>홈페이지</th>
+                <th className="text-center">멤버</th>
+                <th className="text-center">사건</th>
+                <th>상태</th>
+                <th>
+                  <button
+                    onClick={() => handleSort('created_at')}
+                    className="flex items-center gap-1.5 hover:text-[--sa-text-secondary] transition-colors"
+                  >
+                    가입일
+                    <ArrowUpDown className="w-3 h-3" />
+                  </button>
+                </th>
+                <th className="w-[50px]"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-12">
+                    <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-[--sa-text-muted]" />
+                    <p className="text-[12px] text-[--sa-text-muted]">데이터를 불러오는 중...</p>
+                  </td>
+                </tr>
+              ) : tenants.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="text-center py-12">
+                    <Building2 className="w-8 h-8 mx-auto mb-2 text-[--sa-text-muted]" />
+                    <p className="text-[12px] text-[--sa-text-muted]">등록된 테넌트가 없습니다.</p>
+                  </td>
+                </tr>
+              ) : (
+                tenants.map((tenant) => (
+                  <tr key={tenant.id} className="group">
+                    <td>
+                      <Link
+                        href={`/superadmin/tenants/${tenant.id}`}
+                        className="flex items-center gap-3"
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-[--sa-bg-hover] border border-[--sa-border-subtle] flex items-center justify-center flex-shrink-0">
+                          {tenant.type === 'firm' ? (
+                            <Building2 className="w-4 h-4 text-[--sa-text-muted]" />
+                          ) : (
+                            <User className="w-4 h-4 text-[--sa-text-muted]" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-[13px] font-medium text-[--sa-text-primary] group-hover:text-[--sa-accent-blue] transition-colors">
+                            {tenant.name}
+                          </p>
+                          <p className="text-[11px] text-[--sa-text-muted] sa-mono">{tenant.slug}</p>
+                        </div>
+                      </Link>
+                    </td>
+                    <td>
+                      <span className="text-[12px] text-[--sa-text-secondary]">
+                        {tenant.type === 'firm' ? '법무법인' : '개인'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`sa-badge ${getPlanBadgeClass(tenant.plan)}`}>
+                        {getPlanLabel(tenant.plan)}
+                      </span>
+                    </td>
+                    <td>
+                      {tenant.has_homepage ? (
+                        <div className="flex items-center gap-1.5">
+                          <Globe className="w-3.5 h-3.5 text-[--sa-accent-green]" />
+                          <span className="sa-badge sa-badge-green">활성</span>
+                        </div>
+                      ) : (
+                        <span className="text-[12px] text-[--sa-text-muted]">-</span>
+                      )}
+                    </td>
+                    <td className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Users className="w-3.5 h-3.5 text-[--sa-text-muted]" />
+                        <span className="text-[12px] text-[--sa-text-secondary]">{tenant.stats.members}</span>
+                      </div>
+                    </td>
+                    <td className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Briefcase className="w-3.5 h-3.5 text-[--sa-text-muted]" />
+                        <span className="text-[12px] text-[--sa-text-secondary]">{tenant.stats.cases}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className={`sa-badge ${getStatusBadgeClass(tenant.status)}`}>
+                        {getStatusLabel(tenant.status)}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="text-[12px] text-[--sa-text-muted] sa-mono">
+                        {formatDate(tenant.created_at)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="relative">
+                        <button
+                          onClick={() => setActiveMenu(activeMenu === tenant.id ? null : tenant.id)}
+                          className="p-1.5 rounded hover:bg-[--sa-bg-hover] text-[--sa-text-muted] hover:text-[--sa-text-secondary] transition-colors"
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                        {activeMenu === tenant.id && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-10"
+                              onClick={() => setActiveMenu(null)}
+                            />
+                            <div className="absolute right-0 top-full mt-1 w-40 bg-[--sa-bg-elevated] border border-[--sa-border-default] rounded-lg shadow-lg z-20 py-1">
+                              <Link
+                                href={`/superadmin/tenants/${tenant.id}`}
+                                className="flex items-center gap-2 px-3 py-2 text-[12px] text-[--sa-text-secondary] hover:bg-[--sa-bg-hover] transition-colors"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                상세 보기
+                              </Link>
+                              <Link
+                                href={`/superadmin/tenants/${tenant.id}/edit`}
+                                className="flex items-center gap-2 px-3 py-2 text-[12px] text-[--sa-text-secondary] hover:bg-[--sa-bg-hover] transition-colors"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                                수정
+                              </Link>
+                              {tenant.has_homepage && (
+                                <a
+                                  href={`https://${tenant.slug}.luseed.co.kr`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 px-3 py-2 text-[12px] text-[--sa-text-secondary] hover:bg-[--sa-bg-hover] transition-colors"
+                                >
+                                  <ExternalLink className="w-3.5 h-3.5" />
+                                  홈페이지 열기
+                                </a>
+                              )}
+                              <div className="h-px bg-[--sa-border-subtle] my-1" />
+                              <button className="flex items-center gap-2 px-3 py-2 text-[12px] text-[--sa-accent-red] hover:bg-[--sa-bg-hover] transition-colors w-full">
+                                <Trash2 className="w-3.5 h-3.5" />
+                                삭제
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 border-t border-[--sa-border-subtle]">
+            <p className="text-[12px] text-[--sa-text-muted]">
+              전체 {pagination.total}개 중{' '}
+              <span className="text-[--sa-text-secondary]">
+                {(pagination.page - 1) * pagination.limit + 1}-
+                {Math.min(pagination.page * pagination.limit, pagination.total)}
+              </span>
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => fetchTenants(pagination.page - 1)}
+                disabled={pagination.page === 1}
+                className="sa-btn sa-btn-ghost p-2 disabled:opacity-30"
               >
-                <option value="">전체 상태</option>
-                <option value="active">활성</option>
-                <option value="suspended">정지</option>
-                <option value="cancelled">해지</option>
-              </select>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-0.5 px-2">
+                {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (pagination.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (pagination.page <= 3) {
+                    pageNum = i + 1;
+                  } else if (pagination.page >= pagination.totalPages - 2) {
+                    pageNum = pagination.totalPages - 4 + i;
+                  } else {
+                    pageNum = pagination.page - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => fetchTenants(pageNum)}
+                      className={`w-8 h-8 rounded text-[12px] font-medium transition-colors ${
+                        pagination.page === pageNum
+                          ? 'bg-[--sa-text-primary] text-[--sa-bg-primary]'
+                          : 'text-[--sa-text-muted] hover:bg-[--sa-bg-hover]'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={() => fetchTenants(pagination.page + 1)}
+                disabled={pagination.page === pagination.totalPages}
+                className="sa-btn sa-btn-ghost p-2 disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-red-500" />
-            <p className="text-sm text-red-600">{error}</p>
           </div>
         )}
-
-        {/* Table */}
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">
-                    <button
-                      onClick={() => handleSort('name')}
-                      className="flex items-center gap-1 hover:text-gray-700"
-                    >
-                      테넌트
-                      <ArrowUpDown className="w-3 h-3" />
-                    </button>
-                  </th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">유형</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">플랜</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">멤버</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">사건</th>
-                  <th className="text-center px-4 py-3 font-medium text-gray-500">의뢰인</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">상태</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-500">
-                    <button
-                      onClick={() => handleSort('created_at')}
-                      className="flex items-center gap-1 hover:text-gray-700"
-                    >
-                      가입일
-                      <ArrowUpDown className="w-3 h-3" />
-                    </button>
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                      <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2" />
-                      로딩 중...
-                    </td>
-                  </tr>
-                ) : tenants.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
-                      테넌트가 없습니다.
-                    </td>
-                  </tr>
-                ) : (
-                  tenants.map((tenant) => (
-                    <tr key={tenant.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-sage-100 flex items-center justify-center flex-shrink-0">
-                            {tenant.type === 'firm' ? (
-                              <Building2 className="w-4 h-4 text-sage-600" />
-                            ) : (
-                              <User className="w-4 h-4 text-sage-600" />
-                            )}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{tenant.name}</p>
-                            <p className="text-xs text-gray-500">{tenant.slug}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-gray-600">
-                          {tenant.type === 'firm' ? '법무법인' : '개인'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded ${getPlanBadgeStyle(tenant.plan)}`}
-                        >
-                          {getPlanLabel(tenant.plan)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Users className="w-3 h-3 text-gray-400" />
-                          <span className="text-gray-600">{tenant.stats.members}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Briefcase className="w-3 h-3 text-gray-400" />
-                          <span className="text-gray-600">{tenant.stats.cases}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="text-gray-600">{tenant.stats.clients}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded ${getStatusBadgeStyle(tenant.status)}`}
-                        >
-                          {getStatusLabel(tenant.status)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">
-                        {formatDate(tenant.created_at)}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-              <p className="text-sm text-gray-500">
-                전체 {pagination.total}개 중 {(pagination.page - 1) * pagination.limit + 1}-
-                {Math.min(pagination.page * pagination.limit, pagination.total)}
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => fetchTenants(pagination.page - 1)}
-                  disabled={pagination.page === 1}
-                  className="p-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                <span className="text-sm text-gray-600">
-                  {pagination.page} / {pagination.totalPages}
-                </span>
-                <button
-                  onClick={() => fetchTenants(pagination.page + 1)}
-                  disabled={pagination.page === pagination.totalPages}
-                  className="p-2 border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </main>
+      </div>
     </div>
   );
 }

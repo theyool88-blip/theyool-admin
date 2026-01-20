@@ -35,14 +35,40 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
-  // Admin 경로 보호: /admin/* (단, /admin/login 제외)
-  const isAdminRoute = pathname.startsWith('/admin')
-  const isAdminLoginRoute = pathname === '/admin/login'
+  // 보호해야 할 경로 목록 (인증 필요)
+  const protectedPaths = ['/admin', '/cases', '/clients', '/schedules', '/consultations', '/payments', '/receivables', '/expenses', '/settings']
+  const isProtectedRoute = protectedPaths.some(path => pathname.startsWith(path))
+  const isAdminLoginRoute = pathname === '/admin/login' || pathname === '/login'
 
-  // 로그인하지 않은 경우 admin 페이지 접근 시 로그인 페이지로 리다이렉트
-  if (!user && isAdminRoute && !isAdminLoginRoute) {
+  // 슈퍼 어드민 대리 접속 쿠키 확인
+  const impersonationToken = request.cookies.get('sa_impersonate')?.value
+  let isValidImpersonation = false
+
+  // 디버깅: 모든 쿠키 로그
+  console.log('[Proxy Debug] Path:', pathname, 'isProtectedRoute:', isProtectedRoute)
+  console.log('[Proxy Debug] All cookies:', request.cookies.getAll().map(c => c.name))
+  console.log('[Proxy Debug] sa_impersonate token exists:', !!impersonationToken)
+
+  if (impersonationToken) {
+    try {
+      const decoded = JSON.parse(Buffer.from(impersonationToken, 'base64').toString())
+      const expiresAt = new Date(decoded.expiresAt)
+      console.log('[Proxy Debug] Token decoded:', { tenantId: decoded.tenantId, expiresAt: decoded.expiresAt })
+      if (expiresAt > new Date() && decoded.tenantId) {
+        isValidImpersonation = true
+        console.log('[Proxy Debug] Valid impersonation!')
+      }
+    } catch (e) {
+      console.log('[Proxy Debug] Token decode error:', e)
+    }
+  }
+
+  // 로그인하지 않은 경우 AND 대리 접속 중이 아닌 경우 보호된 페이지 접근 시 로그인 페이지로 리다이렉트
+  console.log('[Proxy Debug] Check:', { user: !!user, isValidImpersonation, isProtectedRoute, isAdminLoginRoute })
+  if (!user && !isValidImpersonation && isProtectedRoute && !isAdminLoginRoute) {
+    console.log('[Proxy Debug] Redirecting to login!')
     const url = request.nextUrl.clone()
-    url.pathname = '/admin/login'
+    url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 

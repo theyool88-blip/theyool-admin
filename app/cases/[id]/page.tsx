@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import CaseDetail from '@/components/CaseDetail'
@@ -12,34 +11,13 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     redirect('/cases/new')
   }
 
-  const supabase = await createClient()
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/login')
-  }
-
-  // 사용자 프로필 확인
-  const adminClient = createAdminClient()
-  const { data: profile } = await adminClient
-    .from('tenant_members')
-    .select('*')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .single()
-
-  if (!profile) {
-    redirect('/login')
-  }
-
-  // 테넌트 컨텍스트 조회
+  // 테넌트 컨텍스트 조회 (impersonation 포함)
   const tenantContext = await getCurrentTenantContext()
   if (!tenantContext) {
     redirect('/login')
   }
+
+  const adminClient = createAdminClient()
 
   // 사건 상세 정보 가져오기 (테넌트 필터 적용)
   let caseQuery = adminClient

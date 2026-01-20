@@ -598,7 +598,7 @@ function CalendarInner({ events, onEventClick, onEventUpdate, onClickDate }: Cal
       eventWidth: 95,
     },
     monthGridOptions: {
-      nEventsPerDay: 4,
+      nEventsPerDay: 7,
     },
     callbacks: {
       onEventClick: (event) => onEventClick(event as unknown as ScheduleXEvent),

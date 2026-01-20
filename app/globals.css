@@ -2887,13 +2887,15 @@ body:has(.impersonation-banner-active) .impersonation-wrapper {
 
 .sx__month-grid-day {
   background: var(--bg-secondary);
-  min-height: 140px;
+  min-height: 130px;
+  height: auto;  /* 이벤트 수에 따라 자동 확장 */
 }
 
 /* Responsive adjustments for mobile */
 @media (max-width: 640px) {
   .sx__month-grid-day {
-    min-height: 90px;
+    min-height: 80px;
+    height: auto;
   }
 
   .sx__month-grid-day__day-number {

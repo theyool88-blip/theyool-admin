@@ -1,8 +1,8 @@
 # 문서 인덱스
 
-**Last Updated**: 2026-01-17
+**Last Updated**: 2026-01-20
 
-법무법인 더율 관리자 시스템 (theyool-admin) 문서 목록입니다.
+법무법인 더율 관리자 시스템 (luseed) 문서 목록입니다.
 
 ---
 
@@ -26,6 +26,7 @@
 | [SCOURT_SYNC_SYSTEM.md](systems/SCOURT_SYNC_SYSTEM.md) | SCOURT 사건 갱신 시스템 (진행/일반 분리) |
 | [CLIENT_PARTY_SYNC_SYSTEM.md](systems/CLIENT_PARTY_SYNC_SYSTEM.md) | 의뢰인/당사자 이름 동기화 시스템 |
 | [CAPTCHA_MODEL.md](systems/CAPTCHA_MODEL.md) | 캡차 인식 ML 모델 |
+| [SUPERADMIN_IMPERSONATION.md](systems/SUPERADMIN_IMPERSONATION.md) | 슈퍼 어드민 테넌트 impersonation |
 
 ---
 

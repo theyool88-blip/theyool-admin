@@ -2,18 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, Shield, Link2 } from 'lucide-react';
+import { ArrowLeft, Shield, Link2, AlertCircle, RefreshCw } from 'lucide-react';
 import { MemberRole } from '@/types/tenant';
 import MemberList from '@/components/team/MemberList';
-import PermissionMatrix from '@/components/team/PermissionMatrix';
 import AssignmentList from '@/components/team/AssignmentList';
 
-type TabType = 'members' | 'permissions' | 'assignments';
+type TabType = 'permissions' | 'assignments';
 
 interface TabItem {
   id: TabType;
   label: string;
-  icon: typeof Users;
+  icon: typeof Shield;
   description: string;
 }
 
@@ -27,49 +26,50 @@ interface TenantInfo {
 }
 
 export default function TeamSettingsPage() {
-  const [activeTab, setActiveTab] = useState<TabType>('members');
+  const [activeTab, setActiveTab] = useState<TabType>('permissions');
   const [currentMember, setCurrentMember] = useState<CurrentMember | null>(null);
   const [tenantInfo, setTenantInfo] = useState<TenantInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const tabs: TabItem[] = [
-    {
-      id: 'members',
-      label: '멤버',
-      icon: Users,
-      description: '팀원 초대, 정보 수정, 정지/해제',
-    },
     {
       id: 'permissions',
       label: '권한 설정',
       icon: Shield,
-      description: '역할별 기본 권한 및 개별 권한 오버라이드',
+      description: '팀원 초대, 개별 권한 관리',
     },
     {
       id: 'assignments',
-      label: '배정',
+      label: '직원 배정',
       icon: Link2,
       description: '직원-변호사 담당 매핑',
     },
   ];
 
-  useEffect(() => {
-    const fetchInfo = async () => {
-      try {
-        const response = await fetch('/api/admin/tenant');
-        const result = await response.json();
+  const fetchInfo = async () => {
+    setLoading(true);
+    setError(null);
 
-        if (result.success) {
-          setCurrentMember(result.data.currentMember);
-          setTenantInfo({ type: result.data.tenant.type });
-        }
-      } catch (error) {
-        console.error('Failed to fetch tenant info:', error);
-      } finally {
-        setLoading(false);
+    try {
+      const response = await fetch('/api/admin/tenant');
+      const result = await response.json();
+
+      if (result.success) {
+        setCurrentMember(result.data.currentMember);
+        setTenantInfo({ type: result.data.tenant.type });
+      } else {
+        setError(result.error || '정보를 불러올 수 없습니다.');
       }
-    };
+    } catch (err) {
+      console.error('Failed to fetch tenant info:', err);
+      setError('서버에 연결할 수 없습니다.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchInfo();
   }, []);
 
@@ -104,13 +104,13 @@ export default function TeamSettingsPage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 상위 탭 네비게이션 (설정 페이지로 연결) */}
-        <div className="flex items-center gap-3 mb-5 text-sm">
+        <div className="flex items-center gap-3 mb-5 text-sm overflow-x-auto">
           <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-0.5">
             <Link
-              href="/admin/settings"
+              href="/admin/settings/profile"
               className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
             >
-              상담 시간
+              내 정보
             </Link>
             <Link
               href="/admin/settings/sources"
@@ -138,6 +138,12 @@ export default function TeamSettingsPage() {
               className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
             >
               사무소
+            </Link>
+            <Link
+              href="/admin/onboarding/import"
+              className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              데이터 가져오기
             </Link>
           </div>
         </div>
@@ -172,7 +178,21 @@ export default function TeamSettingsPage() {
         </div>
 
         {/* 탭 컨텐츠 */}
-        {activeTab === 'members' && currentMember && tenantInfo && (
+        {error && (
+          <div className="card p-12 text-center">
+            <AlertCircle className="w-12 h-12 text-[var(--color-danger)] mx-auto mb-4" />
+            <p className="text-sm text-[var(--text-secondary)] mb-4">{error}</p>
+            <button
+              onClick={fetchInfo}
+              className="btn btn-secondary h-9 px-4 text-sm inline-flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              다시 시도
+            </button>
+          </div>
+        )}
+
+        {!error && activeTab === 'permissions' && currentMember && tenantInfo && (
           <MemberList
             currentMemberId={currentMember.id}
             currentRole={currentMember.role}
@@ -180,13 +200,9 @@ export default function TeamSettingsPage() {
           />
         )}
 
-        {activeTab === 'permissions' && canEdit && (
-          <PermissionMatrix currentRole={currentMember?.role || 'admin'} />
-        )}
+        {!error && activeTab === 'assignments' && canEdit && <AssignmentList />}
 
-        {activeTab === 'assignments' && canEdit && <AssignmentList />}
-
-        {!canEdit && activeTab !== 'members' && (
+        {!error && activeTab === 'assignments' && !canEdit && (
           <div className="card p-12 text-center">
             <Shield className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-4" />
             <p className="text-sm text-[var(--text-tertiary)]">

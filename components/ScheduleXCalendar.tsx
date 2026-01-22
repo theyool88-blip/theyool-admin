@@ -721,12 +721,16 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     }
   }
 
+  // Stable date range key for fetch dependency
+  const dateRangeKey = useMemo(() => {
+    return `${format(monthStart, 'yyyy-MM-dd')}_${format(monthEnd, 'yyyy-MM-dd')}`
+  }, [monthStart, monthEnd])
+
   // Fetch schedules (holidays are now handled by useHolidays hook separately)
   const fetchSchedules = useCallback(async () => {
     try {
       setLoading(true)
-      const startDate = format(monthStart, 'yyyy-MM-dd')
-      const endDate = format(monthEnd, 'yyyy-MM-dd')
+      const [startDate, endDate] = dateRangeKey.split('_')
 
       const response = await fetch(`/api/admin/calendar?start_date=${startDate}&end_date=${endDate}`)
       const result = await response.json()
@@ -754,7 +758,7 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     } finally {
       setLoading(false)
     }
-  }, [monthStart, monthEnd])
+  }, [dateRangeKey]) // Only depend on stable dateRangeKey string
 
   useEffect(() => {
     fetchSchedules()

@@ -189,13 +189,13 @@ export default function IntegrationsPage() {
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* 탭 네비게이션 */}
-        <div className="flex items-center gap-3 mb-5 text-sm">
+        <div className="flex items-center gap-3 mb-5 text-sm overflow-x-auto">
           <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-0.5">
             <Link
-              href="/admin/settings"
+              href="/admin/settings/profile"
               className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
             >
-              상담 시간
+              내 정보
             </Link>
             <Link
               href="/admin/settings/sources"
@@ -223,6 +223,12 @@ export default function IntegrationsPage() {
               className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
             >
               사무소
+            </Link>
+            <Link
+              href="/admin/onboarding/import"
+              className="px-3 py-1.5 rounded-md transition-colors text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]"
+            >
+              데이터 가져오기
             </Link>
           </div>
         </div>

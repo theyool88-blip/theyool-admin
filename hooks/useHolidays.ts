@@ -88,13 +88,16 @@ export function useHolidays(years: number[]) {
 
   // Trigger fetch when years change
   useEffect(() => {
+    // Parse years from yearsKey to avoid dependency on unstable years array
+    const yearsToFetch = yearsKey ? yearsKey.split(',').map(Number).filter(Boolean) : []
+
     // Skip if no years to fetch
-    if (years.length === 0) {
+    if (yearsToFetch.length === 0) {
       return
     }
 
     // Check if data is already cached
-    const cached = getCachedHolidays(years)
+    const cached = getCachedHolidays(yearsToFetch)
     if (cached !== null) {
       // Already have cached data, no need to fetch
       return
@@ -103,7 +106,7 @@ export function useHolidays(years: number[]) {
     let isMounted = true
 
     // Fetch all years in parallel
-    Promise.all(years.map(fetchHolidaysForYear))
+    Promise.all(yearsToFetch.map(fetchHolidaysForYear))
       .then(results => {
         if (isMounted) {
           setState({
@@ -117,7 +120,7 @@ export function useHolidays(years: number[]) {
     return () => {
       isMounted = false
     }
-  }, [yearsKey, years])
+  }, [yearsKey]) // Only depend on stable yearsKey string
 
   // Return cached data if available, otherwise state data
   const cachedData = getCachedHolidays(years)

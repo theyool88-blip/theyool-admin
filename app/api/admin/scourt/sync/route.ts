@@ -76,13 +76,14 @@ export async function POST(request: NextRequest) {
     // 1. 사건 정보 조회 (enc_cs_no, scourt_wmonid 확인)
     const { data: legalCase, error: caseError } = await supabase
       .from('legal_cases')
-      .select('*, scourt_last_sync, scourt_last_progress_sync_at, scourt_last_general_sync_at, scourt_progress_hash, scourt_general_hash, scourt_sync_enabled, scourt_sync_cooldown_until, scourt_next_progress_sync_at, scourt_next_general_sync_at, enc_cs_no, scourt_wmonid, court_name')
+      .select('*, scourt_last_sync, scourt_last_progress_sync_at, scourt_last_general_sync_at, scourt_progress_hash, scourt_general_hash, scourt_sync_enabled, scourt_sync_cooldown_until, scourt_next_progress_sync_at, scourt_next_general_sync_at, scourt_enc_cs_no, scourt_wmonid, court_name')
       .eq('id', legalCaseId)
       .single();
 
     if (caseError || !legalCase) {
+      console.error('[SCOURT SYNC] 사건 조회 실패:', { legalCaseId, caseError });
       return NextResponse.json(
-        { error: '사건을 찾을 수 없습니다' },
+        { error: '사건을 찾을 수 없습니다', detail: caseError?.message },
         { status: 404 }
       );
     }
@@ -176,8 +177,8 @@ export async function POST(request: NextRequest) {
     const normalizedCourtName = getCourtFullName(effectiveCourtName, csDvsNm);
     const cortCdNum = getCourtCodeByName(normalizedCourtName) || normalizedCourtName;
 
-    // 첫 연동 여부 확인 (enc_cs_no 없으면 첫 연동)
-    const isFirstLink = !legalCase.enc_cs_no;
+    // 첫 연동 여부 확인 (scourt_enc_cs_no 없으면 첫 연동)
+    const isFirstLink = !legalCase.scourt_enc_cs_no;
     let effectiveSyncType: SyncType = resolvedSyncType;
     if (effectiveSyncType !== 'full' && isFirstLink) {
       effectiveSyncType = 'full';
@@ -309,7 +310,7 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('legal_cases')
           .update({
-            enc_cs_no: newEncCsNo,
+            scourt_enc_cs_no: newEncCsNo,
             scourt_wmonid: newWmonid,
           })
           .eq('id', legalCaseId);
@@ -318,7 +319,7 @@ export async function POST(request: NextRequest) {
       // === 갱신: 저장된 encCsNo로 직접 조회 (캡챠 불필요) ===
       console.log(`🔄 갱신 시작: ${caseNumber} (저장된 encCsNo 사용)`);
 
-      const storedEncCsNo = legalCase.enc_cs_no;
+      const storedEncCsNo = legalCase.scourt_enc_cs_no;
       const storedWmonid = legalCase.scourt_wmonid;
 
       if (shouldFetchGeneral) {
@@ -356,7 +357,7 @@ export async function POST(request: NextRequest) {
             await supabase
               .from('legal_cases')
               .update({
-                enc_cs_no: searchResult.encCsNo,
+                scourt_enc_cs_no: searchResult.encCsNo,
                 scourt_wmonid: searchResult.wmonid,
               })
               .eq('id', legalCaseId);
@@ -411,7 +412,7 @@ export async function POST(request: NextRequest) {
               await supabase
                 .from('legal_cases')
                 .update({
-                  enc_cs_no: searchResult.encCsNo,
+                  scourt_enc_cs_no: searchResult.encCsNo,
                   scourt_wmonid: searchResult.wmonid,
                 })
                 .eq('id', legalCaseId);

@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
     // 사건의 scourt 연동 상태 조회
     const { data: legalCase } = await supabase
       .from('legal_cases')
-      .select('scourt_last_sync, scourt_sync_status, court_case_number, enc_cs_no')
+      .select('scourt_last_sync, scourt_sync_status, court_case_number, scourt_enc_cs_no')
       .eq('id', caseId)
       .single();
 
@@ -96,7 +96,7 @@ export async function GET(request: NextRequest) {
         lastSync: legalCase?.scourt_last_sync,
         status: legalCase?.scourt_sync_status,
         caseNumber: legalCase?.court_case_number,
-        isLinked: !!profileCase || !!legalCase?.enc_cs_no,
+        isLinked: !!profileCase || !!legalCase?.scourt_enc_cs_no,
         profileId: profileCase?.profile_id,
       },
     });
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
     // 사건 정보 조회 (enc_cs_no, wmonid, court_case_number 등)
     const { data: legalCase, error: caseError } = await supabase
       .from('legal_cases')
-      .select('id, court_case_number, court_name, enc_cs_no, scourt_wmonid')
+      .select('id, court_case_number, court_name, scourt_enc_cs_no, scourt_wmonid')
       .eq('id', caseId)
       .single();
 
@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
     }
 
     // API fallback (기존 로직)
-    if (!legalCase.enc_cs_no || !legalCase.scourt_wmonid) {
+    if (!legalCase.scourt_enc_cs_no || !legalCase.scourt_wmonid) {
       return NextResponse.json(
         { error: 'SCOURT 연동 정보가 없습니다. 먼저 사건을 검색해주세요.' },
         { status: 400 }
@@ -288,7 +288,7 @@ export async function POST(request: NextRequest) {
       csYear,
       csDvsCd,
       csSerial,
-      encCsNo: legalCase.enc_cs_no,
+      encCsNo: legalCase.scourt_enc_cs_no,
     });
 
     if (!progressResult.success) {

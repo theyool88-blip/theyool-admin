@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import AdminHeader from '@/components/AdminHeader'
+import { useState, useCallback, useEffect, useRef } from 'react'
 
 interface ParsedCase {
   caseNumber: string
@@ -19,24 +18,22 @@ interface ParsedCase {
   parseError?: string
 }
 
-interface ImportResult {
-  caseNumber: string
-  courtName: string
-  clientName: string
-  status: 'success' | 'failed' | 'skipped'
-  error?: string
-  encCsNo?: string
-  legalCaseId?: string
-}
-
-interface ImportResponse {
+interface BatchProgress {
   total: number
   processed: number
   success: number
   failed: number
   skipped: number
-  results: ImportResult[]
-  parseErrors: Array<{ caseNumber: string; error: string }>
+  percentage: number
+}
+
+interface BatchStatusResponse {
+  batchId: string
+  status: 'pending' | 'processing' | 'completed' | 'failed'
+  progress: BatchProgress
+  createdAt: string
+  startedAt: string | null
+  completedAt: string | null
 }
 
 export default function ScourtImportPage() {
@@ -51,8 +48,9 @@ export default function ScourtImportPage() {
 
   // Import state
   const [importing, setImporting] = useState(false)
-  const [importResult, setImportResult] = useState<ImportResponse | null>(null)
-  const [importProgress, setImportProgress] = useState(0)
+  const [batchId, setBatchId] = useState<string | null>(null)
+  const [batchStatus, setBatchStatus] = useState<BatchStatusResponse | null>(null)
+  const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   // Parse CSV on client side for preview
   const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,7 +60,8 @@ export default function ScourtImportPage() {
     setFileName(file.name)
     setParseError(null)
     setParsedCases([])
-    setImportResult(null)
+    setBatchId(null)
+    setBatchStatus(null)
 
     try {
       const content = await file.text()
@@ -115,37 +114,137 @@ export default function ScourtImportPage() {
     }
   }, [])
 
+  // Poll for batch status
+  const pollBatchStatus = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/admin/onboarding/batch-status/${id}`)
+      if (res.ok) {
+        const data: BatchStatusResponse = await res.json()
+        setBatchStatus(data)
+
+        // Stop polling if completed or failed
+        if (data.status === 'completed' || data.status === 'failed') {
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+          }
+          setImporting(false)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to poll batch status:', err)
+    }
+  }, [])
+
+  // Start polling when batchId is set
+  useEffect(() => {
+    if (batchId && importing) {
+      // Initial fetch
+      pollBatchStatus(batchId)
+
+      // Poll every 3 seconds
+      pollingRef.current = setInterval(() => {
+        pollBatchStatus(batchId)
+      }, 3000)
+
+      return () => {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
+        }
+      }
+    }
+  }, [batchId, importing, pollBatchStatus])
+
   // Start import
   const handleImport = useCallback(async () => {
     if (!csvContent || importing) return
 
     setImporting(true)
-    setImportResult(null)
-    setImportProgress(0)
+    setBatchId(null)
+    setBatchStatus(null)
 
     try {
-      const res = await fetch('/api/admin/scourt/batch-import', {
+      // Convert parsed cases to rows format
+      const rows = parsedCases.map(pc => ({
+        court_case_number: pc.caseNumber,
+        court_name: pc.courtFullName,
+        client_name: pc.clientName,
+        client_role: pc.clientRoleKorean,
+        opponent_name: pc.opponentName,
+        case_name: pc.caseName,
+      }))
+
+      const res = await fetch('/api/admin/onboarding/batch-create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          csvContent,
+          rows,
           options: {
-            skipExisting,
+            duplicateHandling: skipExisting ? 'skip' : 'update',
             dryRun,
-            delayMs: 2500,
+            createNewClients: true,
           },
         }),
       })
 
-      const data: ImportResponse = await res.json()
-      setImportResult(data)
-      setImportProgress(100)
+      const data = await res.json()
+
+      if (data.success) {
+        if (data.dryRun) {
+          setBatchStatus({
+            batchId: 'dry-run',
+            status: 'completed',
+            progress: {
+              total: data.totalRows,
+              processed: data.totalRows,
+              success: data.totalRows,
+              failed: 0,
+              skipped: 0,
+              percentage: 100,
+            },
+            createdAt: new Date().toISOString(),
+            startedAt: new Date().toISOString(),
+            completedAt: new Date().toISOString(),
+          })
+          setImporting(false)
+        } else {
+          setBatchId(data.batchId)
+          // Polling will start via useEffect
+        }
+      } else {
+        setParseError(data.error || '가져오기 실패')
+        setImporting(false)
+      }
     } catch (err) {
       setParseError(err instanceof Error ? err.message : '가져오기 실패')
-    } finally {
       setImporting(false)
     }
-  }, [csvContent, importing, skipExisting, dryRun])
+  }, [csvContent, importing, parsedCases, skipExisting, dryRun])
+
+  // Cancel batch
+  const handleCancel = useCallback(async () => {
+    if (!batchId) return
+
+    try {
+      const res = await fetch(`/api/admin/onboarding/batch-status/${batchId}`, {
+        method: 'DELETE',
+      })
+
+      if (res.ok) {
+        // Stop polling
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current)
+          pollingRef.current = null
+        }
+        setImporting(false)
+        // Fetch final status
+        pollBatchStatus(batchId)
+      }
+    } catch (err) {
+      console.error('Failed to cancel batch:', err)
+    }
+  }, [batchId, pollBatchStatus])
 
   // Stats summary
   const stats = {
@@ -160,25 +259,20 @@ export default function ScourtImportPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader
-        title="SCOURT 사건 가져오기"
-        subtitle="케이스노트 CSV에서 사건 일괄 가져오기"
-      />
-
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <main className="max-w-6xl mx-auto p-6">
         {/* Upload Section */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">CSV 파일 업로드</h2>
+        <div className="card p-6 mb-6">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">CSV 파일 업로드</h2>
 
           <div className="flex items-center gap-4 mb-4">
             <label className="flex-1">
-              <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-sage-500 transition-colors">
+              <div className="flex items-center justify-center w-full h-32 border-2 border-dashed border-[var(--border-default)] rounded-lg cursor-pointer hover:border-[var(--sage-primary)] transition-colors">
                 <div className="text-center">
-                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                  <svg className="mx-auto h-12 w-12 text-[var(--text-muted)]" stroke="currentColor" fill="none" viewBox="0 0 48 48">
                     <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-[var(--text-secondary)]">
                     {fileName ? fileName : '케이스노트 CSV 파일을 선택하세요'}
                   </p>
                 </div>
@@ -193,14 +287,14 @@ export default function ScourtImportPage() {
           </div>
 
           {parseError && (
-            <div className="bg-red-50 text-red-700 p-3 rounded-lg text-sm mb-4">
+            <div className="bg-[var(--color-danger-muted)] text-[var(--color-danger)] p-3 rounded-lg text-sm mb-4">
               {parseError}
             </div>
           )}
 
           {parsedCases.length > 0 && (
-            <div className="text-sm text-gray-600">
-              <span className="font-medium text-gray-800">{parsedCases.length}건</span> 파싱 완료
+            <div className="text-sm text-[var(--text-secondary)]">
+              <span className="font-medium text-[var(--text-primary)]">{parsedCases.length}건</span> 파싱 완료
               <span className="mx-2">|</span>
               법원: {Object.keys(stats.byCourtType).length}곳
               <span className="mx-2">|</span>
@@ -210,10 +304,10 @@ export default function ScourtImportPage() {
         </div>
 
         {/* Preview Section */}
-        {parsedCases.length > 0 && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+        {parsedCases.length > 0 && !batchStatus && (
+          <div className="card p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                 미리보기 ({parsedCases.length}건)
               </h2>
               <div className="flex items-center gap-4">
@@ -222,57 +316,57 @@ export default function ScourtImportPage() {
                     type="checkbox"
                     checked={skipExisting}
                     onChange={(e) => setSkipExisting(e.target.checked)}
-                    className="rounded border-gray-300 text-sage-600 focus:ring-sage-500"
+                    className="form-input rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
                   />
-                  <span className="text-gray-600">이미 연동된 사건 스킵</span>
+                  <span className="text-[var(--text-secondary)]">이미 연동된 사건 스킵</span>
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
                     checked={dryRun}
                     onChange={(e) => setDryRun(e.target.checked)}
-                    className="rounded border-gray-300 text-sage-600 focus:ring-sage-500"
+                    className="form-input rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
                   />
-                  <span className="text-gray-600">테스트 모드</span>
+                  <span className="text-[var(--text-secondary)]">테스트 모드</span>
                 </label>
               </div>
             </div>
 
-            <div className="overflow-x-auto max-h-96 border border-gray-200 rounded-lg">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50 sticky top-0">
+            <div className="overflow-x-auto max-h-96 border border-[var(--border-default)] rounded-lg">
+              <table className="min-w-full divide-y divide-[var(--border-default)] text-sm">
+                <thead className="bg-[var(--bg-primary)] sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">#</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">사건번호</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">법원</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">의뢰인</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">역할</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">상대방</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">#</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">사건번호</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">법원</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">의뢰인</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">역할</th>
+                    <th className="px-4 py-3 text-left font-medium text-[var(--text-tertiary)]">상대방</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-default)]">
                   {parsedCases.slice(0, 50).map((pc, idx) => (
-                    <tr key={idx} className={pc.parseError ? 'bg-red-50' : ''}>
-                      <td className="px-4 py-2 text-gray-500">{idx + 1}</td>
-                      <td className="px-4 py-2 font-mono text-gray-800">{pc.caseNumber}</td>
-                      <td className="px-4 py-2 text-gray-600">{pc.courtName}</td>
-                      <td className="px-4 py-2 text-gray-800">{pc.clientName}</td>
+                    <tr key={idx} className={pc.parseError ? 'bg-[var(--color-danger-muted)]' : ''}>
+                      <td className="px-4 py-2 text-[var(--text-tertiary)]">{idx + 1}</td>
+                      <td className="px-4 py-2 font-mono text-[var(--text-primary)]">{pc.caseNumber}</td>
+                      <td className="px-4 py-2 text-[var(--text-secondary)]">{pc.courtName}</td>
+                      <td className="px-4 py-2 text-[var(--text-primary)]">{pc.clientName}</td>
                       <td className="px-4 py-2">
                         <span className={`px-2 py-0.5 rounded text-xs ${
                           pc.clientRoleKorean === '원고' || pc.clientRoleKorean === '신청인' || pc.clientRoleKorean === '청구인' || pc.clientRoleKorean === '채권자'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-orange-100 text-orange-700'
+                            ? 'bg-[var(--color-info-muted)] text-[var(--color-info)]'
+                            : 'bg-[var(--color-warning-muted)] text-[var(--color-warning)]'
                         }`}>
                           {pc.clientRoleKorean || '-'}
                         </span>
                       </td>
-                      <td className="px-4 py-2 text-gray-600">{pc.opponentName}</td>
+                      <td className="px-4 py-2 text-[var(--text-secondary)]">{pc.opponentName}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {parsedCases.length > 50 && (
-                <div className="text-center py-2 text-gray-500 text-sm bg-gray-50">
+                <div className="text-center py-2 text-[var(--text-tertiary)] text-sm bg-[var(--bg-primary)]">
                   ... 외 {parsedCases.length - 50}건 더 있음
                 </div>
               )}
@@ -282,10 +376,10 @@ export default function ScourtImportPage() {
               <button
                 onClick={handleImport}
                 disabled={importing}
-                className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                className={`btn ${
                   importing
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                    : 'bg-sage-600 text-white hover:bg-sage-700'
+                    ? 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] cursor-not-allowed'
+                    : 'btn-primary'
                 }`}
               >
                 {importing ? (
@@ -294,7 +388,7 @@ export default function ScourtImportPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
-                    가져오는 중...
+                    대기열 추가 중...
                   </span>
                 ) : dryRun ? (
                   '테스트 실행'
@@ -306,101 +400,121 @@ export default function ScourtImportPage() {
           </div>
         )}
 
-        {/* Import Progress */}
-        {importing && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">가져오기 진행 중...</h2>
-            <div className="w-full bg-gray-200 rounded-full h-3">
+        {/* Progress Section */}
+        {batchStatus && batchStatus.status !== 'completed' && (
+          <div className="card p-6 mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+                {batchStatus.status === 'pending' ? '대기 중...' : '처리 중...'}
+              </h2>
+              {importing && (
+                <button
+                  onClick={handleCancel}
+                  className="btn bg-[var(--color-danger-muted)] text-[var(--color-danger)] hover:bg-[var(--color-danger)] hover:text-white"
+                >
+                  취소
+                </button>
+              )}
+            </div>
+
+            <div className="w-full bg-[var(--bg-tertiary)] rounded-full h-3 mb-2">
               <div
-                className="bg-sage-600 h-3 rounded-full transition-all duration-300"
-                style={{ width: `${importProgress}%` }}
+                className="bg-[var(--sage-primary)] h-3 rounded-full transition-all duration-300"
+                style={{ width: `${batchStatus.progress.percentage}%` }}
               />
             </div>
-            <p className="text-sm text-gray-500 mt-2">
-              API 호출 간격 2.5초... 전체 약 {Math.ceil(parsedCases.length * 2.5 / 60)}분 소요 예상
+
+            <div className="flex justify-between text-sm text-[var(--text-tertiary)]">
+              <span>
+                {batchStatus.progress.processed} / {batchStatus.progress.total}건 처리됨
+              </span>
+              <span>{batchStatus.progress.percentage}%</span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-3 gap-4 text-sm">
+              <div className="bg-[var(--color-success-muted)] rounded-lg p-3 text-center">
+                <div className="font-semibold text-[var(--color-success)]">{batchStatus.progress.success}</div>
+                <div className="text-[var(--color-success)]">성공</div>
+              </div>
+              <div className="bg-[var(--color-danger-muted)] rounded-lg p-3 text-center">
+                <div className="font-semibold text-[var(--color-danger)]">{batchStatus.progress.failed}</div>
+                <div className="text-[var(--color-danger)]">실패</div>
+              </div>
+              <div className="bg-[var(--color-warning-muted)] rounded-lg p-3 text-center">
+                <div className="font-semibold text-[var(--color-warning)]">{batchStatus.progress.skipped}</div>
+                <div className="text-[var(--color-warning)]">스킵</div>
+              </div>
+            </div>
+
+            <p className="text-sm text-[var(--text-tertiary)] mt-4">
+              백그라운드에서 처리 중입니다. 페이지를 닫아도 처리가 계속됩니다.
+              완료 시 알림을 받게 됩니다.
             </p>
           </div>
         )}
 
         {/* Results Section */}
-        {importResult && (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">가져오기 결과</h2>
+        {batchStatus && batchStatus.status === 'completed' && (
+          <div className="card p-6">
+            <h2 className="text-lg font-semibold text-[var(--text-primary)] mb-4">가져오기 완료</h2>
 
             <div className="grid grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-gray-800">{importResult.total}</div>
-                <div className="text-sm text-gray-500">전체</div>
+              <div className="bg-[var(--bg-primary)] rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-[var(--text-primary)]">{batchStatus.progress.total}</div>
+                <div className="text-sm text-[var(--text-tertiary)]">전체</div>
               </div>
-              <div className="bg-green-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-green-600">{importResult.success}</div>
-                <div className="text-sm text-green-600">성공</div>
+              <div className="bg-[var(--color-success-muted)] rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-[var(--color-success)]">{batchStatus.progress.success}</div>
+                <div className="text-sm text-[var(--color-success)]">성공</div>
               </div>
-              <div className="bg-red-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-red-600">{importResult.failed}</div>
-                <div className="text-sm text-red-600">실패</div>
+              <div className="bg-[var(--color-danger-muted)] rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-[var(--color-danger)]">{batchStatus.progress.failed}</div>
+                <div className="text-sm text-[var(--color-danger)]">실패</div>
               </div>
-              <div className="bg-yellow-50 rounded-lg p-4 text-center">
-                <div className="text-2xl font-bold text-yellow-600">{importResult.skipped}</div>
-                <div className="text-sm text-yellow-600">스킵</div>
+              <div className="bg-[var(--color-warning-muted)] rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold text-[var(--color-warning)]">{batchStatus.progress.skipped}</div>
+                <div className="text-sm text-[var(--color-warning)]">스킵</div>
               </div>
             </div>
 
-            {importResult.results.length > 0 && (
-              <div className="overflow-x-auto max-h-96 border border-gray-200 rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50 sticky top-0">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">상태</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">사건번호</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">법원</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">의뢰인</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-500">비고</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {importResult.results.map((r, idx) => (
-                      <tr key={idx} className={
-                        r.status === 'success' ? 'bg-green-50' :
-                        r.status === 'failed' ? 'bg-red-50' :
-                        'bg-yellow-50'
-                      }>
-                        <td className="px-4 py-2">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                            r.status === 'success' ? 'bg-green-100 text-green-700' :
-                            r.status === 'failed' ? 'bg-red-100 text-red-700' :
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {r.status === 'success' ? '성공' : r.status === 'failed' ? '실패' : '스킵'}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 font-mono text-gray-800">{r.caseNumber}</td>
-                        <td className="px-4 py-2 text-gray-600">{r.courtName}</td>
-                        <td className="px-4 py-2 text-gray-800">{r.clientName}</td>
-                        <td className="px-4 py-2 text-gray-500 text-xs">
-                          {r.error || (r.encCsNo ? `encCsNo: ${r.encCsNo}` : '')}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {batchStatus.completedAt && (
+              <p className="text-sm text-[var(--text-tertiary)]">
+                완료 시간: {new Date(batchStatus.completedAt).toLocaleString('ko-KR')}
+              </p>
             )}
+
+            <div className="mt-4">
+              <button
+                onClick={() => {
+                  setBatchId(null)
+                  setBatchStatus(null)
+                  setParsedCases([])
+                  setCsvContent('')
+                  setFileName(null)
+                }}
+                className="btn btn-primary"
+              >
+                새 파일 가져오기
+              </button>
+            </div>
           </div>
         )}
 
         {/* Help Section */}
-        <div className="mt-6 bg-sage-50 rounded-lg p-4 text-sm text-sage-700">
+        <div className="mt-6 bg-[var(--sage-muted)] rounded-lg p-4 text-sm text-[var(--sage-primary)]">
           <h3 className="font-semibold mb-2">사용 방법</h3>
           <ol className="list-decimal list-inside space-y-1">
             <li>케이스노트에서 소송리스트를 CSV로 내보내기</li>
             <li>위 파일 선택 영역에 CSV 파일 업로드</li>
             <li>미리보기에서 파싱 결과 확인</li>
             <li>&quot;가져오기 시작&quot; 버튼 클릭</li>
-            <li>각 사건별 SCOURT 검색 및 encCsNo 획득 (건당 약 2.5초)</li>
+            <li>백그라운드에서 자동 처리 (완료 시 알림)</li>
           </ol>
-          <p className="mt-2 text-sage-600">
-            * 이미 시스템에 등록된 사건만 SCOURT 연동됩니다. 신규 사건은 먼저 등록해주세요.
+          <p className="mt-2 text-[var(--sage-primary)] opacity-80">
+            * 대량 등록은 백그라운드에서 처리되므로 페이지를 닫아도 됩니다.
+          </p>
+          <p className="text-[var(--sage-primary)] opacity-80">
+            * 처리 완료 시 알림을 받게 됩니다.
           </p>
         </div>
       </main>

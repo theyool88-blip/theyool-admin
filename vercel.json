@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/scourt-sync-worker?secret=scourt-batch-sync-secret",
       "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/batch-import-worker?secret=batch-import-secret",
+      "schedule": "* * * * *"
     }
   ]
 }

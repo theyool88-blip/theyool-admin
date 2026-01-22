@@ -54,6 +54,7 @@ export default function OnboardingImportPage() {
   const [report, setReport] = useState<ImportReport | null>(null)
   const [progress, setProgress] = useState<ProgressInfo | null>(null)
   const [teamMembers, setTeamMembers] = useState<TenantMember[]>([])
+  const [importStartTime, setImportStartTime] = useState<number | null>(null)
 
   // 팀 멤버 목록 조회
   useEffect(() => {
@@ -180,6 +181,7 @@ export default function OnboardingImportPage() {
     setError(null)
     setStep('importing')
     setProgress(null)
+    setImportStartTime(Date.now())
 
     try {
       const response = await fetch('/api/admin/onboarding/batch-create-stream', {
@@ -270,6 +272,29 @@ export default function OnboardingImportPage() {
             eventData = ''
           }
         }
+
+        // isFinal일 때 남은 이벤트 처리 (마지막 빈 줄이 없는 경우)
+        if (isFinal && eventType && eventData) {
+          try {
+            const data = JSON.parse(eventData)
+            switch (eventType) {
+              case 'complete':
+                setReport({
+                  summary: data.summary,
+                  results: data.results,
+                  missingInfoSummary: data.missingInfoSummary,
+                  createdAt: data.createdAt,
+                  importOptions: options
+                })
+                setStep('complete')
+                break
+              case 'error':
+                throw new Error(data.message)
+            }
+          } catch (parseErr) {
+            console.error('최종 이벤트 파싱 오류:', parseErr)
+          }
+        }
       }
 
       while (true) {
@@ -300,6 +325,7 @@ export default function OnboardingImportPage() {
     setReport(null)
     setError(null)
     setProgress(null)
+    setImportStartTime(null)
   }, [])
 
   // 미리보기 셀 값 포맷팅 (법원명은 약어로 표시)
@@ -750,14 +776,21 @@ export default function OnboardingImportPage() {
                 )}
 
                 {/* 진행 시간 및 예상 소요 시간 */}
-                <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-3">
-                  <span>
-                    경과: {Math.floor((progress.current * 2.5) / 60)}분 {Math.round((progress.current * 2.5) % 60)}초
-                  </span>
-                  <span>
-                    예상 남은 시간: {Math.floor(((progress.total - progress.current) * 2.5) / 60)}분 {Math.round(((progress.total - progress.current) * 2.5) % 60)}초
-                  </span>
-                </div>
+                {(() => {
+                  const elapsedSec = importStartTime ? Math.floor((Date.now() - importStartTime) / 1000) : 0
+                  const avgSecPerItem = progress.current > 0 ? elapsedSec / progress.current : 2.5
+                  const remainingSec = Math.round((progress.total - progress.current) * avgSecPerItem)
+                  return (
+                    <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-3">
+                      <span>
+                        경과: {Math.floor(elapsedSec / 60)}분 {elapsedSec % 60}초
+                      </span>
+                      <span>
+                        예상 남은 시간: {Math.floor(remainingSec / 60)}분 {remainingSec % 60}초
+                      </span>
+                    </div>
+                  )
+                })()}
 
                 <p className="text-xs text-[var(--text-tertiary)] text-center mt-4">
                   대법원 나의사건 연동은 건당 약 2.5초가 소요됩니다

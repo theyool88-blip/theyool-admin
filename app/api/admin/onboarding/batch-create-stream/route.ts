@@ -336,23 +336,54 @@ export async function POST(request: NextRequest) {
               }
             }
 
-            // 4-2. 담당자 처리
+            // 4-2. 담당자 처리 (복수 담당자 지원)
             let assignedTo: string | null = null
-            if (row.assigned_lawyer || row.assigned_staff) {
-              const assignedName = row.assigned_lawyer || row.assigned_staff
-              const { data: member } = await adminClient
+            const assigneeIds: { memberId: string; isPrimary: boolean }[] = []
+
+            if (row.assigned_lawyer) {
+              // 쉼표로 구분된 복수 변호사 파싱
+              const lawyerNames = row.assigned_lawyer.split(',').map(n => n.trim()).filter(n => n)
+
+              for (let idx = 0; idx < lawyerNames.length; idx++) {
+                const lawyerName = lawyerNames[idx]
+                const { data: member } = await adminClient
+                  .from('tenant_members')
+                  .select('id')
+                  .eq('tenant_id', tenant.tenantId)
+                  .eq('display_name', lawyerName)
+                  .single()
+
+                if (member) {
+                  // 첫 번째 변호사가 primary
+                  if (idx === 0) {
+                    assignedTo = member.id
+                  }
+                  assigneeIds.push({ memberId: member.id, isPrimary: idx === 0 })
+                } else {
+                  warnings.push({
+                    field: 'assigned_lawyer',
+                    message: `담당자 "${lawyerName}"을(를) 찾을 수 없습니다`
+                  })
+                }
+              }
+            }
+
+            // assigned_staff 처리 (단일)
+            if (row.assigned_staff) {
+              const { data: staffMember } = await adminClient
                 .from('tenant_members')
                 .select('id')
                 .eq('tenant_id', tenant.tenantId)
-                .eq('display_name', assignedName)
+                .eq('display_name', row.assigned_staff)
                 .single()
 
-              if (member) {
-                assignedTo = member.id
+              if (staffMember) {
+                // staff는 assignedTo에 넣지 않음 (lawyer만 primary)
+                assigneeIds.push({ memberId: staffMember.id, isPrimary: false })
               } else {
                 warnings.push({
-                  field: 'assigned_lawyer',
-                  message: `담당자 "${assignedName}"을(를) 찾을 수 없습니다`
+                  field: 'assigned_staff',
+                  message: `담당직원 "${row.assigned_staff}"을(를) 찾을 수 없습니다`
                 })
               }
             }
@@ -366,28 +397,25 @@ export async function POST(request: NextRequest) {
             })
 
             // 정제된 사건번호, 정규화된 법원명 사용
-            // opponent_name은 case_parties에서 관리하므로 null로 설정
+            // 참고: client_id, client_role, client_role_status, opponent_name, retainer_fee, success_fee_agreement는
+            //       legal_cases 테이블에서 제거됨 (case_clients, case_parties 테이블로 이동)
             const caseData: Record<string, unknown> = {
               tenant_id: tenant.tenantId,
               case_name: row.case_name || cleanedCaseNumber,
               case_type: (row as { case_type?: string }).case_type || '기타',
               court_case_number: cleanedCaseNumber,
               court_name: normalizedCourtName,
-              client_id: clientId,
-              client_role: resolvedClientRole,
-              client_role_status: resolvedClientRoleStatus,
-              opponent_name: null,  // case_parties로 관리
+              primary_client_id: clientId,
+              primary_client_name: row.client_name || null,
               assigned_to: assignedTo,
               status: '진행중',
               contract_date: row.contract_date,
-              retainer_fee: row.retainer_fee || null,
-              success_fee_agreement: row.success_fee_agreement || null,
               notes: row.notes || null,
             }
 
             // 대법원 연동 성공 시에만 연동 정보 추가
             if (scourtLinked && scourtResult) {
-              caseData.enc_cs_no = scourtResult.encCsNo
+              caseData.scourt_enc_cs_no = scourtResult.encCsNo
               caseData.scourt_wmonid = scourtResult.wmonid
               caseData.scourt_last_sync = new Date().toISOString()
               caseData.scourt_sync_status = 'synced'
@@ -433,7 +461,7 @@ export async function POST(request: NextRequest) {
             })
 
             if (partySeeds.length > 0) {
-              // case_parties 생성 (is_our_client → is_primary로 변경, client_id 제거)
+              // case_parties 생성 (client_id, is_our_client, is_primary 컬럼 없음)
               const payload = partySeeds.map((seed, index) => ({
                 tenant_id: tenant.tenantId,
                 case_id: newCase.id,
@@ -441,16 +469,14 @@ export async function POST(request: NextRequest) {
                 party_type: seed.party_type,
                 party_type_label: seed.party_type_label || null,
                 party_order: index + 1,
-                is_primary: seed.is_our_client,  // is_our_client → is_primary
                 representatives: [],
-                manual_override: true,
                 scourt_synced: false,
               }))
 
               const { data: insertedParties, error: partyError } = await adminClient
                 .from('case_parties')
                 .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
-                .select('id, is_primary')
+                .select('id, party_name')
 
               if (partyError) {
                 warnings.push({
@@ -461,8 +487,9 @@ export async function POST(request: NextRequest) {
 
               // case_clients 생성 (의뢰인 연결)
               if (clientId && !partyError) {
-                const clientParty = insertedParties?.find(p => p.is_primary)
-                await adminClient
+                // 의뢰인과 같은 이름의 당사자 찾기
+                const clientParty = insertedParties?.find(p => p.party_name === row.client_name)
+                const { error: clientError } = await adminClient
                   .from('case_clients')
                   .upsert({
                     tenant_id: tenant.tenantId,
@@ -472,6 +499,35 @@ export async function POST(request: NextRequest) {
                     is_primary_client: true,
                     retainer_fee: row.retainer_fee ? Number(row.retainer_fee) : null,
                   }, { onConflict: 'case_id,client_id' })
+
+                if (clientError) {
+                  warnings.push({
+                    field: 'case_clients',
+                    message: `의뢰인 연결 실패: ${clientError.message}`
+                  })
+                }
+              }
+            }
+
+            // case_assignees 생성 (담당자 연결)
+            if (assigneeIds.length > 0) {
+              const assigneePayload = assigneeIds.map(a => ({
+                tenant_id: tenant.tenantId,
+                case_id: newCase.id,
+                member_id: a.memberId,
+                assignee_role: 'lawyer' as const,
+                is_primary: a.isPrimary,
+              }))
+
+              const { error: assigneeError } = await adminClient
+                .from('case_assignees')
+                .upsert(assigneePayload, { onConflict: 'case_id,member_id' })
+
+              if (assigneeError) {
+                warnings.push({
+                  field: 'case_assignees',
+                  message: `담당자 연결 실패: ${assigneeError.message}`
+                })
               }
             }
 

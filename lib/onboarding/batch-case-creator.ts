@@ -318,23 +318,51 @@ async function createSingleCase(
       })
     }
 
-    // 4. 담당자 처리
+    // 4. 담당자 처리 (복수 담당자 지원)
     let assignedTo: string | null = null
-    if (row.assigned_lawyer || row.assigned_staff) {
-      const assignedName = row.assigned_lawyer || row.assigned_staff
-      const { data: member } = await adminClient
+    const assigneeIds: { memberId: string; isPrimary: boolean }[] = []
+
+    if (row.assigned_lawyer) {
+      // 쉼표로 구분된 복수 변호사 파싱
+      const lawyerNames = row.assigned_lawyer.split(',').map(n => n.trim()).filter(n => n)
+
+      for (let idx = 0; idx < lawyerNames.length; idx++) {
+        const lawyerName = lawyerNames[idx]
+        const { data: member } = await adminClient
+          .from('tenant_members')
+          .select('id')
+          .eq('tenant_id', tenant.tenantId)
+          .eq('display_name', lawyerName)
+          .single()
+
+        if (member) {
+          if (idx === 0) {
+            assignedTo = member.id
+          }
+          assigneeIds.push({ memberId: member.id, isPrimary: idx === 0 })
+        } else {
+          warnings.push({
+            field: 'assigned_lawyer',
+            message: `담당자 "${lawyerName}"을(를) 찾을 수 없습니다`
+          })
+        }
+      }
+    }
+
+    if (row.assigned_staff) {
+      const { data: staffMember } = await adminClient
         .from('tenant_members')
         .select('id')
         .eq('tenant_id', tenant.tenantId)
-        .eq('display_name', assignedName)
+        .eq('display_name', row.assigned_staff)
         .single()
 
-      if (member) {
-        assignedTo = member.id
+      if (staffMember) {
+        assigneeIds.push({ memberId: staffMember.id, isPrimary: false })
       } else {
         warnings.push({
-          field: 'assigned_lawyer',
-          message: `담당자 "${assignedName}"을(를) 찾을 수 없습니다`
+          field: 'assigned_staff',
+          message: `담당직원 "${row.assigned_staff}"을(를) 찾을 수 없습니다`
         })
       }
     }
@@ -358,16 +386,11 @@ async function createSingleCase(
         case_type: caseData.case_type,
         court_case_number: cleanedCaseNumber,  // 정제된 사건번호 사용
         court_name: resolvedCourtName,
-        client_id: clientId,
-        client_role: caseData.client_role || null,
-        client_role_status: resolvedClientRoleStatus,
-        // opponent_name은 더 이상 legal_cases에 저장하지 않음 (case_parties로 관리)
-        opponent_name: null,
+        primary_client_id: clientId,
+        primary_client_name: row.client_name || null,
         assigned_to: assignedTo,
         status: '진행중',
         contract_date: caseData.contract_date,
-        retainer_fee: caseData.retainer_fee || null,
-        success_fee_agreement: caseData.success_fee_agreement || null,
         notes: caseData.notes || null
       }])
       .select()
@@ -397,6 +420,7 @@ async function createSingleCase(
     })
 
     if (partySeeds.length > 0) {
+      // case_parties 생성 (client_id, is_our_client, manual_override 컬럼 없음)
       const payload = partySeeds.map((seed, index) => ({
         tenant_id: tenant.tenantId,
         case_id: newCase.id,
@@ -404,15 +428,14 @@ async function createSingleCase(
         party_type: seed.party_type,
         party_type_label: seed.party_type_label || null,
         party_order: index + 1,
-        is_our_client: seed.is_our_client,
-        client_id: seed.client_id || null,
-        manual_override: false,
+        representatives: [],
         scourt_synced: false,
       }))
 
-      const { error: partyError } = await adminClient
+      const { data: insertedParties, error: partyError } = await adminClient
         .from('case_parties')
         .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
+        .select('id, party_name')
 
       if (partyError) {
         warnings.push({
@@ -420,9 +443,53 @@ async function createSingleCase(
           message: `당사자 정보 저장 실패: ${partyError.message}`
         })
       }
+
+      // case_clients 생성 (의뢰인 연결)
+      if (clientId && !partyError) {
+        const clientParty = insertedParties?.find(p => p.party_name === row.client_name)
+        const { error: clientError } = await adminClient
+          .from('case_clients')
+          .upsert({
+            tenant_id: tenant.tenantId,
+            case_id: newCase.id,
+            client_id: clientId,
+            linked_party_id: clientParty?.id || null,
+            is_primary_client: true,
+            retainer_fee: caseData.retainer_fee ? Number(caseData.retainer_fee) : null,
+          }, { onConflict: 'case_id,client_id' })
+
+        if (clientError) {
+          warnings.push({
+            field: 'case_clients',
+            message: `의뢰인 연결 실패: ${clientError.message}`
+          })
+        }
+      }
     }
 
-    // 8. SCOURT 연동은 API 라우트에서 처리 (Node.js 전용 모듈 사용)
+    // 8. case_assignees 생성 (담당자 연결)
+    if (assigneeIds.length > 0) {
+      const assigneePayload = assigneeIds.map(a => ({
+        tenant_id: tenant.tenantId,
+        case_id: newCase.id,
+        member_id: a.memberId,
+        assignee_role: 'lawyer' as const,
+        is_primary: a.isPrimary,
+      }))
+
+      const { error: assigneeError } = await adminClient
+        .from('case_assignees')
+        .upsert(assigneePayload, { onConflict: 'case_id,member_id' })
+
+      if (assigneeError) {
+        warnings.push({
+          field: 'case_assignees',
+          message: `담당자 연결 실패: ${assigneeError.message}`
+        })
+      }
+    }
+
+    // 9. SCOURT 연동은 API 라우트에서 처리 (Node.js 전용 모듈 사용)
     const scourtLinked = false
     const encCsNo: string | undefined = undefined
 
@@ -480,22 +547,15 @@ async function updateExistingCase(
 
   // 업데이트할 필드 결정 (빈 필드만)
   // case_type은 자동 분류되므로 업데이트 대상에서 제외
+  // 참고: opponent_name, retainer_fee, success_fee_agreement, earned_success_fee는
+  //       legal_cases 테이블에서 제거됨 (case_clients, case_parties 테이블로 이동)
   const updates: Record<string, unknown> = {}
 
-  if (!existingCase.opponent_name && row.opponent_name) {
-    updates.opponent_name = row.opponent_name
-  }
-  if (!existingCase.retainer_fee && row.retainer_fee) {
-    updates.retainer_fee = row.retainer_fee
-  }
-  if (!existingCase.success_fee_agreement && row.success_fee_agreement) {
-    updates.success_fee_agreement = row.success_fee_agreement
-  }
-  if (!existingCase.earned_success_fee && row.earned_success_fee) {
-    updates.earned_success_fee = row.earned_success_fee
-  }
   if (!existingCase.notes && row.notes) {
     updates.notes = row.notes
+  }
+  if (!existingCase.primary_client_name && row.client_name) {
+    updates.primary_client_name = row.client_name
   }
 
   if (Object.keys(updates).length > 0) {

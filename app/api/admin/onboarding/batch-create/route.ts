@@ -48,7 +48,7 @@ async function upsertManualParties({
 
   if (seeds.length === 0) return null
 
-  // case_parties 생성 (is_our_client → is_primary로 변경, client_id 제거)
+  // case_parties 생성 (is_primary, manual_override, client_id 컬럼 없음)
   const payload = seeds.map((seed, index) => ({
     tenant_id: tenantId,
     case_id: caseId,
@@ -56,22 +56,21 @@ async function upsertManualParties({
     party_type: seed.party_type,
     party_type_label: seed.party_type_label || null,
     party_order: index + 1,
-    is_primary: seed.is_our_client,  // is_our_client → is_primary
     representatives: [],
-    manual_override: true,
     scourt_synced: false,
   }))
 
   const { data: insertedParties, error } = await adminClient
     .from('case_parties')
     .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
-    .select('id, is_primary')
+    .select('id, party_name')
 
   if (error) return error.message
 
   // case_clients 생성 (의뢰인 연결)
   if (clientId) {
-    const clientParty = insertedParties?.find(p => p.is_primary)
+    // 의뢰인과 같은 이름의 당사자 찾기
+    const clientParty = insertedParties?.find(p => p.party_name === row.client_name)
     await adminClient
       .from('case_clients')
       .upsert({

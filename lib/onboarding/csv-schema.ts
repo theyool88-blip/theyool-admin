@@ -297,15 +297,6 @@ export function validateRow(row: Partial<StandardCaseRow>, _rowIndex: number): {
     }
   }
 
-  // 의뢰인 연락처 없을 경우 경고
-  if (!row.client_phone) {
-    warnings.push({
-      field: 'client_phone',
-      message: '의뢰인 연락처가 없습니다',
-      suggestion: '연락처가 없으면 기존 의뢰인 매칭 실패 시 의뢰인이 생성되지 않습니다'
-    })
-  }
-
   return {
     isValid: errors.length === 0,
     errors,

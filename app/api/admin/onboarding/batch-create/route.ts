@@ -108,7 +108,7 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
       duplicateHandling: inputOptions?.duplicateHandling || 'skip',
       createNewClients: inputOptions?.createNewClients ?? true,
       linkScourt: inputOptions?.linkScourt ?? false,
-      scourtDelayMs: inputOptions?.scourtDelayMs || 2500,
+      scourtDelayMs: inputOptions?.scourtDelayMs || 1500,
       dryRun: inputOptions?.dryRun ?? false
     }
 
@@ -208,6 +208,7 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
 
                     try {
                       await saveSnapshot({
+                        tenantId: tenant.tenantId!,
                         legalCaseId: result.created.caseId,
                         caseNumber: row.court_case_number!,
                         courtCode: normalizedCourtName,

@@ -115,6 +115,7 @@ export async function updateSyncStatus(
  * 스냅샷 저장
  */
 export interface SaveSnapshotParams {
+  tenantId: string;
   legalCaseId: string;
   caseNumber: string;
   courtCode: string;
@@ -132,6 +133,7 @@ export async function saveSnapshot(params: SaveSnapshotParams): Promise<string |
   const { data, error } = await supabase
     .from('scourt_case_snapshots')
     .insert({
+      tenant_id: params.tenantId,
       legal_case_id: params.legalCaseId,
       case_number: params.caseNumber,
       court_code: params.courtCode,

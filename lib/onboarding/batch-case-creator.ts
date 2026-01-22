@@ -287,14 +287,14 @@ async function createSingleCase(
 
     if (existingClient) {
       clientId = existingClient.id
-    } else if (options.createNewClients && row.client_phone) {
-      // 신규 의뢰인 생성
+    } else if (options.createNewClients) {
+      // 신규 의뢰인 생성 (전화번호 없이도 생성 가능)
       const { data: newClient, error: clientError } = await adminClient
         .from('clients')
         .insert([{
           tenant_id: tenant.tenantId,
           name: row.client_name!,
-          phone: row.client_phone,
+          phone: row.client_phone || null,
           email: row.client_email || null
         }])
         .select()
@@ -310,12 +310,6 @@ async function createSingleCase(
         clientId = newClient.id
         isNewClient = true
       }
-    } else if (!row.client_phone) {
-      warnings.push({
-        field: 'client_phone',
-        message: '의뢰인 연락처가 없어 의뢰인을 생성하지 않았습니다',
-        suggestion: '의뢰인 연락처를 입력하면 신규 의뢰인이 자동 생성됩니다'
-      })
     }
 
     // 4. 담당자 처리 (복수 담당자 지원)

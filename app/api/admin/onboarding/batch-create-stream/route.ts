@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       duplicateHandling: inputOptions?.duplicateHandling || 'skip',
       createNewClients: inputOptions?.createNewClients ?? true,
       linkScourt: true, // 항상 true (연동 필수)
-      scourtDelayMs: inputOptions?.scourtDelayMs || 2500,
+      scourtDelayMs: inputOptions?.scourtDelayMs || 1500,
       dryRun: inputOptions?.dryRun ?? false
     }
 
@@ -304,13 +304,14 @@ export async function POST(request: NextRequest) {
 
               if (existingClient) {
                 clientId = existingClient.id
-              } else if (options.createNewClients && row.client_phone) {
+              } else if (options.createNewClients) {
+                // 전화번호 없이도 의뢰인 생성 (이름만 필수)
                 const { data: newClient, error: clientError } = await adminClient
                   .from('clients')
                   .insert([{
                     tenant_id: tenant.tenantId,
                     name: row.client_name,
-                    phone: row.client_phone,
+                    phone: row.client_phone || null,
                     email: row.client_email || null,
                     birth_date: row.client_birth_date || null,
                     address: row.client_address || null,
@@ -328,11 +329,6 @@ export async function POST(request: NextRequest) {
                   clientId = newClient.id
                   isNewClient = true
                 }
-              } else if (!row.client_phone) {
-                warnings.push({
-                  field: 'client_phone',
-                  message: '의뢰인 연락처가 없어 의뢰인을 생성하지 않았습니다'
-                })
               }
             }
 
@@ -570,6 +566,7 @@ export async function POST(request: NextRequest) {
                 }))
 
                 await saveSnapshot({
+                  tenantId: tenant.tenantId,
                   legalCaseId: newCase.id,
                   caseNumber: cleanedCaseNumber,
                   courtCode: normalizedCourtName,

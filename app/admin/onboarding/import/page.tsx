@@ -778,7 +778,8 @@ export default function OnboardingImportPage() {
                 {/* 진행 시간 및 예상 소요 시간 */}
                 {(() => {
                   const elapsedSec = importStartTime ? Math.floor((Date.now() - importStartTime) / 1000) : 0
-                  const avgSecPerItem = progress.current > 0 ? elapsedSec / progress.current : 2.5
+                  // 최소 5건 이상 처리 후 평균 계산, 그 전에는 기본값 1.5초 사용
+                  const avgSecPerItem = progress.current >= 5 ? elapsedSec / progress.current : 1.5
                   const remainingSec = Math.round((progress.total - progress.current) * avgSecPerItem)
                   return (
                     <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)] mt-3">
@@ -793,7 +794,7 @@ export default function OnboardingImportPage() {
                 })()}
 
                 <p className="text-xs text-[var(--text-tertiary)] text-center mt-4">
-                  대법원 나의사건 연동은 건당 약 2.5초가 소요됩니다
+                  대법원 나의사건 연동은 건당 약 1.5초가 소요됩니다
                 </p>
               </div>
             )}

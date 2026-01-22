@@ -34,11 +34,19 @@ export const GET = withTenant(async (request: NextRequest) => {
       throw error;
     }
 
-    return NextResponse.json({
-      success: true,
-      data: holidays || [],
-      count: holidays?.length || 0,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        data: holidays || [],
+        count: holidays?.length || 0,
+      },
+      {
+        headers: {
+          // Cache holidays for 24 hours, allow stale for 7 days while revalidating
+          'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800',
+        },
+      }
+    );
   } catch (error) {
     console.error('GET /api/admin/holidays error:', error);
     const message = error instanceof Error ? error.message : '공휴일 조회 실패';

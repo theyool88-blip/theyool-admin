@@ -1,15 +1,17 @@
 'use client'
 
-// Temporal API polyfill for Schedule-X (must be imported before Schedule-X)
+// Temporal API polyfill for Schedule-X (MUST be imported before Schedule-X)
 import { Temporal } from '@js-temporal/polyfill'
 if (typeof (globalThis as Record<string, unknown>).Temporal === 'undefined') {
   (globalThis as Record<string, unknown>).Temporal = Temporal
 }
 
 import { useEffect, useState, useCallback, useMemo, useRef, createContext, useContext } from 'react'
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, isSameDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { formatDaysUntil } from '@/types/court-hearing'
+import { useTheme } from '@/hooks/useTheme'
+import { useHolidays } from '@/hooks/useHolidays'
 
 // Schedule-X imports
 import { ScheduleXCalendar, useNextCalendarApp } from '@schedule-x/react'
@@ -17,6 +19,7 @@ import { viewWeek, viewMonthGrid, viewDay } from '@schedule-x/calendar'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { createResizePlugin } from '@schedule-x/resize'
 import { createCurrentTimePlugin } from '@schedule-x/current-time'
+import { createCalendarControlsPlugin } from '@schedule-x/calendar-controls'
 import '@schedule-x/theme-default/dist/index.css'
 
 // Custom components
@@ -25,67 +28,173 @@ import ScheduleListView from './ScheduleListView'
 import UnifiedScheduleModal, { type EditScheduleData } from './UnifiedScheduleModal'
 
 // Types
-interface Profile {
-  id: string
-  name?: string
-  email?: string
-  role: string
-  tenant_id?: string
-  display_name?: string
+import type {
+  Profile,
+  TenantMember,
+  Holiday,
+  ApiEvent,
+  ScheduleXEvent,
+  UnifiedSchedule,
+  ViewMode
+} from './calendar/types'
+import { EVENT_TYPE_CALENDAR_MAP } from './calendar/types'
+
+// Type for calendar controls plugin
+type CalendarControls = ReturnType<typeof createCalendarControlsPlugin>
+
+// ========================================
+// Context for Calendar Data (Holiday Map + Current Displayed Month)
+// ========================================
+interface CalendarContextData {
+  holidayMap: Map<string, Holiday>
+  displayedMonth: { year: number; month: number }  // 현재 표시 중인 달
 }
 
-interface ApiEvent {
-  id: string
-  event_type: string
-  event_subtype?: string | null
-  title: string
-  event_date: string
-  event_time?: string | null
-  location?: string | null
-  reference_id?: string | null
-  case_name?: string | null
-  case_id?: string | null
-  description?: string | null
-  status?: string | null
-  attending_lawyer_id?: string | null
-  attending_lawyer_name?: string | null
-  scourt_type_raw?: string | null
-  scourt_result_raw?: string | null
-  hearing_sequence?: number | null
-  video_participant_side?: string | null
-  our_client_side?: string | null
-}
+const CalendarContext = createContext<CalendarContextData>({
+  holidayMap: new Map(),
+  displayedMonth: { year: new Date().getFullYear(), month: new Date().getMonth() + 1 }
+})
 
-interface Holiday {
-  id: string
-  holiday_date: string
-  holiday_name: string
-  year: number
-}
+// Legacy context for backward compatibility
+const HolidayContext = createContext<Map<string, Holiday>>(new Map())
 
-// Holiday Context for custom components to access holiday data
-const HolidayContext = createContext<Holiday[]>([])
+// ========================================
+// Custom Date Components
+// ========================================
 
-// Custom MonthGridDate Component - Shows holiday names and weekend colors
-function MonthGridDateComponent({ date }: { date: string }) {
-  const holidays = useContext(HolidayContext)
-  const jsDate = new Date(date)
-  const holiday = holidays.find(h => h.holiday_date === date)
-  const isSunday = jsDate.getDay() === 0
-  const isSaturday = jsDate.getDay() === 6
+// MonthGridDateComponent - Schedule-X 기본 스타일 + 공휴일/주말 색상 + 이번달 외 날짜 연한색
+function MonthGridDateComponent({ date, jsDate }: { date: unknown; jsDate: Date }) {
+  const { holidayMap, displayedMonth } = useContext(CalendarContext)
+
+  // Validate jsDate
+  if (!jsDate || !(jsDate instanceof Date) || isNaN(jsDate.getTime())) {
+    const dayNum = typeof date === 'number' ? date : 1
+    return <span className="sx__month-grid-day__day-number">{dayNum}</span>
+  }
+
+  const year = jsDate.getFullYear()
+  const month = jsDate.getMonth() + 1
+  const dayNum = jsDate.getDate()
+  const dayOfWeek = jsDate.getDay()
+
+  const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`
+
+  // 현재 표시 중인 달과 비교하여 이번달 외 날짜인지 확인
+  const isOutsideMonth = year !== displayedMonth.year || month !== displayedMonth.month
+
+  const now = new Date()
+  const isToday =
+    year === now.getFullYear() &&
+    month === now.getMonth() + 1 &&
+    dayNum === now.getDate()
+
+  const isSunday = dayOfWeek === 0
+  const isSaturday = dayOfWeek === 6
+  const holiday = holidayMap.get(dateStr)
+
+  // Schedule-X 기본 클래스 사용 + 오늘 표시
+  const baseClass = 'sx__month-grid-day__day-number'
+  const todayClass = isToday ? ' sx__month-grid-day__day-number--is-today' : ''
+
+  // 색상 스타일 - 이번달 외 날짜는 연한색, 그 외는 기존 색상
+  const getColorStyle = (): React.CSSProperties | undefined => {
+    if (isToday) return undefined // 오늘은 흰색 텍스트 (CSS에서 처리)
+
+    // 이번달이 아닌 날짜는 연한색으로 표시
+    if (isOutsideMonth) {
+      return { color: 'var(--text-muted)', opacity: 0.5 }
+    }
+
+    if (holiday || isSunday) return { color: '#B45454' }  // 공휴일/일요일: 부드러운 빨강
+    if (isSaturday) return { color: '#64748B' }  // 토요일: 슬레이트 그레이
+    return { color: 'var(--text-primary)' }  // 평일: 기본 텍스트 색상
+  }
 
   return (
-    <div className="flex items-center gap-1 px-1 py-0.5">
-      <span className={`text-sm font-medium ${
-        holiday ? 'text-red-500' :
-        isSunday ? 'text-red-400' :
-        isSaturday ? 'text-blue-500' :
-        'text-[var(--text-primary)]'
-      }`}>
-        {jsDate.getDate()}
+    <>
+      <span className={baseClass + todayClass} style={getColorStyle()}>
+        {dayNum}
       </span>
+      {/* 이번달 외 날짜는 공휴일 이름 숨김 */}
+      {holiday && !isOutsideMonth && (
+        <span style={{ fontSize: '10px', color: '#B45454', marginLeft: '4px' }}>
+          {holiday.holiday_name}
+        </span>
+      )}
+    </>
+  )
+}
+
+// MonthGridDayNameComponent - Schedule-X 기본 스타일 + 주말 색상
+function MonthGridDayNameComponent({ day }: { day: number }) {
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+  const isSunday = day === 0
+  const isSaturday = day === 6
+
+  // 색상 스타일 - 모든 요일에 적용 (홈페이지 스타일에 맞춘 부드러운 색상)
+  const getColorStyle = (): React.CSSProperties => {
+    if (isSunday) return { color: '#B45454' }  // 일요일: 부드러운 빨강
+    if (isSaturday) return { color: '#64748B' }  // 토요일: 슬레이트 그레이
+    return { color: 'var(--text-tertiary)' }  // 평일: 회색
+  }
+
+  return (
+    <span className="sx__week-grid__day-name" style={getColorStyle()}>
+      {dayNames[day]}
+    </span>
+  )
+}
+
+// WeekGridDateComponent - Week view header with holidays
+function WeekGridDateComponent({ date }: { date: unknown }) {
+  const { holidayMap } = useContext(CalendarContext)
+
+  // Parse date from various formats
+  let jsDate: Date | null = null
+  let dateStr = ''
+
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(date)) {
+    dateStr = date.split('T')[0]
+    jsDate = new Date(dateStr + 'T00:00:00')
+  } else if (date && typeof date === 'object') {
+    // Try Temporal object or object with year/month/day
+    try {
+      const str = String(date)
+      const match = str.match(/^(\d{4}-\d{2}-\d{2})/)
+      if (match) {
+        dateStr = match[1]
+        jsDate = new Date(dateStr + 'T00:00:00')
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  if (!jsDate || isNaN(jsDate.getTime())) {
+    return <span className="text-sm">-</span>
+  }
+
+  const dayNum = jsDate.getDate()
+  const dayOfWeek = jsDate.getDay()
+  const dayNames = ['일', '월', '화', '수', '목', '금', '토']
+
+  const holiday = holidayMap.get(dateStr)
+  const isSunday = dayOfWeek === 0
+  const isSaturday = dayOfWeek === 6
+
+  // 홈페이지 스타일에 맞춘 색상
+  const getTextColor = () => {
+    if (holiday || isSunday) return '#B45454'  // 부드러운 빨강
+    if (isSaturday) return '#64748B'  // 슬레이트 그레이
+    return 'var(--text-primary)'
+  }
+
+  return (
+    <div className="flex flex-col items-center py-2" style={{ color: getTextColor() }}>
+      <span className="text-xs">{dayNames[dayOfWeek]}</span>
+      <span className="text-lg font-semibold">{dayNum}</span>
       {holiday && (
-        <span className="text-[10px] text-red-500 truncate max-w-[60px] font-medium">
+        <span className="text-[9px] truncate max-w-[50px] font-medium">
           {holiday.holiday_name}
         </span>
       )}
@@ -93,51 +202,28 @@ function MonthGridDateComponent({ date }: { date: string }) {
   )
 }
 
-// Custom MonthGridDayName Component - Shows weekend colors on day names
-function MonthGridDayNameComponent({ day }: { day: number }) {
-  const dayNames = ['일', '월', '화', '수', '목', '금', '토']
-  const isSunday = day === 0
-  const isSaturday = day === 6
+// WeekGridHourComponent - 정각만 표시, 30분은 그리드만
+function WeekGridHourComponent({ hour }: { hour: string | number }) {
+  // hour가 "09:30" 같은 형태일 때 30분인지 체크
+  const hourStr = String(hour)
+  const isHalfHour = hourStr.includes(':30')
 
-  return (
-    <span className={`text-xs font-medium ${
-      isSunday ? 'text-red-500' :
-      isSaturday ? 'text-blue-500' :
-      'text-[var(--text-secondary)]'
-    }`}>
-      {dayNames[day]}
-    </span>
-  )
-}
+  // 30분일 경우 라벨 없이 빈 공간만 표시
+  if (isHalfHour) {
+    return <span className="text-xs">&nbsp;</span>
+  }
 
-// Custom WeekGridDate Component - Shows holidays and weekend colors in week view header
-function WeekGridDateComponent({ date }: { date: string }) {
-  const holidays = useContext(HolidayContext)
-  const jsDate = new Date(date)
-  const holiday = holidays.find(h => h.holiday_date === date)
-  const dayNames = ['일', '월', '화', '수', '목', '금', '토']
-  const isSunday = jsDate.getDay() === 0
-  const isSaturday = jsDate.getDay() === 6
+  const hourNum = typeof hour === 'number'
+    ? hour
+    : typeof hour === 'string' && hour.includes(':')
+      ? parseInt(hour.split(':')[0])
+      : parseInt(String(hour))
 
-  return (
-    <div className={`flex flex-col items-center py-2 ${
-      holiday ? 'text-red-500' :
-      isSunday ? 'text-red-400' :
-      isSaturday ? 'text-blue-500' :
-      'text-[var(--text-primary)]'
-    }`}>
-      <span className="text-xs">{dayNames[jsDate.getDay()]}</span>
-      <span className="text-lg font-semibold">{jsDate.getDate()}</span>
-      {holiday && <span className="text-[9px] truncate max-w-[50px] font-medium">{holiday.holiday_name}</span>}
-    </div>
-  )
-}
-
-// Custom WeekGridHour Component - Highlights work hours and lunch time
-function WeekGridHourComponent({ hour }: { hour: string }) {
-  const hourNum = parseInt(hour.split(':')[0])
   const isLunchTime = hourNum === 12
   const isAfterHours = hourNum < 9 || hourNum >= 18
+
+  // 정각만 시간 표시 (09, 10, 11...)
+  const displayHour = String(hourNum).padStart(2, '0')
 
   return (
     <span className={`text-xs ${
@@ -145,237 +231,61 @@ function WeekGridHourComponent({ hour }: { hour: string }) {
       isAfterHours ? 'text-[var(--text-muted)] opacity-50' :
       'text-[var(--text-secondary)]'
     }`}>
-      {hour}
+      {displayHour}
     </span>
   )
 }
 
-interface TenantMember {
-  id: string
-  display_name: string
-  role: string
-}
+// ========================================
+// Helper Functions
+// ========================================
 
-// Schedule-X event format
-interface ScheduleXEvent {
-  id: string
-  start: string | Temporal.PlainDate | Temporal.ZonedDateTime
-  end: string | Temporal.PlainDate | Temporal.ZonedDateTime
-  title: string
-  location?: string
-  description?: string
-  calendarId?: string
-  // Custom properties for our system
-  eventType?: string
-  eventSubtype?: string
-  caseId?: string
-  caseNumber?: string
-  caseName?: string
-  status?: string
-  attendingLawyerId?: string
-  attendingLawyerName?: string
-  scourtTypeRaw?: string
-  scourtResultRaw?: string
-  videoParticipantSide?: string
-  ourClientSide?: string
-  daysUntil?: number
-}
-
-// Unified schedule for detail panel
-interface UnifiedSchedule {
-  id: string
-  type: 'trial' | 'consultation' | 'meeting' | 'court_hearing' | 'deadline'
-  title: string
-  date: string
-  time?: string
-  location?: string
-  case_number?: string
-  case_name?: string
-  case_id?: string
-  notes?: string
-  status?: string
-  daysUntil?: number
-  hearing_type?: string
-  event_subtype?: string
-  attending_lawyer_id?: string
-  attending_lawyer_name?: string
-  scourt_type_raw?: string
-  scourt_result_raw?: string
-  video_participant_side?: string
-  our_client_side?: string
-}
-
-// Helper function to extract date string from event (supports both string and Temporal)
+// Extract date string from event (supports both string and Temporal)
 function getEventDateString(eventStart: string | Temporal.PlainDate | Temporal.ZonedDateTime): string {
   if (typeof eventStart === 'string') {
     return eventStart.split(' ')[0]
   }
-  // Temporal.PlainDate.toString() returns "2026-01-01"
-  // Temporal.ZonedDateTime.toString() returns "2026-01-01T00:00:00+09:00[Asia/Seoul]"
   const str = eventStart.toString()
   return str.split('T')[0]
 }
 
-// Helper function to extract time string from event (supports both string and Temporal)
+// Extract time string from event
 function getEventTimeString(eventStart: string | Temporal.PlainDate | Temporal.ZonedDateTime): string | undefined {
   if (typeof eventStart === 'string') {
     const parts = eventStart.split(' ')
     return parts[1] || undefined
   }
-  // Temporal.PlainDate has no time
   if ('hour' in eventStart) {
-    // ZonedDateTime
     const zdt = eventStart as Temporal.ZonedDateTime
     return `${String(zdt.hour).padStart(2, '0')}:${String(zdt.minute).padStart(2, '0')}`
   }
   return undefined
 }
 
-// Event type to calendar ID mapping
-const EVENT_TYPE_CALENDAR_MAP: Record<string, string> = {
-  COURT_HEARING: 'court_hearing',
-  DEADLINE: 'deadline',
-  CONSULTATION: 'consultation',
-  MEETING: 'meeting',
-}
+// Convert string date/time to Temporal object
+function toTemporalDate(dateStr: string): Temporal.PlainDate | Temporal.ZonedDateTime {
+  if (typeof dateStr !== 'string') return dateStr
 
-// View mode type
-type ViewMode = 'month' | 'week' | 'day' | 'list'
+  const hasTime = dateStr.includes(' ') || (dateStr.includes('T') && dateStr.length > 10)
 
-// 변호사 출석 불필요 기일 유형
-const NO_LAWYER_ATTENDANCE_TYPES = [
-  'HEARING_JUDGMENT',
-  'HEARING_INVESTIGATION',
-  'HEARING_PARENTING',
-] as const
+  if (hasTime) {
+    const normalized = dateStr.replace(' ', 'T')
+    const [datePart, timePart] = normalized.split('T')
+    const [year, month, day] = datePart.split('-').map(Number)
+    const [hours, minutes] = (timePart || '00:00').split(':').map(Number)
 
-const NO_LAWYER_ATTENDANCE_KEYWORDS = ['조정조치']
+    return Temporal.ZonedDateTime.from({
+      year,
+      month,
+      day,
+      hour: hours || 0,
+      minute: minutes || 0,
+      second: 0,
+      timeZone: 'UTC',  // Use UTC to prevent double timezone conversion
+    })
+  }
 
-function isNoLawyerAttendanceRequired(schedule: UnifiedSchedule): boolean {
-  if (NO_LAWYER_ATTENDANCE_TYPES.includes(schedule.hearing_type as typeof NO_LAWYER_ATTENDANCE_TYPES[number])) {
-    return true
-  }
-  if (schedule.scourt_type_raw) {
-    return NO_LAWYER_ATTENDANCE_KEYWORDS.some(keyword => schedule.scourt_type_raw!.includes(keyword))
-  }
-  return false
-}
-
-// 기일 연기/변경 여부 확인
-const isPostponedHearing = (result?: string): boolean => {
-  if (!result) return false
-  const keywords = ['기일변경', '연기', '취하', '취소', '변경지정']
-  return keywords.some(kw => result.includes(kw))
-}
-
-// 화상장치 관련 텍스트 제거
-const removeVideoDeviceText = (text: string) => {
-  return text.replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, '').trim()
-}
-
-// 화상기일 배지 정보 반환
-const getVideoBadgeInfo = (scourtTypeRaw?: string, videoParticipantSide?: string, ourClientSide?: string): { show: boolean; label: string; color: string } | null => {
-  if (scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치') || videoParticipantSide === 'both') {
-    return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
-  }
-  if (videoParticipantSide && ourClientSide) {
-    if (videoParticipantSide === ourClientSide) {
-      return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
-    }
-    return null
-  }
-  if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
-    return { show: true, label: '화상', color: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' }
-  }
-  return null
-}
-
-// 캘린더 셀용 짧은 제목
-const getShortTitle = (title: string) => {
-  return title
-    .replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, ' ')
-    .replace('변론기일', '변론')
-    .replace('조정기일', '조정')
-    .replace('선고기일', '선고')
-    .replace('판결선고', '판결')
-    .replace('심문기일', '심문')
-    .replace('양육상담', '양육')
-    .replace('중간심문', '중간')
-    .replace('변호사 미팅', '미팅')
-    .replace('상소기간', '상소')
-    .replace('조정이의기간', '조정이의')
-    .replace('즉시항고', '즉항')
-    .replace('항소이유서', '항소이유')
-    .replace('지급명령이의', '지명이의')
-    .trim()
-}
-
-// 법원명 짧게
-const getShortCourt = (location?: string) => {
-  if (!location) return ''
-  const jiwonMatch = location.match(/([가-힣]{2,4})지원/)
-  if (jiwonMatch) return jiwonMatch[1]
-  const siMatch = location.match(/([가-힣]{2,4})시법원/)
-  if (siMatch) return siMatch[1]
-  const courtNames = ['서울', '수원', '평택', '천안', '대전', '대구', '부산', '광주', '인천', '울산', '창원', '청주', '전주', '춘천', '제주', '의정부', '고양', '성남', '안산', '안양', '용인', '화성', '서산', '아산', '세종']
-  for (const name of courtNames) {
-    if (location.includes(name)) return name
-  }
-  return location.slice(0, 2)
-}
-
-// 법원명 축약형
-const shortenCourtLocation = (location?: string): string => {
-  if (!location) return ''
-  const jiwonMatch = location.match(/[가-힣]+법원\s+([가-힣]{2,4}지원)\s+(.+)/)
-  if (jiwonMatch) return `${jiwonMatch[1]} ${jiwonMatch[2]}`
-  const goMatch = location.match(/([가-힣]{2,3})고등법원\s+(.+)/)
-  if (goMatch) return `${goMatch[1]}고법 ${goMatch[2]}`
-  const gaMatch = location.match(/([가-힣]{2,3})가정법원\s+(.+)/)
-  if (gaMatch) return `${gaMatch[1]}가정 ${gaMatch[2]}`
-  const jiMatch = location.match(/([가-힣]{2,3})지방법원\s+(.+)/)
-  if (jiMatch) return `${jiMatch[1]}지법 ${jiMatch[2]}`
-  return location
-}
-
-// 일정 타입 레이블
-const getScheduleTypeLabel = (type: string, location?: string | null) => {
-  if (type === 'consultation' && location) {
-    if (location.includes('천안')) return '천안상담'
-    if (location.includes('평택')) return '평택상담'
-  }
-  switch (type) {
-    case 'trial': return '변론'
-    case 'consultation': return '상담'
-    case 'meeting': return '회의'
-    case 'court_hearing': return '법원기일'
-    case 'deadline': return '마감'
-    default: return '기타'
-  }
-}
-
-// 일정 타입별 색상
-const getScheduleTypeColor = (type: string, hearingType?: string, eventSubtype?: string, scourtResultRaw?: string) => {
-  if (type === 'court_hearing' && isPostponedHearing(scourtResultRaw)) {
-    return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-l-[var(--border-default)]'
-  }
-  if (type === 'court_hearing' && hearingType === 'HEARING_LAWYER_MEETING') {
-    return 'bg-teal-50 text-teal-700 border-l-teal-500'
-  }
-  if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING' || hearingType === 'HEARING_INVESTIGATION')) {
-    return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
-  }
-  if (type === 'consultation' && eventSubtype?.startsWith('pending_')) {
-    return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)] border-dashed'
-  }
-  switch (type) {
-    case 'trial': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
-    case 'consultation': return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)]'
-    case 'meeting': return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
-    case 'court_hearing': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
-    case 'deadline': return 'bg-orange-50 text-orange-700 border-l-orange-500'
-    default: return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
-  }
+  return Temporal.PlainDate.from(dateStr)
 }
 
 // Convert API event to Schedule-X format
@@ -390,8 +300,11 @@ function convertToScheduleXEvent(event: ApiEvent): ScheduleXEvent {
     const timeStr = event.event_time!.slice(0, 5)
     start = `${event.event_date} ${timeStr}`
     const [hours, minutes] = timeStr.split(':').map(Number)
-    const endHours = Math.min(hours + 1, 23)
-    end = `${event.event_date} ${String(endHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+    // 기본 이벤트 길이: 30분
+    const totalMinutes = minutes + 30
+    const endHours = Math.min(hours + Math.floor(totalMinutes / 60), 23)
+    const endMinutes = totalMinutes % 60
+    end = `${event.event_date} ${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`
   } else {
     start = event.event_date
     end = event.event_date
@@ -438,7 +351,6 @@ function convertToUnifiedSchedule(event: ScheduleXEvent): UnifiedSchedule {
   else if (event.eventType === 'DEADLINE') type = 'deadline'
   else if (event.eventType === 'CONSULTATION') type = 'consultation'
 
-  // Use helper functions to handle both string and Temporal formats
   const date = getEventDateString(event.start)
   const time = getEventTimeString(event.start)
 
@@ -466,140 +378,184 @@ function convertToUnifiedSchedule(event: ScheduleXEvent): UnifiedSchedule {
   }
 }
 
-interface ScheduleXCalendarProps {
-  profile: Profile
+// ========================================
+// Display Helper Functions
+// ========================================
+
+const isPostponedHearing = (result?: string): boolean => {
+  if (!result) return false
+  const keywords = ['기일변경', '연기', '취하', '취소', '변경지정']
+  return keywords.some(kw => result.includes(kw))
 }
 
-// Convert string date/time to Temporal object for Schedule-X
-function toTemporalDate(dateStr: string): Temporal.PlainDate | Temporal.ZonedDateTime {
-  // If already a Temporal object, return as-is (shouldn't happen but safety check)
-  if (typeof dateStr !== 'string') {
-    return dateStr
+const removeVideoDeviceText = (text: string) => {
+  return text.replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, '').trim()
+}
+
+const getVideoBadgeInfo = (scourtTypeRaw?: string, videoParticipantSide?: string, ourClientSide?: string): { show: boolean; label: string; color: string } | null => {
+  if (scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치') || videoParticipantSide === 'both') {
+    return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
   }
+  if (videoParticipantSide && ourClientSide) {
+    if (videoParticipantSide === ourClientSide) {
+      return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
+    }
+    return null
+  }
+  if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
+    return { show: true, label: '화상', color: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' }
+  }
+  return null
+}
 
-  // Check if it has time component (e.g., "2026-01-20 10:00" or "2026-01-20T10:00")
-  const hasTime = dateStr.includes(' ') || (dateStr.includes('T') && dateStr.length > 10)
+const shortenCourtLocation = (location?: string): string => {
+  if (!location) return ''
+  const jiwonMatch = location.match(/[가-힣]+법원\s+([가-힣]{2,4}지원)\s+(.+)/)
+  if (jiwonMatch) return `${jiwonMatch[1]} ${jiwonMatch[2]}`
+  const goMatch = location.match(/([가-힣]{2,3})고등법원\s+(.+)/)
+  if (goMatch) return `${goMatch[1]}고법 ${goMatch[2]}`
+  const gaMatch = location.match(/([가-힣]{2,3})가정법원\s+(.+)/)
+  if (gaMatch) return `${gaMatch[1]}가정 ${gaMatch[2]}`
+  const jiMatch = location.match(/([가-힣]{2,3})지방법원\s+(.+)/)
+  if (jiMatch) return `${jiMatch[1]}지법 ${jiMatch[2]}`
+  return location
+}
 
-  if (hasTime) {
-    // Parse date and time
-    const normalized = dateStr.replace(' ', 'T')
-    const [datePart, timePart] = normalized.split('T')
-    const [year, month, day] = datePart.split('-').map(Number)
-    const [hours, minutes] = (timePart || '00:00').split(':').map(Number)
-
-    // Use UTC timezone with local time values
-    // This prevents double timezone conversion by Schedule-X
-    return Temporal.ZonedDateTime.from({
-      year,
-      month,
-      day,
-      hour: hours || 0,
-      minute: minutes || 0,
-      second: 0,
-      timeZone: 'UTC',
-    })
-  } else {
-    // Date only
-    return Temporal.PlainDate.from(dateStr)
+const getScheduleTypeLabel = (type: string, location?: string | null) => {
+  if (type === 'consultation' && location) {
+    if (location.includes('천안')) return '천안상담'
+    if (location.includes('평택')) return '평택상담'
+  }
+  switch (type) {
+    case 'trial': return '변론'
+    case 'consultation': return '상담'
+    case 'meeting': return '회의'
+    case 'court_hearing': return '법원기일'
+    case 'deadline': return '마감'
+    default: return '기타'
   }
 }
 
-// Inner calendar component that creates a fresh calendar instance with the given events
+const getScheduleTypeColor = (type: string, hearingType?: string, eventSubtype?: string, scourtResultRaw?: string) => {
+  if (type === 'court_hearing' && isPostponedHearing(scourtResultRaw)) {
+    return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-l-[var(--border-default)]'
+  }
+  if (type === 'court_hearing' && hearingType === 'HEARING_LAWYER_MEETING') {
+    return 'bg-teal-50 text-teal-700 border-l-teal-500'
+  }
+  if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING' || hearingType === 'HEARING_INVESTIGATION')) {
+    return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
+  }
+  if (type === 'consultation' && eventSubtype?.startsWith('pending_')) {
+    return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)] border-dashed'
+  }
+  switch (type) {
+    case 'trial': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
+    case 'consultation': return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)]'
+    case 'meeting': return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
+    case 'court_hearing': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
+    case 'deadline': return 'bg-orange-50 text-orange-700 border-l-orange-500'
+    default: return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
+  }
+}
+
+// ========================================
+// Calendar Inner Component
+// ========================================
+
 interface CalendarInnerProps {
   events: ScheduleXEvent[]
+  holidayMap: Map<string, Holiday>
+  isDark: boolean
+  viewMode: ViewMode
+  selectedDate: Date  // The date to display (controls which month is shown)
   onEventClick: (event: ScheduleXEvent) => void
   onEventUpdate: (event: ScheduleXEvent) => void
   onClickDate: (date: Date) => void
+  onCalendarControlsReady: (controls: CalendarControls) => void
 }
 
-function CalendarInner({ events, onEventClick, onEventUpdate, onClickDate }: CalendarInnerProps) {
+function CalendarInner({
+  events,
+  holidayMap,
+  isDark,
+  viewMode,
+  selectedDate,
+  onEventClick,
+  onEventUpdate,
+  onClickDate,
+  onCalendarControlsReady,
+}: CalendarInnerProps) {
   const isInitialMount = useRef(true)
+  const controlsReadyRef = useRef(false)
 
-  // Convert string dates to Temporal objects for Schedule-X
+  // Create plugins (memoized)
+  const calendarControls = useMemo(() => createCalendarControlsPlugin(), [])
+  const dragAndDropPlugin = useMemo(() => createDragAndDropPlugin(15), [])
+  const resizePlugin = useMemo(() => createResizePlugin(15), [])
+  const currentTimePlugin = useMemo(() => createCurrentTimePlugin(), [])
+
+  // Determine which plugins to use based on view mode
+  const plugins = useMemo(() => {
+    const basePlugins = [calendarControls, dragAndDropPlugin, resizePlugin]
+    // Only include currentTimePlugin for week/day views
+    if (viewMode === 'week' || viewMode === 'day') {
+      return [...basePlugins, currentTimePlugin]
+    }
+    return basePlugins
+  }, [calendarControls, dragAndDropPlugin, resizePlugin, currentTimePlugin, viewMode])
+
+  // Convert events to Temporal format
   const temporalEvents = useMemo(() => {
-    return events.map(event => {
-      const startTemporal = typeof event.start === 'string' ? toTemporalDate(event.start) : event.start
-      const endTemporal = typeof event.end === 'string' ? toTemporalDate(event.end) : event.end
-      return {
-        ...event,
-        start: startTemporal,
-        end: endTemporal,
-      }
-    })
+    return events.map(event => ({
+      ...event,
+      start: typeof event.start === 'string' ? toTemporalDate(event.start) : event.start,
+      end: typeof event.end === 'string' ? toTemporalDate(event.end) : event.end,
+    }))
   }, [events])
 
+  // Convert selectedDate to Temporal.PlainDate for Schedule-X (v3+ requires Temporal object)
+  const selectedDateTemporal = Temporal.PlainDate.from(format(selectedDate, 'yyyy-MM-dd'))
+
+  // Create calendar app
   const calendar = useNextCalendarApp({
     locale: 'ko-KR',
+    isDark,
+    timezone: 'Asia/Seoul',
+    selectedDate: selectedDateTemporal,  // This controls which month is displayed
     defaultView: viewMonthGrid.name,
     views: [viewDay, viewWeek, viewMonthGrid],
     events: temporalEvents,
+    // 주간/일간 뷰 시간 범위: 08:00 ~ 20:00
+    dayBoundaries: {
+      start: '08:00',
+      end: '20:00',
+    },
     calendars: {
-      // Note: holiday calendar removed - holidays are now displayed in date headers
       court_hearing: {
         colorName: 'court_hearing',
-        lightColors: {
-          main: '#6DB5A4',
-          container: 'rgba(109, 181, 164, 0.15)',
-          onContainer: '#6DB5A4',
-        },
-        darkColors: {
-          main: '#6DB5A4',
-          container: 'rgba(109, 181, 164, 0.2)',
-          onContainer: '#8CCABE',
-        },
+        lightColors: { main: '#6DB5A4', container: 'rgba(109, 181, 164, 0.15)', onContainer: '#6DB5A4' },
+        darkColors: { main: '#6DB5A4', container: 'rgba(109, 181, 164, 0.2)', onContainer: '#8CCABE' },
       },
       consultation: {
         colorName: 'consultation',
-        lightColors: {
-          main: '#3B82F6',
-          container: 'rgba(59, 130, 246, 0.15)',
-          onContainer: '#3B82F6',
-        },
-        darkColors: {
-          main: '#3B82F6',
-          container: 'rgba(59, 130, 246, 0.2)',
-          onContainer: '#60A5FA',
-        },
+        lightColors: { main: '#3B82F6', container: 'rgba(59, 130, 246, 0.15)', onContainer: '#3B82F6' },
+        darkColors: { main: '#3B82F6', container: 'rgba(59, 130, 246, 0.2)', onContainer: '#60A5FA' },
       },
       deadline: {
         colorName: 'deadline',
-        lightColors: {
-          main: '#F59E0B',
-          container: 'rgba(245, 158, 11, 0.15)',
-          onContainer: '#F59E0B',
-        },
-        darkColors: {
-          main: '#F59E0B',
-          container: 'rgba(245, 158, 11, 0.2)',
-          onContainer: '#FBBF24',
-        },
+        lightColors: { main: '#F59E0B', container: 'rgba(245, 158, 11, 0.15)', onContainer: '#F59E0B' },
+        darkColors: { main: '#F59E0B', container: 'rgba(245, 158, 11, 0.2)', onContainer: '#FBBF24' },
       },
       meeting: {
         colorName: 'meeting',
-        lightColors: {
-          main: '#6B7280',
-          container: 'rgba(107, 114, 128, 0.1)',
-          onContainer: '#6B7280',
-        },
-        darkColors: {
-          main: '#9CA3AF',
-          container: 'rgba(156, 163, 175, 0.15)',
-          onContainer: '#9CA3AF',
-        },
+        lightColors: { main: '#6B7280', container: 'rgba(107, 114, 128, 0.1)', onContainer: '#6B7280' },
+        darkColors: { main: '#9CA3AF', container: 'rgba(156, 163, 175, 0.15)', onContainer: '#9CA3AF' },
       },
     },
-    dayBoundaries: {
-      start: '07:00',
-      end: '22:00',
-    },
-    weekOptions: {
-      gridHeight: 800,
-      nDays: 7,
-      eventWidth: 95,
-    },
-    monthGridOptions: {
-      nEventsPerDay: 7,
-    },
+    // 주간/일간 뷰 설정: 30분 단위 그리드
+    weekOptions: { gridHeight: 800, nDays: 7, eventWidth: 95, gridStep: 30 },
+    monthGridOptions: { nEventsPerDay: 7 },
     callbacks: {
       onEventClick: (event) => onEventClick(event as unknown as ScheduleXEvent),
       onEventUpdate: (event) => onEventUpdate(event as unknown as ScheduleXEvent),
@@ -609,52 +565,79 @@ function CalendarInner({ events, onEventClick, onEventUpdate, onClickDate }: Cal
         onClickDate(clickedDate)
       },
     },
-  }, [
-    createDragAndDropPlugin(15),
-    createResizePlugin(15),
-    createCurrentTimePlugin(),
-  ])
+  }, plugins)
 
-  // Update events dynamically without remounting the calendar
+  // Update events dynamically
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
       return
     }
-    // Update events in place - no remount needed
     if (calendar) {
       calendar.events.set(temporalEvents)
     }
   }, [temporalEvents, calendar])
 
+  // Pass calendar controls to parent
+  useEffect(() => {
+    if (calendar && !controlsReadyRef.current) {
+      controlsReadyRef.current = true
+      onCalendarControlsReady(calendarControls)
+    }
+  }, [calendar, calendarControls, onCalendarControlsReady])
+
+  // 현재 표시 중인 달 정보 (selectedDate에서 추출)
+  const calendarContextValue = useMemo<CalendarContextData>(() => ({
+    holidayMap,
+    displayedMonth: {
+      year: selectedDate.getFullYear(),
+      month: selectedDate.getMonth() + 1,  // JavaScript month is 0-indexed
+    },
+  }), [holidayMap, selectedDate])
+
   return (
-    <ScheduleXCalendar
-      calendarApp={calendar}
-      customComponents={{
-        timeGridEvent: ScheduleXEventCard,
-        dateGridEvent: ScheduleXEventCard,
-        monthGridEvent: ScheduleXEventChip,
-        monthGridDate: MonthGridDateComponent,
-        monthGridDayName: MonthGridDayNameComponent,
-        weekGridDate: WeekGridDateComponent,
-        weekGridHour: WeekGridHourComponent,
-      }}
-    />
+    <CalendarContext.Provider value={calendarContextValue}>
+      <ScheduleXCalendar
+        calendarApp={calendar}
+        customComponents={{
+          timeGridEvent: ScheduleXEventCard,
+          dateGridEvent: ScheduleXEventCard,
+          monthGridEvent: ScheduleXEventChip,
+          monthGridDate: MonthGridDateComponent,
+          monthGridDayName: MonthGridDayNameComponent,
+          weekGridDate: WeekGridDateComponent,
+          weekGridHour: WeekGridHourComponent,
+        }}
+      />
+    </CalendarContext.Provider>
   )
 }
 
+// ========================================
+// Main Component
+// ========================================
+
+interface ScheduleXCalendarProps {
+  profile: Profile
+}
+
 export default function ScheduleXCalendarComponent({ profile: _profile }: ScheduleXCalendarProps) {
+  const { resolvedTheme } = useTheme()
   const [currentDate, setCurrentDate] = useState(new Date())
   const [allEvents, setAllEvents] = useState<ScheduleXEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const [holidays, setHolidays] = useState<Holiday[]>([])
   const [tenantMembers, setTenantMembers] = useState<TenantMember[]>([])
+
+  // Calendar controls
+  const [calendarControls, setCalendarControls] = useState<CalendarControls | null>(null)
 
   // View and filter state
   const [viewMode, setViewMode] = useState<ViewMode>('month')
   const [filterType, setFilterType] = useState<'all' | 'court'>('all')
-  const [lawyerFilter, setLawyerFilter] = useState<string>('all')
-  const [showMenu, setShowMenu] = useState(false)
+  const [selectedLawyers, setSelectedLawyers] = useState<string[]>([])
+  const [showLawyerPopover, setShowLawyerPopover] = useState(false)
+  const [showMonthPicker, setShowMonthPicker] = useState(false)
+  const [pickerYear, setPickerYear] = useState(new Date().getFullYear())
 
   // Selected date and detail panel
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
@@ -673,7 +656,25 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
   const calendarStart = useMemo(() => startOfWeek(monthStart, { weekStartsOn: 0 }), [monthStart])
   const calendarEnd = useMemo(() => endOfWeek(monthEnd, { weekStartsOn: 0 }), [monthEnd])
 
-  // Fetch tenant members (lawyers)
+  // Years to fetch holidays for (automatically cached by useHolidays)
+  const holidayYears = useMemo(() => {
+    const years = new Set<number>()
+    years.add(calendarStart.getFullYear())
+    years.add(calendarEnd.getFullYear())
+    return Array.from(years)
+  }, [calendarStart, calendarEnd])
+
+  // Use cached holidays hook (global cache, no redundant fetches)
+  const { holidays } = useHolidays(holidayYears)
+
+  // Holiday Map for fast O(1) lookup
+  const holidayMap = useMemo(() => {
+    const map = new Map<string, Holiday>()
+    holidays.forEach(h => map.set(h.holiday_date, h))
+    return map
+  }, [holidays])
+
+  // Fetch tenant members
   const fetchTenantMembers = useCallback(async () => {
     try {
       const { createClient } = await import('@/lib/supabase/client')
@@ -720,7 +721,7 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     }
   }
 
-  // Fetch schedules from API
+  // Fetch schedules (holidays are now handled by useHolidays hook separately)
   const fetchSchedules = useCallback(async () => {
     try {
       setLoading(true)
@@ -738,8 +739,8 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
 
       // Sort deadlines to top
       const sortedEvents = [...scheduleXEvents].sort((a, b) => {
-        const aDate = a.start.split(' ')[0]
-        const bDate = b.start.split(' ')[0]
+        const aDate = typeof a.start === 'string' ? a.start.split(' ')[0] : String(a.start).split('T')[0]
+        const bDate = typeof b.start === 'string' ? b.start.split(' ')[0] : String(b.start).split('T')[0]
         if (aDate === bDate) {
           if (a.eventType === 'DEADLINE' && b.eventType !== 'DEADLINE') return -1
           if (a.eventType !== 'DEADLINE' && b.eventType === 'DEADLINE') return 1
@@ -748,26 +749,12 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
       })
 
       setAllEvents(sortedEvents)
-
-      // Fetch holidays
-      const yearsToFetch = Array.from(
-        new Set([calendarStart.getFullYear(), calendarEnd.getFullYear()])
-      )
-      const holidayResponses = await Promise.all(
-        yearsToFetch.map(year =>
-          fetch(`/api/admin/holidays?year=${year}`).then(res => res.json())
-        )
-      )
-      const holidayData: Holiday[] = holidayResponses
-        .filter(result => result?.success && Array.isArray(result.data))
-        .flatMap(result => result.data)
-      setHolidays(holidayData)
     } catch (error) {
       console.error('Failed to load schedules:', error)
     } finally {
       setLoading(false)
     }
-  }, [monthStart, monthEnd, calendarStart, calendarEnd])
+  }, [monthStart, monthEnd])
 
   useEffect(() => {
     fetchSchedules()
@@ -777,11 +764,14 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     fetchTenantMembers()
   }, [fetchTenantMembers])
 
-  // Note: Holiday events are no longer converted to calendar events
-  // They are now displayed directly in the date headers using MonthGridDateComponent and WeekGridDateComponent
+  // Toggle lawyer selection
+  const toggleLawyer = useCallback((id: string) => {
+    setSelectedLawyers(prev =>
+      prev.includes(id) ? prev.filter(l => l !== id) : [...prev, id]
+    )
+  }, [])
 
-  // Apply filters using useMemo to avoid extra render cycles
-  // Note: Holiday events are no longer included as they are displayed in date headers
+  // Filtered events
   const events = useMemo(() => {
     let filtered = allEvents
 
@@ -789,16 +779,15 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
       filtered = filtered.filter(e => e.eventType !== 'CONSULTATION')
     }
 
-    if (lawyerFilter !== 'all') {
-      filtered = filtered.filter(e => e.attendingLawyerId === lawyerFilter)
+    if (selectedLawyers.length > 0) {
+      filtered = filtered.filter(e => e.attendingLawyerId && selectedLawyers.includes(e.attendingLawyerId))
     }
 
     return filtered
-  }, [allEvents, filterType, lawyerFilter])
+  }, [allEvents, filterType, selectedLawyers])
 
   // Handle event update (drag and drop / resize)
   const handleEventUpdate = useCallback(async (updatedEvent: ScheduleXEvent) => {
-    // Update local state optimistically
     setAllEvents(prev => prev.map(e => e.id === updatedEvent.id ? updatedEvent : e))
 
     try {
@@ -845,9 +834,6 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
 
   // Handle event click
   const handleEventClick = useCallback((event: ScheduleXEvent) => {
-    console.log('Event clicked:', event)
-
-    // Set selected date to the event's date
     const eventDate = new Date(getEventDateString(event.start))
     setSelectedDate(eventDate)
   }, [])
@@ -855,8 +841,7 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
   // Get holiday for a day
   const getHolidayForDay = (day: Date): string | null => {
     const dateStr = format(day, 'yyyy-MM-dd')
-    const holiday = holidays.find(h => h.holiday_date === dateStr)
-    return holiday ? holiday.holiday_name : null
+    return holidayMap.get(dateStr)?.holiday_name || null
   }
 
   // Get schedules for a specific day
@@ -869,11 +854,10 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
 
   const selectedDaySchedules = selectedDate ? getSchedulesForDay(selectedDate) : []
 
-  // Callbacks for the calendar inner component
+  // Handle date click
   const handleDateClick = useCallback((date: Date) => {
     const scrollY = window.scrollY
     setSelectedDate(date)
-    // Restore scroll position as fast as possible after layout
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.scrollTo(0, scrollY)
@@ -882,22 +866,66 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
   }, [])
 
   // Navigation functions
-  const goToPreviousMonth = () => setCurrentDate(subMonths(currentDate, 1))
-  const goToNextMonth = () => setCurrentDate(addMonths(currentDate, 1))
-  const goToToday = () => {
-    setCurrentDate(new Date())
-    setSelectedDate(new Date())
-  }
+  const goToPreviousMonth = useCallback(() => {
+    const newDate = subMonths(currentDate, 1)
+    setCurrentDate(newDate)
+    if (calendarControls) {
+      const temporalDate = Temporal.PlainDate.from(format(newDate, 'yyyy-MM-dd'))
+      calendarControls.setDate(temporalDate)
+    }
+  }, [currentDate, calendarControls])
+
+  const goToNextMonth = useCallback(() => {
+    const newDate = addMonths(currentDate, 1)
+    setCurrentDate(newDate)
+    if (calendarControls) {
+      const temporalDate = Temporal.PlainDate.from(format(newDate, 'yyyy-MM-dd'))
+      calendarControls.setDate(temporalDate)
+    }
+  }, [currentDate, calendarControls])
+
+  const goToToday = useCallback(() => {
+    const today = new Date()
+    setCurrentDate(today)
+    setSelectedDate(today)
+    if (calendarControls) {
+      const temporalDate = Temporal.PlainDate.from(format(today, 'yyyy-MM-dd'))
+      calendarControls.setDate(temporalDate)
+    }
+  }, [calendarControls])
+
+  // View switching
+  const handleViewChange = useCallback((newView: 'month' | 'week' | 'day') => {
+    setViewMode(newView)
+    if (calendarControls) {
+      const viewName = newView === 'day' ? viewDay.name : newView === 'week' ? viewWeek.name : viewMonthGrid.name
+      calendarControls.setView(viewName)
+    }
+  }, [calendarControls])
+
+  // Month picker handlers
+  const openMonthPicker = useCallback(() => {
+    setPickerYear(currentDate.getFullYear())
+    setShowMonthPicker(true)
+  }, [currentDate])
+
+  const handleMonthSelect = useCallback((month: number) => {
+    const newDate = new Date(pickerYear, month, 1)
+    setCurrentDate(newDate)
+    setShowMonthPicker(false)
+    if (calendarControls) {
+      const temporalDate = Temporal.PlainDate.from(format(newDate, 'yyyy-MM-dd'))
+      calendarControls.setDate(temporalDate)
+    }
+  }, [pickerYear, calendarControls])
 
   // Handle schedule click in detail panel
   const handleScheduleClick = async (schedule: UnifiedSchedule) => {
-    // For court hearings and deadlines with case_id, navigate to case page
     if ((schedule.type === 'court_hearing' || schedule.type === 'deadline') && schedule.case_id) {
       window.location.href = `/cases/${schedule.case_id}`
       return
     }
 
-    // For consultations, open edit modal
     if (schedule.type === 'consultation') {
       try {
         const response = await fetch(`/api/admin/consultations/${schedule.id}`)
@@ -999,6 +1027,7 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     }
   }
 
+  // Loading state
   if (loading && events.length === 0) {
     return (
       <div className="w-full max-w-screen-2xl mx-auto pt-16 sm:pt-20 pb-6 sm:pb-8 px-3 sm:px-6 lg:px-8">
@@ -1016,154 +1045,267 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
 
   return (
     <div className="w-full max-w-screen-2xl mx-auto pt-16 sm:pt-20 pb-6 sm:pb-8 px-3 sm:px-6 lg:px-8 relative">
-      {/* Top Controls - Filters and View Toggle */}
+      {/* Top Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-        {/* Left: Filter Toggles */}
+        {/* Left: Filter Controls */}
         <div className="flex items-center gap-2">
-          {/* Event Type Filter */}
+          {/* Event Type Filter Toggle */}
           <div className="flex items-center bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg p-0.5">
             <button
-              onClick={() => { setFilterType('all'); setShowMenu(false); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${filterType === 'all' ? 'bg-[var(--sage-primary)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              onClick={() => { setFilterType('all'); if (viewMode === 'list') setViewMode('month'); }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${filterType === 'all' && viewMode !== 'list' ? 'bg-[var(--sage-primary)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
               전체
             </button>
             <button
-              onClick={() => { setFilterType('court'); setShowMenu(false); }}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${filterType === 'court' ? 'bg-[var(--sage-primary)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+              onClick={() => { setFilterType('court'); if (viewMode === 'list') setViewMode('month'); }}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${filterType === 'court' && viewMode !== 'list' ? 'bg-[var(--sage-primary)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
             >
               재판만
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${viewMode === 'list' ? 'bg-[var(--sage-primary)] text-white' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
+            >
+              목록
             </button>
           </div>
 
           {/* Lawyer Filter */}
           {tenantMembers.length > 0 && (
-            <select
-              value={lawyerFilter}
-              onChange={(e) => { setLawyerFilter(e.target.value); setShowMenu(false); }}
-              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)] text-[var(--text-secondary)]"
-            >
-              <option value="all">모든 변호사</option>
-              {tenantMembers.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.display_name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                onClick={() => setShowLawyerPopover(!showLawyerPopover)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  selectedLawyers.length > 0
+                    ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)] text-[var(--sage-primary)]'
+                    : 'border-[var(--border-default)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                }`}
+              >
+                <span>변호사</span>
+                {selectedLawyers.length > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-bold bg-[var(--sage-primary)] text-white rounded-full">
+                    {selectedLawyers.length}
+                  </span>
+                )}
+                <svg className={`w-3.5 h-3.5 transition-transform ${showLawyerPopover ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {showLawyerPopover && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowLawyerPopover(false)} />
+                  <div className="absolute left-0 top-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg shadow-lg p-2 z-50 min-w-[180px]">
+                    {selectedLawyers.length > 0 && (
+                      <button
+                        onClick={() => setSelectedLawyers([])}
+                        className="w-full text-left px-2 py-1.5 text-[11px] text-[var(--text-tertiary)] hover:text-[var(--color-danger)] hover:bg-[var(--bg-hover)] rounded transition-colors mb-1"
+                      >
+                        선택 해제
+                      </button>
+                    )}
+                    {tenantMembers.map(member => (
+                      <label
+                        key={member.id}
+                        className="flex items-center gap-2 px-2 py-1.5 hover:bg-[var(--bg-hover)] rounded cursor-pointer transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedLawyers.includes(member.id)}
+                          onChange={() => toggleLawyer(member.id)}
+                          className="w-4 h-4 rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)] focus:ring-offset-0"
+                        />
+                        <span className="text-xs text-[var(--text-primary)]">{member.display_name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {/* Filter Active Indicator */}
-          {(filterType !== 'all' || lawyerFilter !== 'all') && (
-            <span className="flex items-center gap-1 text-[10px] text-[var(--sage-primary)] bg-[var(--sage-muted)] px-2 py-1 rounded-full">
+          {(filterType !== 'all' || selectedLawyers.length > 0) && (
+            <span className="hidden sm:flex items-center gap-1 text-[10px] text-[var(--sage-primary)] bg-[var(--sage-muted)] px-2 py-1 rounded-full">
               <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
               </svg>
-              필터 적용
+              필터
             </span>
           )}
         </div>
 
-        {/* Right: View Toggle and List Button */}
+        {/* Right: Today Button + Date Navigation + View Toggle */}
         <div className="flex items-center gap-2">
-          {/* View Mode - Desktop */}
+          {/* Today Button */}
+          <button
+            onClick={goToToday}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            오늘
+          </button>
+
+          {/* Date Navigation */}
+          <div className="flex items-center gap-1 relative">
+            <button
+              onClick={goToPreviousMonth}
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              aria-label="이전 달"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+
+            <button
+              onClick={openMonthPicker}
+              className="px-2 py-1 text-sm font-semibold text-[var(--text-primary)] min-w-[80px] text-center rounded-lg hover:bg-[var(--bg-hover)] transition-colors"
+            >
+              {format(currentDate, 'yyyy. M.', { locale: ko })}
+            </button>
+
+            {/* Month Picker Popup */}
+            {showMonthPicker && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMonthPicker(false)} />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-xl shadow-lg p-3 z-50 min-w-[240px]">
+                  {/* Year Navigation */}
+                  <div className="flex items-center justify-between mb-3">
+                    <button
+                      onClick={() => setPickerYear(y => y - 1)}
+                      className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <span className="text-sm font-semibold text-[var(--text-primary)]">{pickerYear}년</span>
+                    <button
+                      onClick={() => setPickerYear(y => y + 1)}
+                      className="p-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)]"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                  {/* Month Grid */}
+                  <div className="grid grid-cols-4 gap-1">
+                    {[...Array(12)].map((_, i) => {
+                      const isCurrentMonth = pickerYear === currentDate.getFullYear() && i === currentDate.getMonth()
+                      const isToday = pickerYear === new Date().getFullYear() && i === new Date().getMonth()
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => handleMonthSelect(i)}
+                          className={`py-2 px-1 text-xs font-medium rounded-lg transition-colors ${
+                            isCurrentMonth
+                              ? 'bg-[var(--sage-primary)] text-white'
+                              : isToday
+                                ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)] font-bold'
+                                : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                          }`}
+                        >
+                          {i + 1}월
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {/* Quick Actions */}
+                  <div className="mt-3 pt-2 border-t border-[var(--border-subtle)] flex justify-center">
+                    <button
+                      onClick={() => {
+                        const today = new Date()
+                        setPickerYear(today.getFullYear())
+                        handleMonthSelect(today.getMonth())
+                      }}
+                      className="text-xs text-[var(--sage-primary)] hover:underline"
+                    >
+                      오늘로 이동
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <button
+              onClick={goToNextMonth}
+              className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+              aria-label="다음 달"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* View Mode Toggle - Desktop */}
           <div className="hidden sm:flex items-center bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg p-0.5">
             <button
-              onClick={() => setViewMode('month')}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === 'month' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-              title="월간 보기"
+              onClick={() => handleViewChange('month')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'month'
+                  ? 'bg-[var(--sage-primary)] text-white'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+              }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+              월
             </button>
             <button
-              onClick={() => setViewMode('week')}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === 'week' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-              title="주간 보기"
+              onClick={() => handleViewChange('week')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'week'
+                  ? 'bg-[var(--sage-primary)] text-white'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+              }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
+              주
             </button>
             <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-              title="목록 보기"
+              onClick={() => handleViewChange('day')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'day'
+                  ? 'bg-[var(--sage-primary)] text-white'
+                  : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+              }`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
+              일
             </button>
           </div>
 
-          {/* Mobile Menu */}
-          <div className="sm:hidden relative">
+          {/* View Mode Toggle - Mobile */}
+          <div className="sm:hidden flex items-center bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg p-0.5">
             <button
-              onClick={() => setShowMenu(!showMenu)}
-              className={`p-2 rounded-lg transition-colors border border-[var(--border-default)] bg-[var(--bg-secondary)] ${showMenu ? 'text-[var(--sage-primary)]' : 'text-[var(--text-secondary)]'}`}
+              onClick={() => handleViewChange('month')}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'month'
+                  ? 'bg-[var(--sage-primary)] text-white'
+                  : 'text-[var(--text-secondary)]'
+              }`}
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              월
             </button>
-
-            {showMenu && (
-              <div className="absolute right-0 top-12 bg-[var(--bg-secondary)] rounded-lg shadow-lg border border-[var(--border-default)] p-2 z-50 min-w-[160px]">
-                <button
-                  onClick={() => { setViewMode('month'); setShowMenu(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${viewMode === 'month' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  월간
-                </button>
-                <button
-                  onClick={() => { setViewMode('week'); setShowMenu(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${viewMode === 'week' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                  주간
-                </button>
-                <button
-                  onClick={() => { setViewMode('list'); setShowMenu(false); }}
-                  className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${viewMode === 'list' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'}`}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                  </svg>
-                  목록
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Legend - Improved Card Style */}
-      <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] p-3 mb-3">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-[#EF4444] shadow-sm" />
-            <span className="text-xs font-medium text-[var(--text-secondary)]">공휴일</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-[#6DB5A4] shadow-sm" />
-            <span className="text-xs font-medium text-[var(--text-secondary)]">법원기일</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-[#3B82F6] shadow-sm" />
-            <span className="text-xs font-medium text-[var(--text-secondary)]">상담</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-[#F59E0B] shadow-sm" />
-            <span className="text-xs font-medium text-[var(--text-secondary)]">마감일</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <div className="w-3 h-3 rounded bg-[#6B7280] shadow-sm" />
-            <span className="text-xs font-medium text-[var(--text-secondary)]">기타</span>
+            <button
+              onClick={() => handleViewChange('week')}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'week'
+                  ? 'bg-[var(--sage-primary)] text-white'
+                  : 'text-[var(--text-secondary)]'
+              }`}
+            >
+              주
+            </button>
+            <button
+              onClick={() => handleViewChange('day')}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === 'day'
+                  ? 'bg-[var(--sage-primary)] text-white'
+                  : 'text-[var(--text-secondary)]'
+              }`}
+            >
+              일
+            </button>
           </div>
         </div>
       </div>
@@ -1219,20 +1361,24 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
         <>
           {/* Schedule-X Calendar */}
           <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-default)] overflow-hidden">
-            <HolidayContext.Provider value={holidays}>
-              <CalendarInner
-                events={events}
-                onEventClick={handleEventClick}
-                onEventUpdate={handleEventUpdate}
-                onClickDate={handleDateClick}
-              />
-            </HolidayContext.Provider>
+            <CalendarInner
+              key={`${currentDate.getFullYear()}-${currentDate.getMonth()}`}
+              events={events}
+              holidayMap={holidayMap}
+              isDark={resolvedTheme === 'dark'}
+              viewMode={viewMode}
+              selectedDate={currentDate}
+              onEventClick={handleEventClick}
+              onEventUpdate={handleEventUpdate}
+              onClickDate={handleDateClick}
+              onCalendarControlsReady={setCalendarControls}
+            />
           </div>
 
-          {/* Selected date detail panel - Collapsible */}
+          {/* Selected date detail panel */}
           {selectedDate && (
             <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] mt-3 shadow-sm overflow-hidden" style={{ overflowAnchor: 'none' }}>
-              {/* Header - Always visible */}
+              {/* Header */}
               <div
                 className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                 onClick={() => setIsDetailPanelCollapsed(!isDetailPanelCollapsed)}
@@ -1274,121 +1420,113 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
                 </button>
               </div>
 
-              {/* Content - Collapsible */}
+              {/* Content */}
               {!isDetailPanelCollapsed && (
                 <div className="px-3 pb-3 border-t border-[var(--border-subtle)]">
-              {selectedDaySchedules.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
-                    <svg className="w-7 h-7 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <p className="text-sm font-medium text-[var(--text-secondary)] mb-1">일정이 없습니다</p>
-                  <p className="text-xs text-[var(--text-tertiary)] mb-4">이 날짜에 새 일정을 추가해보세요</p>
-                  <button
-                    className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[var(--sage-primary)] rounded-lg hover:bg-[var(--sage-primary-hover)] transition-colors shadow-sm"
-                    onClick={() => {
-                      if (selectedDate) {
-                        setPrefilledDate(format(selectedDate, 'yyyy-MM-dd'))
-                      }
-                      setEditingSchedule(null)
-                      setShowAddModal(true)
-                    }}
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                    </svg>
-                    일정 추가하기
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-1">
-                  {selectedDaySchedules.map((schedule) => {
-                    const isPostponed = schedule.type === 'court_hearing' && isPostponedHearing(schedule.scourt_result_raw)
-                    const typeLabel = schedule.type === 'court_hearing' && schedule.scourt_type_raw
-                      ? removeVideoDeviceText(schedule.scourt_type_raw)
-                      : getScheduleTypeLabel(schedule.type, schedule.location)
-                    const videoBadge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side, schedule.our_client_side)
-
-                    return (
-                      <div
-                        key={schedule.id}
-                        className={`px-2 py-1.5 rounded-md border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} hover:bg-[var(--bg-hover)] transition-all cursor-pointer ${isPostponed ? 'opacity-60' : ''}`}
-                        onClick={() => handleScheduleClick(schedule)}
-                      >
-                        <div className="flex items-center gap-1.5 text-[11px]">
-                          {/* Type badge */}
-                          <span className={`px-1 py-0.5 rounded text-[9px] font-semibold flex-shrink-0 ${
-                            isPostponed ? 'bg-gray-200 text-gray-500' : 'bg-white/90 shadow-sm'
-                          }`}>
-                            {isPostponed ? '연기' : typeLabel}
-                          </span>
-                          {/* Video badge */}
-                          {videoBadge && !isPostponed && (
-                            <span className={`px-1 py-0.5 rounded text-[9px] font-bold flex-shrink-0 ${videoBadge.color}`}>
-                              {videoBadge.label}
-                            </span>
-                          )}
-                          {/* Time */}
-                          {schedule.time && (
-                            <span className="font-semibold text-[var(--text-primary)] flex-shrink-0">
-                              {schedule.time.slice(0, 5)}
-                            </span>
-                          )}
-                          {/* Location */}
-                          {schedule.location && (
-                            <span className="text-[var(--text-secondary)] flex-shrink-0">
-                              {shortenCourtLocation(schedule.location)}
-                            </span>
-                          )}
-                          {/* Title (client name) */}
-                          <span className={`truncate ${isPostponed ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
-                            {schedule.title}
-                          </span>
-                          {/* Days until for deadlines */}
-                          {schedule.type === 'deadline' && schedule.daysUntil !== undefined && (
-                            <span className={`px-1 py-0.5 rounded text-[9px] font-bold flex-shrink-0 ${
-                              schedule.daysUntil <= 1 ? 'bg-red-100 text-red-600' :
-                              schedule.daysUntil <= 3 ? 'bg-orange-100 text-orange-600' :
-                              'bg-yellow-100 text-yellow-600'
-                            }`}>
-                              {formatDaysUntil(schedule.daysUntil)}
-                            </span>
-                          )}
-                          {/* Result */}
-                          {schedule.type === 'court_hearing' && schedule.scourt_result_raw && (
-                            <span className="text-[var(--sage-primary)] flex-shrink-0 font-medium">
-                              → {schedule.scourt_result_raw}
-                            </span>
-                          )}
-                        </div>
+                  {selectedDaySchedules.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-[var(--bg-tertiary)] flex items-center justify-center">
+                        <svg className="w-7 h-7 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
                       </div>
-                    )
-                  })}
-                </div>
-              )}
+                      <p className="text-sm font-medium text-[var(--text-secondary)] mb-1">일정이 없습니다</p>
+                      <p className="text-xs text-[var(--text-tertiary)] mb-4">이 날짜에 새 일정을 추가해보세요</p>
+                      <button
+                        className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-[var(--sage-primary)] rounded-lg hover:bg-[var(--sage-primary-hover)] transition-colors shadow-sm"
+                        onClick={() => {
+                          if (selectedDate) {
+                            setPrefilledDate(format(selectedDate, 'yyyy-MM-dd'))
+                          }
+                          setEditingSchedule(null)
+                          setShowAddModal(true)
+                        }}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        일정 추가하기
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      {selectedDaySchedules.map((schedule) => {
+                        const isPostponed = schedule.type === 'court_hearing' && isPostponedHearing(schedule.scourt_result_raw)
+                        const typeLabel = schedule.type === 'court_hearing' && schedule.scourt_type_raw
+                          ? removeVideoDeviceText(schedule.scourt_type_raw)
+                          : getScheduleTypeLabel(schedule.type, schedule.location)
+                        const videoBadge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side, schedule.our_client_side)
 
-              {/* Add schedule button - only show when there are schedules */}
-              {selectedDaySchedules.length > 0 && (
-              <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
-                <button
-                  className="w-full px-3 py-2 text-xs font-medium text-[var(--sage-primary)] bg-[var(--sage-muted)] rounded-lg hover:bg-[var(--sage-primary)] hover:text-white transition-all flex items-center justify-center gap-1.5"
-                  onClick={() => {
-                    if (selectedDate) {
-                      setPrefilledDate(format(selectedDate, 'yyyy-MM-dd'))
-                    }
-                    setEditingSchedule(null)
-                    setShowAddModal(true)
-                  }}
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  일정 추가
-                </button>
-              </div>
-              )}
+                        return (
+                          <div
+                            key={schedule.id}
+                            className={`px-2 py-1.5 rounded-md border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} hover:bg-[var(--bg-hover)] transition-all cursor-pointer ${isPostponed ? 'opacity-60' : ''}`}
+                            onClick={() => handleScheduleClick(schedule)}
+                          >
+                            <div className="flex items-center gap-1.5 text-[11px]">
+                              <span className={`px-1 py-0.5 rounded text-[9px] font-semibold flex-shrink-0 ${
+                                isPostponed ? 'bg-gray-200 text-gray-500' : 'bg-white/90 shadow-sm'
+                              }`}>
+                                {isPostponed ? '연기' : typeLabel}
+                              </span>
+                              {videoBadge && !isPostponed && (
+                                <span className={`px-1 py-0.5 rounded text-[9px] font-bold flex-shrink-0 ${videoBadge.color}`}>
+                                  {videoBadge.label}
+                                </span>
+                              )}
+                              {schedule.time && (
+                                <span className="font-semibold text-[var(--text-primary)] flex-shrink-0">
+                                  {schedule.time.slice(0, 5)}
+                                </span>
+                              )}
+                              {schedule.location && (
+                                <span className="text-[var(--text-secondary)] flex-shrink-0">
+                                  {shortenCourtLocation(schedule.location)}
+                                </span>
+                              )}
+                              <span className={`truncate ${isPostponed ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
+                                {schedule.title}
+                              </span>
+                              {schedule.type === 'deadline' && schedule.daysUntil !== undefined && (
+                                <span className={`px-1 py-0.5 rounded text-[9px] font-bold flex-shrink-0 ${
+                                  schedule.daysUntil <= 1 ? 'bg-red-100 text-red-600' :
+                                  schedule.daysUntil <= 3 ? 'bg-orange-100 text-orange-600' :
+                                  'bg-yellow-100 text-yellow-600'
+                                }`}>
+                                  {formatDaysUntil(schedule.daysUntil)}
+                                </span>
+                              )}
+                              {schedule.type === 'court_hearing' && schedule.scourt_result_raw && (
+                                <span className="text-[var(--sage-primary)] flex-shrink-0 font-medium">
+                                  → {schedule.scourt_result_raw}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {selectedDaySchedules.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-[var(--border-subtle)]">
+                      <button
+                        className="w-full px-3 py-2 text-xs font-medium text-[var(--sage-primary)] bg-[var(--sage-muted)] rounded-lg hover:bg-[var(--sage-primary)] hover:text-white transition-all flex items-center justify-center gap-1.5"
+                        onClick={() => {
+                          if (selectedDate) {
+                            setPrefilledDate(format(selectedDate, 'yyyy-MM-dd'))
+                          }
+                          setEditingSchedule(null)
+                          setShowAddModal(true)
+                        }}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        일정 추가
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

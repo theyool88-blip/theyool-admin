@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, type FormEvent, type KeyboardEvent } from 'react'
 import Link from 'next/link'
-import AdminHeader from '@/components/AdminHeader'
 import type { Payment, PaymentCategory } from '@/types/payment'
 import { PAYMENT_CATEGORIES, formatCurrency } from '@/types/payment'
 import { exportPaymentsToExcel } from '@/lib/excel-export'
@@ -29,11 +28,11 @@ export default function PaymentsPage() {
   const [totalCount, setTotalCount] = useState(0)
 
   // Filters
+  // NOTE: is_confirmed 컬럼이 스키마에서 제거됨
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [depositorSearch, setDepositorSearch] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
-  const [confirmationFilter, setConfirmationFilter] = useState<string>('false')
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -51,7 +50,7 @@ export default function PaymentsPage() {
       if (depositorSearch) params.append('depositor_name', depositorSearch)
       if (fromDate) params.append('from_date', fromDate)
       if (toDate) params.append('to_date', toDate)
-      if (confirmationFilter) params.append('is_confirmed', confirmationFilter)
+      // NOTE: is_confirmed 필터 제거됨 (스키마에서 컬럼 삭제)
       params.append('limit', limit.toString())
       params.append('offset', ((currentPage - 1) * limit).toString())
       params.append('sort_by', 'payment_date')
@@ -69,7 +68,7 @@ export default function PaymentsPage() {
     } finally {
       setLoading(false)
     }
-  }, [categoryFilter, depositorSearch, fromDate, toDate, confirmationFilter, currentPage, limit])
+  }, [categoryFilter, depositorSearch, fromDate, toDate, currentPage, limit])
 
   useEffect(() => {
     fetchPayments()
@@ -86,72 +85,50 @@ export default function PaymentsPage() {
     }
   }
 
-  async function handleToggleConfirmation(payment: Payment) {
-    try {
-      const res = await fetch(`/api/admin/payments/${payment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_confirmed: !payment.is_confirmed }),
-      })
-      if (res.ok) fetchPayments()
-    } catch {
-      alert('상태 변경 실패')
-    }
-  }
+  // NOTE: handleToggleConfirmation 함수 제거됨 (is_confirmed 컬럼 스키마에서 삭제)
 
   function resetFilters() {
     setCategoryFilter('')
     setDepositorSearch('')
     setFromDate('')
     setToDate('')
-    setConfirmationFilter('false')
     setCurrentPage(1)
   }
 
   const totalPages = Math.ceil(totalCount / limit) || 1
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0)
-  const confirmedCount = payments.filter(p => p.is_confirmed).length
-  const unconfirmedCount = payments.filter(p => !p.is_confirmed).length
+  // NOTE: confirmedCount, unconfirmedCount 제거됨 (is_confirmed 컬럼 스키마에서 삭제)
 
   if (loading && payments.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <AdminHeader title="수금 관리" />
+      <div className="min-h-screen bg-[var(--bg-primary)]">
         <div className="flex items-center justify-center min-h-screen">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-sage-600"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--border-default)] border-t-[var(--sage-primary)]"></div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="수금 관리" />
-
-      <div className="max-w-5xl mx-auto pt-20 pb-8 px-4">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
+      <div className="max-w-5xl mx-auto pt-6 pb-8 px-4">
         {/* Summary */}
         <div className="flex flex-wrap items-center gap-4 mb-5">
           <div className="flex items-baseline gap-2">
-            <span className="text-xs text-gray-500">조회 금액</span>
-            <span className="text-lg font-bold text-green-600">{formatCurrency(totalAmount)}</span>
+            <span className="text-xs text-[var(--text-tertiary)]">조회 금액</span>
+            <span className="text-lg font-medium text-[var(--text-primary)]">{formatCurrency(totalAmount)}</span>
           </div>
-          <span className="text-gray-300">|</span>
-          <span className="text-sm text-gray-500">{totalCount}건</span>
-          {confirmedCount > 0 && (
-            <span className="text-xs text-gray-500">확인 {confirmedCount}</span>
-          )}
-          {unconfirmedCount > 0 && (
-            <span className="text-xs text-amber-600">미확인 {unconfirmedCount}</span>
-          )}
+          <span className="text-[var(--border-default)]">|</span>
+          <span className="text-sm text-[var(--text-tertiary)]">{totalCount}건</span>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">
+        <div className="card p-4 mb-6">
           <div className="flex flex-wrap items-center gap-3">
             {/* Search */}
             <div className="relative w-full sm:w-auto sm:min-w-[180px]">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
@@ -160,35 +137,16 @@ export default function PaymentsPage() {
                 placeholder="입금인 검색"
                 value={depositorSearch}
                 onChange={(e) => { setDepositorSearch(e.target.value); setCurrentPage(1) }}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500 focus:border-sage-500 min-h-[40px]"
+                className="form-input pl-9 pr-3 py-2 text-sm min-h-[40px]"
               />
             </div>
 
-            {/* Status Filter */}
-            <div className="flex bg-gray-100 rounded-lg p-0.5">
-              {[
-                { value: '', label: '전체' },
-                { value: 'false', label: '미확인' },
-                { value: 'true', label: '확인' },
-              ].map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => { setConfirmationFilter(s.value); setCurrentPage(1) }}
-                  className={`px-3 py-1.5 rounded-md text-sm transition-all ${
-                    confirmationFilter === s.value
-                      ? 'bg-white text-gray-900 shadow-sm font-medium'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
+            {/* NOTE: 확인상태 필터 제거됨 (is_confirmed 컬럼 스키마에서 삭제) */}
 
             <select
               value={categoryFilter}
               onChange={(e) => { setCategoryFilter(e.target.value); setCurrentPage(1) }}
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[40px]"
+              className="form-input px-3 py-2 text-sm min-h-[40px]"
             >
               <option value="">전체 명목</option>
               {Object.values(PAYMENT_CATEGORIES).map((cat) => (
@@ -201,20 +159,20 @@ export default function PaymentsPage() {
                 type="date"
                 value={fromDate}
                 onChange={(e) => { setFromDate(e.target.value); setCurrentPage(1) }}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[40px]"
+                className="form-input px-3 py-2 text-sm min-h-[40px]"
               />
-              <span className="text-gray-400">~</span>
+              <span className="text-[var(--text-muted)]">~</span>
               <input
                 type="date"
                 value={toDate}
                 onChange={(e) => { setToDate(e.target.value); setCurrentPage(1) }}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm min-h-[40px]"
+                className="form-input px-3 py-2 text-sm min-h-[40px]"
               />
             </div>
 
             <button
               onClick={resetFilters}
-              className="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+              className="btn btn-ghost px-3 py-2 text-sm"
             >
               초기화
             </button>
@@ -224,7 +182,7 @@ export default function PaymentsPage() {
             <button
               onClick={() => exportPaymentsToExcel(payments, `입금내역_${fromDate || 'all'}_${toDate || 'all'}.xlsx`)}
               disabled={payments.length === 0}
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-40 min-w-[40px] min-h-[40px]"
+              className="btn btn-ghost p-2 disabled:opacity-40 min-w-[40px] min-h-[40px]"
               title="Excel 다운로드"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -234,7 +192,7 @@ export default function PaymentsPage() {
 
             <button
               onClick={() => { setEditingPayment(null); setShowModal(true) }}
-              className="px-4 py-2 bg-sage-600 text-white text-sm font-medium rounded-lg hover:bg-sage-700 min-h-[40px]"
+              className="btn btn-primary px-4 py-2 text-sm font-medium min-h-[40px]"
             >
               + 입금 추가
             </button>
@@ -242,65 +200,52 @@ export default function PaymentsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="card">
           {payments.length === 0 ? (
-            <div className="py-16 text-center text-gray-400">입금 내역이 없습니다</div>
+            <div className="py-16 text-center text-[var(--text-muted)]">입금 내역이 없습니다</div>
           ) : (
             <>
               {/* Desktop Table */}
               <div className="hidden lg:block overflow-x-auto">
                 <table className="w-full">
-                  <thead className="border-b border-gray-200 bg-gray-50">
+                  <thead className="border-b border-[var(--border-default)] bg-[var(--bg-primary)]">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">상태</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">입금일</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">입금인</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">입금액</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">명목</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 min-w-[150px]">사건명</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 min-w-[100px]">메모</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-500">작업</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)]">입금일</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)]">입금인</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-tertiary)]">입금액</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)]">명목</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] min-w-[150px]">사건명</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] min-w-[100px]">메모</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-tertiary)]">작업</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[var(--border-subtle)]">
                     {payments.map((p) => (
-                      <tr key={p.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3">
-                          <button
-                            onClick={() => handleToggleConfirmation(p)}
-                            className={`text-xs px-2 py-0.5 rounded ${
-                              p.is_confirmed
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-amber-100 text-amber-700'
-                            }`}
-                          >
-                            {p.is_confirmed ? '확인' : '미확인'}
-                          </button>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-gray-700">{p.payment_date}</td>
-                        <td className="px-4 py-3 text-sm text-gray-900">{p.depositor_name}</td>
-                        <td className="px-4 py-3 text-sm text-right text-gray-900">{formatCurrency(p.amount)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{p.payment_category}</td>
+                      <tr key={p.id} className="hover:bg-[var(--bg-hover)]">
+                        <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{p.payment_date}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--text-primary)]">{p.depositor_name}</td>
+                        <td className="px-4 py-3 text-sm text-right text-[var(--text-primary)]">{formatCurrency(p.amount)}</td>
+                        <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">{p.payment_category}</td>
                         <td className="px-4 py-3">
                           {p.case_id ? (
-                            <Link href={`/cases/${p.case_id}`} className="text-sm text-gray-700 hover:text-sage-600 hover:underline line-clamp-1">
+                            <Link href={`/cases/${p.case_id}`} className="text-sm text-[var(--text-secondary)] hover:text-[var(--sage-primary)] hover:underline line-clamp-1">
                               {p.case_name || '-'}
                             </Link>
                           ) : (
-                            <span className="text-sm text-gray-400">{p.case_name || '-'}</span>
+                            <span className="text-sm text-[var(--text-muted)]">{p.case_name || '-'}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-500 line-clamp-1">{p.memo || '-'}</td>
+                        <td className="px-4 py-3 text-xs text-[var(--text-tertiary)] line-clamp-1">{p.memo || '-'}</td>
                         <td className="px-4 py-3 text-right">
                           <button
                             onClick={() => { setEditingPayment(p); setShowModal(true) }}
-                            className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 hover:bg-gray-100 rounded mr-1"
+                            className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-2 py-1 hover:bg-[var(--bg-tertiary)] rounded mr-1"
                           >
                             수정
                           </button>
                           <button
                             onClick={() => handleDelete(p.id)}
-                            className="text-xs text-red-500 hover:text-red-700 px-2 py-1 hover:bg-red-50 rounded"
+                            className="text-xs text-[var(--color-danger)] hover:text-[var(--color-danger)] px-2 py-1 hover:bg-[var(--color-danger-muted)] rounded"
                           >
                             삭제
                           </button>
@@ -312,38 +257,28 @@ export default function PaymentsPage() {
               </div>
 
               {/* Mobile */}
-              <div className="lg:hidden divide-y divide-gray-100">
+              <div className="lg:hidden divide-y divide-[var(--border-subtle)]">
                 {payments.map((p) => (
                   <div key={p.id} className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleToggleConfirmation(p)}
-                          className={`text-xs px-2 py-0.5 rounded ${
-                            p.is_confirmed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                          }`}
-                        >
-                          {p.is_confirmed ? '확인' : '미확인'}
-                        </button>
-                        <span className="text-xs text-gray-500">{p.payment_date}</span>
-                      </div>
-                      <span className="text-sm text-gray-900">{formatCurrency(p.amount)}</span>
+                      <span className="text-xs text-[var(--text-tertiary)]">{p.payment_date}</span>
+                      <span className="text-sm text-[var(--text-primary)]">{formatCurrency(p.amount)}</span>
                     </div>
-                    <div className="text-sm text-gray-900 mb-1">{p.depositor_name}</div>
-                    <div className="text-xs text-gray-500 mb-2">
+                    <div className="text-sm text-[var(--text-primary)] mb-1">{p.depositor_name}</div>
+                    <div className="text-xs text-[var(--text-tertiary)] mb-2">
                       {p.payment_category}
                       {p.case_name && <span> · {p.case_name}</span>}
                     </div>
-                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                    <div className="flex gap-2 pt-2 border-t border-[var(--border-subtle)]">
                       <button
                         onClick={() => { setEditingPayment(p); setShowModal(true) }}
-                        className="flex-1 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg"
+                        className="btn btn-secondary flex-1 py-2 text-sm"
                       >
                         수정
                       </button>
                       <button
                         onClick={() => handleDelete(p.id)}
-                        className="flex-1 py-2 text-sm text-red-600 bg-red-50 hover:bg-red-100 rounded-lg"
+                        className="flex-1 py-2 text-sm text-[var(--color-danger)] bg-[var(--color-danger-muted)] hover:bg-[var(--color-danger-muted)] rounded-lg"
                       >
                         삭제
                       </button>
@@ -353,13 +288,13 @@ export default function PaymentsPage() {
               </div>
 
               {/* Pagination */}
-              <div className="px-4 py-3 border-t border-gray-200 flex items-center justify-between text-sm text-gray-600">
+              <div className="px-4 py-3 border-t border-[var(--border-default)] flex items-center justify-between text-sm text-[var(--text-secondary)]">
                 <span>{((currentPage - 1) * limit) + 1}-{Math.min(currentPage * limit, totalCount)} / {totalCount}건</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                     disabled={currentPage === 1}
-                    className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+                    className="px-3 py-1.5 border border-[var(--border-default)] rounded-lg hover:bg-[var(--bg-hover)] disabled:opacity-40"
                   >
                     이전
                   </button>
@@ -367,7 +302,7 @@ export default function PaymentsPage() {
                   <button
                     onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                     disabled={currentPage === totalPages}
-                    className="px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-40"
+                    className="px-3 py-1.5 border border-[var(--border-default)] rounded-lg hover:bg-[var(--bg-hover)] disabled:opacity-40"
                   >
                     다음
                   </button>
@@ -461,7 +396,7 @@ function PaymentFormModal({
             case_id: linkageType === 'case' ? (formData.case_id || null) : null,
             consultation_id: linkageType === 'consultation' ? (formData.consultation_id || null) : null,
             receipt_type: formData.receipt_type || null,
-            is_confirmed: true,
+            // NOTE: is_confirmed 컬럼이 스키마에서 제거됨
           }),
         }
       )
@@ -476,11 +411,11 @@ function PaymentFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--bg-secondary)] rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="p-5">
           <div className="flex items-center justify-between mb-5">
-            <h3 className="text-base font-medium text-gray-900">{payment ? '입금 수정' : '입금 추가'}</h3>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+            <h3 className="text-base font-medium text-[var(--text-primary)]">{payment ? '입금 수정' : '입금 추가'}</h3>
+            <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] p-1">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -489,44 +424,44 @@ function PaymentFormModal({
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">입금일 *</label>
+              <div className="form-group">
+                <label className="form-label">입금일 *</label>
                 <input
                   type="date"
                   required
                   value={formData.payment_date}
                   onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
+                  className="form-input"
                 />
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">입금인 *</label>
+              <div className="form-group">
+                <label className="form-label">입금인 *</label>
                 <input
                   type="text"
                   required
                   value={formData.depositor_name}
                   onChange={(e) => setFormData({ ...formData, depositor_name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
+                  className="form-input"
                 />
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">입금액 *</label>
+              <div className="form-group">
+                <label className="form-label">입금액 *</label>
                 <input
                   type="text"
                   required
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
+                  className="form-input"
                   placeholder="1,000,000"
                 />
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">명목 *</label>
+              <div className="form-group">
+                <label className="form-label">명목 *</label>
                 <select
                   required
                   value={formData.payment_category}
                   onChange={(e) => setFormData({ ...formData, payment_category: e.target.value as PaymentCategory })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
+                  className="form-input"
                 >
                   <option value="">선택</option>
                   {Object.values(PAYMENT_CATEGORIES).map((cat) => (
@@ -534,12 +469,12 @@ function PaymentFormModal({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-gray-500 mb-1">영수증</label>
+              <div className="form-group">
+                <label className="form-label">영수증</label>
                 <select
                   value={formData.receipt_type}
                   onChange={(e) => setFormData({ ...formData, receipt_type: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
+                  className="form-input"
                 >
                   <option value="">선택 안 함</option>
                   <option value="카드결제">카드결제</option>
@@ -550,21 +485,21 @@ function PaymentFormModal({
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">전화번호</label>
+            <div className="form-group">
+              <label className="form-label">전화번호</label>
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
+                className="form-input"
               />
             </div>
 
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">연결 대상</label>
+            <div className="form-group">
+              <label className="form-label">연결 대상</label>
               <div className="flex gap-3 mb-2">
                 {(['none', 'case', 'consultation'] as const).map((t) => (
-                  <label key={t} className="flex items-center gap-1.5 text-sm text-gray-700">
+                  <label key={t} className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)]">
                     <input
                       type="radio"
                       name="linkage"
@@ -575,7 +510,7 @@ function PaymentFormModal({
                         setSearchTerm('')
                         setSelectedLabel('')
                       }}
-                      className="text-sage-600"
+                      className="text-[var(--sage-primary)]"
                     />
                     {t === 'none' ? '미연결' : t === 'case' ? '사건' : '상담'}
                   </label>
@@ -591,21 +526,21 @@ function PaymentFormModal({
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500"
+                    className="form-input flex-1"
                     placeholder={linkageType === 'case' ? '사건명/사건번호' : '이름/전화번호'}
                   />
                   <button
                     type="button"
                     onClick={handleSearch}
                     disabled={searchLoading}
-                    className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                    className="btn btn-secondary px-3 py-2 text-sm"
                   >
                     {searchLoading ? '...' : '검색'}
                   </button>
                 </div>
-                {selectedLabel && <p className="text-xs text-green-600">선택됨: {selectedLabel}</p>}
+                {selectedLabel && <p className="text-xs text-[var(--color-success)]">선택됨: {selectedLabel}</p>}
                 {searchResults.length > 0 && (
-                  <div className="border border-gray-200 rounded-lg max-h-32 overflow-y-auto">
+                  <div className="border border-[var(--border-default)] rounded-lg max-h-32 overflow-y-auto">
                     {searchResults.map((item) => {
                       const isCase = linkageType === 'case'
                       const caseItem = item as CaseSearchResult
@@ -613,9 +548,9 @@ function PaymentFormModal({
                       return (
                         <div
                           key={item.id}
-                          className="flex items-center justify-between p-2 hover:bg-gray-50 text-sm"
+                          className="flex items-center justify-between p-2 hover:bg-[var(--bg-hover)] text-sm"
                         >
-                          <span className="text-gray-700">
+                          <span className="text-[var(--text-secondary)]">
                             {isCase ? caseItem.case_name : consultItem.name}
                           </span>
                           <button
@@ -633,7 +568,7 @@ function PaymentFormModal({
                                 setSelectedLabel(consultItem.name)
                               }
                             }}
-                            className="text-xs text-sage-600 hover:text-sage-700"
+                            className="text-xs text-[var(--sage-primary)] hover:text-[var(--sage-primary)]"
                           >
                             선택
                           </button>
@@ -645,12 +580,12 @@ function PaymentFormModal({
               </div>
             )}
 
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">메모</label>
+            <div className="form-group">
+              <label className="form-label">메모</label>
               <textarea
                 value={formData.memo}
                 onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-sage-500 resize-none"
+                className="form-input resize-none"
                 rows={2}
               />
             </div>
@@ -659,14 +594,14 @@ function PaymentFormModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 py-2.5 text-sm text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                className="btn btn-secondary flex-1 py-2.5 text-sm"
               >
                 취소
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="flex-1 py-2.5 text-sm text-white bg-sage-600 rounded-lg hover:bg-sage-700 disabled:opacity-50"
+                className="btn btn-primary flex-1 py-2.5 text-sm disabled:opacity-50"
               >
                 {saving ? '저장 중...' : '저장'}
               </button>

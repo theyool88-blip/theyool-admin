@@ -69,6 +69,7 @@ export function exportCategoryStatsToExcel(
  * 입금 데이터를 Excel로 다운로드
  */
 export function exportPaymentsToExcel(payments: Payment[], filename: string = 'payments.xlsx') {
+  // NOTE: is_confirmed, confirmed_at, confirmed_by 컬럼이 스키마에서 제거됨
   const data = payments.map(payment => ({
     '입금일': payment.payment_date,
     '입금자명': payment.depositor_name,
@@ -78,9 +79,6 @@ export function exportPaymentsToExcel(payments: Payment[], filename: string = 'p
     '영수증유형': payment.receipt_type || '-',
     '연락처': payment.phone || '-',
     '정산월': payment.month_key || '-',
-    '확인상태': payment.is_confirmed ? '확인' : '미확인',
-    '확인일시': payment.confirmed_at ? new Date(payment.confirmed_at).toLocaleString('ko-KR') : '-',
-    '확인자': payment.confirmed_by || '-',
     '메모': payment.memo || '-'
   }))
 
@@ -98,9 +96,6 @@ export function exportPaymentsToExcel(payments: Payment[], filename: string = 'p
     { wch: 12 }, // 영수증유형
     { wch: 15 }, // 연락처
     { wch: 10 }, // 정산월
-    { wch: 10 }, // 확인상태
-    { wch: 20 }, // 확인일시
-    { wch: 20 }, // 확인자
     { wch: 30 }  // 메모
   ]
 
@@ -119,16 +114,16 @@ export function exportFinancialReportToExcel(
   const workbook = XLSX.utils.book_new()
 
   // 1. 입금 시트
+  // NOTE: is_confirmed 컬럼이 스키마에서 제거됨
   const paymentData = payments.map(payment => ({
     '입금일': payment.payment_date,
     '입금자명': payment.depositor_name,
     '금액': payment.amount,
-    '카테고리': payment.payment_category,
-    '확인상태': payment.is_confirmed ? '확인' : '미확인'
+    '카테고리': payment.payment_category
   }))
   const paymentSheet = XLSX.utils.json_to_sheet(paymentData)
   paymentSheet['!cols'] = [
-    { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 10 }
+    { wch: 12 }, { wch: 15 }, { wch: 15 }, { wch: 15 }
   ]
   XLSX.utils.book_append_sheet(workbook, paymentSheet, '입금내역')
 
@@ -147,15 +142,13 @@ export function exportFinancialReportToExcel(
   XLSX.utils.book_append_sheet(workbook, expenseSheet, '지출내역')
 
   // 3. 요약 시트
+  // NOTE: is_confirmed 컬럼이 스키마에서 제거됨 - 확인된/미확인 입금액 구분 제거
   const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0)
-  const confirmedRevenue = payments.filter(p => p.is_confirmed).reduce((sum, p) => sum + p.amount, 0)
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
   const netProfit = totalRevenue - totalExpenses
 
   const summaryData = [
     { '항목': '총 입금액', '금액': totalRevenue },
-    { '항목': '확인된 입금액', '금액': confirmedRevenue },
-    { '항목': '미확인 입금액', '금액': totalRevenue - confirmedRevenue },
     { '항목': '총 지출액', '금액': totalExpenses },
     { '항목': '순수익', '금액': netProfit },
     { '항목': '수익률', '금액': totalRevenue > 0 ? `${((netProfit / totalRevenue) * 100).toFixed(1)}%` : '0%' }

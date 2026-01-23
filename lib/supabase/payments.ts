@@ -68,19 +68,8 @@ export async function createPayment(
 
     if (error) throw error;
 
-    if (payment?.case_id) {
-      const { data: sums } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('case_id', payment.case_id);
-      if (sums) {
-        const total = sums.reduce((sum, p) => sum + p.amount, 0);
-        await supabase
-          .from('legal_cases')
-          .update({ total_received: total })
-          .eq('id', payment.case_id);
-      }
-    }
+    // NOTE: total_received 컬럼이 legal_cases 스키마에서 제거됨
+    // 입금 합계는 payments 테이블을 실시간 조회하여 계산
 
     return { data: payment, error: null };
   } catch (error) {
@@ -291,19 +280,8 @@ export async function updatePayment(
 
     if (error) throw error;
 
-    if (payment?.case_id) {
-      const { data: sums } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('case_id', payment.case_id);
-      if (sums) {
-        const total = sums.reduce((sum, p) => sum + p.amount, 0);
-        await supabase
-          .from('legal_cases')
-          .update({ total_received: total })
-          .eq('id', payment.case_id);
-      }
-    }
+    // NOTE: total_received 컬럼이 legal_cases 스키마에서 제거됨
+    // 입금 합계는 payments 테이블을 실시간 조회하여 계산
 
     return { data: payment, error: null };
   } catch (error) {

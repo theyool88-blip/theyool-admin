@@ -149,9 +149,7 @@ export interface Payment {
 
   // 정산 통합
   month_key: string | null;  // YYYY-MM
-  is_confirmed: boolean;
-  confirmed_at: string | null;  // ISO 8601 datetime
-  confirmed_by: string | null;
+  // NOTE: is_confirmed, confirmed_at, confirmed_by 컬럼이 스키마에서 제거됨
 }
 
 // =====================================================
@@ -172,7 +170,7 @@ export interface CreatePaymentRequest {
   phone?: string;
   memo?: string;
   admin_notes?: string;
-  is_confirmed?: boolean;
+  // NOTE: is_confirmed 컬럼이 스키마에서 제거됨
 }
 
 export interface UpdatePaymentRequest {
@@ -189,9 +187,7 @@ export interface UpdatePaymentRequest {
   phone?: string | null;
   memo?: string | null;
   admin_notes?: string | null;
-  is_confirmed?: boolean;
-  confirmed_at?: string | null;
-  confirmed_by?: string | null;
+  // NOTE: is_confirmed, confirmed_at, confirmed_by 컬럼이 스키마에서 제거됨
 }
 
 // =====================================================

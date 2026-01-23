@@ -207,92 +207,82 @@ export default function OnboardingImportPage() {
       const decoder = new TextDecoder()
       let buffer = ''
 
-      // SSE 이벤트 처리 함수
+      // 이벤트 처리 함수
+      const handleEvent = (eventType: string, eventData: string) => {
+        try {
+          const data = JSON.parse(eventData)
+
+          switch (eventType) {
+            case 'phase':
+              setProgress(_prev => ({
+                phase: data.phase,
+                current: 0,
+                total: data.total,
+                currentCase: '',
+                status: ''
+              }))
+              break
+
+            case 'progress':
+              setProgress({
+                phase: data.phase,
+                current: data.current,
+                total: data.total,
+                currentCase: data.caseName || '',
+                status: data.status
+              })
+              break
+
+            case 'complete':
+              setReport({
+                summary: data.summary,
+                results: data.results,
+                missingInfoSummary: data.missingInfoSummary,
+                createdAt: data.createdAt,
+                importOptions: options
+              })
+              setStep('complete')
+              break
+
+            case 'error':
+              throw new Error(data.message)
+          }
+        } catch (parseErr) {
+          console.error('이벤트 파싱 오류:', parseErr, { eventType, eventData })
+        }
+      }
+
+      // SSE 이벤트 처리 함수 (이벤트 블록 단위로 파싱)
       const processBuffer = (text: string, isFinal: boolean = false) => {
         buffer += text
 
-        // SSE 이벤트 파싱
-        const lines = buffer.split('\n')
-        // 마지막이 아니면 불완전한 라인 보존
-        buffer = isFinal ? '' : (lines.pop() || '')
+        // SSE 이벤트는 두 개의 줄바꿈(\n\n)으로 구분됨
+        const eventBlocks = buffer.split('\n\n')
 
-        let eventType = ''
-        let eventData = ''
-
-        for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            eventType = line.slice(7)
-          } else if (line.startsWith('data: ')) {
-            eventData = line.slice(6)
-          } else if (line === '' && eventType && eventData) {
-            // 이벤트 처리
-            try {
-              const data = JSON.parse(eventData)
-
-              switch (eventType) {
-                case 'phase':
-                  setProgress(_prev => ({
-                    phase: data.phase,
-                    current: 0,
-                    total: data.total,
-                    currentCase: '',
-                    status: ''
-                  }))
-                  break
-
-                case 'progress':
-                  setProgress({
-                    phase: data.phase,
-                    current: data.current,
-                    total: data.total,
-                    currentCase: data.caseName || '',
-                    status: data.status
-                  })
-                  break
-
-                case 'complete':
-                  setReport({
-                    summary: data.summary,
-                    results: data.results,
-                    missingInfoSummary: data.missingInfoSummary,
-                    createdAt: data.createdAt,
-                    importOptions: options
-                  })
-                  setStep('complete')
-                  break
-
-                case 'error':
-                  throw new Error(data.message)
-              }
-            } catch (parseErr) {
-              console.error('이벤트 파싱 오류:', parseErr)
-            }
-
-            eventType = ''
-            eventData = ''
-          }
+        // 마지막 항목이 불완전할 수 있으므로 보존 (isFinal이 아닌 경우)
+        if (!isFinal) {
+          buffer = eventBlocks.pop() || ''
+        } else {
+          buffer = ''
         }
 
-        // isFinal일 때 남은 이벤트 처리 (마지막 빈 줄이 없는 경우)
-        if (isFinal && eventType && eventData) {
-          try {
-            const data = JSON.parse(eventData)
-            switch (eventType) {
-              case 'complete':
-                setReport({
-                  summary: data.summary,
-                  results: data.results,
-                  missingInfoSummary: data.missingInfoSummary,
-                  createdAt: data.createdAt,
-                  importOptions: options
-                })
-                setStep('complete')
-                break
-              case 'error':
-                throw new Error(data.message)
+        for (const eventBlock of eventBlocks) {
+          if (!eventBlock.trim()) continue
+
+          const lines = eventBlock.split('\n')
+          let eventType = ''
+          let eventData = ''
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventType = line.slice(7)
+            } else if (line.startsWith('data: ')) {
+              eventData = line.slice(6)
             }
-          } catch (parseErr) {
-            console.error('최종 이벤트 파싱 오류:', parseErr)
+          }
+
+          if (eventType && eventData) {
+            handleEvent(eventType, eventData)
           }
         }
       }
@@ -599,6 +589,10 @@ export default function OnboardingImportPage() {
                         <option value="client_birth_date">생년월일</option>
                         <option value="client_address">주소</option>
                         <option value="client_bank_account">계좌번호</option>
+                        <option value="client_type">의뢰인유형</option>
+                        <option value="client_resident_number">주민등록번호</option>
+                        <option value="client_company_name">회사명</option>
+                        <option value="client_registration_number">사업자등록번호</option>
                       </optgroup>
                       <optgroup label="기타">
                         <option value="notes">메모</option>

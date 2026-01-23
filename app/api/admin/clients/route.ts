@@ -41,28 +41,35 @@ export const GET = withTenant(async (request, { tenant }) => {
       )
     }
 
-    // Fetch case counts and latest case for each client
+    // Fetch case counts and latest case for each client (via case_parties)
     const clientsWithCases = await Promise.all(
       (data || []).map(async (client) => {
-        // Get case count
-        const { count: caseCount } = await supabase
-          .from('legal_cases')
-          .select('*', { count: 'exact', head: true })
+        // Get case count via case_parties
+        const { data: caseParties, count: caseCount } = await supabase
+          .from('case_parties')
+          .select('case_id', { count: 'exact' })
           .eq('client_id', client.id)
 
-        // Get latest case
-        const { data: latestCase } = await supabase
-          .from('legal_cases')
-          .select('id, case_name')
-          .eq('client_id', client.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single()
+        // Get latest case via case_parties
+        let latestCase = null
+        if (caseParties && caseParties.length > 0) {
+          const caseIds = caseParties.map(cp => cp.case_id).filter(Boolean)
+          if (caseIds.length > 0) {
+            const { data: latestCaseData } = await supabase
+              .from('legal_cases')
+              .select('id, case_name')
+              .in('id', caseIds)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            latestCase = latestCaseData
+          }
+        }
 
         return {
           ...client,
           case_count: caseCount || 0,
-          latest_case: latestCase || null
+          latest_case: latestCase
         }
       })
     )
@@ -91,8 +98,12 @@ export const POST = withTenant(async (request, { tenant }) => {
       phone?: string
       email?: string
       birth_date?: string
+      resident_number?: string
       address?: string
-      gender?: string | null
+      bank_account?: string
+      client_type?: 'individual' | 'corporation'
+      company_name?: string
+      registration_number?: string
       notes?: string
     }
 
@@ -114,8 +125,12 @@ export const POST = withTenant(async (request, { tenant }) => {
         phone: body.phone,
         email: body.email || null,
         birth_date: body.birth_date || null,
+        resident_number: body.resident_number || null,
         address: body.address || null,
-        gender: body.gender || null,
+        bank_account: body.bank_account || null,
+        client_type: body.client_type || 'individual',
+        company_name: body.company_name || null,
+        registration_number: body.registration_number || null,
         notes: body.notes || null
       }, tenant)])
       .select()

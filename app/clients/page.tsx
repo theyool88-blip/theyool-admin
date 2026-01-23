@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import ClientsList from '@/components/ClientsList'
-import AdminHeader from '@/components/AdminHeader'
+import AdminLayoutClient from '@/components/AdminLayoutClient'
 
 export default async function ClientsPage() {
   // 테넌트 컨텍스트 조회 (impersonation 포함)
@@ -76,10 +76,11 @@ export default async function ClientsPage() {
       email: client.email,
       address: client.address,
       birth_date: client.birth_date,
-      gender: client.gender,
       notes: client.notes,
       created_at: client.created_at,
       total_outstanding: totalOutstanding,
+      client_type: client.client_type || 'individual',
+      company_name: client.company_name,
       latest_case: latestCase
     }
   })
@@ -93,9 +94,8 @@ export default async function ClientsPage() {
   }
 
   return (
-    <>
-      <AdminHeader title="의뢰인 관리" subtitle="법무법인 더율 어드민" />
+    <AdminLayoutClient>
       <ClientsList profile={profile as any} initialClients={clientsWithCalculations} />
-    </>
+    </AdminLayoutClient>
   )
 }

@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import AdminHeader from './AdminHeader'
 import ClientPaymentsModal from './ClientPaymentsModal'
+import StatusBadge from './ui/StatusBadge'
+import { Phone, Mail, MapPin, Calendar, User, ChevronRight, CreditCard, Wallet, Plus, Building2, FileText } from 'lucide-react'
 
 interface LegalCase {
   id: string
@@ -25,9 +26,11 @@ interface Client {
   email: string | null
   address: string | null
   birth_date: string | null
-  gender: 'M' | 'F' | null
-  account_number: string | null
+  bank_account: string | null
   resident_number: string | null
+  client_type: 'individual' | 'corporation' | null
+  company_name: string | null
+  registration_number: string | null
   notes: string | null
   created_at: string
   updated_at: string
@@ -86,162 +89,240 @@ export default function ClientDetail({ clientData }: { clientData: Client }) {
     fetchTotals()
   }, [clientData.id, clientData.name])
 
-  const getStatusBadge = (status: string) => {
-    return status === '진행중'
-      ? 'bg-emerald-50 text-emerald-700'
-      : 'bg-gray-100 text-gray-600'
-  }
-
+  const outstandingBalance = calculateTotalOutstanding()
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="의뢰인 상세" subtitle={clientData.name} />
-
-      <div className="max-w-4xl mx-auto pt-20 pb-8 px-4">
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between mb-5">
+    <div className="page-container max-w-4xl">
+      {/* Page Header */}
+      <div className="page-header">
+        <div>
           <Link
             href="/clients"
-            className="text-sm text-gray-500 hover:text-gray-700"
+            className="text-caption text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-2 inline-block"
           >
-            ← 목록으로
+            ← 의뢰인 목록
           </Link>
-          <div className="flex gap-2">
-            <button
-              onClick={() => window.open(`/admin/client-preview/${clientData.id}?preview=admin`, '_blank')}
-              className="px-3 py-1.5 text-sm font-medium text-sage-700 bg-sage-100 rounded-lg hover:bg-sage-200 transition-colors"
-            >
-              포털 미리보기
-            </button>
-            <Link
-              href={`/clients/${clientData.id}/edit`}
-              className="px-3 py-1.5 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors"
-            >
-              수정
-            </Link>
-          </div>
+          <h1 className="page-title">{clientData.name}</h1>
+          <p className="page-subtitle">
+            {clientData.cases?.length || 0}건의 사건
+            {outstandingBalance > 0 && (
+              <span className="ml-2 text-[var(--color-danger)]">
+                미수금 {formatCurrency(outstandingBalance)}
+              </span>
+            )}
+          </p>
         </div>
-
-        {/* Basic Info Card */}
-        <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">기본 정보</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-xs text-gray-500">이름</span>
-              <p className="text-gray-900 font-medium mt-0.5">{clientData.name}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">주민등록번호</span>
-              <p className="text-gray-900 mt-0.5">{clientData.resident_number || '-'}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">연락처</span>
-              <p className="text-gray-900 mt-0.5">{clientData.phone || '-'}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">생년월일</span>
-              <p className="text-gray-900 mt-0.5">{formatDate(clientData.birth_date)}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">이메일</span>
-              <p className="text-gray-900 mt-0.5">{clientData.email || '-'}</p>
-            </div>
-            <div>
-              <span className="text-xs text-gray-500">성별</span>
-              <p className="text-gray-900 mt-0.5">
-                {clientData.gender === 'M' ? '남성' : clientData.gender === 'F' ? '여성' : '-'}
-              </p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-xs text-gray-500">주소</span>
-              <p className="text-gray-900 mt-0.5">{clientData.address || '-'}</p>
-            </div>
-            <div className="col-span-2">
-              <span className="text-xs text-gray-500">계좌번호</span>
-              <p className="text-gray-900 mt-0.5">{clientData.account_number || '-'}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Financial Summary */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div
-            className="bg-white rounded-lg border border-gray-200 p-4 cursor-pointer hover:border-emerald-300 transition-colors"
-            onClick={() => setShowPaymentModal(true)}
+        <div className="flex gap-2">
+          <button
+            onClick={() => window.open(`/admin/client-preview/${clientData.id}?preview=admin`, '_blank')}
+            className="btn btn-secondary"
           >
-            <span className="text-xs text-gray-500">총 입금액</span>
-            <p className="text-xl font-bold text-emerald-600 mt-1">
-              {formatCurrency(calculateTotalReceived())}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">클릭하여 상세보기</p>
+            포털 미리보기
+          </button>
+          <Link
+            href={`/clients/${clientData.id}/edit`}
+            className="btn btn-primary"
+          >
+            수정
+          </Link>
+        </div>
+      </div>
+
+      {/* Financial Summary Cards */}
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div
+          className="card p-4 cursor-pointer hover:border-[var(--sage-primary)] transition-colors"
+          onClick={() => setShowPaymentModal(true)}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-[var(--color-success-muted)] flex items-center justify-center">
+              <Wallet className="w-4 h-4 text-[var(--color-success)]" />
+            </div>
+            <span className="text-caption text-[var(--text-muted)]">총 입금액</span>
           </div>
-          <div className="bg-white rounded-lg border border-gray-200 p-4">
-            <span className="text-xs text-gray-500">미수금 합계</span>
-            <p className="text-xl font-bold text-red-600 mt-1">
-              {formatCurrency(calculateTotalOutstanding())}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">전체 사건 미수금</p>
-          </div>
+          <p className="text-heading font-bold text-[var(--color-success)]">
+            {formatCurrency(calculateTotalReceived())}
+          </p>
+          <p className="text-caption text-[var(--text-muted)] mt-1">클릭하여 상세보기</p>
         </div>
 
-        {/* Memo Card */}
-        {clientData.notes && (
-          <div className="bg-white rounded-lg border border-gray-200 p-5 mb-4">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">메모</h2>
-            <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${outstandingBalance > 0 ? 'bg-[var(--color-danger-muted)]' : 'bg-[var(--bg-tertiary)]'}`}>
+              <CreditCard className={`w-4 h-4 ${outstandingBalance > 0 ? 'text-[var(--color-danger)]' : 'text-[var(--text-muted)]'}`} />
+            </div>
+            <span className="text-caption text-[var(--text-muted)]">미수금 합계</span>
+          </div>
+          <p className={`text-heading font-bold ${outstandingBalance > 0 ? 'text-[var(--color-danger)]' : 'text-[var(--text-muted)]'}`}>
+            {formatCurrency(outstandingBalance)}
+          </p>
+          <p className="text-caption text-[var(--text-muted)] mt-1">전체 사건 미수금</p>
+        </div>
+      </div>
+
+      {/* Basic Info Card */}
+      <div className="card mb-4">
+        <div className="p-4 border-b border-[var(--border-subtle)]">
+          <h2 className="text-body font-semibold text-[var(--text-primary)]">기본 정보</h2>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            {/* 의뢰인 유형 표시 */}
+            <div className="col-span-2 flex items-start gap-3">
+              <User className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-caption text-[var(--text-muted)]">의뢰인 유형</span>
+                <p className="text-[var(--text-primary)] font-medium">
+                  {clientData.client_type === 'corporation' ? '법인' : '개인'}
+                </p>
+              </div>
+            </div>
+
+            {/* 법인인 경우 회사명, 사업자등록번호 표시 */}
+            {clientData.client_type === 'corporation' && (
+              <>
+                <div className="flex items-start gap-3">
+                  <Building2 className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="text-caption text-[var(--text-muted)]">회사명</span>
+                    <p className="text-[var(--text-primary)] font-medium">{clientData.company_name || '-'}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <FileText className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+                  <div>
+                    <span className="text-caption text-[var(--text-muted)]">사업자등록번호</span>
+                    <p className="text-[var(--text-primary)]">{clientData.registration_number || '-'}</p>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <div className="flex items-start gap-3">
+              <User className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-caption text-[var(--text-muted)]">
+                  {clientData.client_type === 'corporation' ? '대표자명' : '이름'}
+                </span>
+                <p className="text-[var(--text-primary)] font-medium">{clientData.name}</p>
+              </div>
+            </div>
+
+            {/* 개인인 경우 주민등록번호 표시 */}
+            {clientData.client_type !== 'corporation' && (
+              <div className="flex items-start gap-3">
+                <CreditCard className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+                <div>
+                  <span className="text-caption text-[var(--text-muted)]">주민등록번호</span>
+                  <p className="text-[var(--text-primary)]">{clientData.resident_number || '-'}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-start gap-3">
+              <Phone className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-caption text-[var(--text-muted)]">연락처</span>
+                <p className="text-[var(--text-primary)]">{clientData.phone || '-'}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Calendar className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-caption text-[var(--text-muted)]">
+                  {clientData.client_type === 'corporation' ? '설립일' : '생년월일'}
+                </span>
+                <p className="text-[var(--text-primary)]">{formatDate(clientData.birth_date)}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Mail className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-caption text-[var(--text-muted)]">이메일</span>
+                <p className="text-[var(--text-primary)]">{clientData.email || '-'}</p>
+              </div>
+            </div>
+            <div className="col-span-2 flex items-start gap-3">
+              <MapPin className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-caption text-[var(--text-muted)]">주소</span>
+                <p className="text-[var(--text-primary)]">{clientData.address || '-'}</p>
+              </div>
+            </div>
+            <div className="col-span-2 flex items-start gap-3">
+              <Wallet className="w-4 h-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+              <div>
+                <span className="text-caption text-[var(--text-muted)]">계좌번호</span>
+                <p className="text-[var(--text-primary)]">{clientData.bank_account || '-'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Memo Card */}
+      {clientData.notes && (
+        <div className="card mb-4">
+          <div className="p-4 border-b border-[var(--border-subtle)]">
+            <h2 className="text-body font-semibold text-[var(--text-primary)]">메모</h2>
+          </div>
+          <div className="p-4">
+            <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">
               {clientData.notes}
             </p>
           </div>
-        )}
-
-        {/* Cases List */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-900">
-              사건 목록 ({clientData.cases?.length || 0}건)
-            </h2>
-            <Link
-              href={`/cases/new?client_id=${clientData.id}`}
-              className="px-2.5 py-1 text-xs font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
-            >
-              + 사건 추가
-            </Link>
-          </div>
-
-          {clientData.cases && clientData.cases.length > 0 ? (
-            <div className="divide-y divide-gray-100">
-              {clientData.cases.map((legalCase) => (
-                <div
-                  key={legalCase.id}
-                  onClick={() => router.push(`/cases/${legalCase.id}`)}
-                  className="px-5 py-3 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${getStatusBadge(legalCase.status)}`}>
-                        {legalCase.status}
-                      </span>
-                    </div>
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {legalCase.case_name}
-                    </p>
-                    <div className="flex gap-3 mt-1 text-xs text-gray-500">
-                      {legalCase.case_type && <span>{legalCase.case_type}</span>}
-                      {legalCase.contract_date && <span>계약일: {formatDate(legalCase.contract_date)}</span>}
-                    </div>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400 ml-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-12 text-center text-gray-400 text-sm">
-              등록된 사건이 없습니다
-            </div>
-          )}
         </div>
+      )}
+
+      {/* Cases List */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)]">
+          <h2 className="text-body font-semibold text-[var(--text-primary)]">
+            사건 목록 ({clientData.cases?.length || 0}건)
+          </h2>
+          <Link
+            href={`/cases/new?client_id=${clientData.id}`}
+            className="btn btn-sm btn-primary"
+          >
+            <Plus className="w-4 h-4" />
+            사건 추가
+          </Link>
+        </div>
+
+        {clientData.cases && clientData.cases.length > 0 ? (
+          <div className="divide-y divide-[var(--border-subtle)]">
+            {clientData.cases.map((legalCase) => (
+              <div
+                key={legalCase.id}
+                onClick={() => router.push(`/cases/${legalCase.id}`)}
+                className="px-4 py-3 hover:bg-[var(--bg-hover)] cursor-pointer flex items-center justify-between transition-colors"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <StatusBadge
+                      variant={legalCase.status === '진행중' ? 'success' : 'neutral'}
+                      showDot
+                    >
+                      {legalCase.status}
+                    </StatusBadge>
+                  </div>
+                  <p className="text-body font-medium text-[var(--text-primary)] truncate">
+                    {legalCase.case_name}
+                  </p>
+                  <div className="flex gap-3 mt-1 text-caption text-[var(--text-muted)]">
+                    {legalCase.case_type && <span>{legalCase.case_type}</span>}
+                    {legalCase.contract_date && <span>계약일: {formatDate(legalCase.contract_date)}</span>}
+                  </div>
+                </div>
+                <ChevronRight className="w-4 h-4 text-[var(--text-muted)] ml-3 flex-shrink-0" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="py-12 text-center text-[var(--text-muted)] text-sm">
+            등록된 사건이 없습니다
+          </div>
+        )}
       </div>
 
       {/* Payment Modal */}

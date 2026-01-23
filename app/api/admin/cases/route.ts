@@ -141,6 +141,10 @@ export const POST = withTenant(async (request, { tenant }) => {
         birth_date?: string
         address?: string
         bank_account?: string // 의뢰인 계좌번호
+        client_type?: 'individual' | 'corporation'
+        resident_number?: string
+        company_name?: string
+        registration_number?: string
       }
       assigned_to?: string  // 주 담당변호사 (레거시 호환)
       assignees?: Array<{   // 담당변호사 목록 (다중 지정)
@@ -310,7 +314,11 @@ export const POST = withTenant(async (request, { tenant }) => {
           email: body.new_client.email || null,
           birth_date: body.new_client.birth_date || null,
           address: body.new_client.address || null,
-          bank_account: body.new_client.bank_account || null
+          bank_account: body.new_client.bank_account || null,
+          client_type: body.new_client.client_type || 'individual',
+          resident_number: body.new_client.resident_number || null,
+          company_name: body.new_client.company_name || null,
+          registration_number: body.new_client.registration_number || null
         }, tenant)])
         .select()
         .single()

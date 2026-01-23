@@ -12,6 +12,13 @@ export interface ClientInfo {
   name: string;
   phone: string;
   email?: string;
+  address?: string;
+  birth_date?: string;
+  resident_number?: string;
+  bank_account?: string;
+  client_type?: 'individual' | 'corporation';
+  company_name?: string;
+  registration_number?: string;
 }
 
 export interface CaseInfo {

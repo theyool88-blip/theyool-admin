@@ -159,6 +159,34 @@ export const OPTIONAL_FIELDS: FieldDefinition[] = [
     labelKorean: '계좌번호',
     type: 'string',
     required: false
+  },
+  {
+    name: 'client_type',
+    label: 'Client Type',
+    labelKorean: '의뢰인유형',
+    type: 'string',
+    required: false
+  },
+  {
+    name: 'client_resident_number',
+    label: 'Client Resident Number',
+    labelKorean: '주민등록번호',
+    type: 'string',
+    required: false
+  },
+  {
+    name: 'client_company_name',
+    label: 'Client Company Name',
+    labelKorean: '회사명',
+    type: 'string',
+    required: false
+  },
+  {
+    name: 'client_registration_number',
+    label: 'Client Registration Number',
+    labelKorean: '사업자등록번호',
+    type: 'string',
+    required: false
   }
 ]
 
@@ -176,6 +204,7 @@ export const COLUMN_ORDER: (keyof StandardCaseRow)[] = [
   'court_case_number',
   'case_name',
   'client_name',
+  'client_type',
   'opponent_name',
   'retainer_fee',
   'success_fee_agreement',
@@ -185,6 +214,9 @@ export const COLUMN_ORDER: (keyof StandardCaseRow)[] = [
   'client_email',
   'client_birth_date',
   'client_address',
+  'client_resident_number',
+  'client_company_name',
+  'client_registration_number',
   'notes',
 ]
 

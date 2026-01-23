@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import AdminHeader from './AdminHeader'
 import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
 import { getCaseTypeAuto, isCriminalCase } from '@/lib/constants/case-types'
+import { AssigneeMultiSelect } from './ui/AssigneeMultiSelect'
 
 interface Client {
   id: string
@@ -60,6 +60,16 @@ interface NewClientPayload {
   birth_date: string | null
   address: string | null
   bank_account: string | null
+  client_type: 'individual' | 'corporation'
+  resident_number: string | null
+  company_name: string | null
+  registration_number: string | null
+}
+
+interface Assignee {
+  member_id: string
+  assignee_role?: 'lawyer' | 'staff'
+  is_primary?: boolean
 }
 
 interface NewCasePayload {
@@ -67,6 +77,7 @@ interface NewCasePayload {
   case_type: string
   contract_number?: string | null
   assigned_to?: string | null
+  assignees?: Assignee[]
   status: string
   contract_date: string
   retainer_fee: number | null
@@ -98,20 +109,20 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-sage-100 flex items-center justify-center">
-        <span className="text-sm font-semibold text-sage-700">{number}</span>
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--sage-muted)] flex items-center justify-center">
+        <span className="text-sm font-semibold text-[var(--sage-primary)]">{number}</span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-body font-semibold text-[var(--text-primary)]">{title}</h2>
           {optional && (
-            <span className="px-2 py-0.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium text-[var(--sage-primary)] bg-[var(--sage-muted)] rounded-full">
               선택
             </span>
           )}
         </div>
         {subtitle && (
-          <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
+          <p className="text-caption text-[var(--text-muted)] mt-0.5">{subtitle}</p>
         )}
       </div>
     </div>
@@ -131,14 +142,14 @@ function FormField({
   hint?: string
 }) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+    <div className="form-group">
+      <label className="form-label">
         {label}
-        {required && <span className="text-coral-600 ml-0.5">*</span>}
+        {required && <span className="text-[var(--color-danger)] ml-0.5">*</span>}
       </label>
       {children}
       {hint && (
-        <p className="mt-1 text-xs text-gray-500">{hint}</p>
+        <p className="form-hint">{hint}</p>
       )}
     </div>
   )
@@ -223,7 +234,7 @@ export default function NewCaseForm({
     case_type: '',
     case_label: '', // 사건명 (이혼, 양육권, 손해배상 등)
     contract_number: '', // 관리번호
-    assigned_to: '',
+    assignees: [] as Assignee[], // 담당변호사 목록 (다중 지정)
     status: '진행중',
     contract_date: new Date().toISOString().split('T')[0],
     retainer_fee: '',
@@ -241,7 +252,11 @@ export default function NewCaseForm({
     client_email: '',
     client_birth_date: '',
     client_address: '',
-    client_bank_account: '' // 의뢰인 계좌번호
+    client_bank_account: '', // 의뢰인 계좌번호
+    client_type: 'individual' as 'individual' | 'corporation',
+    client_resident_number: '',
+    client_company_name: '',
+    client_registration_number: ''
   })
 
   // 의뢰인 이름 가져오기
@@ -626,11 +641,17 @@ export default function NewCaseForm({
         formData.court_case_number || null
       )
 
+      // 다중 담당변호사 → 첫 번째 주담당을 assigned_to로도 설정 (하위호환)
+      const primaryAssignee = formData.assignees.find(a => a.is_primary)
+      const firstAssignee = formData.assignees[0]
+      const assignedTo = primaryAssignee?.member_id || firstAssignee?.member_id || null
+
       const payload: NewCasePayload = {
         case_name: caseName,
         case_type: formData.case_label || formData.case_type || '기타',
         contract_number: formData.contract_number || null,
-        assigned_to: formData.assigned_to || null,
+        assigned_to: assignedTo,
+        assignees: formData.assignees.length > 0 ? formData.assignees : undefined,
         status: formData.status,
         contract_date: formData.contract_date,
         retainer_fee: formData.retainer_fee ? Number(formData.retainer_fee) : null,
@@ -663,7 +684,11 @@ export default function NewCaseForm({
           email: formData.client_email || null,
           birth_date: formData.client_birth_date || null,
           address: formData.client_address || null,
-          bank_account: formData.client_bank_account || null
+          bank_account: formData.client_bank_account || null,
+          client_type: formData.client_type,
+          resident_number: formData.client_type === 'individual' ? (formData.client_resident_number || null) : null,
+          company_name: formData.client_type === 'corporation' ? (formData.client_company_name || null) : null,
+          registration_number: formData.client_type === 'corporation' ? (formData.client_registration_number || null) : null
         }
       } else {
         if (!formData.client_id) {
@@ -720,49 +745,47 @@ export default function NewCaseForm({
     await submitCase()
   }
 
-  const inputClassName = "w-full h-11 px-4 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors"
-  const selectClassName = "w-full h-11 px-4 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors appearance-none cursor-pointer"
+  const inputClassName = "form-input h-11"
+  const selectClassName = "form-input h-11 appearance-none cursor-pointer"
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sage-50/50 to-white">
-      <AdminHeader title="새 사건 등록" />
-
-      <div className="max-w-2xl mx-auto pt-20 pb-12 px-4">
-        {/* 뒤로가기 */}
-        <div className="mb-6">
-          <Link
-            href="/cases"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white rounded-full shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            사건 목록
-          </Link>
+    <div className="page-container max-w-2xl">
+        {/* Page Header */}
+        <div className="page-header">
+          <div>
+            <Link
+              href="/cases"
+              className="text-caption text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-2 inline-block"
+            >
+              ← 사건 목록
+            </Link>
+            <h1 className="page-title">새 사건 등록</h1>
+            <p className="page-subtitle">사건 정보를 입력하여 새 사건을 등록하세요</p>
+          </div>
         </div>
 
         {/* 에러 메시지 */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+          <div className="mb-6 p-4 bg-[var(--color-danger-muted)] border border-[var(--color-danger)]/20 rounded-xl">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 w-5 h-5 mt-0.5">
-                <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-5 h-5 text-[var(--color-danger)]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-sm text-[var(--color-danger)]">{error}</p>
             </div>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* ========== 섹션 1: 대법원 사건 연동 ========== */}
-          <div className={`rounded-2xl border transition-all ${
+          <div className={`card overflow-hidden transition-all ${
             scourtSearchSuccess
-              ? 'bg-sage-50 border-sage-300'
-              : 'bg-white border-sage-200 shadow-sm'
+              ? 'bg-[var(--sage-muted)] border-[var(--sage-primary)]'
+              : ''
           }`}>
-            <div className="p-5 border-b border-sage-100">
+            <div className="p-5 border-b border-[var(--border-subtle)]">
               <SectionHeader
                 number={1}
                 title="대법원 사건 연동"
@@ -775,11 +798,11 @@ export default function NewCaseForm({
               {scourtSearchSuccess ? (
                 // 연동 성공 상태
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sage-700">
-                    <svg className="w-5 h-5 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="flex items-center gap-2 text-[var(--sage-primary)]">
+                    <svg className="w-5 h-5 text-[var(--color-success)]" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <span className="font-medium">
+                    <span className="font-medium text-[var(--text-primary)]">
                       {formData.court_case_number} / {getCourtAbbrev(formData.court_name)}
                       {formData.client_role && ` (${formData.client_role === 'plaintiff' ? '원고' : '피고'})`}
                     </span>
@@ -791,7 +814,7 @@ export default function NewCaseForm({
                       setScourtSearchSuccess(false)
                       setScourtSearchError(null)
                     }}
-                    className="text-sm text-sage-600 hover:text-sage-700 font-medium"
+                    className="text-sm text-[var(--sage-primary)] hover:text-[var(--sage-primary-hover)] font-medium"
                   >
                     다시 검색하기
                   </button>
@@ -831,11 +854,11 @@ export default function NewCaseForm({
                           className={inputClassName}
                         />
                         {showCourtDropdown && filteredCourts.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border border-sage-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          <div className="absolute z-50 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg shadow-lg max-h-48 overflow-y-auto">
                             {filteredCourts.map(c => (
                               <div
                                 key={c.code}
-                                className="px-4 py-3 text-sm cursor-pointer hover:bg-sage-50 text-gray-900 border-b border-sage-50 last:border-b-0"
+                                className="px-4 py-3 text-sm cursor-pointer hover:bg-[var(--bg-hover)] text-[var(--text-primary)] border-b border-[var(--border-subtle)] last:border-b-0"
                                 onMouseDown={() => {
                                   setFormData({ ...formData, court_name: getCourtAbbrev(c.name) })
                                   setShowCourtDropdown(false)
@@ -862,8 +885,8 @@ export default function NewCaseForm({
                   </div>
 
                   {scourtSearchError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm text-red-600">{scourtSearchError}</p>
+                    <div className="p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)]/20 rounded-lg">
+                      <p className="text-sm text-[var(--color-danger)]">{scourtSearchError}</p>
                     </div>
                   )}
 
@@ -871,7 +894,7 @@ export default function NewCaseForm({
                     type="button"
                     onClick={handleScourtSearch}
                     disabled={scourtSearching}
-                    className="w-full sm:w-auto px-6 py-2.5 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    className="btn btn-primary w-full sm:w-auto"
                   >
                     {scourtSearching ? (
                       <span className="flex items-center justify-center gap-2">
@@ -886,7 +909,7 @@ export default function NewCaseForm({
                     )}
                   </button>
 
-                  <p className="text-xs text-gray-500">
+                  <p className="text-caption text-[var(--text-muted)]">
                     연동 시 의뢰인 이름, 사건 유형, 원고/피고 정보가 자동으로 입력됩니다.
                   </p>
                 </div>
@@ -895,8 +918,8 @@ export default function NewCaseForm({
           </div>
 
           {/* ========== 섹션 2: 당사자 정보 ========== */}
-          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-sage-100">
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b border-[var(--border-subtle)]">
               <SectionHeader
                 number={2}
                 title="당사자 정보"
@@ -908,42 +931,60 @@ export default function NewCaseForm({
 
             <div className="p-5 space-y-4">
               {/* 새 의뢰인/기존 의뢰인 토글 */}
-              <div className="flex gap-2">
+              <div className="segmented-control">
                 <button
                   type="button"
                   onClick={() => setIsNewClient(true)}
-                  className={`flex-1 py-2.5 px-4 text-sm font-medium rounded-lg transition-all ${
-                    isNewClient
-                      ? 'bg-sage-600 text-white shadow-sm'
-                      : 'bg-sage-50 text-sage-700 hover:bg-sage-100'
-                  }`}
+                  className={`segmented-control-item ${isNewClient ? 'active' : ''}`}
                 >
                   새 의뢰인
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsNewClient(false)}
-                  className={`flex-1 py-2.5 px-4 text-sm font-medium rounded-lg transition-all ${
-                    !isNewClient
-                      ? 'bg-sage-600 text-white shadow-sm'
-                      : 'bg-sage-50 text-sage-700 hover:bg-sage-100'
-                  }`}
+                  className={`segmented-control-item ${!isNewClient ? 'active' : ''}`}
                 >
                   기존 의뢰인 선택
                 </button>
               </div>
 
               {isNewClient ? (
-                <div className="space-y-4 p-4 bg-sage-50/50 rounded-xl border border-sage-100">
+                <div className="space-y-4 p-4 bg-[var(--bg-tertiary)] rounded-xl border border-[var(--border-subtle)]">
+                  {/* 의뢰인 유형 선택 */}
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="client_type"
+                        value="individual"
+                        checked={formData.client_type === 'individual'}
+                        onChange={(e) => setFormData({ ...formData, client_type: e.target.value as 'individual' | 'corporation' })}
+                        className="w-4 h-4 text-[var(--color-primary)]"
+                      />
+                      <span className="text-sm text-[var(--text-primary)]">개인</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="client_type"
+                        value="corporation"
+                        checked={formData.client_type === 'corporation'}
+                        onChange={(e) => setFormData({ ...formData, client_type: e.target.value as 'individual' | 'corporation' })}
+                        className="w-4 h-4 text-[var(--color-primary)]"
+                      />
+                      <span className="text-sm text-[var(--text-primary)]">법인</span>
+                    </label>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField label="이름" required>
+                    <FormField label={formData.client_type === 'corporation' ? '대표자명' : '이름'} required>
                       <input
                         type="text"
                         required={isNewClient}
                         value={formData.client_name}
                         onChange={(e) => setFormData({ ...formData, client_name: e.target.value })}
                         className={inputClassName}
-                        placeholder="홍길동"
+                        placeholder={formData.client_type === 'corporation' ? '대표자 이름' : '홍길동'}
                       />
                     </FormField>
                     <FormField label="연락처">
@@ -957,10 +998,47 @@ export default function NewCaseForm({
                     </FormField>
                   </div>
 
+                  {/* 법인 전용 필드 */}
+                  {formData.client_type === 'corporation' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <FormField label="회사명">
+                        <input
+                          type="text"
+                          value={formData.client_company_name}
+                          onChange={(e) => setFormData({ ...formData, client_company_name: e.target.value })}
+                          className={inputClassName}
+                          placeholder="주식회사 ○○○"
+                        />
+                      </FormField>
+                      <FormField label="사업자등록번호">
+                        <input
+                          type="text"
+                          value={formData.client_registration_number}
+                          onChange={(e) => setFormData({ ...formData, client_registration_number: e.target.value })}
+                          className={inputClassName}
+                          placeholder="000-00-00000"
+                        />
+                      </FormField>
+                    </div>
+                  )}
+
+                  {/* 개인 전용 필드 */}
+                  {formData.client_type === 'individual' && (
+                    <FormField label="주민등록번호">
+                      <input
+                        type="text"
+                        value={formData.client_resident_number}
+                        onChange={(e) => setFormData({ ...formData, client_resident_number: e.target.value })}
+                        className={inputClassName}
+                        placeholder="000000-0000000"
+                      />
+                    </FormField>
+                  )}
+
                   {/* 이해충돌 경고 */}
                   {isSearchingConflict && (
-                    <div className="p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                      <p className="text-sm text-gray-600 flex items-center gap-2">
+                    <div className="p-3 bg-[var(--bg-tertiary)] border border-[var(--border-default)] rounded-lg">
+                      <p className="text-sm text-[var(--text-secondary)] flex items-center gap-2">
                         <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -975,34 +1053,34 @@ export default function NewCaseForm({
                     const isPhoneMatch = conflictResult.client.phone && formData.client_phone &&
                       conflictResult.client.phone.replace(/-/g, '') === formData.client_phone.replace(/-/g, '')
                     return (
-                    <div className={`p-4 border rounded-xl ${isPhoneMatch ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'}`}>
+                    <div className={`p-4 border rounded-xl ${isPhoneMatch ? 'bg-[var(--color-warning-muted)] border-[var(--color-warning)]/30' : 'bg-[var(--color-info-muted)] border-[var(--color-info)]/30'}`}>
                       <div className="flex items-start gap-3">
-                        <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPhoneMatch ? 'text-amber-600' : 'text-blue-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                        <svg className={`w-5 h-5 flex-shrink-0 mt-0.5 ${isPhoneMatch ? 'text-[var(--color-warning)]' : 'text-[var(--color-info)]'}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                         </svg>
                         <div className="flex-1">
-                          <p className={`text-sm font-semibold mb-1 ${isPhoneMatch ? 'text-amber-800' : 'text-blue-800'}`}>
+                          <p className={`text-sm font-semibold mb-1 ${isPhoneMatch ? 'text-[var(--color-warning)]' : 'text-[var(--color-info)]'}`}>
                             {isPhoneMatch ? '이해충돌 검토 필요' : '동명이인 확인'}
                           </p>
-                          <p className={`text-sm mb-2 ${isPhoneMatch ? 'text-amber-700' : 'text-blue-700'}`}>
+                          <p className={`text-sm mb-2 text-[var(--text-secondary)]`}>
                             {isPhoneMatch
                               ? '동일한 연락처의 의뢰인이 이미 등록되어 있습니다.'
                               : '동일한 이름의 의뢰인이 있습니다. 확인해주세요.'}
                           </p>
-                          <p className={`text-sm font-medium ${isPhoneMatch ? 'text-amber-900' : 'text-blue-900'}`}>
+                          <p className="text-sm font-medium text-[var(--text-primary)]">
                             기존 의뢰인: {conflictResult.client.name}{conflictResult.client.phone ? ` (${conflictResult.client.phone})` : ''}
                           </p>
                           {conflictResult.cases.length > 0 && (
                             <div className="mt-2">
-                              <p className={`text-xs mb-1 ${isPhoneMatch ? 'text-amber-700' : 'text-blue-700'}`}>진행 중 사건:</p>
+                              <p className="text-xs mb-1 text-[var(--text-muted)]">진행 중 사건:</p>
                               <ul className="space-y-1">
                                 {conflictResult.cases.slice(0, 3).map(c => (
-                                  <li key={c.id} className={`text-xs ${isPhoneMatch ? 'text-amber-800' : 'text-blue-800'}`}>
+                                  <li key={c.id} className="text-xs text-[var(--text-secondary)]">
                                     - {c.case_name} ({c.case_type})
                                   </li>
                                 ))}
                                 {conflictResult.cases.length > 3 && (
-                                  <li className={`text-xs ${isPhoneMatch ? 'text-amber-600' : 'text-blue-600'}`}>
+                                  <li className="text-xs text-[var(--text-muted)]">
                                     외 {conflictResult.cases.length - 3}건
                                   </li>
                                 )}
@@ -1013,14 +1091,14 @@ export default function NewCaseForm({
                             <button
                               type="button"
                               onClick={switchToExistingClient}
-                              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${isPhoneMatch ? 'text-amber-800 bg-amber-100 hover:bg-amber-200' : 'text-blue-800 bg-blue-100 hover:bg-blue-200'}`}
+                              className="btn btn-sm btn-primary"
                             >
                               기존 의뢰인으로 등록
                             </button>
                             <button
                               type="button"
                               onClick={() => setConflictResult(null)}
-                              className={`px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${isPhoneMatch ? 'text-amber-700 border-amber-300 hover:bg-amber-50' : 'text-blue-700 border-blue-300 hover:bg-blue-50'}`}
+                              className="btn btn-sm btn-secondary"
                             >
                               새 의뢰인으로 계속
                             </button>
@@ -1087,7 +1165,7 @@ export default function NewCaseForm({
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -1097,7 +1175,7 @@ export default function NewCaseForm({
 
               {/* 상대방 정보 - 형사사건에서는 표시하지 않음 */}
               {!isCriminalCase(formData.case_type || formData.case_label, formData.court_case_number) && (
-                <div className="pt-4 border-t border-sage-100">
+                <div className="pt-4 border-t border-[var(--border-subtle)]">
                   <FormField label="상대방 이름" hint="분쟁 상대방이 있는 경우에만 입력하세요">
                     <input
                       type="text"
@@ -1113,8 +1191,8 @@ export default function NewCaseForm({
           </div>
 
           {/* ========== 섹션 3: 계약 정보 ========== */}
-          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-sage-100">
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b border-[var(--border-subtle)]">
               <SectionHeader
                 number={3}
                 title="계약 정보"
@@ -1142,27 +1220,13 @@ export default function NewCaseForm({
                     placeholder="예: 2024-001"
                   />
                 </FormField>
-                <FormField label="담당 변호사">
-                  <div className="relative">
-                    <select
-                      value={formData.assigned_to}
-                      onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                      className={selectClassName}
-                    >
-                      <option value="">선택하세요</option>
-                      {lawyerMembers.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.display_name || '이름 없음'}
-                          {member.role === 'owner' && ' (대표)'}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
+                <FormField label="담당 변호사" hint="다중 선택 가능, 첫 번째가 주담당">
+                  <AssigneeMultiSelect
+                    members={lawyerMembers}
+                    value={formData.assignees}
+                    onChange={(assignees) => setFormData({ ...formData, assignees })}
+                    placeholder="담당변호사 선택"
+                  />
                 </FormField>
               </div>
 
@@ -1198,21 +1262,21 @@ export default function NewCaseForm({
               </div>
 
               {/* 계약서 업로드 */}
-              <div className="pt-4 border-t border-sage-100">
+              <div className="pt-4 border-t border-[var(--border-subtle)]">
                 <FormField label="계약서 업로드" hint="PDF, 이미지, Word 파일 (최대 10MB)">
                   <div
-                    className="border-2 border-dashed border-sage-200 rounded-lg p-6 text-center hover:border-sage-400 transition-colors cursor-pointer"
+                    className="border-2 border-dashed border-[var(--border-default)] rounded-lg p-6 text-center hover:border-[var(--sage-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={(e) => {
                       e.preventDefault()
-                      e.currentTarget.classList.add('border-sage-400', 'bg-sage-50')
+                      e.currentTarget.classList.add('border-[var(--sage-primary)]', 'bg-[var(--sage-muted)]')
                     }}
                     onDragLeave={(e) => {
-                      e.currentTarget.classList.remove('border-sage-400', 'bg-sage-50')
+                      e.currentTarget.classList.remove('border-[var(--sage-primary)]', 'bg-[var(--sage-muted)]')
                     }}
                     onDrop={(e) => {
                       e.preventDefault()
-                      e.currentTarget.classList.remove('border-sage-400', 'bg-sage-50')
+                      e.currentTarget.classList.remove('border-[var(--sage-primary)]', 'bg-[var(--sage-muted)]')
                       handleFileUpload(e.dataTransfer.files)
                     }}
                   >
@@ -1225,7 +1289,7 @@ export default function NewCaseForm({
                       onChange={(e) => handleFileUpload(e.target.files)}
                     />
                     {isUploading ? (
-                      <div className="flex items-center justify-center gap-2 text-sage-600">
+                      <div className="flex items-center justify-center gap-2 text-[var(--sage-primary)]">
                         <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -1234,10 +1298,10 @@ export default function NewCaseForm({
                       </div>
                     ) : (
                       <>
-                        <svg className="mx-auto w-10 h-10 text-sage-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="mx-auto w-10 h-10 text-[var(--text-muted)] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-[var(--text-secondary)]">
                           파일을 드래그하거나 클릭하여 업로드
                         </p>
                       </>
@@ -1249,18 +1313,18 @@ export default function NewCaseForm({
                 {uploadedFiles.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {uploadedFiles.map((file, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-sage-50 rounded-lg">
+                      <div key={index} className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg">
                         <div className="flex items-center gap-2 min-w-0">
-                          <svg className="w-5 h-5 text-sage-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-5 h-5 text-[var(--sage-primary)] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                           </svg>
-                          <span className="text-sm text-gray-700 truncate">{file.fileName}</span>
-                          <span className="text-xs text-gray-500">({formatFileSize(file.fileSize)})</span>
+                          <span className="text-sm text-[var(--text-primary)] truncate">{file.fileName}</span>
+                          <span className="text-xs text-[var(--text-muted)]">({formatFileSize(file.fileSize)})</span>
                         </div>
                         <button
                           type="button"
                           onClick={() => handleFileDelete(file.filePath)}
-                          className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                          className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)] transition-colors"
                         >
                           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -1277,7 +1341,7 @@ export default function NewCaseForm({
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={2}
-                  className="w-full px-4 py-3 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors resize-none"
+                  className="form-input resize-none"
                   placeholder="추가 메모 사항"
                 />
               </FormField>
@@ -1288,14 +1352,14 @@ export default function NewCaseForm({
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4">
             <Link
               href="/cases"
-              className="w-full sm:w-auto px-6 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-center"
+              className="btn btn-secondary w-full sm:w-auto justify-center"
             >
               취소
             </Link>
             <button
               type="submit"
               disabled={loading}
-              className="w-full sm:w-auto px-8 py-3 text-sm font-medium text-white bg-sage-600 rounded-xl hover:bg-sage-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
+              className="btn btn-primary w-full sm:w-auto justify-center"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -1311,8 +1375,6 @@ export default function NewCaseForm({
             </button>
           </div>
         </form>
-      </div>
-
     </div>
   )
 }

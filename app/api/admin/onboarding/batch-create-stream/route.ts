@@ -9,6 +9,14 @@
  */
 
 import { NextRequest } from 'next/server'
+import * as fs from 'fs'
+
+// 디버그 로그를 파일에 저장
+function debugLog(message: string, data?: unknown) {
+  const logLine = `[${new Date().toISOString()}] ${message} ${data ? JSON.stringify(data) : ''}\n`
+  console.log(logLine.trim())
+  fs.appendFileSync('/tmp/import-debug.log', logLine)
+}
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import { createAdminClient } from '@/lib/supabase/admin'
 import type { StandardCaseRow, ImportOptions, ImportResult } from '@/types/onboarding'
@@ -29,15 +37,42 @@ function delay(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+// 의뢰인 유형 정규화 (한글 → 영문)
+function normalizeClientType(value: string | undefined): 'individual' | 'corporation' {
+  if (!value) return 'individual'
+  const trimmed = value.trim().toLowerCase()
+
+  // 이미 영문인 경우
+  if (trimmed === 'individual' || trimmed === 'corporation') {
+    return trimmed as 'individual' | 'corporation'
+  }
+
+  // 한글 매핑
+  const corporationKeywords = ['법인', '회사', '기업', 'corporation', 'company', 'corp']
+  if (corporationKeywords.some(kw => trimmed.includes(kw))) {
+    return 'corporation'
+  }
+
+  return 'individual'
+}
+
 export async function POST(request: NextRequest) {
   const tenant = await getCurrentTenantContext()
 
   if (!tenant || !tenant.tenantId) {
+    debugLog('테넌트 인증 실패', { tenant, tenantId: tenant?.tenantId })
     return new Response(JSON.stringify({ error: '인증이 필요합니다' }), {
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     })
   }
+
+  debugLog('테넌트 컨텍스트', {
+    tenantId: tenant.tenantId,
+    tenantName: tenant.tenantName,
+    isSuperAdmin: tenant.isSuperAdmin,
+    isImpersonating: (tenant as any).isImpersonating
+  })
 
   try {
     const body = await request.json() as {
@@ -56,13 +91,20 @@ export async function POST(request: NextRequest) {
     }
 
     // 기본 옵션
+    // 대법원 API 호출 자체가 1~3초 걸리므로 추가 딜레이는 최소화
     const options: ImportOptions = {
       duplicateHandling: inputOptions?.duplicateHandling || 'skip',
       createNewClients: inputOptions?.createNewClients ?? true,
       linkScourt: true, // 항상 true (연동 필수)
-      scourtDelayMs: inputOptions?.scourtDelayMs || 1500,
+      scourtDelayMs: inputOptions?.scourtDelayMs || 300,
       dryRun: inputOptions?.dryRun ?? false
     }
+
+    debugLog('Import 옵션', {
+      inputOptions,
+      resolvedOptions: options,
+      createNewClients: options.createNewClients
+    })
 
     // 컬럼 매핑 적용하여 표준 형식으로 변환
     const mapping = columnMapping ? new Map(Object.entries(columnMapping)) : undefined
@@ -294,18 +336,23 @@ export async function POST(request: NextRequest) {
             let isNewClient = false
 
             // 4-1. 의뢰인 처리
+            debugLog('의뢰인 처리 시작', { client_name: row.client_name, createNewClients: options.createNewClients })
             if (row.client_name) {
-              const { data: existingClient } = await adminClient
+              const { data: existingClient, error: lookupError } = await adminClient
                 .from('clients')
                 .select('id, name')
                 .eq('tenant_id', tenant.tenantId)
                 .eq('name', row.client_name)
-                .single()
+                .maybeSingle()  // single() → maybeSingle()로 변경 (0건일 때 에러 방지)
+
+              debugLog('기존 의뢰인 조회 결과', { existingClient, lookupError: lookupError?.code })
 
               if (existingClient) {
                 clientId = existingClient.id
+                debugLog('기존 의뢰인 매칭', { clientId })
               } else if (options.createNewClients) {
                 // 전화번호 없이도 의뢰인 생성 (이름만 필수)
+                debugLog('신규 의뢰인 생성 시도', { tenant_id: tenant.tenantId, name: row.client_name })
                 const { data: newClient, error: clientError } = await adminClient
                   .from('clients')
                   .insert([{
@@ -316,11 +363,16 @@ export async function POST(request: NextRequest) {
                     birth_date: row.client_birth_date || null,
                     address: row.client_address || null,
                     bank_account: row.client_bank_account || null,
+                    client_type: normalizeClientType(row.client_type),
+                    resident_number: row.client_resident_number || null,
+                    company_name: row.client_company_name || null,
+                    registration_number: row.client_registration_number || null,
                   }])
                   .select()
                   .single()
 
                 if (clientError) {
+                  debugLog('의뢰인 생성 실패', clientError)
                   warnings.push({
                     field: 'client_name',
                     message: `의뢰인 생성 실패: ${clientError.message}`
@@ -328,8 +380,13 @@ export async function POST(request: NextRequest) {
                 } else {
                   clientId = newClient.id
                   isNewClient = true
+                  debugLog('의뢰인 생성 성공', { clientId })
                 }
+              } else {
+                debugLog('createNewClients=false, 의뢰인 생성 스킵')
               }
+            } else {
+              debugLog('client_name이 비어있음, 의뢰인 처리 스킵')
             }
 
             // 4-2. 담당자 처리 (복수 담당자 지원)
@@ -456,8 +513,13 @@ export async function POST(request: NextRequest) {
               clientId,
             })
 
+            // ============================================
+            // 병렬 처리: 당사자, 의뢰인, 담당자 동시 생성
+            // ============================================
+            let insertedParties: { id: string; party_name: string }[] | null = null
+
+            // 1. case_parties 생성 (case_clients가 linked_party_id 필요하므로 먼저)
             if (partySeeds.length > 0) {
-              // case_parties 생성 (client_id, is_our_client, is_primary 컬럼 없음)
               const payload = partySeeds.map((seed, index) => ({
                 tenant_id: tenant.tenantId,
                 case_id: newCase.id,
@@ -469,23 +531,24 @@ export async function POST(request: NextRequest) {
                 scourt_synced: false,
               }))
 
-              const { data: insertedParties, error: partyError } = await adminClient
+              const { data, error: partyError } = await adminClient
                 .from('case_parties')
                 .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
                 .select('id, party_name')
 
+              insertedParties = data
               if (partyError) {
-                warnings.push({
-                  field: 'party',
-                  message: `당사자 정보 저장 실패: ${partyError.message}`
-                })
+                warnings.push({ field: 'party', message: `당사자 정보 저장 실패: ${partyError.message}` })
               }
+            }
 
-              // case_clients 생성 (의뢰인 연결)
-              if (clientId && !partyError) {
-                // 의뢰인과 같은 이름의 당사자 찾기
-                const clientParty = insertedParties?.find(p => p.party_name === row.client_name)
-                const { error: clientError } = await adminClient
+            // 2. case_clients + case_assignees 병렬 생성
+            const parallelOps: Promise<void>[] = []
+
+            if (clientId) {
+              const clientParty = insertedParties?.find(p => p.party_name === row.client_name)
+              parallelOps.push((async () => {
+                const { error } = await adminClient
                   .from('case_clients')
                   .upsert({
                     tenant_id: tenant.tenantId,
@@ -495,17 +558,10 @@ export async function POST(request: NextRequest) {
                     is_primary_client: true,
                     retainer_fee: row.retainer_fee ? Number(row.retainer_fee) : null,
                   }, { onConflict: 'case_id,client_id' })
-
-                if (clientError) {
-                  warnings.push({
-                    field: 'case_clients',
-                    message: `의뢰인 연결 실패: ${clientError.message}`
-                  })
-                }
-              }
+                if (error) warnings.push({ field: 'case_clients', message: `의뢰인 연결 실패: ${error.message}` })
+              })())
             }
 
-            // case_assignees 생성 (담당자 연결)
             if (assigneeIds.length > 0) {
               const assigneePayload = assigneeIds.map(a => ({
                 tenant_id: tenant.tenantId,
@@ -514,147 +570,97 @@ export async function POST(request: NextRequest) {
                 assignee_role: 'lawyer' as const,
                 is_primary: a.isPrimary,
               }))
-
-              const { error: assigneeError } = await adminClient
-                .from('case_assignees')
-                .upsert(assigneePayload, { onConflict: 'case_id,member_id' })
-
-              if (assigneeError) {
-                warnings.push({
-                  field: 'case_assignees',
-                  message: `담당자 연결 실패: ${assigneeError.message}`
-                })
-              }
+              parallelOps.push((async () => {
+                const { error } = await adminClient.from('case_assignees').upsert(assigneePayload, { onConflict: 'case_id,member_id' })
+                if (error) warnings.push({ field: 'case_assignees', message: `담당자 연결 실패: ${error.message}` })
+              })())
             }
 
-            // 4-4. 스냅샷 저장 (대법원 연동 성공 시에만)
+            await Promise.all(parallelOps)
+
+            // ============================================
+            // 병렬 처리: 스냅샷 저장 + 동기화 작업
+            // ============================================
             if (scourtLinked && scourtResult && (scourtResult.generalData || scourtResult.progressData)) {
-              try {
-                type GeneralDataType = {
-                  hearings?: unknown[];
-                  lowerCourtCases?: Array<{
-                    userCsNo: string;
-                    cortNm?: string;
-                    ultmtDvsNm?: string;
-                    ultmtYmd?: string;
-                    encCsNo?: string;
-                  }>;
-                  relatedCases?: Array<{
-                    userCsNo: string;
-                    reltCsCortNm?: string;
-                    reltCsDvsNm?: string;
-                    encCsNo?: string;
-                  }>;
-                  documents?: unknown[];
-                }
-                const generalData = scourtResult.generalData as GeneralDataType | undefined
+              type GeneralDataType = {
+                hearings?: Array<{ trmDt?: string; trmHm?: string; trmNm?: string; trmPntNm?: string; rslt?: string }>;
+                lowerCourtCases?: Array<{ userCsNo: string; cortNm?: string; ultmtDvsNm?: string; ultmtYmd?: string; encCsNo?: string }>;
+                relatedCases?: Array<{ userCsNo: string; reltCsCortNm?: string; reltCsDvsNm?: string; encCsNo?: string }>;
+                documents?: unknown[];
+                parties?: Array<{ btprNm: string; btprDvsNm: string; adjdocRchYmd?: string; indvdCfmtnYmd?: string }>;
+                representatives?: Array<{ agntDvsNm: string; agntNm: string; jdafrCorpNm?: string }>;
+              }
+              const generalData = scourtResult.generalData as GeneralDataType | undefined
 
-                // 연관사건/심급 데이터 변환
-                const lowerCourtData: LowerCourtData[] = (generalData?.lowerCourtCases || []).map(lc => ({
-                  caseNo: lc.userCsNo,
-                  courtName: lc.cortNm,
-                  result: lc.ultmtDvsNm,
-                  resultDate: lc.ultmtYmd,
-                  encCsNo: lc.encCsNo || null,
-                }))
+              // 데이터 변환
+              const lowerCourtData: LowerCourtData[] = (generalData?.lowerCourtCases || []).map(lc => ({
+                caseNo: lc.userCsNo, courtName: lc.cortNm, result: lc.ultmtDvsNm, resultDate: lc.ultmtYmd, encCsNo: lc.encCsNo || null,
+              }))
+              const relatedCasesData: RelatedCaseData[] = (generalData?.relatedCases || []).map(rc => ({
+                caseNo: rc.userCsNo, caseName: rc.reltCsCortNm, relation: rc.reltCsDvsNm, encCsNo: rc.encCsNo || null,
+              }))
 
-                const relatedCasesData: RelatedCaseData[] = (generalData?.relatedCases || []).map(rc => ({
-                  caseNo: rc.userCsNo,
-                  caseName: rc.reltCsCortNm,
-                  relation: rc.reltCsDvsNm,
-                  encCsNo: rc.encCsNo || null,
-                }))
+              // 모든 동기화 작업을 병렬로 실행 (실패해도 사건 등록에 영향 없음)
+              const syncOps: Promise<{ type: string; error?: string }>[] = []
 
-                await saveSnapshot({
+              // 1. 스냅샷 저장 + legal_cases 업데이트
+              syncOps.push(
+                saveSnapshot({
                   tenantId: tenant.tenantId,
                   legalCaseId: newCase.id,
                   caseNumber: cleanedCaseNumber,
                   courtCode: normalizedCourtName,
                   basicInfo: (generalData || {}) as Record<string, unknown>,
-                  hearings: ((generalData?.hearings as unknown[]) || []),
+                  hearings: (generalData?.hearings || []) as unknown[],
                   progress: (scourtResult.progressData || []) as unknown[],
-                  documents: ((generalData?.documents as unknown[]) || []),
+                  documents: (generalData?.documents || []) as unknown[],
                   lowerCourt: lowerCourtData,
                   relatedCases: relatedCasesData,
-                })
-
-                // 4-4-1. 연관사건/심급 자동 연결
-                if (lowerCourtData.length > 0 || relatedCasesData.length > 0) {
-                  try {
-                    await linkRelatedCases({
-                      supabase: adminClient,
-                      legalCaseId: newCase.id,
-                      tenantId: tenant.tenantId,
-                      caseNumber: cleanedCaseNumber,
-                      caseType: parsed.caseType,
-                      relatedCases: relatedCasesData,
-                      lowerCourt: lowerCourtData,
-                    })
-                  } catch (linkError) {
-                    console.error('연관사건 연결 실패:', linkError)
-                    warnings.push({
-                      field: 'related_cases',
-                      message: '연관사건 자동 연결 실패 (사건은 정상 등록됨)'
-                    })
+                }).then(async (snapshotId) => {
+                  if (snapshotId) {
+                    await adminClient.from('legal_cases').update({ scourt_last_snapshot_id: snapshotId }).eq('id', newCase.id)
                   }
-                }
-              } catch (snapshotError) {
-                console.error('스냅샷 저장 실패:', snapshotError)
-                warnings.push({
-                  field: 'snapshot',
-                  message: '스냅샷 저장 실패 (사건은 정상 등록됨)'
-                })
-              }
-            }
+                  return { type: 'snapshot' }
+                }).catch(e => ({ type: 'snapshot', error: e.message }))
+              )
 
-            // 4-5. SCOURT 당사자 동기화 (대법원 연동 성공 시에만)
-            if (scourtLinked && scourtResult && scourtResult.generalData) {
-              type PartyType = { btprNm: string; btprDvsNm: string; adjdocRchYmd?: string; indvdCfmtnYmd?: string }
-              type RepType = { agntDvsNm: string; agntNm: string; jdafrCorpNm?: string }
-              const generalData = scourtResult.generalData as { parties?: PartyType[]; representatives?: RepType[] }
-              if ((generalData.parties && generalData.parties.length > 0) ||
-                  (generalData.representatives && generalData.representatives.length > 0)) {
-                try {
-                  await syncPartiesFromScourtServer(adminClient, {
-                    legalCaseId: newCase.id,
-                    tenantId: tenant.tenantId,
-                    parties: generalData.parties || [],
-                    representatives: generalData.representatives || []
-                  })
-                } catch (syncError) {
-                  console.error('당사자 동기화 실패:', syncError)
-                  warnings.push({
-                    field: 'party_sync',
-                    message: '당사자 동기화 실패 (사건은 정상 등록됨)'
-                  })
-                }
+              // 2. 연관사건 연결
+              if (lowerCourtData.length > 0 || relatedCasesData.length > 0) {
+                syncOps.push(
+                  linkRelatedCases({
+                    supabase: adminClient, legalCaseId: newCase.id, tenantId: tenant.tenantId,
+                    caseNumber: cleanedCaseNumber, caseType: parsed.caseType,
+                    relatedCases: relatedCasesData, lowerCourt: lowerCourtData,
+                  }).then(() => ({ type: 'related_cases' })).catch(e => ({ type: 'related_cases', error: e.message }))
+                )
               }
-            }
 
-            // 4-6. SCOURT 기일 동기화 (대법원 연동 성공 시에만)
-            if (scourtLinked && scourtResult && scourtResult.generalData) {
-              type HearingType = { trmDt?: string; trmHm?: string; trmNm?: string; trmPntNm?: string; rslt?: string }
-              const generalData = scourtResult.generalData as { hearings?: HearingType[] }
-              if (generalData.hearings && generalData.hearings.length > 0) {
-                try {
-                  const hearingsForSync = generalData.hearings.map((h) => ({
-                    date: h.trmDt || '',
-                    time: h.trmHm || '',
-                    type: h.trmNm || '',
-                    location: h.trmPntNm || '',
-                    result: h.rslt || '',
-                  }))
-                  await syncHearingsToCourtHearings(
-                    newCase.id,
-                    cleanedCaseNumber,
-                    hearingsForSync
-                  )
-                } catch (syncError) {
-                  console.error('기일 동기화 실패:', syncError)
-                  warnings.push({
-                    field: 'hearing_sync',
-                    message: '기일 동기화 실패 (사건은 정상 등록됨)'
-                  })
+              // 3. 당사자 동기화
+              if (generalData?.parties?.length || generalData?.representatives?.length) {
+                syncOps.push(
+                  syncPartiesFromScourtServer(adminClient, {
+                    legalCaseId: newCase.id, tenantId: tenant.tenantId,
+                    parties: generalData.parties || [], representatives: generalData.representatives || []
+                  }).then(() => ({ type: 'party_sync' })).catch(e => ({ type: 'party_sync', error: e.message }))
+                )
+              }
+
+              // 4. 기일 동기화
+              if (generalData?.hearings?.length) {
+                const hearingsForSync = generalData.hearings.map(h => ({
+                  date: h.trmDt || '', time: h.trmHm || '', type: h.trmNm || '', location: h.trmPntNm || '', result: h.rslt || '',
+                }))
+                syncOps.push(
+                  syncHearingsToCourtHearings(newCase.id, cleanedCaseNumber, hearingsForSync)
+                    .then(() => ({ type: 'hearing_sync' })).catch(e => ({ type: 'hearing_sync', error: e.message }))
+                )
+              }
+
+              // 병렬 실행 & 에러 수집
+              const syncResults = await Promise.all(syncOps)
+              for (const result of syncResults) {
+                if (result.error) {
+                  warnings.push({ field: result.type, message: `${result.type} 실패: ${result.error}` })
                 }
               }
             }

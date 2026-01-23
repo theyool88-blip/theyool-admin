@@ -70,9 +70,11 @@ export const PATCH = withTenant(async (
       email?: string
       birth_date?: string
       address?: string
-      gender?: string | null
-      account_number?: string
+      bank_account?: string
       resident_number?: string
+      client_type?: 'individual' | 'corporation'
+      company_name?: string
+      registration_number?: string
       notes?: string
     }
 
@@ -99,20 +101,26 @@ export const PATCH = withTenant(async (
     }
 
     // 2. clients 테이블 업데이트
+    const updateData: Record<string, unknown> = {
+      updated_at: new Date().toISOString()
+    }
+
+    // 전달된 필드만 업데이트 (undefined는 무시)
+    if (body.name !== undefined) updateData.name = body.name
+    if (body.phone !== undefined) updateData.phone = body.phone || null
+    if (body.email !== undefined) updateData.email = body.email || null
+    if (body.birth_date !== undefined) updateData.birth_date = body.birth_date || null
+    if (body.address !== undefined) updateData.address = body.address || null
+    if (body.bank_account !== undefined) updateData.bank_account = body.bank_account || null
+    if (body.resident_number !== undefined) updateData.resident_number = body.resident_number || null
+    if (body.client_type !== undefined) updateData.client_type = body.client_type
+    if (body.company_name !== undefined) updateData.company_name = body.company_name || null
+    if (body.registration_number !== undefined) updateData.registration_number = body.registration_number || null
+    if (body.notes !== undefined) updateData.notes = body.notes || null
+
     let updateQuery = adminClient
       .from('clients')
-      .update({
-        name: body.name,
-        phone: body.phone || null,
-        email: body.email || null,
-        birth_date: body.birth_date || null,
-        address: body.address || null,
-        gender: body.gender || null,
-        account_number: body.account_number || null,
-        resident_number: body.resident_number || null,
-        notes: body.notes || null,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', id)
 
     if (!tenant.isSuperAdmin && tenant.tenantId) {

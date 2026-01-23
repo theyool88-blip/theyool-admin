@@ -35,6 +35,10 @@ export interface StandardCaseRow {
   client_birth_date?: string   // 의뢰인 생년월일 (YYYY-MM-DD)
   client_address?: string      // 의뢰인 주소
   client_bank_account?: string // 의뢰인 계좌번호
+  client_type?: 'individual' | 'corporation'  // 의뢰인 유형
+  client_resident_number?: string  // 주민등록번호
+  client_company_name?: string     // 회사명 (법인인 경우)
+  client_registration_number?: string  // 사업자등록번호 (법인인 경우)
 }
 
 // 파싱된 파일 결과
@@ -237,4 +241,14 @@ export const KOREAN_COLUMN_ALIASES: Record<string, keyof StandardCaseRow> = {
   '계좌번호': 'client_bank_account',
   '계좌': 'client_bank_account',
   '의뢰인계좌': 'client_bank_account',
+  '의뢰인유형': 'client_type',
+  '유형': 'client_type',
+  '개인법인': 'client_type',
+  '주민등록번호': 'client_resident_number',
+  '주민번호': 'client_resident_number',
+  '회사명': 'client_company_name',
+  '법인명': 'client_company_name',
+  '상호': 'client_company_name',
+  '사업자등록번호': 'client_registration_number',
+  '사업자번호': 'client_registration_number',
 }

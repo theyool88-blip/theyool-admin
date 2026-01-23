@@ -15,6 +15,13 @@ interface ClientInfo {
   name: string;
   phone: string;
   email?: string;
+  address?: string;
+  birth_date?: string;
+  resident_number?: string;
+  bank_account?: string;
+  client_type?: 'individual' | 'corporation';
+  company_name?: string;
+  registration_number?: string;
 }
 
 interface CaseInfo {
@@ -83,7 +90,7 @@ export async function GET(
     // 1. 의뢰인 정보 조회
     const { data: client, error: clientError } = await supabase
       .from('clients')
-      .select('id, name, phone, email')
+      .select('id, name, phone, email, address, birth_date, resident_number, bank_account, client_type, company_name, registration_number')
       .eq('id', clientId)
       .single();
 
@@ -106,11 +113,20 @@ export async function GET(
       );
     }
 
-    // 2. 의뢰인의 사건 목록 조회
+    // 2. 의뢰인의 사건 목록 조회 (primary_client_id 또는 case_clients 테이블 사용)
+    // 먼저 case_clients에서 해당 의뢰인이 연결된 사건 ID 목록 조회
+    const { data: clientCases } = await supabase
+      .from('case_clients')
+      .select('case_id')
+      .eq('client_id', clientId);
+
+    const caseIdsFromClientTable = clientCases?.map(cc => cc.case_id) || [];
+
+    // primary_client_id로도 조회 (레거시 호환)
     const { data: cases, error: casesError } = await supabase
       .from('legal_cases')
       .select('id, case_name, contract_number, case_type, status, office, contract_date, created_at, onedrive_folder_url')
-      .eq('client_id', clientId)
+      .or(`primary_client_id.eq.${clientId}${caseIdsFromClientTable.length > 0 ? `,id.in.(${caseIdsFromClientTable.join(',')})` : ''}`)
       .order('created_at', { ascending: false });
 
     if (casesError) {

@@ -174,3 +174,25 @@ npx tsx scripts/backfill-snapshots.ts
 - `lib/onboarding/csv-schema.ts` - 스키마 및 검증
 - `lib/scourt/case-storage.ts` - 스냅샷 저장
 - `lib/scourt/api-client.ts` - 대법원 API 클라이언트
+
+## 버그 수정 이력
+
+### 2026-01-22: SCOURT 연동 필드명 불일치 수정
+
+**문제:**
+- 대량 등록 시스템에서 `scourt_enc_cs_no` 필드에 저장
+- 개별 연동 API(sync/route.ts, snapshot/route.ts)에서는 `enc_cs_no` 필드 확인
+- 결과: 대량 등록으로 연동된 사건이 "미연동"으로 표시됨
+
+**해결:**
+- `sync/route.ts`: `enc_cs_no` → `scourt_enc_cs_no` (6곳)
+- `snapshot/route.ts`: `enc_cs_no` → `scourt_enc_cs_no` (5곳)
+- `CaseDetail.tsx`: 타입 및 로직 수정 (2곳)
+- 에러 로깅 추가로 디버깅 용이성 개선
+
+**영향받는 기능:**
+- 사건 상세 페이지 "대법원 연동" 버튼
+- 사건 상세 페이지 "갱신" 버튼
+- 연동 상태 표시 (연동됨/미연동)
+
+**커밋:** `e72d213`

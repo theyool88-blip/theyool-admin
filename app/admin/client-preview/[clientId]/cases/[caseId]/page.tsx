@@ -45,12 +45,15 @@ const HEARING_TYPE_LABELS: Record<string, string> = {
   'OTHER': '기타',
 };
 
-// 결과 라벨
+// 결과 라벨 (DB enum과 일치)
 const HEARING_RESULT_LABELS: Record<string, string> = {
-  'CONTINUED': '속행',
-  'CONCLUDED': '종결',
-  'POSTPONED': '연기',
-  'ESTIMATED': '추정',
+  'continued': '속행',
+  'settled': '종결/화해',
+  'judgment': '판결선고',
+  'dismissed': '각하/기각',
+  'withdrawn': '취하',
+  'adjourned': '휴정/연기',
+  'other': '기타',
 };
 
 export default function CaseDetailPreview() {
@@ -89,9 +92,9 @@ export default function CaseDetailPreview() {
   // 상태 정보
   const getStatusInfo = (status: string) => {
     if (status === '진행중' || status === 'active') {
-      return { label: '진행중', color: 'bg-emerald-100 text-emerald-700' };
+      return { label: '진행중', color: 'bg-[var(--color-success-muted)] text-[var(--color-success)]' };
     }
-    return { label: '종결', color: 'bg-gray-100 text-gray-600' };
+    return { label: '종결', color: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' };
   };
 
   // 날짜 포맷
@@ -134,16 +137,16 @@ export default function CaseDetailPreview() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-sage-500 border-t-transparent"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-[var(--sage-primary)] border-t-transparent"></div>
       </div>
     );
   }
 
   if (!caseDetail) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <p className="text-gray-500">사건 정보를 찾을 수 없습니다.</p>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+        <p className="text-[var(--text-tertiary)]">사건 정보를 찾을 수 없습니다.</p>
       </div>
     );
   }
@@ -161,9 +164,9 @@ export default function CaseDetailPreview() {
   const officePhone = getOfficePhone();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       {/* 관리자 배너 */}
-      <div className="bg-sage-700 text-white px-4 py-2.5 text-center text-sm">
+      <div className="bg-[var(--sage-primary)] text-white px-4 py-2.5 text-center text-sm">
         <span className="font-medium">관리자 미리보기</span>
         <Link href={`/admin/client-preview/${clientId}`} className="ml-3 underline underline-offset-2 hover:no-underline opacity-80">
           ← 목록으로
@@ -171,14 +174,14 @@ export default function CaseDetailPreview() {
       </div>
 
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-100 sticky top-0 z-10">
+      <header className="bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] sticky top-0 z-10">
         <div className="max-w-lg mx-auto px-5 py-4">
           <div className="flex items-start gap-3">
             <Link
               href={`/admin/client-preview/${clientId}`}
-              className="mt-0.5 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 shrink-0"
+              className="mt-0.5 w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-hover)] shrink-0"
             >
-              <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </Link>
@@ -188,10 +191,10 @@ export default function CaseDetailPreview() {
                   {statusInfo.label}
                 </span>
                 {caseDetail.case_type && (
-                  <span className="text-xs text-gray-400">{caseDetail.case_type}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{caseDetail.case_type}</span>
                 )}
               </div>
-              <h1 className="text-lg font-bold text-gray-900">{caseDetail.case_name}</h1>
+              <h1 className="text-lg font-bold text-[var(--text-primary)]">{caseDetail.case_name}</h1>
             </div>
           </div>
         </div>
@@ -199,43 +202,43 @@ export default function CaseDetailPreview() {
 
       <main className="max-w-lg mx-auto px-5 py-6 space-y-5">
         {/* 사건 정보 */}
-        <section className="bg-white rounded-2xl border border-gray-100 p-4">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">사건 정보</h2>
+        <section className="card rounded-2xl p-4">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">사건 정보</h2>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
-              <p className="text-xs text-gray-400">사건 유형</p>
-              <p className="font-medium text-gray-900">{caseDetail.case_type || '-'}</p>
+              <p className="text-xs text-[var(--text-muted)]">사건 유형</p>
+              <p className="font-medium text-[var(--text-primary)]">{caseDetail.case_type || '-'}</p>
             </div>
             <div>
-              <p className="text-xs text-gray-400">담당 사무소</p>
-              <p className="font-medium text-gray-900">{caseDetail.office || '-'}</p>
+              <p className="text-xs text-[var(--text-muted)]">담당 사무소</p>
+              <p className="font-medium text-[var(--text-primary)]">{caseDetail.office || '-'}</p>
             </div>
             <div className="col-span-2">
-              <p className="text-xs text-gray-400">계약일</p>
-              <p className="font-medium text-gray-900">{caseDetail.contract_date ? formatDate(caseDetail.contract_date).simple : '-'}</p>
+              <p className="text-xs text-[var(--text-muted)]">계약일</p>
+              <p className="font-medium text-[var(--text-primary)]">{caseDetail.contract_date ? formatDate(caseDetail.contract_date).simple : '-'}</p>
             </div>
           </div>
         </section>
 
         {/* 다가오는 기한 */}
         {pendingDeadlines.length > 0 && (
-          <section className="bg-white rounded-2xl border border-gray-100 p-4">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">다가오는 기한</h2>
+          <section className="card rounded-2xl p-4">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">다가오는 기한</h2>
             <div className="space-y-2">
               {pendingDeadlines.map((deadline) => {
                 const dday = getDDay(deadline.deadline_date);
                 const isUrgent = dday <= 3;
                 return (
-                  <div key={deadline.id} className={`flex items-center gap-3 p-3 rounded-xl ${isUrgent ? 'bg-red-50' : 'bg-amber-50'}`}>
-                    <div className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0 ${isUrgent ? 'bg-red-100' : 'bg-amber-100'}`}>
-                      <span className={`text-[10px] font-medium ${isUrgent ? 'text-red-600' : 'text-amber-600'}`}>{formatDate(deadline.deadline_date).month}월</span>
-                      <span className={`text-sm font-bold ${isUrgent ? 'text-red-700' : 'text-amber-700'}`}>{formatDate(deadline.deadline_date).day}</span>
+                  <div key={deadline.id} className={`flex items-center gap-3 p-3 rounded-xl ${isUrgent ? 'bg-[var(--color-danger-muted)]' : 'bg-amber-50'}`}>
+                    <div className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center shrink-0 ${isUrgent ? 'bg-[var(--color-danger)]/20' : 'bg-amber-100'}`}>
+                      <span className={`text-[10px] font-medium ${isUrgent ? 'text-[var(--color-danger)]' : 'text-amber-600'}`}>{formatDate(deadline.deadline_date).month}월</span>
+                      <span className={`text-sm font-bold ${isUrgent ? 'text-[var(--color-danger)]' : 'text-amber-700'}`}>{formatDate(deadline.deadline_date).day}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900">{deadline.deadline_type || '기한'}</p>
-                      {deadline.description && <p className="text-xs text-gray-500 truncate">{deadline.description}</p>}
+                      <p className="text-sm font-medium text-[var(--text-primary)]">{deadline.deadline_type || '기한'}</p>
+                      {deadline.description && <p className="text-xs text-[var(--text-tertiary)] truncate">{deadline.description}</p>}
                     </div>
-                    <span className={`text-xs font-bold ${isUrgent ? 'text-red-600' : 'text-amber-600'}`}>D-{dday}</span>
+                    <span className={`text-xs font-bold ${isUrgent ? 'text-[var(--color-danger)]' : 'text-amber-600'}`}>D-{dday}</span>
                   </div>
                 );
               })}
@@ -245,32 +248,32 @@ export default function CaseDetailPreview() {
 
         {/* 재판기일 */}
         {hearings.length > 0 && (
-          <section className="bg-white rounded-2xl border border-gray-100 p-4">
-            <h2 className="text-sm font-semibold text-gray-900 mb-3">재판기일</h2>
+          <section className="card rounded-2xl p-4">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-3">재판기일</h2>
             <div className="space-y-3">
               {/* 예정된 재판 */}
               {upcomingHearings.map((hearing) => (
                 <div
                   key={hearing.id}
-                  className="p-4 bg-sage-50 rounded-xl cursor-pointer hover:bg-sage-100 transition-colors"
+                  className="p-4 bg-[var(--sage-muted)] rounded-xl cursor-pointer hover:bg-[var(--sage-muted)]/80 transition-colors"
                   onClick={() => setSelectedHearing(hearing)}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-sage-100 rounded-xl flex flex-col items-center justify-center shrink-0">
-                      <span className="text-xs text-sage-600 font-medium">{formatDate(hearing.hearing_date).month}월</span>
-                      <span className="text-xl font-bold text-sage-800">{formatDate(hearing.hearing_date).day}</span>
+                    <div className="w-14 h-14 bg-[var(--sage-muted)] border border-[var(--sage-primary)]/20 rounded-xl flex flex-col items-center justify-center shrink-0">
+                      <span className="text-xs text-[var(--sage-primary)] font-medium">{formatDate(hearing.hearing_date).month}월</span>
+                      <span className="text-xl font-bold text-[var(--sage-primary)]">{formatDate(hearing.hearing_date).day}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-gray-900">{formatDate(hearing.hearing_date).weekday}요일 {hearing.hearing_time || ''}</p>
-                        <span className="px-2 py-0.5 bg-sage-200 text-sage-700 text-xs font-bold rounded-full">D-{getDDay(hearing.hearing_date)}</span>
+                        <p className="font-semibold text-[var(--text-primary)]">{formatDate(hearing.hearing_date).weekday}요일 {hearing.hearing_time || ''}</p>
+                        <span className="px-2 py-0.5 bg-[var(--sage-primary)]/20 text-[var(--sage-primary)] text-xs font-bold rounded-full">D-{getDDay(hearing.hearing_date)}</span>
                       </div>
-                      <p className="text-sm text-gray-600">{hearing.court_name || '장소 미정'}</p>
+                      <p className="text-sm text-[var(--text-secondary)]">{hearing.court_name || '장소 미정'}</p>
                       {hearing.hearing_type && (
-                        <p className="text-xs text-sage-600 mt-1">{HEARING_TYPE_LABELS[hearing.hearing_type] || hearing.hearing_type}</p>
+                        <p className="text-xs text-[var(--sage-primary)] mt-1">{HEARING_TYPE_LABELS[hearing.hearing_type] || hearing.hearing_type}</p>
                       )}
                     </div>
-                    <svg className="w-5 h-5 text-sage-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 text-[var(--sage-primary)]/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
@@ -281,20 +284,20 @@ export default function CaseDetailPreview() {
               {pastHearings.map((hearing) => (
                 <div
                   key={hearing.id}
-                  className="p-4 bg-gray-50 rounded-xl cursor-pointer hover:bg-gray-100 transition-colors"
+                  className="p-4 bg-[var(--bg-primary)] rounded-xl cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"
                   onClick={() => setSelectedHearing(hearing)}
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-gray-100 rounded-xl flex flex-col items-center justify-center shrink-0">
-                      <span className="text-xs text-gray-500 font-medium">{formatDate(hearing.hearing_date).month}월</span>
-                      <span className="text-xl font-bold text-gray-600">{formatDate(hearing.hearing_date).day}</span>
+                    <div className="w-14 h-14 bg-[var(--bg-tertiary)] rounded-xl flex flex-col items-center justify-center shrink-0">
+                      <span className="text-xs text-[var(--text-tertiary)] font-medium">{formatDate(hearing.hearing_date).month}월</span>
+                      <span className="text-xl font-bold text-[var(--text-secondary)]">{formatDate(hearing.hearing_date).day}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-700">{formatDate(hearing.hearing_date).full}</p>
-                      <p className="text-sm text-gray-500">{hearing.court_name || '-'}</p>
+                      <p className="font-medium text-[var(--text-secondary)]">{formatDate(hearing.hearing_date).full}</p>
+                      <p className="text-sm text-[var(--text-tertiary)]">{hearing.court_name || '-'}</p>
                       <div className="flex items-center gap-2 mt-1">
                         {hearing.hearing_type && (
-                          <span className="text-xs text-gray-500">{HEARING_TYPE_LABELS[hearing.hearing_type] || hearing.hearing_type}</span>
+                          <span className="text-xs text-[var(--text-tertiary)]">{HEARING_TYPE_LABELS[hearing.hearing_type] || hearing.hearing_type}</span>
                         )}
                         {hearing.hearing_result && (
                           <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
@@ -304,7 +307,7 @@ export default function CaseDetailPreview() {
                       </div>
                     </div>
                     {hearing.hearing_report && (
-                      <div className="shrink-0 flex items-center gap-1 text-sage-600">
+                      <div className="shrink-0 flex items-center gap-1 text-[var(--sage-primary)]">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
@@ -320,18 +323,18 @@ export default function CaseDetailPreview() {
 
         {/* 완료된 기한 */}
         {completedDeadlines.length > 0 && (
-          <section className="bg-white rounded-2xl border border-gray-100 p-4">
-            <h2 className="text-sm font-semibold text-gray-400 mb-3">완료된 기한</h2>
+          <section className="card rounded-2xl p-4">
+            <h2 className="text-sm font-semibold text-[var(--text-muted)] mb-3">완료된 기한</h2>
             <div className="space-y-2">
               {completedDeadlines.map((deadline) => (
                 <div key={deadline.id} className="flex items-center gap-3 p-2 opacity-50">
-                  <div className="w-6 h-6 bg-green-100 rounded flex items-center justify-center shrink-0">
-                    <svg className="w-3 h-3 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-6 h-6 bg-[var(--color-success-muted)] rounded flex items-center justify-center shrink-0">
+                    <svg className="w-3 h-3 text-[var(--color-success)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
-                  <p className="text-sm text-gray-500 line-through flex-1">{deadline.deadline_type || '기한'}</p>
-                  <span className="text-xs text-gray-400">{formatDate(deadline.deadline_date).simple}</span>
+                  <p className="text-sm text-[var(--text-tertiary)] line-through flex-1">{deadline.deadline_type || '기한'}</p>
+                  <span className="text-xs text-[var(--text-muted)]">{formatDate(deadline.deadline_date).simple}</span>
                 </div>
               ))}
             </div>
@@ -339,13 +342,13 @@ export default function CaseDetailPreview() {
         )}
 
         {/* 소송 서류 */}
-        <section className="bg-white rounded-2xl border border-gray-100 p-4">
+        <section className="card rounded-2xl p-4">
           <CaseDocuments caseId={caseId} />
         </section>
 
         {/* 문의 안내 */}
-        <section className="bg-sage-50 rounded-2xl p-4 text-center">
-          <p className="text-sm text-sage-700">
+        <section className="bg-[var(--sage-muted)] rounded-2xl p-4 text-center">
+          <p className="text-sm text-[var(--sage-primary)]">
             문의사항이 있으시면 <strong>{officePhone}</strong>으로 연락주세요.
           </p>
         </section>
@@ -354,16 +357,16 @@ export default function CaseDetailPreview() {
       {/* 재판 진행 보고서 모달 */}
       {selectedHearing && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden">
+          <div className="bg-[var(--bg-secondary)] rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[85vh] overflow-hidden">
             {/* 모달 헤더 */}
-            <div className="sticky top-0 bg-white border-b border-gray-100 px-5 py-4">
+            <div className="sticky top-0 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] px-5 py-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-gray-900">재판기일 상세</h3>
+                <h3 className="text-lg font-bold text-[var(--text-primary)]">재판기일 상세</h3>
                 <button
                   onClick={() => setSelectedHearing(null)}
-                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-hover)]"
                 >
-                  <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className="w-5 h-5 text-[var(--text-tertiary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -373,38 +376,38 @@ export default function CaseDetailPreview() {
             {/* 모달 내용 */}
             <div className="p-5 overflow-y-auto max-h-[calc(85vh-64px)] space-y-4">
               {/* 날짜 및 장소 */}
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                <div className="w-14 h-14 bg-white rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm">
-                  <span className="text-xs text-gray-500 font-medium">{formatDate(selectedHearing.hearing_date).month}월</span>
-                  <span className="text-xl font-bold text-gray-800">{formatDate(selectedHearing.hearing_date).day}</span>
+              <div className="flex items-center gap-4 p-4 bg-[var(--bg-primary)] rounded-xl">
+                <div className="w-14 h-14 bg-[var(--bg-secondary)] rounded-xl flex flex-col items-center justify-center shrink-0 shadow-sm">
+                  <span className="text-xs text-[var(--text-tertiary)] font-medium">{formatDate(selectedHearing.hearing_date).month}월</span>
+                  <span className="text-xl font-bold text-[var(--text-primary)]">{formatDate(selectedHearing.hearing_date).day}</span>
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900">{formatDate(selectedHearing.hearing_date).full}</p>
-                  <p className="text-sm text-gray-500">{selectedHearing.hearing_time || '시간 미정'}</p>
+                  <p className="font-semibold text-[var(--text-primary)]">{formatDate(selectedHearing.hearing_date).full}</p>
+                  <p className="text-sm text-[var(--text-tertiary)]">{selectedHearing.hearing_time || '시간 미정'}</p>
                 </div>
               </div>
 
               {/* 상세 정보 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">기일 유형</p>
-                  <p className="text-sm font-medium text-gray-900">
+                  <p className="text-xs text-[var(--text-muted)] mb-1">기일 유형</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">
                     {selectedHearing.hearing_type ? (HEARING_TYPE_LABELS[selectedHearing.hearing_type] || selectedHearing.hearing_type) : '-'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 mb-1">법원/장소</p>
-                  <p className="text-sm font-medium text-gray-900">{selectedHearing.court_name || '-'}</p>
+                  <p className="text-xs text-[var(--text-muted)] mb-1">법원/장소</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{selectedHearing.court_name || '-'}</p>
                 </div>
                 {selectedHearing.judge_name && (
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">담당 판사</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedHearing.judge_name}</p>
+                    <p className="text-xs text-[var(--text-muted)] mb-1">담당 판사</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{selectedHearing.judge_name}</p>
                   </div>
                 )}
                 {selectedHearing.hearing_result && (
                   <div>
-                    <p className="text-xs text-gray-400 mb-1">기일 결과</p>
+                    <p className="text-xs text-[var(--text-muted)] mb-1">기일 결과</p>
                     <span className="inline-block px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-lg">
                       {HEARING_RESULT_LABELS[selectedHearing.hearing_result] || selectedHearing.hearing_result}
                     </span>
@@ -415,9 +418,9 @@ export default function CaseDetailPreview() {
               {/* 재판 진행 보고서 */}
               {selectedHearing.hearing_report && (
                 <div>
-                  <p className="text-xs text-gray-400 mb-2">재판 진행 보고서</p>
-                  <div className="p-4 bg-sage-50 border border-sage-100 rounded-xl">
-                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                  <p className="text-xs text-[var(--text-muted)] mb-2">재판 진행 보고서</p>
+                  <div className="p-4 bg-[var(--sage-muted)] border border-[var(--sage-primary)]/20 rounded-xl">
+                    <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">
                       {selectedHearing.hearing_report}
                     </p>
                   </div>
@@ -426,14 +429,14 @@ export default function CaseDetailPreview() {
 
               {/* D-Day 또는 경과일 */}
               {getDDay(selectedHearing.hearing_date) >= 0 ? (
-                <div className="p-4 bg-sage-100 rounded-xl text-center">
-                  <p className="text-sm text-sage-700">
-                    재판까지 <strong className="text-sage-800">D-{getDDay(selectedHearing.hearing_date)}</strong> 남았습니다.
+                <div className="p-4 bg-[var(--sage-muted)] rounded-xl text-center">
+                  <p className="text-sm text-[var(--sage-primary)]">
+                    재판까지 <strong>D-{getDDay(selectedHearing.hearing_date)}</strong> 남았습니다.
                   </p>
                 </div>
               ) : (
-                <div className="p-4 bg-gray-100 rounded-xl text-center">
-                  <p className="text-sm text-gray-600">
+                <div className="p-4 bg-[var(--bg-tertiary)] rounded-xl text-center">
+                  <p className="text-sm text-[var(--text-secondary)]">
                     {Math.abs(getDDay(selectedHearing.hearing_date))}일 전에 진행된 재판입니다.
                   </p>
                 </div>
@@ -441,10 +444,10 @@ export default function CaseDetailPreview() {
             </div>
 
             {/* 닫기 버튼 */}
-            <div className="sticky bottom-0 bg-white border-t border-gray-100 p-4">
+            <div className="sticky bottom-0 bg-[var(--bg-secondary)] border-t border-[var(--border-subtle)] p-4">
               <button
                 onClick={() => setSelectedHearing(null)}
-                className="w-full py-3 bg-sage-600 text-white font-medium rounded-xl hover:bg-sage-700 transition-colors"
+                className="btn btn-primary w-full py-3 rounded-xl"
               >
                 닫기
               </button>

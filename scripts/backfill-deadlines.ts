@@ -191,7 +191,7 @@ async function backfillDeadlines(options: {
       id, case_id, hearing_type, hearing_date, result, scourt_result_raw,
       legal_cases!inner (id, court_case_number, tenant_id)
     `)
-    .or('hearing_type.eq.HEARING_JUDGMENT,result.eq.CONCLUDED,scourt_result_raw.ilike.%선고%,scourt_result_raw.ilike.%판결%,scourt_result_raw.ilike.%종결%')
+    .or('hearing_type.eq.HEARING_JUDGMENT,result.eq.settled,result.eq.judgment,scourt_result_raw.ilike.%선고%,scourt_result_raw.ilike.%판결%,scourt_result_raw.ilike.%종결%')
     .order('hearing_date', { ascending: false });
 
   if (options.tenantId) {

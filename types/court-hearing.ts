@@ -49,12 +49,15 @@ export const HEARING_STATUS = {
 
 export type HearingStatus = keyof typeof HEARING_STATUS;
 
-// 변론기일 결과 타입
+// 변론기일 결과 타입 (DB enum과 일치)
 export const HEARING_RESULT = {
-  CONTINUED: 'CONTINUED',      // 속행
-  CONCLUDED: 'CONCLUDED',      // 종결
-  POSTPONED: 'POSTPONED',      // 연기
-  DISMISSED: 'DISMISSED',      // 추정
+  continued: 'continued',      // 속행
+  settled: 'settled',          // 화해/조정 성립 (종결 포함)
+  judgment: 'judgment',        // 판결 선고
+  dismissed: 'dismissed',      // 각하/기각
+  withdrawn: 'withdrawn',      // 취하
+  adjourned: 'adjourned',      // 휴정/연기
+  other: 'other',              // 기타
 } as const;
 
 export type HearingResult = keyof typeof HEARING_RESULT;
@@ -108,10 +111,13 @@ export const HEARING_STATUS_LABELS: Record<HearingStatus, string> = {
 };
 
 export const HEARING_RESULT_LABELS: Record<HearingResult, string> = {
-  CONTINUED: '속행',
-  CONCLUDED: '종결',
-  POSTPONED: '연기',
-  DISMISSED: '추정',
+  continued: '속행',
+  settled: '종결/화해',
+  judgment: '판결선고',
+  dismissed: '각하/기각',
+  withdrawn: '취하',
+  adjourned: '휴정/연기',
+  other: '기타',
 };
 
 export const DEADLINE_STATUS_LABELS: Record<DeadlineStatus, string> = {

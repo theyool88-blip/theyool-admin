@@ -150,7 +150,7 @@ export default function UnifiedScheduleModal({
     case_office: '평택',
     // For court hearings (법원기일 전용)
     report: '',
-    result: '' as 'CONTINUED' | 'CONCLUDED' | 'POSTPONED' | 'DISMISSED' | '',
+    result: '' as 'continued' | 'settled' | 'judgment' | 'dismissed' | 'withdrawn' | 'adjourned' | 'other' | '',
     hearing_status: 'SCHEDULED' as 'SCHEDULED' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED',
     // For deadlines (데드라인 전용)
     deadline_status: 'PENDING' as 'PENDING' | 'COMPLETED' | 'OVERDUE'
@@ -317,7 +317,7 @@ export default function UnifiedScheduleModal({
           case_office: '평택',
           // 법원기일 전용 필드 (court hearing specific fields)
           report: editData.report || '',
-          result: (editData.result as 'CONTINUED' | 'CONCLUDED' | 'POSTPONED' | 'DISMISSED' | '') || '',
+          result: (editData.result as 'continued' | 'settled' | 'judgment' | 'dismissed' | 'withdrawn' | 'adjourned' | 'other' | '') || '',
           hearing_status: (editData.status as 'SCHEDULED' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED') || 'SCHEDULED',
           // 데드라인 전용 필드
           deadline_status: (editData.status as 'PENDING' | 'COMPLETED' | 'OVERDUE') || 'PENDING'
@@ -392,7 +392,7 @@ export default function UnifiedScheduleModal({
         case_office: '평택',
         // 법원기일 전용 필드
         report: '',
-        result: '' as 'CONTINUED' | 'CONCLUDED' | 'POSTPONED' | 'DISMISSED' | '',
+        result: '' as 'continued' | 'settled' | 'judgment' | 'dismissed' | 'withdrawn' | 'adjourned' | 'other' | '',
         hearing_status: 'SCHEDULED' as 'SCHEDULED' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED',
         // 데드라인 전용 필드
         deadline_status: 'PENDING' as 'PENDING' | 'COMPLETED' | 'OVERDUE'
@@ -924,13 +924,13 @@ export default function UnifiedScheduleModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--bg-secondary)] rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-sage-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
-          <h2 className="text-lg font-semibold text-sage-800">{editMode ? '일정 수정' : '통합 추가'}</h2>
+        <div className="sticky top-0 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between rounded-t-xl">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{editMode ? '일정 수정' : '통합 추가'}</h2>
           <button
             onClick={onClose}
-            className="text-sage-400 hover:text-sage-600 transition-colors"
+            className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -940,7 +940,7 @@ export default function UnifiedScheduleModal({
 
         {/* Tab Navigation */}
         <div className="px-6 pt-4">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="segmented-control grid-cols-3">
             {[
               { key: 'schedule', label: '일정 추가' },
               { key: 'payment', label: '입금 추가' },
@@ -950,11 +950,7 @@ export default function UnifiedScheduleModal({
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key as UnifiedTab)}
-                className={`min-h-[44px] rounded-lg border text-sm font-medium transition-colors ${
-                  activeTab === tab.key
-                    ? 'bg-sage-600 text-white border-sage-600'
-                    : 'bg-white text-sage-700 border-sage-300 hover:border-sage-400 hover:bg-sage-50'
-                }`}
+                className={`segmented-control-item ${activeTab === tab.key ? 'active' : ''}`}
               >
                 {tab.label}
               </button>
@@ -967,8 +963,8 @@ export default function UnifiedScheduleModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* Category Selection */}
           <div>
-            <label className="block text-sm font-medium text-sage-700 mb-2">
-              일정 종류 <span className="text-red-500">*</span>
+            <label className="form-label">
+              일정 종류 <span className="text-[var(--color-danger)]">*</span>
             </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
               <button
@@ -979,8 +975,8 @@ export default function UnifiedScheduleModal({
                 }}
                 className={`min-h-[44px] px-3 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                   category === 'court_hearing'
-                    ? 'border-sage-600 bg-sage-50 text-sage-800'
-                    : 'border-sage-200 text-sage-700 hover:border-sage-300 hover:bg-sage-50'
+                    ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)] text-[var(--text-primary)]'
+                    : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:bg-[var(--bg-tertiary)]'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -996,8 +992,8 @@ export default function UnifiedScheduleModal({
                 }}
                 className={`min-h-[44px] px-3 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                   category === 'deadline'
-                    ? 'border-sage-600 bg-sage-50 text-sage-800'
-                    : 'border-sage-200 text-sage-700 hover:border-sage-300 hover:bg-sage-50'
+                    ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)] text-[var(--text-primary)]'
+                    : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:bg-[var(--bg-tertiary)]'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1013,8 +1009,8 @@ export default function UnifiedScheduleModal({
                 }}
                 className={`min-h-[44px] px-3 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                   category === 'consultation'
-                    ? 'border-sage-600 bg-sage-50 text-sage-800'
-                    : 'border-sage-200 text-sage-700 hover:border-sage-300 hover:bg-sage-50'
+                    ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)] text-[var(--text-primary)]'
+                    : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:bg-[var(--bg-tertiary)]'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1030,8 +1026,8 @@ export default function UnifiedScheduleModal({
                 }}
                 className={`min-h-[44px] px-3 rounded-lg border text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                   category === 'schedule'
-                    ? 'border-sage-600 bg-sage-50 text-sage-800'
-                    : 'border-sage-200 text-sage-700 hover:border-sage-300 hover:bg-sage-50'
+                    ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)] text-[var(--text-primary)]'
+                    : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:bg-[var(--bg-tertiary)]'
                 }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1044,43 +1040,35 @@ export default function UnifiedScheduleModal({
 
           {/* Case Number Search or Consultation Name */}
           {category === 'consultation' ? (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                이름 <span className="text-red-500">*</span>
+            <div className="form-group">
+              <label className="form-label">
+                이름 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="상담 신청자 이름"
-                className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                  errors.name
-                    ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                    : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                }`}
+                className={`form-input ${errors.name ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
               />
               {errors.name && (
-                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+                <p className="mt-1 text-sm text-[var(--color-danger)]">{errors.name}</p>
               )}
             </div>
           ) : (
-            <div className="relative">
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                사건번호 <span className="text-red-500">*</span>
+            <div className="form-group relative">
+              <label className="form-label">
+                사건번호 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="사건번호 또는 사건명 검색..."
-                className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                  errors.case_number
-                    ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                    : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                }`}
+                className={`form-input ${errors.case_number ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
               />
               {errors.case_number && (
-                <p className="mt-1 text-sm text-red-600">{errors.case_number}</p>
+                <p className="mt-1 text-sm text-[var(--color-danger)]">{errors.case_number}</p>
               )}
 
               {/* Link to case detail page in edit mode */}
@@ -1090,7 +1078,7 @@ export default function UnifiedScheduleModal({
                     href={`/cases/${formData.case_id}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-sm font-medium text-sage-600 hover:text-sage-800 transition-colors"
+                    className="inline-flex items-center gap-1 text-sm font-medium text-[var(--sage-primary)] hover:text-[var(--text-primary)] transition-colors"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -1102,16 +1090,16 @@ export default function UnifiedScheduleModal({
 
               {/* Dropdown */}
               {showDropdown && (
-                <div className="absolute z-10 mt-1 w-full bg-white border border-sage-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                <div className="absolute z-10 mt-1 w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {caseOptions.map((option) => (
                     <button
                       key={option.id}
                       type="button"
                       onClick={() => handleSelectCase(option)}
-                      className="w-full px-4 py-3 text-left hover:bg-sage-50 border-b border-sage-100 last:border-b-0 transition-colors"
+                      className="w-full px-4 py-3 text-left hover:bg-[var(--bg-hover)] border-b border-[var(--border-subtle)] last:border-b-0 transition-colors"
                     >
-                      <div className="font-medium text-sage-800">{option.case_number}</div>
-                      <div className="text-sm text-sage-600">{option.case_name}</div>
+                      <div className="font-medium text-[var(--text-primary)]">{option.case_number}</div>
+                      <div className="text-sm text-[var(--text-secondary)]">{option.case_name}</div>
                     </button>
                   ))}
                 </div>
@@ -1122,33 +1110,27 @@ export default function UnifiedScheduleModal({
           {/* Phone Number for Consultations */}
           {category === 'consultation' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-2">
-                  전화번호 <span className="text-red-500">*</span>
+              <div className="form-group">
+                <label className="form-label">
+                  전화번호 <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                   placeholder="010-1234-5678"
-                  className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                    errors.phone
-                      ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                      : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                  }`}
+                  className={`form-input ${errors.phone ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
                 />
                 {errors.phone && (
-                  <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                  <p className="mt-1 text-sm text-[var(--color-danger)]">{errors.phone}</p>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-2">
-                  상담 상태
-                </label>
+              <div className="form-group">
+                <label className="form-label">상담 상태</label>
                 <select
                   value={formData.consultation_status}
                   onChange={(e) => setFormData(prev => ({ ...prev, consultation_status: e.target.value as ConsultationStatus }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                 >
                   <option value="pending">대기</option>
                   <option value="confirmed">확정</option>
@@ -1161,27 +1143,27 @@ export default function UnifiedScheduleModal({
 
           {/* Selected Case Display */}
           {category !== 'consultation' && formData.case_number && (
-            <div className="bg-sage-50 border border-sage-200 rounded-lg p-4">
-              <p className="text-sm font-medium text-sage-800">선택된 사건</p>
-              <p className="text-sm text-sage-600 mt-1">
+            <div className="bg-[var(--sage-muted)] border border-[var(--border-subtle)] rounded-lg p-4">
+              <p className="text-sm font-medium text-[var(--text-primary)]">선택된 사건</p>
+              <p className="text-sm text-[var(--text-secondary)] mt-1">
                 {formData.case_number} {formData.case_name && `- ${formData.case_name}`}
               </p>
             </div>
           )}
 
           {category === 'consultation' && formData.consultation_status === 'completed' && (
-            <div className="border border-sage-200 rounded-lg p-4 bg-sage-50 space-y-3">
+            <div className="border border-[var(--border-subtle)] rounded-lg p-4 bg-[var(--sage-muted)] space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-sage-800">수임 처리 시 사건 생성</p>
-                  <p className="text-xs text-sage-600">신규 사건을 자동 생성하고 상담 메모에 링크를 남깁니다.</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">수임 처리 시 사건 생성</p>
+                  <p className="text-xs text-[var(--text-secondary)]">신규 사건을 자동 생성하고 상담 메모에 링크를 남깁니다.</p>
                 </div>
-                <label className="flex items-center gap-2 text-sm font-medium text-sage-700">
+                <label className="flex items-center gap-2 text-sm font-medium text-[var(--text-secondary)]">
                   <input
                     type="checkbox"
                     checked={formData.create_case}
                     onChange={(e) => setFormData(prev => ({ ...prev, create_case: e.target.checked }))}
-                    className="rounded border-sage-300 text-sage-600 focus:ring-sage-500"
+                    className="rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
                   />
                   사건 생성
                 </label>
@@ -1189,23 +1171,23 @@ export default function UnifiedScheduleModal({
 
               {formData.create_case && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-sage-700 mb-1">사건명</label>
+                  <div className="form-group">
+                    <label className="form-label">사건명</label>
                     <input
                       type="text"
                       value={formData.case_name}
                       onChange={(e) => setFormData(prev => ({ ...prev, case_name: e.target.value }))}
-                      className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                      className="form-input"
                       placeholder="예: 김OO 상담 사건"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-sage-700 mb-1">사건유형</label>
+                  <div className="form-group">
+                    <label className="form-label">사건유형</label>
                     <input
                       type="text"
                       value={formData.case_type}
                       onChange={(e) => setFormData(prev => ({ ...prev, case_type: e.target.value }))}
-                      className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                      className="form-input"
                       placeholder="상담"
                     />
                   </div>
@@ -1215,10 +1197,10 @@ export default function UnifiedScheduleModal({
           )}
 
           {/* Subtype Selection */}
-          <div>
-            <label className="block text-sm font-medium text-sage-700 mb-2">
+          <div className="form-group">
+            <label className="form-label">
               {category === 'court_hearing' ? '기일 유형' : category === 'deadline' ? '데드라인 유형' : category === 'consultation' ? '상담 유형' : '일정 유형'}{' '}
-              <span className="text-red-500">*</span>
+              <span className="text-[var(--color-danger)]">*</span>
             </label>
             {category === 'schedule' ? (
               // 일반일정: 자유입력 가능 (input + datalist)
@@ -1229,11 +1211,7 @@ export default function UnifiedScheduleModal({
                   value={formData.subtype}
                   onChange={(e) => setFormData(prev => ({ ...prev, subtype: e.target.value as ScheduleSubtype }))}
                   placeholder="일정 유형 (선택 또는 직접 입력)"
-                  className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                    errors.subtype
-                      ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                      : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                  }`}
+                  className={`form-input ${errors.subtype ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
                 />
                 <datalist id="schedule-type-options">
                   <option value="변론" />
@@ -1250,11 +1228,7 @@ export default function UnifiedScheduleModal({
               <select
                 value={formData.subtype}
                 onChange={(e) => setFormData(prev => ({ ...prev, subtype: e.target.value as ScheduleSubtype }))}
-                className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                  errors.subtype
-                    ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                    : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                }`}
+                className={`form-input ${errors.subtype ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
               >
                 <option value="">선택하세요</option>
                 {getSubtypeOptions().map(option => (
@@ -1265,65 +1239,55 @@ export default function UnifiedScheduleModal({
               </select>
             )}
             {errors.subtype && (
-              <p className="mt-1 text-sm text-red-600">{errors.subtype}</p>
+              <p className="mt-1 text-sm text-[var(--color-danger)]">{errors.subtype}</p>
             )}
           </div>
 
           {/* Date/Time or Trigger Date based on category */}
           {category === 'deadline' ? (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                기산일 <span className="text-red-500">*</span>
+            <div className="form-group">
+              <label className="form-label">
+                기산일 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <input
                 type="date"
                 value={formData.trigger_date}
                 onChange={(e) => setFormData(prev => ({ ...prev, trigger_date: e.target.value }))}
-                className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                  errors.trigger_date
-                    ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                    : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                }`}
+                className={`form-input ${errors.trigger_date ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
+                style={{ colorScheme: 'light' }}
               />
               {errors.trigger_date && (
-                <p className="mt-1 text-sm text-red-600">{errors.trigger_date}</p>
+                <p className="mt-1 text-sm text-[var(--color-danger)]">{errors.trigger_date}</p>
               )}
-              <p className="mt-1 text-xs text-sage-500">
+              <p className="form-hint">
                 만료일은 기산일과 데드라인 유형에 따라 자동으로 계산됩니다.
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-2">
-                  날짜 <span className="text-red-500">*</span>
+              <div className="form-group">
+                <label className="form-label">
+                  날짜 <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <input
                   type="date"
                   value={formData.date}
                   onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                  className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                    errors.date
-                      ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                      : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                  }`}
+                  className={`form-input ${errors.date ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
+                  style={{ colorScheme: 'light' }}
                 />
                 {errors.date && (
-                  <p className="mt-1 text-sm text-red-600">{errors.date}</p>
+                  <p className="mt-1 text-sm text-[var(--color-danger)]">{errors.date}</p>
                 )}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-2">
-                  시간 <span className="text-red-500">*</span>
+              <div className="form-group">
+                <label className="form-label">
+                  시간 <span className="text-[var(--color-danger)]">*</span>
                 </label>
                 <select
                   value={formData.time}
                   onChange={(e) => setFormData(prev => ({ ...prev, time: e.target.value }))}
-                  className={`w-full px-4 py-2 border rounded-lg text-sm focus:outline-none transition-colors ${
-                    errors.time
-                      ? 'border-red-300 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                      : 'border-sage-200 focus:border-sage-500 focus:ring-1 focus:ring-sage-500'
-                  }`}
+                  className={`form-input ${errors.time ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]' : ''}`}
                 >
                   <option value="">시간 선택</option>
                   {TIME_OPTIONS.map(time => (
@@ -1331,7 +1295,7 @@ export default function UnifiedScheduleModal({
                   ))}
                 </select>
                 {errors.time && (
-                  <p className="mt-1 text-sm text-red-600">{errors.time}</p>
+                  <p className="mt-1 text-sm text-[var(--color-danger)]">{errors.time}</p>
                 )}
               </div>
             </div>
@@ -1339,8 +1303,8 @@ export default function UnifiedScheduleModal({
 
           {/* Location (not for deadlines) */}
           {category !== 'deadline' && (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
+            <div className="form-group">
+              <label className="form-label">
                 {category === 'court_hearing' ? '법정' : category === 'consultation' ? '상담 장소' : '장소'}
               </label>
               <input
@@ -1354,73 +1318,68 @@ export default function UnifiedScheduleModal({
                   category === 'court_hearing' ? '예: 서울가정법원 301호' :
                   category === 'consultation' ? '예: 본 사무소' : '예: 사무실 회의실'
                 }
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
               />
             </div>
           )}
 
           {/* Judge Name (only for court hearings) */}
           {category === 'court_hearing' && (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                담당 판사
-              </label>
+            <div className="form-group">
+              <label className="form-label">담당 판사</label>
               <input
                 type="text"
                 value={formData.judge_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, judge_name: e.target.value }))}
                 placeholder="예: 홍길동"
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
               />
             </div>
           )}
 
           {/* Court Hearing Report (edit mode only) */}
           {editMode && category === 'court_hearing' && (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                재판기일 보고서
-              </label>
+            <div className="form-group">
+              <label className="form-label">재판기일 보고서</label>
               <textarea
                 value={formData.report}
                 onChange={(e) => setFormData(prev => ({ ...prev, report: e.target.value }))}
                 rows={6}
                 placeholder="재판 진행 내용, 결과, 다음 절차 등을 기록하세요"
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors resize-none"
+                className="form-input resize-none"
               />
             </div>
           )}
 
           {/* Hearing Result (edit mode only) */}
           {editMode && category === 'court_hearing' && (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                변론기일 결과
-              </label>
+            <div className="form-group">
+              <label className="form-label">변론기일 결과</label>
               <select
                 value={formData.result}
-                onChange={(e) => setFormData(prev => ({ ...prev, result: e.target.value as 'CONTINUED' | 'CONCLUDED' | 'POSTPONED' | 'DISMISSED' | '' }))}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                onChange={(e) => setFormData(prev => ({ ...prev, result: e.target.value as 'continued' | 'settled' | 'judgment' | 'dismissed' | 'withdrawn' | 'adjourned' | 'other' | '' }))}
+                className="form-input"
               >
                 <option value="">선택 안 함</option>
-                <option value="CONTINUED">속행 (변론이 계속 진행)</option>
-                <option value="CONCLUDED">종결 (변론 종결)</option>
-                <option value="POSTPONED">연기 (다음 기일로 연기)</option>
-                <option value="DISMISSED">취하 (사건 취하)</option>
+                <option value="continued">속행 (변론이 계속 진행)</option>
+                <option value="settled">종결/화해 (변론 종결, 조정 성립)</option>
+                <option value="judgment">판결선고</option>
+                <option value="adjourned">휴정/연기 (다음 기일로 연기)</option>
+                <option value="dismissed">각하/기각</option>
+                <option value="withdrawn">취하 (사건 취하)</option>
+                <option value="other">기타</option>
               </select>
             </div>
           )}
 
           {/* Hearing Status (edit mode only) */}
           {editMode && category === 'court_hearing' && (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                기일 상태
-              </label>
+            <div className="form-group">
+              <label className="form-label">기일 상태</label>
               <select
                 value={formData.hearing_status}
                 onChange={(e) => setFormData(prev => ({ ...prev, hearing_status: e.target.value as 'SCHEDULED' | 'COMPLETED' | 'POSTPONED' | 'CANCELLED' }))}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
               >
                 <option value="SCHEDULED">예정</option>
                 <option value="COMPLETED">완료</option>
@@ -1431,25 +1390,23 @@ export default function UnifiedScheduleModal({
           )}
 
           {/* Notes */}
-          <div>
-            <label className="block text-sm font-medium text-sage-700 mb-2">
-              메모
-            </label>
+          <div className="form-group">
+            <label className="form-label">메모</label>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
               rows={3}
               placeholder="추가 메모사항을 입력하세요"
-              className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors resize-none"
+              className="form-input resize-none"
             />
           </div>
 
           {/* Submit Buttons */}
-          <div className="flex gap-3 pt-4 border-t border-sage-200">
+          <div className="flex gap-3 pt-4 border-t border-[var(--border-subtle)]">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 min-h-[44px] px-4 py-2 text-sage-700 bg-white border border-sage-300 rounded-lg hover:bg-sage-50 transition-colors font-medium text-sm"
+              className="btn btn-secondary flex-1"
             >
               취소
             </button>
@@ -1458,7 +1415,7 @@ export default function UnifiedScheduleModal({
                 type="button"
                 onClick={handleDelete}
                 disabled={loading}
-                className="flex-1 min-h-[44px] px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-danger flex-1"
               >
                 {loading ? '삭제 중...' : '일정 삭제'}
               </button>
@@ -1466,7 +1423,7 @@ export default function UnifiedScheduleModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 min-h-[44px] px-4 py-2 text-white bg-sage-600 hover:bg-sage-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn-primary flex-1"
             >
               {loading ? (editMode ? '수정 중...' : '추가 중...') : (editMode ? '일정 수정' : '일정 추가')}
             </button>
@@ -1477,51 +1434,52 @@ export default function UnifiedScheduleModal({
         {/* Payment Tab */}
         {activeTab === 'payment' && (
           <form onSubmit={handlePaymentSubmit} className="p-6 space-y-5">
-            <h3 className="text-lg font-semibold text-sage-800">{editMode ? '입금 수정' : '입금 추가'}</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">{editMode ? '입금 수정' : '입금 추가'}</h3>
             {errors.payment && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <div className="p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)]/20 rounded-lg text-sm text-[var(--color-danger)]">
                 {errors.payment}
               </div>
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">입금일</label>
+              <div className="form-group">
+                <label className="form-label">입금일</label>
                 <input
                   type="date"
                   value={paymentForm.payment_date}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_date: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
+                  style={{ colorScheme: 'light' }}
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">입금인</label>
+              <div className="form-group">
+                <label className="form-label">입금인</label>
                 <input
                   type="text"
                   value={paymentForm.depositor_name}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, depositor_name: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">금액</label>
+              <div className="form-group">
+                <label className="form-label">금액</label>
                 <input
                   type="text"
                   value={paymentForm.amount}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                   placeholder="1,000,000"
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">명목</label>
+              <div className="form-group">
+                <label className="form-label">명목</label>
                 <select
                   value={paymentForm.payment_category}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, payment_category: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                   required
                 >
                   <option value="">선택</option>
@@ -1530,12 +1488,12 @@ export default function UnifiedScheduleModal({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">결제/영수증</label>
+              <div className="form-group">
+                <label className="form-label">결제/영수증</label>
                 <select
                   value={paymentForm.receipt_type}
                   onChange={(e) => setPaymentForm(prev => ({ ...prev, receipt_type: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                 >
                   <option value="">선택 안 함</option>
                   <option value="카드결제">카드결제</option>
@@ -1549,8 +1507,8 @@ export default function UnifiedScheduleModal({
             </div>
 
             <div className="space-y-3">
-              <p className="text-sm font-medium text-sage-700">연결 유형</p>
-              <div className="flex gap-2">
+              <p className="text-sm font-medium text-[var(--text-secondary)]">연결 유형</p>
+              <div className="segmented-control w-fit">
                 {[
                   { value: 'none', label: '미연결' },
                   { value: 'case', label: '사건' },
@@ -1570,11 +1528,7 @@ export default function UnifiedScheduleModal({
                       setPaymentSearchResults([])
                       setPaymentSearchTerm('')
                     }}
-                    className={`min-h-[44px] px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
-                      paymentForm.linkage === opt.value
-                        ? 'bg-sage-600 text-white border-sage-600'
-                        : 'border-sage-300 text-sage-700 hover:bg-sage-50'
-                    }`}
+                    className={`segmented-control-item ${paymentForm.linkage === opt.value ? 'active' : ''}`}
                   >
                     {opt.label}
                   </button>
@@ -1584,7 +1538,7 @@ export default function UnifiedScheduleModal({
 
             {paymentForm.linkage !== 'none' && (
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-sage-700">
+                <label className="form-label">
                   {paymentForm.linkage === 'case' ? '사건 검색 (사건명/번호/계약번호)' : '상담 검색 (이름/전화/요청유형)'}
                 </label>
                 <div className="flex gap-2">
@@ -1598,33 +1552,33 @@ export default function UnifiedScheduleModal({
                         handlePaymentSearch()
                       }
                     }}
-                    className="flex-1 px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                    className="form-input flex-1"
                     placeholder={paymentForm.linkage === 'case' ? '사건명 / 사건번호 / 계약번호' : '이름 / 전화번호 / 요청유형'}
                   />
                   <button
                     type="button"
                     onClick={handlePaymentSearch}
-                    className="min-h-[44px] px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors text-sm font-medium"
+                    className="btn btn-primary"
                   >
                     {paymentSearchLoading ? '검색중...' : '검색'}
                   </button>
                 </div>
                 {paymentSelectedLabel && (
-                  <p className="text-xs text-sage-600">선택됨: {paymentSelectedLabel}</p>
+                  <p className="text-xs text-[var(--text-secondary)]">선택됨: {paymentSelectedLabel}</p>
                 )}
-                <div className="max-h-48 overflow-y-auto border border-sage-200 rounded-lg">
+                <div className="max-h-48 overflow-y-auto border border-[var(--border-subtle)] rounded-lg">
                 {paymentSearchResults.length === 0 ? (
-                  <p className="text-xs text-sage-500 p-3">검색 결과가 없습니다.</p>
+                  <p className="text-xs text-[var(--text-muted)] p-3">검색 결과가 없습니다.</p>
                 ) : (
-                  <ul className="divide-y divide-sage-100">
+                  <ul className="divide-y divide-[var(--border-subtle)]">
                     {paymentSearchResults.map(item => (
                       <li
                         key={item.id}
-                        className={`p-3 flex items-center justify-between ${paymentSelectedId === item.id ? 'bg-sage-50' : ''}`}
+                        className={`p-3 flex items-center justify-between ${paymentSelectedId === item.id ? 'bg-[var(--sage-muted)]' : ''}`}
                       >
                         <div className="text-sm">
-                          <p className="font-medium text-sage-800">{item.name}</p>
-                          <p className="text-xs text-sage-600">
+                          <p className="font-medium text-[var(--text-primary)]">{item.name}</p>
+                          <p className="text-xs text-[var(--text-secondary)]">
                             {item.extra || '-'}{item.office ? ` / ${item.office}` : ''}
                           </p>
                         </div>
@@ -1640,7 +1594,7 @@ export default function UnifiedScheduleModal({
                             setPaymentSelectedLabel(item.extra ? `${item.name} (${item.extra})` : item.name)
                             setPaymentSelectedId(item.id)
                           }}
-                          className="text-xs px-3 py-1 bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+                          className="btn btn-sm btn-primary"
                         >
                           선택
                         </button>
@@ -1652,21 +1606,21 @@ export default function UnifiedScheduleModal({
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-1">메모</label>
+            <div className="form-group">
+              <label className="form-label">메모</label>
               <textarea
                 value={paymentForm.memo}
                 onChange={(e) => setPaymentForm(prev => ({ ...prev, memo: e.target.value }))}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors resize-none"
+                className="form-input resize-none"
                 rows={2}
               />
             </div>
 
-            <div className="flex gap-3 pt-4 border-t border-sage-200">
+            <div className="flex gap-3 pt-4 border-t border-[var(--border-subtle)]">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 min-h-[44px] px-4 py-2 text-sage-700 bg-white border border-sage-300 rounded-lg hover:bg-sage-50 transition-colors font-medium text-sm"
+                className="btn btn-secondary flex-1"
               >
                 취소
               </button>
@@ -1701,7 +1655,7 @@ export default function UnifiedScheduleModal({
                     }
                   }}
                   disabled={loading}
-                  className="flex-1 min-h-[44px] px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-danger flex-1"
                 >
                   {loading ? '삭제 중...' : '입금 삭제'}
                 </button>
@@ -1709,7 +1663,7 @@ export default function UnifiedScheduleModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 min-h-[44px] px-4 py-2 text-white bg-sage-600 hover:bg-sage-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-primary flex-1"
               >
                 {loading ? '저장 중...' : (editMode ? '입금 수정' : '입금 추가')}
               </button>
@@ -1720,40 +1674,41 @@ export default function UnifiedScheduleModal({
         {/* Expense Tab */}
         {activeTab === 'expense' && (
           <form onSubmit={handleExpenseSubmit} className="p-6 space-y-5">
-            <h3 className="text-lg font-semibold text-sage-800">{editMode ? '지출 수정' : '지출 추가'}</h3>
+            <h3 className="text-lg font-semibold text-[var(--text-primary)]">{editMode ? '지출 수정' : '지출 추가'}</h3>
             {errors.expense && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+              <div className="p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)]/20 rounded-lg text-sm text-[var(--color-danger)]">
                 {errors.expense}
               </div>
             )}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">지출일</label>
+              <div className="form-group">
+                <label className="form-label">지출일</label>
                 <input
                   type="date"
                   value={expenseForm.expense_date}
                   onChange={(e) => setExpenseForm(prev => ({ ...prev, expense_date: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
+                  style={{ colorScheme: 'light' }}
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">금액</label>
+              <div className="form-group">
+                <label className="form-label">금액</label>
                 <input
                   type="text"
                   value={expenseForm.amount}
                   onChange={(e) => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                   placeholder="100,000"
                   required
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">카테고리</label>
+              <div className="form-group">
+                <label className="form-label">카테고리</label>
                 <select
                   value={expenseForm.expense_category}
                   onChange={(e) => setExpenseForm(prev => ({ ...prev, expense_category: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                   required
                 >
                   <option value="">선택</option>
@@ -1762,53 +1717,53 @@ export default function UnifiedScheduleModal({
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">세부 카테고리</label>
+              <div className="form-group">
+                <label className="form-label">세부 카테고리</label>
                 <input
                   type="text"
                   value={expenseForm.subcategory}
                   onChange={(e) => setExpenseForm(prev => ({ ...prev, subcategory: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                   placeholder="예: 사무실 임대료"
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">결제수단</label>
+              <div className="form-group">
+                <label className="form-label">결제수단</label>
                 <select
                   value={expenseForm.payment_method}
                   onChange={(e) => setExpenseForm(prev => ({ ...prev, payment_method: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                 >
                   {['카드', '현금', '계좌이체', '자동이체', '기타'].map(m => (
                     <option key={m} value={m}>{m}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-sage-700 mb-1">공급업체</label>
+              <div className="form-group">
+                <label className="form-label">공급업체</label>
                 <input
                   type="text"
                   value={expenseForm.vendor_name}
                   onChange={(e) => setExpenseForm(prev => ({ ...prev, vendor_name: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                  className="form-input"
                   placeholder="예: 네이버"
                 />
               </div>
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-sage-700 mb-1">메모</label>
+              <div className="form-group md:col-span-2">
+                <label className="form-label">메모</label>
                 <textarea
                   value={expenseForm.memo}
                   onChange={(e) => setExpenseForm(prev => ({ ...prev, memo: e.target.value }))}
-                  className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors resize-none"
+                  className="form-input resize-none"
                   rows={2}
                 />
               </div>
             </div>
-            <div className="flex gap-3 pt-4 border-t border-sage-200">
+            <div className="flex gap-3 pt-4 border-t border-[var(--border-subtle)]">
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 min-h-[44px] px-4 py-2 text-sage-700 bg-white border border-sage-300 rounded-lg hover:bg-sage-50 transition-colors font-medium text-sm"
+                className="btn btn-secondary flex-1"
               >
                 취소
               </button>
@@ -1843,7 +1798,7 @@ export default function UnifiedScheduleModal({
                     }
                   }}
                   disabled={loading}
-                  className="flex-1 min-h-[44px] px-4 py-2 text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn btn-danger flex-1"
                 >
                   {loading ? '삭제 중...' : '지출 삭제'}
                 </button>
@@ -1851,7 +1806,7 @@ export default function UnifiedScheduleModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 min-h-[44px] px-4 py-2 text-white bg-sage-600 hover:bg-sage-700 rounded-lg transition-colors font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn-primary flex-1"
               >
                 {loading ? '저장 중...' : (editMode ? '지출 수정' : '지출 추가')}
               </button>

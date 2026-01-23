@@ -56,6 +56,19 @@ export async function PATCH(
 
     const body: UpdatePaymentRequest = await request.json()
 
+    // 기존 결제 데이터 조회 (부분 수정 시 기존 상태 유지를 위해)
+    const { data: existingPayment, error: existingError } = await supabase
+      .from('payments')
+      .select('case_id, is_confirmed, confirmed_at, confirmed_by')
+      .eq('id', id)
+      .single()
+
+    if (existingError || !existingPayment) {
+      return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+    }
+
+    const previousCaseId = existingPayment.case_id
+
     let caseNameFromCase: string | null | undefined = undefined
     if (body.case_id) {
       const { data: caseRow, error: caseError } = await supabase
@@ -70,15 +83,23 @@ export async function PATCH(
       }
     }
 
-    const shouldConfirm = !!(body.case_id || body.consultation_id || body.is_confirmed)
+    // 기존 확인 상태 유지하면서, 명시적으로 case_id/consultation_id/is_confirmed를 보낸 경우만 확인 처리
+    const shouldConfirm = body.is_confirmed === true
+      || (body.is_confirmed !== false && existingPayment.is_confirmed)
+      || !!(body.case_id || body.consultation_id)
+
     const { data, error } = await supabase
       .from('payments')
       .update({
         ...body,
         case_name: body.case_name || caseNameFromCase || body.case_name,
         is_confirmed: shouldConfirm,
-        confirmed_at: shouldConfirm ? new Date().toISOString() : body.confirmed_at ?? null,
-        confirmed_by: shouldConfirm ? (user?.email || user?.id || 'admin') : body.confirmed_by || null,
+        confirmed_at: shouldConfirm
+          ? (existingPayment.confirmed_at || new Date().toISOString())
+          : null,
+        confirmed_by: shouldConfirm
+          ? (existingPayment.confirmed_by || user?.email || user?.id || 'admin')
+          : null,
       })
       .eq('id', id)
       .select()
@@ -89,19 +110,23 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Update case total_received if case_id exists after update
-    if (data.case_id) {
+    // Update case total_received - 이전 case_id와 새 case_id 모두 처리
+    const caseIdsToUpdate = new Set<string>()
+    if (previousCaseId) caseIdsToUpdate.add(previousCaseId)
+    if (data.case_id) caseIdsToUpdate.add(data.case_id)
+
+    for (const caseId of caseIdsToUpdate) {
       const { data: sums, error: sumError } = await supabase
         .from('payments')
         .select('amount')
-        .eq('case_id', data.case_id)
+        .eq('case_id', caseId)
 
       if (!sumError && sums) {
         const total = sums.reduce((sum, p) => sum + p.amount, 0)
         await supabase
           .from('legal_cases')
           .update({ total_received: total })
-          .eq('id', data.case_id)
+          .eq('id', caseId)
       }
     }
 

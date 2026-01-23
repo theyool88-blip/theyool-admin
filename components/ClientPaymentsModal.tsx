@@ -51,10 +51,15 @@ export default function ClientPaymentsModal({
       })
 
       // 2) 기존 데이터 호환: 사건 경유 조회 (client_id가 없는 기존 입금)
-      const { data: cases } = await supabase
+      const { data: cases, error: casesErr } = await supabase
         .from('legal_cases')
         .select('id, case_name')
         .eq('client_id', clientId)
+
+      if (casesErr) {
+        console.error('Failed to fetch client cases:', casesErr)
+        // 첫 번째 조회 결과만으로 진행
+      }
 
       const caseIds = cases?.map(c => c.id) || []
       const caseNameMap = new Map((cases || []).map(c => [c.id, c.case_name]))
@@ -109,17 +114,17 @@ export default function ClientPaymentsModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-[var(--bg-secondary)] rounded-xl shadow-xl w-full max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-sage-100">
+        <div className="px-6 py-5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-sage-800">{clientName}</h2>
-              <p className="text-sm text-sage-500 mt-0.5">전체 입금 내역</p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">{clientName}</h2>
+              <p className="text-sm text-[var(--text-muted)] mt-0.5">전체 입금 내역</p>
             </div>
             <button
               onClick={onClose}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sage-400 hover:text-sage-600 hover:bg-sage-50 rounded-lg transition-colors"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -128,15 +133,15 @@ export default function ClientPaymentsModal({
           </div>
           {/* Summary Stats */}
           <div className="mt-4 flex items-center gap-4">
-            <div className="bg-sage-50 px-4 py-3 rounded-lg border border-sage-200">
-              <p className="text-xs text-sage-500 mb-0.5">총 입금액</p>
-              <p className="text-lg font-semibold text-sage-800">
+            <div className="bg-[var(--sage-muted)] px-4 py-3 rounded-lg border border-[var(--border-subtle)]">
+              <p className="text-xs text-[var(--text-muted)] mb-0.5">총 입금액</p>
+              <p className="text-lg font-semibold text-[var(--text-primary)]">
                 {formatCurrency(totalAmount)}
               </p>
             </div>
-            <div className="bg-sage-50 px-4 py-3 rounded-lg border border-sage-200">
-              <p className="text-xs text-sage-500 mb-0.5">입금 건수</p>
-              <p className="text-lg font-semibold text-sage-800">{payments.length}건</p>
+            <div className="bg-[var(--sage-muted)] px-4 py-3 rounded-lg border border-[var(--border-subtle)]">
+              <p className="text-xs text-[var(--text-muted)] mb-0.5">입금 건수</p>
+              <p className="text-lg font-semibold text-[var(--text-primary)]">{payments.length}건</p>
             </div>
           </div>
         </div>
@@ -145,63 +150,63 @@ export default function ClientPaymentsModal({
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-2 border-sage-200 border-t-sage-600"></div>
-              <p className="mt-3 text-sm text-sage-500">불러오는 중...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--border-subtle)] border-t-[var(--sage-primary)]"></div>
+              <p className="mt-3 text-sm text-[var(--text-muted)]">불러오는 중...</p>
             </div>
           ) : payments.length === 0 ? (
-            <div className="py-16 text-center text-sage-400 text-sm">
+            <div className="py-16 text-center text-[var(--text-muted)] text-sm">
               입금 내역이 없습니다
             </div>
           ) : (
             <table className="w-full text-sm">
-              <thead className="bg-sage-50 sticky top-0">
+              <thead className="bg-[var(--bg-tertiary)] sticky top-0">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">입금일</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">사건명</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">입금자</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-sage-500 uppercase tracking-wider">금액</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">방법</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">명목</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">입금일</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">사건명</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">입금자</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">금액</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">방법</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">명목</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-sage-100">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {payments.map((payment) => (
-                  <tr key={payment.id} className="hover:bg-sage-50 transition-colors">
-                    <td className="px-4 py-3 text-sm text-sage-600">
+                  <tr key={payment.id} className="hover:bg-[var(--bg-hover)] transition-colors">
+                    <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
                       {fmtDate(payment.payment_date)}
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {payment.case_id ? (
                         <Link
                           href={`/cases/${payment.case_id}`}
-                          className="text-sage-700 hover:text-sage-900 hover:underline font-medium"
+                          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:underline font-medium"
                         >
                           {payment.case_name || '-'}
                         </Link>
                       ) : (
-                        <span className="text-sage-400">{payment.case_name || '-'}</span>
+                        <span className="text-[var(--text-muted)]">{payment.case_name || '-'}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-sage-800">
+                    <td className="px-4 py-3 text-sm text-[var(--text-primary)]">
                       {payment.depositor_name || '-'}
                     </td>
-                    <td className={`px-4 py-3 text-sm text-right font-medium ${payment.amount < 0 ? 'text-coral-600' : 'text-sage-800'}`}>
+                    <td className="px-4 py-3 text-sm text-right font-medium text-[var(--text-primary)]">
                       {formatCurrency(payment.amount)}
                     </td>
                     <td className="px-4 py-3">
                       {payment.receipt_type ? (
-                        <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-sage-100 text-sage-700 rounded-md">
+                        <span className="inline-flex px-2 py-0.5 text-xs font-medium bg-[var(--sage-muted)] text-[var(--sage-primary)] rounded-md">
                           {payment.receipt_type}
                         </span>
                       ) : (
-                        <span className="text-sage-400">-</span>
+                        <span className="text-[var(--text-muted)]">-</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-md ${
                         payment.payment_category === '환불'
-                          ? 'bg-coral-50 text-coral-700'
-                          : 'bg-sage-100 text-sage-700'
+                          ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]'
+                          : 'bg-[var(--sage-muted)] text-[var(--sage-primary)]'
                       }`}>
                         {payment.payment_category}
                       </span>
@@ -214,10 +219,10 @@ export default function ClientPaymentsModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-sage-100 bg-sage-50">
+        <div className="px-6 py-4 border-t border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 min-h-[44px] text-sm font-medium bg-white border border-sage-300 text-sage-700 rounded-lg hover:bg-sage-50 transition-colors"
+            className="btn btn-secondary"
           >
             닫기
           </button>

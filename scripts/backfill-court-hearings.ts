@@ -17,7 +17,7 @@ const supabase = createClient(
 
 type HearingType = 'HEARING_MAIN' | 'HEARING_MEDIATION' | 'HEARING_INVESTIGATION' |
                    'HEARING_JUDGMENT' | 'HEARING_INTERIM' | 'HEARING_PARENTING' | 'HEARING_LAWYER_MEETING';
-type HearingResult = 'CONTINUED' | 'CONCLUDED' | 'POSTPONED' | 'DISMISSED';
+type HearingResult = 'continued' | 'settled' | 'judgment' | 'dismissed' | 'withdrawn' | 'adjourned' | 'other';
 type HearingStatus = 'SCHEDULED' | 'COMPLETED' | 'CANCELLED';
 
 interface HearingInfo {
@@ -76,18 +76,22 @@ const SCOURT_HEARING_TYPE_MAP: Record<string, HearingType> = {
 };
 
 const SCOURT_RESULT_MAP: Record<string, HearingResult> = {
-  '속행': 'CONTINUED',
-  '변론속행': 'CONTINUED',
-  '조정속행': 'CONTINUED',
-  '종결': 'CONCLUDED',
-  '변론종결': 'CONCLUDED',
-  '조정종결': 'CONCLUDED',
-  '조정성립': 'CONCLUDED',
-  '연기': 'POSTPONED',
-  '기일연기': 'POSTPONED',
-  '취하': 'DISMISSED',
-  '각하': 'DISMISSED',
-  '기각': 'DISMISSED',
+  '속행': 'continued',
+  '변론속행': 'continued',
+  '조정속행': 'continued',
+  '종결': 'settled',
+  '변론종결': 'settled',
+  '조정종결': 'settled',
+  '조정성립': 'settled',
+  '화해성립': 'settled',
+  '연기': 'adjourned',
+  '기일연기': 'adjourned',
+  '휴정': 'adjourned',
+  '취하': 'withdrawn',
+  '각하': 'dismissed',
+  '기각': 'dismissed',
+  '판결선고': 'judgment',
+  '선고': 'judgment',
 };
 
 function mapScourtHearingType(scourtType: string): HearingType {
@@ -128,10 +132,12 @@ function mapScourtResult(scourtResult: string | undefined): HearingResult | null
   }
 
   const resultLC = scourtResult.toLowerCase();
-  if (resultLC.includes('속행')) return 'CONTINUED';
-  if (resultLC.includes('종결') || resultLC.includes('성립')) return 'CONCLUDED';
-  if (resultLC.includes('연기')) return 'POSTPONED';
-  if (resultLC.includes('취하') || resultLC.includes('각하') || resultLC.includes('기각')) return 'DISMISSED';
+  if (resultLC.includes('속행')) return 'continued';
+  if (resultLC.includes('종결') || resultLC.includes('성립') || resultLC.includes('화해')) return 'settled';
+  if (resultLC.includes('연기') || resultLC.includes('휴정')) return 'adjourned';
+  if (resultLC.includes('취하')) return 'withdrawn';
+  if (resultLC.includes('각하') || resultLC.includes('기각')) return 'dismissed';
+  if (resultLC.includes('선고') || resultLC.includes('판결')) return 'judgment';
 
   return null;
 }

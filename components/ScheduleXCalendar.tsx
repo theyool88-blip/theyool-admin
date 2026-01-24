@@ -7,7 +7,7 @@ if (typeof (globalThis as Record<string, unknown>).Temporal === 'undefined') {
 }
 
 import { useEffect, useState, useCallback, useMemo, useRef, createContext, useContext } from 'react'
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths } from 'date-fns'
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { formatDaysUntil } from '@/types/court-hearing'
 import { useTheme } from '@/hooks/useTheme'
@@ -762,11 +762,13 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
 
   useEffect(() => {
     fetchSchedules()
-  }, [fetchSchedules])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRangeKey]) // fetchSchedules 대신 dateRangeKey 직접 사용하여 불필요한 리렌더링 방지
 
   useEffect(() => {
     fetchTenantMembers()
-  }, [fetchTenantMembers])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // 최초 1회만 실행
 
   // Toggle lawyer selection
   const toggleLawyer = useCallback((id: string) => {
@@ -869,24 +871,44 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     })
   }, [])
 
-  // Navigation functions
-  const goToPreviousMonth = useCallback(() => {
-    const newDate = subMonths(currentDate, 1)
+  // Navigation functions - viewMode에 따라 이동 단위 변경
+  const goToPrevious = useCallback(() => {
+    let newDate: Date
+    switch (viewMode) {
+      case 'week':
+        newDate = subWeeks(currentDate, 1)
+        break
+      case 'day':
+        newDate = subDays(currentDate, 1)
+        break
+      default: // 'month'
+        newDate = subMonths(currentDate, 1)
+    }
     setCurrentDate(newDate)
     if (calendarControls) {
       const temporalDate = Temporal.PlainDate.from(format(newDate, 'yyyy-MM-dd'))
       calendarControls.setDate(temporalDate)
     }
-  }, [currentDate, calendarControls])
+  }, [currentDate, calendarControls, viewMode])
 
-  const goToNextMonth = useCallback(() => {
-    const newDate = addMonths(currentDate, 1)
+  const goToNext = useCallback(() => {
+    let newDate: Date
+    switch (viewMode) {
+      case 'week':
+        newDate = addWeeks(currentDate, 1)
+        break
+      case 'day':
+        newDate = addDays(currentDate, 1)
+        break
+      default: // 'month'
+        newDate = addMonths(currentDate, 1)
+    }
     setCurrentDate(newDate)
     if (calendarControls) {
       const temporalDate = Temporal.PlainDate.from(format(newDate, 'yyyy-MM-dd'))
       calendarControls.setDate(temporalDate)
     }
-  }, [currentDate, calendarControls])
+  }, [currentDate, calendarControls, viewMode])
 
   const goToToday = useCallback(() => {
     const today = new Date()
@@ -1153,9 +1175,9 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
           {/* Date Navigation */}
           <div className="flex items-center gap-1 relative">
             <button
-              onClick={goToPreviousMonth}
+              onClick={goToPrevious}
               className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              aria-label="이전 달"
+              aria-label={viewMode === 'week' ? '이전 주' : viewMode === 'day' ? '이전 일' : '이전 달'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -1234,9 +1256,9 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
             )}
 
             <button
-              onClick={goToNextMonth}
+              onClick={goToNext}
               className="p-1.5 rounded-lg hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              aria-label="다음 달"
+              aria-label={viewMode === 'week' ? '다음 주' : viewMode === 'day' ? '다음 일' : '다음 달'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
                   debugLog('의뢰인 생성 실패', clientError)
                   warnings.push({
                     field: 'client_name',
-                    message: `의뢰인 생성 실패: ${clientError.message}`
+                    message: `의뢰인 생성 실패: ${clientError.message} (code: ${clientError.code})`
                   })
                 } else {
                   clientId = newClient.id
@@ -386,7 +386,12 @@ export async function POST(request: NextRequest) {
                 debugLog('createNewClients=false, 의뢰인 생성 스킵')
               }
             } else {
+              // 의뢰인명이 비어있는 경우 경고 추가
               debugLog('client_name이 비어있음, 의뢰인 처리 스킵')
+              warnings.push({
+                field: 'client_name',
+                message: '의뢰인명이 없어 의뢰인 정보가 등록되지 않았습니다'
+              })
             }
 
             // 4-2. 담당자 처리 (복수 담당자 지원)

@@ -43,6 +43,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
       const today = new Date().toISOString().split('T')[0];
 
       // 기일 조회 (Supabase 직접 사용, 당사자/출석변호사 JOIN)
+      // NOTE: client_id → primary_client_id로 변경 (스키마 변경)
       const { data: hearings, error: hearingError } = await supabase
         .from('court_hearings')
         .select(`
@@ -52,7 +53,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
             id,
             case_name,
             court_case_number,
-            client:client_id(id, name)
+            primary_client_name
           )
         `)
         .gte('hearing_date', today)
@@ -73,7 +74,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
             id,
             case_name,
             court_case_number,
-            client:client_id(id, name)
+            primary_client_name
           )
         `)
         .gte('deadline_date', today)
@@ -92,12 +93,13 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
 
       let opponentMap = new Map<string, string>();
       if (allCaseIds.length > 0) {
+        // NOTE: is_our_client 컬럼이 스키마에서 제거됨 - is_primary=false로 상대방 식별
         const { data: opponents } = await supabase
           .from('case_parties')
           .select('case_id, party_name')
           .in('case_id', allCaseIds)
-          .eq('is_our_client', false)
-          .eq('is_primary', true);
+          .eq('is_primary', false)
+          .order('party_order', { ascending: true });
 
         if (opponents) {
           opponentMap = new Map(opponents.map(o => [o.case_id, o.party_name]));
@@ -110,7 +112,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
           const daysRemaining = Math.ceil(
             (new Date(h.hearing_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          const legalCase = h.legal_cases as { id?: string; court_case_number?: string; case_name?: string; client?: { name?: string } } | null;
+          const legalCase = h.legal_cases as { id?: string; court_case_number?: string; case_name?: string; primary_client_name?: string } | null;
           // scourt_type_raw 우선 사용 (예: "제1회 변론기일"), 없으면 ENUM 라벨
           const hearingTitle = h.scourt_type_raw
             || HEARING_TYPE_LABELS[h.hearing_type as HearingType]
@@ -126,7 +128,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
             caseId: h.case_id,
             caseNumber: legalCase?.court_case_number || '',
             caseName: legalCase?.case_name,
-            clientName: legalCase?.client?.name,
+            clientName: legalCase?.primary_client_name || undefined,
             opponentName: legalCase?.id ? opponentMap.get(legalCase.id) : undefined,
             attendingLawyerName: (h.attending_lawyer as { display_name?: string } | null)?.display_name,
             daysRemaining,
@@ -141,7 +143,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
           const daysRemaining = Math.ceil(
             (new Date(d.deadline_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
           );
-          const legalCase = d.legal_cases as { id?: string; court_case_number?: string; case_name?: string; client?: { name?: string } } | null;
+          const legalCase = d.legal_cases as { id?: string; court_case_number?: string; case_name?: string; primary_client_name?: string } | null;
           // DEADLINE_TYPE_LABELS에서 한글 라벨 사용
           const deadlineTitle = DEADLINE_TYPE_LABELS[d.deadline_type as DeadlineType]
             || d.deadline_type
@@ -155,7 +157,7 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
             caseId: d.case_id,
             caseNumber: legalCase?.court_case_number || '',
             caseName: legalCase?.case_name,
-            clientName: legalCase?.client?.name,
+            clientName: legalCase?.primary_client_name || undefined,
             opponentName: legalCase?.id ? opponentMap.get(legalCase.id) : undefined,
             daysRemaining,
           });
@@ -191,12 +193,12 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900">다가오는 일정</p>
+      <div className="card">
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <p className="text-sm font-medium text-[var(--text-primary)]">다가오는 일정</p>
         </div>
         <div className="p-4 flex justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-sage-600"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-[var(--border-default)] border-t-[var(--sage-primary)]"></div>
         </div>
       </div>
     );
@@ -204,33 +206,33 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900">다가오는 일정</p>
+      <div className="card">
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <p className="text-sm font-medium text-[var(--text-primary)]">다가오는 일정</p>
         </div>
-        <div className="p-4 text-center text-sm text-gray-500">{error}</div>
+        <div className="p-4 text-center text-sm text-[var(--text-tertiary)]">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-900">다가오는 일정</p>
-        <span className="text-xs text-gray-500">{events.length}건</span>
+    <div className="card">
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <p className="text-sm font-medium text-[var(--text-primary)]">다가오는 일정</p>
+        <span className="text-xs text-[var(--text-tertiary)]">{events.length}건</span>
       </div>
 
       {events.length === 0 ? (
-        <div className="p-4 text-center text-sm text-gray-500">
+        <div className="p-4 text-center text-sm text-[var(--text-tertiary)]">
           예정된 일정이 없습니다
         </div>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-[var(--border-subtle)]">
           {events.map((event) => (
             <Link
               key={`${event.type}-${event.id}`}
               href={`/cases/${event.caseId}`}
-              className="block px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="block px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors"
             >
               <div className="flex items-start gap-3">
                 {/* 날짜 */}
@@ -238,16 +240,16 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
                   <span
                     className={`text-xs font-medium ${
                       event.daysRemaining <= 0
-                        ? 'text-red-600'
+                        ? 'text-[var(--color-danger)]'
                         : event.daysRemaining <= 3
-                          ? 'text-orange-600'
-                          : 'text-gray-600'
+                          ? 'text-[var(--color-warning)]'
+                          : 'text-[var(--text-secondary)]'
                     }`}
                   >
                     {formatDate(event.date)}
                   </span>
                   {event.time && (
-                    <p className="text-xs text-gray-400">{event.time}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{event.time}</p>
                   )}
                 </div>
 
@@ -258,31 +260,31 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
                     <span
                       className={`flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-medium ${
                         event.type === 'hearing'
-                          ? 'bg-blue-50 text-blue-600'
+                          ? 'bg-[var(--color-info-muted)] text-[var(--color-info)]'
                           : 'bg-purple-50 text-purple-600'
                       }`}
                     >
                       {event.title}
                     </span>
                     {event.type === 'hearing' && (event.clientName || event.opponentName) && (
-                      <span className="text-sm text-gray-900 truncate">
+                      <span className="text-sm text-[var(--text-primary)] truncate">
                         {event.clientName || '의뢰인'} v {event.opponentName || '상대방'}
                       </span>
                     )}
                     {event.type === 'deadline' && (
-                      <span className="text-sm text-gray-900 truncate">
+                      <span className="text-sm text-[var(--text-primary)] truncate">
                         {event.caseName || event.caseNumber}
                       </span>
                     )}
                   </div>
                   {/* 둘째 줄: 사건번호 */}
                   {event.caseNumber && (
-                    <p className="text-xs text-gray-500 truncate">
+                    <p className="text-xs text-[var(--text-tertiary)] truncate">
                       {event.caseNumber}
                     </p>
                   )}
                   {/* 셋째 줄: 장소 | 출석변호사 */}
-                  <div className="flex items-center gap-2 text-xs text-gray-400 truncate">
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] truncate">
                     {event.location && (
                       <span>{event.location}</span>
                     )}
@@ -300,10 +302,10 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
                   <span
                     className={`text-xs font-medium ${
                       event.daysRemaining <= 0
-                        ? 'text-red-600'
+                        ? 'text-[var(--color-danger)]'
                         : event.daysRemaining <= 3
-                          ? 'text-orange-600'
-                          : 'text-gray-500'
+                          ? 'text-[var(--color-warning)]'
+                          : 'text-[var(--text-tertiary)]'
                     }`}
                   >
                     {getDaysLabel(event.daysRemaining)}

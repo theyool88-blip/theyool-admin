@@ -140,6 +140,7 @@ export async function checkExistingRelation(
 export async function createCaseRelation(
   supabase: SupabaseClient,
   params: {
+    tenantId: string;
     caseId: string;
     relatedCaseId: string;
     relationType: string;
@@ -149,6 +150,7 @@ export async function createCaseRelation(
   }
 ): Promise<{ created: boolean; error?: string }> {
   const { error } = await supabase.from('case_relations').insert({
+    tenant_id: params.tenantId,
     case_id: params.caseId,
     related_case_id: params.relatedCaseId,
     relation_type: params.relationType,
@@ -242,6 +244,7 @@ export async function linkRelatedCases(
           const direction = determineRelationDirection(relationType);
 
           const createResult = await createCaseRelation(supabase, {
+            tenantId,
             caseId: legalCaseId,
             relatedCaseId: existingCase.id,
             relationType,
@@ -303,6 +306,7 @@ export async function linkRelatedCases(
           const direction = determineRelationDirection(relatedCase.relation || '', caseType);
 
           const createResult = await createCaseRelation(supabase, {
+            tenantId,
             caseId: legalCaseId,
             relatedCaseId: existingCase.id,
             relationType: relatedCase.relation || '관련사건',

@@ -145,12 +145,12 @@ export async function POST(request: NextRequest) {
         case_name: `${relatedCaseInfo.relationType} 사건`,  // 임시 사건명
         status: '진행중',
         case_type: parsed.caseType,
-        enc_cs_no: relatedCaseInfo.encCsNo || null,
-        // 연관관계 설명
-        related_case_info: `${sourceCase.court_case_number}의 ${relatedCaseInfo.relationType}`,
+        scourt_enc_cs_no: relatedCaseInfo.encCsNo || null,
         // 캐시 필드 (트리거가 동기화하지만 초기값 설정)
         primary_client_id: resolvedClientId,
         primary_client_name: sourceCase.primary_client_name || null,
+        // 연관관계 정보는 case_relations 테이블에서 관리
+        notes: `${sourceCase.court_case_number}의 ${relatedCaseInfo.relationType}`,
       };
 
       const { data: createdCase, error: createError } = await supabase
@@ -244,7 +244,7 @@ export async function POST(request: NextRequest) {
             party_type: seed.party_type,
             party_type_label: seed.party_type_label,
             party_order: idx + 1,
-            is_primary: seed.is_our_client,  // is_our_client → is_primary
+            is_primary: seed.is_primary,  // 대표 당사자 여부
             representatives: [],
             manual_override: false,  // 자동 생성
             scourt_synced: false,
@@ -344,6 +344,7 @@ export async function POST(request: NextRequest) {
     const { data: newRelation, error: relationError } = await supabase
       .from('case_relations')
       .insert({
+        tenant_id: sourceCase.tenant_id,
         case_id: sourceCaseId,
         related_case_id: targetCaseId,
         relation_type: relatedCaseInfo.relationType,  // 원본 SCOURT 라벨

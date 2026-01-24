@@ -222,17 +222,28 @@ async function processJob(
     let clientId: string | null = null
     let isNewClient = false
 
+    // 디버깅 로그: 의뢰인 처리 시작
+    console.log('[BatchImport] 의뢰인 처리:', {
+      jobId: job.id,
+      client_name: row.client_name,
+      createNewClients: options.createNewClients,
+    })
+
     if (row.client_name) {
       const { data: existingClient } = await supabase
         .from('clients')
         .select('id, name')
         .eq('tenant_id', job.tenant_id)
         .eq('name', row.client_name)
-        .single()
+        .maybeSingle()  // single() → maybeSingle()로 변경 (0건일 때 에러 방지)
+
+      console.log('[BatchImport] 기존 의뢰인 조회:', { existingClient: existingClient?.id })
 
       if (existingClient) {
         clientId = existingClient.id
+        console.log('[BatchImport] 기존 의뢰인 매칭:', { clientId })
       } else if (options.createNewClients !== false) {
+        console.log('[BatchImport] 신규 의뢰인 생성 시도:', { name: row.client_name })
         const { data: newClient, error: clientError } = await supabase
           .from('clients')
           .insert([{
@@ -248,12 +259,26 @@ async function processJob(
           .single()
 
         if (clientError) {
-          warnings.push({ field: 'client_name', message: `의뢰인 생성 실패: ${clientError.message}` })
+          console.error('[BatchImport] 의뢰인 생성 실패:', clientError)
+          warnings.push({
+            field: 'client_name',
+            message: `의뢰인 생성 실패: ${clientError.message} (code: ${clientError.code})`
+          })
         } else {
           clientId = newClient.id
           isNewClient = true
+          console.log('[BatchImport] 의뢰인 생성 성공:', { clientId, isNewClient })
         }
+      } else {
+        console.log('[BatchImport] createNewClients=false, 의뢰인 생성 스킵')
       }
+    } else {
+      // 의뢰인명이 비어있는 경우 경고 추가
+      console.log('[BatchImport] client_name이 비어있음, 의뢰인 처리 스킵')
+      warnings.push({
+        field: 'client_name',
+        message: '의뢰인명이 없어 의뢰인 정보가 등록되지 않았습니다'
+      })
     }
 
     // 5. Process assignees

@@ -69,9 +69,7 @@ interface ExistingPartyRecord {
   party_name: string;
   party_type: PartyType;
   party_type_label?: string | null;
-  is_our_client?: boolean;
-  client_id?: string | null;
-  fee_allocation_amount?: number | null;
+  // NOTE: is_our_client, client_id, fee_allocation_amount 컬럼이 스키마에서 제거됨
   scourt_synced?: boolean;
   scourt_party_index?: number | null;
   manual_override?: boolean;
@@ -418,10 +416,13 @@ export async function syncPartiesFromScourtServer(
       representativesUpserted = representativesJsonb.length;
 
       // 판결도달일 변경된 당사자들의 기한 업데이트
+      // 판결 결과(case_result)에 따라 항소 가능한 측에만 기한 생성
       for (const change of adjdocRchYmdChanges) {
         const result = await updatePartyDeadline(change.partyId, change.newValue, tenantId);
         if (result.error) {
           console.error(`기한 업데이트 오류 (${change.partyId}):`, result.error);
+        } else if (result.filtered) {
+          console.log(`  ⏭️ 항소 불가 당사자 - 기한 생성 스킵: ${change.partyId}`);
         } else if (result.created) {
           console.log(`  📅 당사자 기한 생성: ${change.partyId} (${change.newValue})`);
         } else if (result.updated) {

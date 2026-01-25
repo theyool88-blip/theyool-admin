@@ -149,6 +149,65 @@ SCOURT API에서 당사자별 판결도달일을 제공합니다:
 |--------|--------|------|
 | `adjdoc_rch_ymd` | `case_parties` | 해당 당사자에게 판결문이 도달한 날짜 |
 
+### 판결 결과에 따른 기한 생성 (2026-01-25 추가)
+
+판결 결과(`legal_cases.case_result`)에 따라 항소 가능한 측에만 기한을 생성합니다.
+
+#### 판결 결과별 기한 생성 규칙
+
+| 판결 결과 | 항소 가능 측 | 예시 |
+|----------|-------------|------|
+| 원고 전부 승소 | 피고측만 | 원고승, 전부인용, 청구인용 |
+| 피고 전부 승소 | 원고측만 | 원고패, 피고승, 청구기각 |
+| 각하 | 원고측만 | 소각하, 신청각하 |
+| 일부 승소 | 양측 모두 | 원고일부승, 일부인용, 일부기각 |
+| 조정/화해 성립 | 없음 (항소 불가) | 조정성립, 화해성립 |
+| 취하 | 없음 (항소 불가) | 취하, 소취하 |
+
+#### 관련 함수
+
+```typescript
+// lib/scourt/deadline-auto-register.ts
+
+// 판결 결과 파싱
+parseJudgmentOutcome(caseResult: string): AppealableSide
+// 반환값: 'plaintiff_only' | 'defendant_only' | 'both' | 'none'
+
+// 항소 가능 여부 확인
+canAppeal(appealableSide: AppealableSide, partySide: PartySide): boolean
+
+// 당사자 측 결정 (party-sync.ts와 동일한 매핑)
+getPartySideFromType(partyType: PartyType): PartySide
+// plaintiff_side: plaintiff, creditor, applicant, actor
+// defendant_side: defendant, debtor, respondent, third_debtor, accused, juvenile
+```
+
+#### 예시 시나리오
+
+```
+사건: 2024드단12345 (이혼소송)
+판결결과: "원고일부승" (일부 승소)
+당사자:
+  - 원고 김OO: 판결도달일 2026-01-10
+  - 피고 이OO: 판결도달일 2026-01-12
+
+결과: 양측 모두 항소 가능 → 두 당사자 모두에게 항소기간 생성
+  - 원고 김OO: 항소기간 만료 2026-01-24
+  - 피고 이OO: 항소기간 만료 2026-01-26
+```
+
+```
+사건: 2024가합56789 (손해배상)
+판결결과: "청구기각" (피고 승소)
+당사자:
+  - 원고 박OO: 판결도달일 2026-01-15
+  - 피고 최OO: 판결도달일 2026-01-14
+
+결과: 원고측만 항소 가능 → 원고에게만 항소기간 생성
+  - 원고 박OO: 항소기간 만료 2026-01-29
+  - 피고 최OO: 기한 생성 안함 (승소 측)
+```
+
 ### 자동 기한 생성 흐름
 
 ```
@@ -156,7 +215,12 @@ SCOURT API (당사자별 adjdocRchYmd)
         ↓
 party-sync.ts (adjdoc_rch_ymd 변경 감지)
         ↓
-deadline-auto-register.ts (updatePartyDeadline)
+deadline-auto-register.ts
+  ├── case_result 조회 (판결 결과)
+  ├── parseJudgmentOutcome() (항소 가능 측 결정)
+  ├── getPartySideFromType() (당사자 측 결정)
+  ├── canAppeal() (항소 가능 여부 확인)
+  └── 조건 충족 시 기한 생성
         ↓
 case_deadlines (party_id, party_side 연결)
         ↓
@@ -407,6 +471,10 @@ npx tsx scripts/cleanup-incorrect-appeal-deadlines.ts --delete
 
 | 날짜 | 변경 내용 |
 |------|----------|
+| 2026-01-25 | 판결 결과(case_result)에 따른 항소 기한 생성 로직 추가 |
+| 2026-01-25 | 원고승/피고승/일부승/각하/조정성립 등 판결 유형별 기한 생성 분기 |
+| 2026-01-25 | party_type → partySide 매핑 수정 (accused를 defendant_side로 이동) |
+| 2026-01-25 | 통합 스키마 정합성 수정 (case_party_id → party_id 통일) |
 | 2026-01-16 | 유틸리티 스크립트 문서화 (cleanup, backfill 스크립트) |
 | 2026-01-14 | 당사자별 불변기한 관리 기능 추가 (party_id, party_side 컬럼) |
 | 2026-01-14 | 판결도달일(adjdoc_rch_ymd) 변경 감지 및 기한 자동 생성 |

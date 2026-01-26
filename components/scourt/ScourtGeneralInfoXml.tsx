@@ -58,7 +58,7 @@ interface CasePartyInfo {
   scourt_party_index?: number | null;
   scourt_label_raw?: string | null;
   scourt_name_raw?: string | null;
-  is_our_client?: boolean;
+  // NOTE: is_our_client 컬럼이 스키마에서 제거됨 - is_primary 사용
   is_primary?: boolean;
   clients?: {
     id: string;
@@ -88,6 +88,10 @@ interface ScourtGeneralInfoXmlProps {
   onPartyEdit?: (partyId: string, partyLabel: string, currentName: string) => void;
   /** DB 당사자 목록 (마스킹 치환 및 수정 시 사용) */
   caseParties?: CasePartyInfo[];
+  /** 의뢰인 이름 (linked_party_id 없이도 마스킹 해제 가능) */
+  clientName?: string;
+  /** 의뢰인 측 (plaintiff | defendant) */
+  clientSide?: 'plaintiff' | 'defendant';
 }
 
 interface DataListEntry {
@@ -298,6 +302,29 @@ function getSideFromLabel(label: string): "plaintiff" | "defendant" | null {
   return null;
 }
 
+// party_type 기반 측 결정 (라벨이 없거나 매칭 안될 때 사용)
+const PLAINTIFF_SIDE_TYPES = new Set([
+  "plaintiff",
+  "creditor",
+  "applicant",
+  "actor",
+]);
+const DEFENDANT_SIDE_TYPES = new Set([
+  "defendant",
+  "debtor",
+  "respondent",
+  "third_debtor",
+  "accused",
+  "juvenile",
+]);
+
+function getPartySideFromType(partyType?: string | null): "plaintiff" | "defendant" | null {
+  if (!partyType) return null;
+  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return "plaintiff";
+  if (DEFENDANT_SIDE_TYPES.has(partyType)) return "defendant";
+  return null;
+}
+
 const FALLBACK_CASE_NUMBER_PATTERN = /\d{4}\s*[가-힣]+\s*\d+/;
 const FALLBACK_NORMALIZED_CASE_NUMBER_PATTERN = /^\d{4}[가-힣]+\d+$/;
 
@@ -403,42 +430,140 @@ function getPartyRowLabel(row: Record<string, unknown>): string {
   return "";
 }
 
-function resolveCasePartyName(party: CasePartyInfo): string | null {
-  const clientName = party.clients?.name?.trim();
-  if (clientName && !isMaskedPartyName(clientName)) return clientName;
+function resolveCasePartyName(
+  party: CasePartyInfo,
+  propClientName?: string,
+  propClientSide?: 'plaintiff' | 'defendant'
+): string | null {
+  // 1순위: party.clients.name (linked_party_id가 연결된 경우)
+  const linkedClientName = party.clients?.name?.trim();
+  if (linkedClientName && !isMaskedPartyName(linkedClientName)) {
+    return linkedClientName;
+  }
+
+  // 2순위: party_name이 마스킹 안된 경우
   const partyName = party.party_name?.trim();
   if (partyName && !isMaskedPartyName(partyName)) {
     return normalizePartyNameUtil(partyName);
   }
+
+  // 3순위: prop으로 전달받은 clientName을 해당 측 당사자에 적용
+  if (propClientName && !isMaskedPartyName(propClientName) && propClientSide) {
+    // 3a: 라벨 기반 측 판단
+    const partyLabel = normalizePartyLabel(
+      party.scourt_label_raw ||
+      party.party_type_label ||
+      PARTY_TYPE_LABELS[party.party_type as keyof typeof PARTY_TYPE_LABELS] ||
+      ''
+    );
+    let partySide = getSideFromLabel(partyLabel);
+
+    // 3b: 라벨로 안되면 party_type 기반 판단
+    if (!partySide && party.party_type) {
+      partySide = getPartySideFromType(party.party_type);
+    }
+
+    // 3c: is_primary 플래그가 있으면 이 당사자가 의뢰인 측임
+    if (!partySide && party.is_primary) {
+      partySide = propClientSide;  // is_primary면 의뢰인 측으로 간주
+    }
+
+    if (partySide === propClientSide) {
+      return propClientName;
+    }
+  }
+
   return null;
 }
 
 /**
  * 당사자 리스트의 마스킹된 이름을 확정된 당사자 정보로 치환
  *
- * 단순 로직:
- * 1. scourt_party_index가 일치하는 행만 대상
- * 2. 풀네임이 있는 경우에만 치환
+ * 로직:
+ * 1. scourt_party_index가 일치하는 행 대상 (1순위)
+ * 2. scourt_party_index가 없으면 label 기반 측 매칭 (2순위)
+ * 3. resolveCasePartyName으로 이름 해결 (clients.name → party_name → clientName fallback)
+ * 4. 풀네임이 있는 경우에만 치환
  */
 function substitutePartyListNames(
   list: Record<string, unknown>[] | undefined,
-  caseParties?: CasePartyInfo[]
+  caseParties?: CasePartyInfo[],
+  clientName?: string,
+  clientSide?: 'plaintiff' | 'defendant'
 ): { list: Record<string, unknown>[] | undefined; updated: boolean } {
   if (!Array.isArray(list) || list.length === 0) return { list, updated: false };
   if (!caseParties || caseParties.length === 0) return { list, updated: false };
 
+  // 1순위: scourt_party_index로 매칭
   const partiesByIndex = new Map<number, CasePartyInfo>();
   caseParties.forEach((party) => {
     if (party.scourt_party_index === null || party.scourt_party_index === undefined) return;
     partiesByIndex.set(party.scourt_party_index, party);
   });
 
+  // 2순위 준비: label 기반 매칭 (scourt_party_index가 없는 경우 사용)
+  const partiesBySide = new Map<'plaintiff' | 'defendant', CasePartyInfo[]>();
+  partiesBySide.set('plaintiff', []);
+  partiesBySide.set('defendant', []);
+
+  caseParties.forEach((party) => {
+    const partyLabel = normalizePartyLabel(
+      party.scourt_label_raw ||
+      party.party_type_label ||
+      PARTY_TYPE_LABELS[party.party_type as keyof typeof PARTY_TYPE_LABELS] ||
+      ''
+    );
+    let side = getSideFromLabel(partyLabel);
+    if (!side && party.party_type) {
+      side = getPartySideFromType(party.party_type);
+    }
+    if (side) {
+      partiesBySide.get(side)!.push(party);
+    }
+  });
+
+  // 사용된 clientName fallback 추적 (한 번만 사용)
+  let usedClientNameFallback = false;
+
   let updated = false;
   const next = list.map((row, index) => {
-    const matchedParty = partiesByIndex.get(index);
-    if (!matchedParty) return row;
+    // 1순위: scourt_party_index로 매칭
+    let matchedParty = partiesByIndex.get(index);
 
-    const resolvedName = resolveCasePartyName(matchedParty);
+    // 2순위: scourt_party_index가 없으면 label 기반 측 매칭
+    if (!matchedParty && partiesByIndex.size === 0) {
+      const rowLabel = getPartyRowLabel(row);
+      const rowSide = getSideFromLabel(normalizePartyLabel(rowLabel));
+      if (rowSide) {
+        const sideParties = partiesBySide.get(rowSide) || [];
+        // primary 당사자 우선, 없으면 첫 번째
+        matchedParty = sideParties.find(p => p.is_primary) || sideParties[0];
+      }
+    }
+
+    if (!matchedParty) {
+      // 3순위: clientName/clientSide fallback (측이 일치하면 직접 치환)
+      if (clientName && !isMaskedPartyName(clientName) && clientSide && !usedClientNameFallback) {
+        const rowLabel = getPartyRowLabel(row);
+        const rowSide = getSideFromLabel(normalizePartyLabel(rowLabel));
+        if (rowSide === clientSide) {
+          const nameField = PARTY_LIST_NAME_FIELDS.find((field) =>
+            Object.prototype.hasOwnProperty.call(row, field)
+          );
+          if (nameField) {
+            const currentName = String(row[nameField] || '');
+            if (isMaskedPartyName(currentName)) {
+              usedClientNameFallback = true;
+              updated = true;
+              return updatePartyRowName(row, clientName);
+            }
+          }
+        }
+      }
+      return row;
+    }
+
+    const resolvedName = resolveCasePartyName(matchedParty, clientName, clientSide);
     if (!resolvedName) return row;
 
     const nameField = PARTY_LIST_NAME_FIELDS.find((field) =>
@@ -609,6 +734,8 @@ export function ScourtGeneralInfoXml({
   compact = false,
   onPartyEdit,
   caseParties,
+  clientName,
+  clientSide,
 }: ScourtGeneralInfoXmlProps) {
   const apiEnvelope = useMemo(() => {
     if (!apiData) return {} as Record<string, unknown>;
@@ -693,7 +820,8 @@ export function ScourtGeneralInfoXml({
   /**
    * 확정된 당사자 정보 추출
    * - party_name이 마스킹 해제되었거나
-   * - clients.name이 있으면 확정된 것으로 간주
+   * - clients.name이 있거나
+   * - clientName prop fallback이 적용되면 확정된 것으로 간주
    * { label: "신청인", name: "이명규", isClient: true }
    */
   const confirmedParties = useMemo((): ConfirmedParty[] => {
@@ -704,7 +832,7 @@ export function ScourtGeneralInfoXml({
 
     return sourceParties
       .map((party) => {
-        const resolvedName = resolveCasePartyName(party);
+        const resolvedName = resolveCasePartyName(party, clientName, clientSide);
         if (!resolvedName) return null;
         const fallbackLabel = normalizePartyLabel(
           party.scourt_label_raw ||
@@ -721,11 +849,11 @@ export function ScourtGeneralInfoXml({
         return {
           label: resolvedLabel,
           name: resolvedName,
-          isClient: party.is_our_client || false,
+          isClient: party.is_primary || false,  // NOTE: is_our_client → is_primary
         };
       })
       .filter((party): party is ConfirmedParty => Boolean(party));
-  }, [caseParties, scourtPartyLabelsByIndex]);
+  }, [caseParties, scourtPartyLabelsByIndex, clientName, clientSide]);
 
   /**
    * 기본정보 마스킹 치환
@@ -785,11 +913,13 @@ export function ScourtGeneralInfoXml({
       return Array.isArray(val) ? val as Record<string, unknown>[] : undefined;
     };
 
-    // 2. 당사자 리스트 치환 (caseParties 사용)
+    // 2. 당사자 리스트 치환 (caseParties + clientName/clientSide fallback 사용)
     if (caseParties && caseParties.length > 0) {
       const partiesResult = substitutePartyListNames(
         getRecordArray('dlt_btprtCttLst'),
-        caseParties
+        caseParties,
+        clientName,
+        clientSide
       );
       if (partiesResult.updated) {
         next.dlt_btprtCttLst = partiesResult.list;
@@ -798,7 +928,9 @@ export function ScourtGeneralInfoXml({
 
       const accusedResult = substitutePartyListNames(
         getRecordArray('dlt_acsCttLst'),
-        caseParties
+        caseParties,
+        clientName,
+        clientSide
       );
       if (accusedResult.updated) {
         next.dlt_acsCttLst = accusedResult.list;
@@ -826,6 +958,8 @@ export function ScourtGeneralInfoXml({
     basicInfoData,
     confirmedParties,
     caseParties,
+    clientName,
+    clientSide,
     representativeOverrideGroups,
   ]);
 
@@ -981,8 +1115,8 @@ export function ScourtGeneralInfoXml({
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-48 bg-gray-100 rounded-lg"></div>
-        <div className="h-32 bg-gray-100 rounded-lg"></div>
+        <div className="h-48 bg-[var(--bg-tertiary)] rounded-lg"></div>
+        <div className="h-32 bg-[var(--bg-tertiary)] rounded-lg"></div>
       </div>
     );
   }
@@ -990,7 +1124,7 @@ export function ScourtGeneralInfoXml({
   // 에러
   if (error) {
     return (
-      <div className="text-red-500 p-4 bg-red-50 rounded-lg">
+      <div className="text-[var(--color-danger)] p-4 bg-[var(--color-danger-muted)] rounded-lg">
         XML 로드 오류: {error}
       </div>
     );
@@ -999,7 +1133,7 @@ export function ScourtGeneralInfoXml({
   // 데이터 없음
   if (!basicInfoData) {
     return (
-      <div className="text-gray-500 text-sm p-4 bg-gray-50 rounded-lg">
+      <div className="text-[var(--text-tertiary)] text-sm p-4 bg-[var(--bg-primary)] rounded-lg">
         SCOURT 연동 데이터가 없습니다.
       </div>
     );
@@ -1054,7 +1188,7 @@ export function ScourtGeneralInfoXml({
               return (
                 <button
                   onClick={() => onPartyEdit(matchedParty.id, partyLabel, partyName)}
-                  className="text-sage-600 hover:text-sage-800 text-xs"
+                  className="text-[var(--sage-primary)] hover:text-[var(--sage-hover)] text-xs"
                   title="이름 수정"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1164,23 +1298,23 @@ function FallbackGridTable({
   return (
     <div>
       <h3 className="text-base md:text-lg font-semibold mb-3 flex items-center gap-2">
-        <span className="w-1 h-5 bg-sage-600 rounded"></span>
+        <span className="w-1 h-5 bg-[var(--sage-primary)] rounded"></span>
         {title}
       </h3>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-gray-50 border-y border-gray-200">
+            <tr className="bg-[var(--bg-primary)] border-y border-[var(--border-default)]">
               {columns.map((col, i) => (
                 <th
                   key={i}
-                  className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 text-left"
+                  className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-[var(--text-secondary)] text-left"
                 >
                   {DLT_COLUMN_LABELS[col] || col}
                 </th>
               ))}
               {showEditButtons && (
-                <th className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 text-center w-16">
+                <th className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-[var(--text-secondary)] text-center w-16">
                   수정
                 </th>
               )}
@@ -1195,7 +1329,7 @@ function FallbackGridTable({
               const canEdit = Boolean(matchedParty);
 
               return (
-                <tr key={rowIndex} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={rowIndex} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]">
                   {columns.map((col, colIndex) => {
                     const displayValue = formatCellValue(row[col], col);
                     const caseLink = enableCaseLinks
@@ -1205,10 +1339,10 @@ function FallbackGridTable({
                     return (
                       <td
                         key={colIndex}
-                        className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900"
+                        className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-[var(--text-primary)]"
                       >
                         {caseLink ? (
-                          <a href={caseLink} className="text-sage-700 hover:underline">
+                          <a href={caseLink} className="text-[var(--sage-primary)] hover:underline">
                             {displayValue}
                           </a>
                         ) : (
@@ -1222,7 +1356,7 @@ function FallbackGridTable({
                       {canEdit && matchedParty && (
                         <button
                           onClick={() => onPartyEdit(matchedParty.id, partyLabel, partyName)}
-                          className="text-sage-600 hover:text-sage-800 text-xs"
+                          className="text-[var(--sage-primary)] hover:text-[var(--sage-hover)] text-xs"
                           title="이름 수정"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

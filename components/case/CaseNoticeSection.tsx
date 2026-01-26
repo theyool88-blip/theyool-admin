@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import type { CaseNotice } from '@/types/case-notice'
-import { NOTICE_CATEGORY_ICONS, NOTICE_CATEGORY_LABELS } from '@/types/case-notice'
+import { NOTICE_CATEGORY_LABELS } from '@/types/case-notice'
+import { NOTICE_ICONS, NOTICE_ICON_COLORS } from '@/lib/icons/notice-icons'
 
 interface ActionMetadata {
   opponentName?: string
@@ -12,20 +13,21 @@ interface CaseNoticeSectionProps {
   notices: CaseNotice[]
   onAction?: (notice: CaseNotice, actionType: string, metadata?: ActionMetadata) => void
   onDismiss?: (notice: CaseNotice) => Promise<void>
+  onRelatedCasePreview?: (notice: CaseNotice) => void
 }
 
-export default function CaseNoticeSection({ notices, onAction, onDismiss }: CaseNoticeSectionProps) {
+export default function CaseNoticeSection({ notices, onAction, onDismiss, onRelatedCasePreview }: CaseNoticeSectionProps) {
   // 알림이 없으면 빈 상태 표시
   if (notices.length === 0) {
     return (
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+      <div className="card overflow-hidden">
+        <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
             <span>알림</span>
           </h3>
         </div>
         <div className="px-5 py-8 text-center">
-          <div className="text-gray-400 text-sm">
+          <div className="text-[var(--text-muted)] text-sm">
             확인이 필요한 알림이 없습니다
           </div>
         </div>
@@ -34,22 +36,23 @@ export default function CaseNoticeSection({ notices, onAction, onDismiss }: Case
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+    <div className="card overflow-hidden">
+      <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
           <span>알림</span>
-          <span className="text-xs font-normal text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+          <span className="text-xs font-normal text-[var(--text-tertiary)] bg-[var(--bg-tertiary)] px-1.5 py-0.5 rounded">
             {notices.length}건
           </span>
         </h3>
       </div>
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-[var(--border-subtle)]">
         {notices.map((notice) => (
           <NoticeItem
             key={notice.id}
             notice={notice}
             onAction={onAction}
             onDismiss={onDismiss}
+            onRelatedCasePreview={onRelatedCasePreview}
           />
         ))}
       </div>
@@ -61,16 +64,21 @@ interface NoticeItemProps {
   notice: CaseNotice
   onAction?: (notice: CaseNotice, actionType: string, metadata?: ActionMetadata) => void
   onDismiss?: (notice: CaseNotice) => Promise<void>
+  onRelatedCasePreview?: (notice: CaseNotice) => void
 }
 
-function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
+function NoticeItem({ notice, onAction, onDismiss, onRelatedCasePreview }: NoticeItemProps) {
   const [isDismissing, setIsDismissing] = useState(false)
   const [opponentNameInput, setOpponentNameInput] = useState('')
-  const icon = NOTICE_CATEGORY_ICONS[notice.category]
+  const Icon = NOTICE_ICONS[notice.category]
+  const iconColor = NOTICE_ICON_COLORS[notice.category]
   const _categoryLabel = NOTICE_CATEGORY_LABELS[notice.category]
 
   // 상대방 이름 미입력 여부
   const opponentNameMissing = notice.category === 'client_role_confirm' && notice.metadata?.opponentNameMissing === 'true'
+
+  // 관련사건 프리뷰 가능 여부
+  const isRelatedCase = notice.category === 'unlinked_related_case' || notice.category === 'unlinked_lower_court'
 
   const handleDismiss = async () => {
     if (!onDismiss || isDismissing) return
@@ -92,43 +100,52 @@ function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
 
   // D-day에 따른 배경색
   const bgColor = useMemo(() => {
-    if (notice.daysRemaining === undefined) return 'bg-white'
-    if (notice.daysRemaining < 0) return 'bg-red-50'
-    if (notice.daysRemaining <= 3) return 'bg-amber-50'
-    if (notice.daysRemaining <= 7) return 'bg-yellow-50'
-    return 'bg-white'
+    if (notice.daysRemaining === undefined) return 'bg-[var(--bg-secondary)]'
+    if (notice.daysRemaining < 0) return 'bg-[var(--color-danger-muted)]'
+    if (notice.daysRemaining <= 3) return 'bg-[var(--color-warning-muted)]'
+    if (notice.daysRemaining <= 7) return 'bg-[var(--color-warning-muted)]/50'
+    return 'bg-[var(--bg-secondary)]'
   }, [notice.daysRemaining])
 
   // D-day 텍스트 색상
   const dDayColor = useMemo(() => {
-    if (notice.daysRemaining === undefined) return 'text-gray-500'
-    if (notice.daysRemaining < 0) return 'text-red-600 font-semibold'
-    if (notice.daysRemaining <= 3) return 'text-amber-600 font-semibold'
-    if (notice.daysRemaining <= 7) return 'text-yellow-600'
-    return 'text-gray-500'
+    if (notice.daysRemaining === undefined) return 'text-[var(--text-tertiary)]'
+    if (notice.daysRemaining < 0) return 'text-[var(--color-danger)] font-semibold'
+    if (notice.daysRemaining <= 3) return 'text-[var(--color-warning)] font-semibold'
+    if (notice.daysRemaining <= 7) return 'text-[var(--color-warning)]'
+    return 'text-[var(--text-tertiary)]'
   }, [notice.daysRemaining])
 
   return (
-    <div className={`px-5 py-4 ${bgColor} hover:bg-gray-50 transition-colors`}>
+    <div className={`px-5 py-4 ${bgColor} hover:bg-[var(--bg-hover)] transition-colors`}>
       <div className="flex items-start gap-3">
         {/* 아이콘 */}
-        <div className="text-lg flex-shrink-0">
-          {icon}
+        <div className="flex-shrink-0">
+          <Icon className={`w-5 h-5 ${iconColor}`} />
         </div>
 
         {/* 내용 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-gray-900">
-              {notice.title}
-            </span>
+            {isRelatedCase && onRelatedCasePreview ? (
+              <button
+                onClick={() => onRelatedCasePreview(notice)}
+                className="text-sm font-medium text-[var(--color-info)] hover:text-[var(--color-info)]/80 hover:underline transition-colors text-left"
+              >
+                {notice.title}
+              </button>
+            ) : (
+              <span className="text-sm font-medium text-[var(--text-primary)]">
+                {notice.title}
+              </span>
+            )}
             {dDayText && (
               <span className={`text-xs ${dDayColor}`}>
                 {dDayText}
               </span>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
             {notice.description}
           </p>
 
@@ -138,13 +155,13 @@ function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
               {/* 상대방 이름 입력 필드 (미입력 시) */}
               {opponentNameMissing && (
                 <div className="flex items-center gap-2">
-                  <label className="text-xs text-gray-600 whitespace-nowrap">상대방:</label>
+                  <label className="text-xs text-[var(--text-secondary)] whitespace-nowrap">상대방:</label>
                   <input
                     type="text"
                     value={opponentNameInput}
                     onChange={(e) => setOpponentNameInput(e.target.value)}
                     placeholder="상대방 이름을 입력해주세요"
-                    className="flex-1 text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+                    className="form-input flex-1 text-sm px-3 py-1.5"
                   />
                 </div>
               )}
@@ -163,10 +180,10 @@ function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
                     disabled={opponentNameMissing && !opponentNameInput.trim()}
                     className={`text-xs px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                       action.type === 'confirm_plaintiff'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                        ? 'bg-[var(--color-info-muted)] text-[var(--color-info)] border border-[var(--color-info)]/20 hover:bg-[var(--color-info-muted)]/80'
                         : action.type === 'confirm_defendant'
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
-                        : 'border-gray-200 text-gray-600 hover:bg-gray-100'
+                        ? 'bg-[var(--color-warning-muted)] text-[var(--color-warning)] border border-[var(--color-warning)]/20 hover:bg-[var(--color-warning-muted)]/80'
+                        : 'border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                     }`}
                   >
                     {action.label}
@@ -185,8 +202,8 @@ function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
                   onClick={() => onAction?.(notice, action.type)}
                   className={`text-xs px-3 py-1.5 rounded border transition-colors ${
                     action.type === 'dismiss'
-                      ? 'border-gray-200 text-gray-600 hover:bg-gray-100'
-                      : 'border-sage-200 text-sage-700 hover:bg-sage-50'
+                      ? 'border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                      : 'border-[var(--sage-primary)]/20 text-[var(--sage-primary)] hover:bg-[var(--sage-muted)]'
                   }`}
                 >
                   {action.label}
@@ -201,7 +218,7 @@ function NoticeItem({ notice, onAction, onDismiss }: NoticeItemProps) {
           <button
             onClick={handleDismiss}
             disabled={isDismissing}
-            className="flex-shrink-0 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors disabled:opacity-50"
+            className="flex-shrink-0 p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded transition-colors disabled:opacity-50"
             title="알림 삭제"
           >
             {isDismissing ? (

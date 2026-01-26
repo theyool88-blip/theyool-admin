@@ -1,25 +1,27 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import Image from 'next/image'
-import Link from 'next/link'
-import { AlertTriangle } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import type { CourtHearing, CaseDeadline } from '@/types/court-hearing'
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { AlertTriangle } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import type { CourtHearing, CaseDeadline } from "@/types/court-hearing";
 import {
   HEARING_TYPE_LABELS,
   DEADLINE_TYPE_LABELS,
   HearingType,
   DeadlineType,
-} from '@/types/court-hearing'
-import UnifiedScheduleModal from './UnifiedScheduleModal'
-import HearingDetailModal from './HearingDetailModal'
-import CasePaymentsModal from './CasePaymentsModal'
-import CaseNoticeSection from './case/CaseNoticeSection'
-import { detectCaseNotices } from '@/lib/case/notice-detector'
-import type { CaseNotice } from '@/types/case-notice'
-import ScourtGeneralInfoXml from './scourt/ScourtGeneralInfoXml'
+} from "@/types/court-hearing";
+import UnifiedScheduleModal from "./UnifiedScheduleModal";
+import HearingDetailModal from "./HearingDetailModal";
+import CasePaymentsModal from "./CasePaymentsModal";
+import CaseNoticeSection from "./case/CaseNoticeSection";
+import CaseHeroSection from "./case/CaseHeroSection";
+import RelatedCasePreviewModal from "./RelatedCasePreviewModal";
+import { detectCaseNotices } from "@/lib/case/notice-detector";
+import type { CaseNotice } from "@/types/case-notice";
+import ScourtGeneralInfoXml from "./scourt/ScourtGeneralInfoXml";
 import {
   getPartyLabels as getPartyLabelsFromSchema,
   getCaseCategory,
@@ -28,10 +30,14 @@ import {
   normalizePartyNameForMatch,
   PARTY_TYPE_LABELS,
   preservePrefix,
-} from '@/types/case-party'
-import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
-import { detectCaseTypeFromApiResponse, detectCaseTypeFromCaseNumber, type ScourtCaseType } from '@/lib/scourt/xml-mapping'
-import { normalizeCaseNumber } from '@/lib/scourt/case-number-utils'
+} from "@/types/case-party";
+import { COURTS, getCourtAbbrev } from "@/lib/scourt/court-codes";
+import {
+  detectCaseTypeFromApiResponse,
+  detectCaseTypeFromCaseNumber,
+  type ScourtCaseType,
+} from "@/lib/scourt/xml-mapping";
+import { normalizeCaseNumber } from "@/lib/scourt/case-number-utils";
 
 /**
  * 당사자 유형 정렬 순서 (법적 표시 순서)
@@ -39,553 +45,719 @@ import { normalizeCaseNumber } from '@/lib/scourt/case-number-utils'
  */
 const PARTY_TYPE_ORDER: Record<string, number> = {
   // 원고측 (민사), 검찰측 (형사)
-  'plaintiff': 1,
-  'creditor': 2,
-  'applicant': 3,
-  'actor': 4,        // 피해자 (형사)
+  plaintiff: 1,
+  creditor: 2,
+  applicant: 3,
+  actor: 4, // 피해자 (형사)
   // 피고측 (민사), 피고인측 (형사)
-  'defendant': 10,
-  'debtor': 11,
-  'respondent': 12,
-  'accused': 13,     // 피고인 (형사) - 피고측
-  'juvenile': 14,    // 소년부 - 피고측
-  'third_debtor': 15, // 제3채무자
-}
+  defendant: 10,
+  debtor: 11,
+  respondent: 12,
+  accused: 13, // 피고인 (형사) - 피고측
+  juvenile: 14, // 소년부 - 피고측
+  third_debtor: 15, // 제3채무자
+};
 
 interface Client {
-  id: string
-  name: string
-  phone: string | null
-  email: string | null
-  address: string | null
-  birth_date: string | null
-  gender: string | null
-  notes: string | null
+  id: string;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  birth_date: string | null;
+  notes: string | null;
 }
 
 interface RelatedCase {
-  id: string
-  case_id: string
-  related_case_id: string
-  relation_type: string | null
-  relation_type_code?: string | null
-  notes: string | null
+  id: string;
+  case_id: string;
+  related_case_id: string;
+  relation_type: string | null;
+  relation_type_code?: string | null;
+  notes: string | null;
   related_case?: {
-    id: string
-    case_name: string
-    contract_number: string | null
-    status: string
-    court_case_number?: string | null
-    case_level?: string | null
-    case_result?: string | null
-  }
+    id: string;
+    case_name: string;
+    contract_number: string | null;
+    status: string;
+    court_case_number?: string | null;
+    case_level?: string | null;
+    case_result?: string | null;
+  };
 }
 
 // 주사건 정보
 interface MainCase {
-  id: string
-  case_name: string
-  court_case_number: string | null
-  case_level?: string | null
+  id: string;
+  case_name: string;
+  court_case_number: string | null;
+  case_level?: string | null;
 }
 
 interface LegalCase {
-  id: string
-  contract_number: string | null
-  case_name: string
+  id: string;
+  contract_number: string | null;
+  case_name: string;
   // 의뢰인 캐시 필드 (case_clients 테이블에서 동기화됨)
-  primary_client_id: string | null
-  primary_client_name: string | null
-  status: '진행중' | '종결'
-  office: string | null
-  contract_date: string | null
-  retainer_fee: number | null
-  total_received: number | null
-  outstanding_balance: number | null
-  success_fee_agreement: string | null
-  calculated_success_fee: number | null
-  court_case_number: string | null
-  court_name: string | null
-  case_type: string | null
-  judge_name: string | null
-  notes: string | null
-  onedrive_folder_url: string | null
-  created_at: string
-  updated_at: string
-  client?: Client  // 기존 호환성 유지
-  case_relations?: RelatedCase[]
+  primary_client_id: string | null;
+  primary_client_name: string | null;
+  status: "진행중" | "종결";
+  office: string | null;
+  contract_date: string | null;
+  retainer_fee: number | null;
+  total_received: number | null;
+  outstanding_balance: number | null;
+  success_fee_agreement: string | null;
+  calculated_success_fee: number | null;
+  court_case_number: string | null;
+  court_name: string | null;
+  case_type: string | null;
+  judge_name: string | null;
+  notes: string | null;
+  onedrive_folder_url: string | null;
+  created_at: string;
+  updated_at: string;
+  client?: Client; // 기존 호환성 유지
+  case_relations?: RelatedCase[];
   // 주사건 연결
-  main_case_id?: string | null
-  main_case?: MainCase | null
-  case_level?: string | null
+  main_case_id?: string | null;
+  main_case?: MainCase | null;
+  case_level?: string | null;
   // SCOURT 연동 관련
-  scourt_enc_cs_no?: string | null
-  scourt_wmonid?: string | null
-  scourt_case_name?: string | null
-  client_role?: 'plaintiff' | 'defendant' | null
-  opponent_name?: string | null
-  case_result?: string | null
+  scourt_enc_cs_no?: string | null;
+  scourt_wmonid?: string | null;
+  scourt_case_name?: string | null;
+  client_role?: "plaintiff" | "defendant" | null;
+  opponent_name?: string | null;
+  case_result?: string | null;
 }
 
 interface Schedule {
-  id: string
-  title: string
-  scheduled_date: string
-  scheduled_time: string | null
-  schedule_type: 'trial' | 'consultation' | 'meeting'
-  location: string | null
-  description: string | null
+  id: string;
+  title: string;
+  scheduled_date: string;
+  scheduled_time: string | null;
+  schedule_type: "trial" | "consultation" | "meeting";
+  location: string | null;
+  description: string | null;
 }
 
 // 대법원 진행사항 관련 인터페이스
 interface ScourtProgressItem {
-  date: string
-  content: string
-  result?: string | null
+  date: string;
+  content: string;
+  result?: string | null;
   // SCOURT 진행구분 코드: 0=법원(검정), 1=기일(파랑), 2=명령(녹색), 3=제출(진빨강), 4=송달(주황)
-  progCttDvs?: string
+  progCttDvs?: string;
 }
 
 interface ScourtHearingItem {
-  date: string
-  time?: string
-  type: string
-  location?: string
-  result?: string
+  date: string;
+  time?: string;
+  type: string;
+  location?: string;
+  result?: string;
 }
 
 interface ScourtSnapshot {
-  id: string
-  scrapedAt: string
-  caseType?: string
-  basicInfo: Record<string, string>
-  hearings: ScourtHearingItem[]
-  progress: ScourtProgressItem[]
-  documents: { date: string; content: string; submitter?: string }[]
-  lowerCourt: { courtName?: string; court?: string; caseNo: string; result?: string; resultDate?: string; linkedCaseId?: string | null }[]
-  relatedCases: { caseNo: string; caseName?: string; relation?: string; linkedCaseId?: string | null }[]
-  rawData?: Record<string, unknown>  // XML 렌더링용 원본 API 데이터
+  id: string;
+  scrapedAt: string;
+  caseType?: string;
+  basicInfo: Record<string, string>;
+  hearings: ScourtHearingItem[];
+  progress: ScourtProgressItem[];
+  documents: { date: string; content: string; submitter?: string }[];
+  lowerCourt: {
+    courtName?: string;
+    court?: string;
+    caseNo: string;
+    result?: string;
+    resultDate?: string;
+    linkedCaseId?: string | null;
+  }[];
+  relatedCases: {
+    caseNo: string;
+    caseName?: string;
+    relation?: string;
+    linkedCaseId?: string | null;
+  }[];
+  rawData?: Record<string, unknown>; // XML 렌더링용 원본 API 데이터
 }
 
 interface ScourtSyncStatus {
-  lastSync: string | null
-  status: string | null
-  caseNumber: string | null
-  isLinked: boolean
-  profileId: string | null
+  lastSync: string | null;
+  status: string | null;
+  caseNumber: string | null;
+  isLinked: boolean;
+  profileId: string | null;
 }
 
 interface UnifiedScheduleItem {
-  id: string
-  type: 'court_hearing' | 'deadline' | 'schedule'
-  title: string
-  date: string
-  datetime?: string
-  location?: string | null
-  status?: string
-  days_until?: number
-  subtype?: string
-  source: CourtHearing | CaseDeadline | Schedule
+  id: string;
+  type: "court_hearing" | "deadline" | "schedule";
+  title: string;
+  date: string;
+  datetime?: string;
+  location?: string | null;
+  status?: string;
+  days_until?: number;
+  subtype?: string;
+  source: CourtHearing | CaseDeadline | Schedule;
 }
 
 // 탭 타입 정의
-type TabType = 'notice' | 'general' | 'progress'
+type TabType = "notice" | "general" | "progress";
 
-const PLAINTIFF_SIDE_TYPES = new Set(['plaintiff', 'creditor', 'applicant', 'actor'])
-const DEFENDANT_SIDE_TYPES = new Set(['defendant', 'debtor', 'respondent', 'third_debtor', 'accused', 'juvenile'])
-const PLAINTIFF_SIDE_LABELS = new Set([
-  '원고',
-  '채권자',
-  '신청인',
-  '항고인',
-  '항소인',
-  '상고인',
-  '행위자',
-  '청구인',
-].map(label => normalizePartyLabel(label)))
-const DEFENDANT_SIDE_LABELS = new Set([
-  '피고',
-  '채무자',
-  '피신청인',
-  '상대방',
-  '피항고인',
-  '피항소인',
-  '피상고인',
-  '보호소년',
-  '피고인',
-  '피고인명',
-  '제3채무자',
-  '피청구인',
-  '피해아동',
-  '피해자',
-].map(label => normalizePartyLabel(label)))
+const PLAINTIFF_SIDE_TYPES = new Set([
+  "plaintiff",
+  "creditor",
+  "applicant",
+  "actor",
+]);
+const DEFENDANT_SIDE_TYPES = new Set([
+  "defendant",
+  "debtor",
+  "respondent",
+  "third_debtor",
+  "accused",
+  "juvenile",
+]);
+const PLAINTIFF_SIDE_LABELS = new Set(
+  [
+    "원고",
+    "채권자",
+    "신청인",
+    "항고인",
+    "항소인",
+    "상고인",
+    "행위자",
+    "청구인",
+  ].map((label) => normalizePartyLabel(label)),
+);
+const DEFENDANT_SIDE_LABELS = new Set(
+  [
+    "피고",
+    "채무자",
+    "피신청인",
+    "상대방",
+    "피항고인",
+    "피항소인",
+    "피상고인",
+    "보호소년",
+    "피고인",
+    "피고인명",
+    "제3채무자",
+    "피청구인",
+    "피해아동",
+    "피해자",
+  ].map((label) => normalizePartyLabel(label)),
+);
 
 const getPartySideFromType = (partyType?: string | null) => {
-  if (!partyType) return null
-  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return 'plaintiff'
-  if (DEFENDANT_SIDE_TYPES.has(partyType)) return 'defendant'
-  return null
-}
+  if (!partyType) return null;
+  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return "plaintiff";
+  if (DEFENDANT_SIDE_TYPES.has(partyType)) return "defendant";
+  return null;
+};
 
 export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
-  const [_unifiedSchedules, setUnifiedSchedules] = useState<UnifiedScheduleItem[]>([])
-  const [_loading, setLoading] = useState(false)
-  const [showScheduleModal, setShowScheduleModal] = useState(false)
-  const [selectedHearing, setSelectedHearing] = useState<CourtHearing | null>(null)
-  const [showHearingModal, setShowHearingModal] = useState(false)
-  const [showPaymentModal, setShowPaymentModal] = useState(false)
-  const [reportModal, setReportModal] = useState<{ title: string; report: string; court?: string | null; caseNumber?: string | null; date?: string | null } | null>(null)
-  const [paymentTotal, setPaymentTotal] = useState<number | null>(null)
+  const [_unifiedSchedules, setUnifiedSchedules] = useState<
+    UnifiedScheduleItem[]
+  >([]);
+  const [_loading, setLoading] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedHearing, setSelectedHearing] = useState<CourtHearing | null>(
+    null,
+  );
+  const [showHearingModal, setShowHearingModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [reportModal, setReportModal] = useState<{
+    title: string;
+    report: string;
+    court?: string | null;
+    caseNumber?: string | null;
+    date?: string | null;
+  } | null>(null);
+  const [paymentTotal, setPaymentTotal] = useState<number | null>(null);
+
+  // Related Case Preview Modal state
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [selectedRelatedCase, setSelectedRelatedCase] = useState<{
+    caseNo: string;
+    courtName: string;
+    relationType: string;
+    encCsNo?: string;
+  } | null>(null);
 
   // 대법원 진행사항 관련 상태
-  const [scourtSnapshot, setScourtSnapshot] = useState<ScourtSnapshot | null>(null)
-  const [scourtSyncStatus, setScourtSyncStatus] = useState<ScourtSyncStatus | null>(null)
-  const [scourtLoading, setScourtLoading] = useState(false)
-  const [scourtSyncing, setScourtSyncing] = useState(false)
-  const [_scourtOpening, setScourtOpening] = useState(false)
-  const [showProgressDetail, setShowProgressDetail] = useState(false)
+  const [scourtSnapshot, setScourtSnapshot] = useState<ScourtSnapshot | null>(
+    null,
+  );
+  const [scourtSyncStatus, setScourtSyncStatus] =
+    useState<ScourtSyncStatus | null>(null);
+  const [scourtLoading, setScourtLoading] = useState(false);
+  const [scourtSyncing, setScourtSyncing] = useState(false);
+  const [_scourtOpening, setScourtOpening] = useState(false);
+  const [showProgressDetail, setShowProgressDetail] = useState(false);
 
   // 탭 상태 - Apple 스타일 Segmented Control
-  const [activeTab, setActiveTab] = useState<TabType>('notice')
+  const [activeTab, setActiveTab] = useState<TabType>("notice");
 
   // 진행내용 필터 상태
-  const [progressFilter, setProgressFilter] = useState<'all' | 'hearing' | 'order' | 'submit' | 'delivery' | 'court'>('all')
+  const [progressFilter, setProgressFilter] = useState<
+    "all" | "hearing" | "order" | "submit" | "delivery" | "court"
+  >("all");
 
   // 대법원 연동 모달 상태
-  const [showLinkModal, setShowLinkModal] = useState(false)
-  const [linkCourtName, setLinkCourtName] = useState('')
-  const [linkCaseNumber, setLinkCaseNumber] = useState('')
-  const [linkPartyName, setLinkPartyName] = useState('')
-  const [showCourtDropdown, setShowCourtDropdown] = useState(false)
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkCourtName, setLinkCourtName] = useState("");
+  const [linkCaseNumber, setLinkCaseNumber] = useState("");
+  const [linkPartyName, setLinkPartyName] = useState("");
+  const [showCourtDropdown, setShowCourtDropdown] = useState(false);
 
   // 심급/관련사건 연동 상태 (사건번호별 로딩 상태)
-  const [linkingCases, setLinkingCases] = useState<Set<string>>(new Set())
-  const [isLinkingAll, setIsLinkingAll] = useState(false)
-
+  const [linkingCases, setLinkingCases] = useState<Set<string>>(new Set());
+  const [isLinkingAll, setIsLinkingAll] = useState(false);
 
   // 법원 필터링
-  const filteredCourts = COURTS
-    .filter(c => {
-      const query = linkCourtName.trim()
-      if (!query) return true
-      const abbrev = getCourtAbbrev(c.name)
-      return c.name.includes(query) || abbrev.includes(query)
-    })
-    .reduce((acc, court) => {
-      const abbrev = getCourtAbbrev(court.name)
-      if (acc.seen.has(abbrev)) return acc
-      acc.seen.add(abbrev)
-      acc.items.push(court)
-      return acc
-    }, { items: [] as typeof COURTS, seen: new Set<string>() })
-    .items.slice(0, 10)
+  const filteredCourts = COURTS.filter((c) => {
+    const query = linkCourtName.trim();
+    if (!query) return true;
+    const abbrev = getCourtAbbrev(c.name);
+    return c.name.includes(query) || abbrev.includes(query);
+  })
+    .reduce(
+      (acc, court) => {
+        const abbrev = getCourtAbbrev(court.name);
+        if (acc.seen.has(abbrev)) return acc;
+        acc.seen.add(abbrev);
+        acc.items.push(court);
+        return acc;
+      },
+      { items: [] as typeof COURTS, seen: new Set<string>() },
+    )
+    .items.slice(0, 10);
 
   // 나의사건 연동 상태
-  const isLinked = !!caseData.scourt_enc_cs_no || scourtSyncStatus?.isLinked
+  const isLinked = !!caseData.scourt_enc_cs_no || scourtSyncStatus?.isLinked;
   const resolvedScourtCaseType =
     detectCaseTypeFromApiResponse(scourtSnapshot?.rawData || {}) ||
     (scourtSnapshot?.caseType as ScourtCaseType | undefined) ||
-    detectCaseTypeFromCaseNumber(caseData.court_case_number || '')
+    detectCaseTypeFromCaseNumber(caseData.court_case_number || "");
 
   // 당사자 정보 (사건개요 표시용)
-  const [caseParties, setCaseParties] = useState<{
-    id: string
-    party_name: string
-    party_type: string
-    party_type_label: string | null
-    scourt_label_raw?: string | null
-    scourt_name_raw?: string | null
-    party_order?: number | null
-    is_primary?: boolean
-    manual_override?: boolean
-    scourt_party_index?: number | null
-    representatives?: Array<{
-      name: string
-      type_label: string | null
-      law_firm: string | null
-      is_our_firm: boolean
-    }>
-  }[]>([])
+  const [caseParties, setCaseParties] = useState<
+    {
+      id: string;
+      party_name: string;
+      party_type: string;
+      party_type_label: string | null;
+      scourt_label_raw?: string | null;
+      scourt_name_raw?: string | null;
+      party_order?: number | null;
+      is_primary?: boolean;
+      manual_override?: boolean;
+      scourt_party_index?: number | null;
+      clients?: {
+        id: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+      } | null;
+      representatives?: Array<{
+        name: string;
+        type_label: string | null;
+        law_firm: string | null;
+        is_our_firm: boolean;
+      }>;
+    }[]
+  >([]);
+
+  // case_clients 테이블 데이터 (의뢰인-당사자 연결)
+  const [caseClients, setCaseClients] = useState<
+    {
+      id: string;
+      client_id: string;
+      linked_party_id: string | null;
+      is_primary_client: boolean;
+      client?: {
+        id: string;
+        name: string;
+        phone?: string | null;
+        email?: string | null;
+      } | null;
+    }[]
+  >([]);
 
   // 대리인은 이제 각 당사자의 representatives JSONB에 저장됨
   // caseRepresentatives는 호환성을 위해 당사자들의 대리인을 집계하여 사용
   const caseRepresentatives = useMemo(() => {
     const reps: Array<{
-      name: string
-      type_label: string | null
-      law_firm: string | null
-      is_our_firm: boolean
-    }> = []
-    caseParties.forEach(party => {
-      const partyReps = party.representatives || []
-      reps.push(...partyReps)
-    })
-    return reps
-  }, [caseParties])
+      name: string;
+      type_label: string | null;
+      law_firm: string | null;
+      is_our_firm: boolean;
+    }> = [];
+    caseParties.forEach((party) => {
+      const partyReps = party.representatives || [];
+      reps.push(...partyReps);
+    });
+    return reps;
+  }, [caseParties]);
 
   // 변호사 목록 (출석변호사 선택용)
-  const [_tenantMembers, setTenantMembers] = useState<{
-    id: string
-    display_name: string
-    role: string
-  }[]>([])
+  const [_tenantMembers, setTenantMembers] = useState<
+    {
+      id: string;
+      display_name: string;
+      role: string;
+    }[]
+  >([]);
 
   // 출석변호사 변경 중인 기일 ID
-  const [_editingLawyerHearingId, setEditingLawyerHearingId] = useState<string | null>(null)
+  const [_editingLawyerHearingId, setEditingLawyerHearingId] = useState<
+    string | null
+  >(null);
 
   // 알림 관련 상태
-  const [caseNotices, setCaseNotices] = useState<CaseNotice[]>([])
-  const [dismissedNoticeIds, setDismissedNoticeIds] = useState<Set<string>>(new Set())
-  const [dismissedRelatedCases, setDismissedRelatedCases] = useState<Set<string>>(new Set())
+  const [caseNotices, setCaseNotices] = useState<CaseNotice[]>([]);
+  const [dismissedNoticeIds, setDismissedNoticeIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [dismissedRelatedCases, setDismissedRelatedCases] = useState<
+    Set<string>
+  >(new Set());
 
   // 계약서 파일 관련 상태
-  const [contractFiles, setContractFiles] = useState<{
-    id: string
-    file_name: string
-    file_path: string
-    file_size: number | null
-    file_type: string | null
-    publicUrl: string
-  }[]>([])
+  const [contractFiles, setContractFiles] = useState<
+    {
+      id: string;
+      file_name: string;
+      file_path: string;
+      file_size: number | null;
+      file_type: string | null;
+      publicUrl: string;
+    }[]
+  >([]);
 
   // 일반 탭 당사자 이름 수정 모달 상태
   const [editingPartyFromGeneral, setEditingPartyFromGeneral] = useState<{
-    partyId: string
-    partyLabel: string
-    partyName: string
-    isPrimary: boolean
-  } | null>(null)
-  const [editPartyNameInput, setEditPartyNameInput] = useState('')
-  const [editPartyPrimaryInput, setEditPartyPrimaryInput] = useState(false)
-  const [editPartyIsOurClient, setEditPartyIsOurClient] = useState(false)
-  const [editPartyClientId, setEditPartyClientId] = useState<string | null>(null)
-  const [clients, setClients] = useState<{ id: string; name: string }[]>([])
-  const [pendingPartyEdits, setPendingPartyEdits] = useState<Record<string, {
-    partyId: string
-    partyLabel: string
-    originalName: string
-    nextName: string
-    isPrimary: boolean
-  }>>({})
-  const [savingPartyFromGeneral, setSavingPartyFromGeneral] = useState(false)
-  const [allHearings, setAllHearings] = useState<CourtHearing[]>([])
-  const [caseDeadlines, setCaseDeadlines] = useState<CaseDeadline[]>([])
-  const [caseHearings, setCaseHearings] = useState<CourtHearing[]>([])
+    partyId: string;
+    partyLabel: string;
+    partyName: string;
+    isPrimary: boolean;
+  } | null>(null);
+  const [editPartyNameInput, setEditPartyNameInput] = useState("");
+  const [editPartyPrimaryInput, setEditPartyPrimaryInput] = useState(false);
+  const [editPartyIsOurClient, setEditPartyIsOurClient] = useState(false);
+  const [editPartyClientId, setEditPartyClientId] = useState<string | null>(
+    null,
+  );
+  const [clients, setClients] = useState<{ id: string; name: string }[]>([]);
+  const [pendingPartyEdits, setPendingPartyEdits] = useState<
+    Record<
+      string,
+      {
+        partyId: string;
+        partyLabel: string;
+        originalName: string;
+        nextName: string;
+        isPrimary: boolean;
+      }
+    >
+  >({});
+  const [savingPartyFromGeneral, setSavingPartyFromGeneral] = useState(false);
+  const [allHearings, setAllHearings] = useState<CourtHearing[]>([]);
+  const [caseDeadlines, setCaseDeadlines] = useState<CaseDeadline[]>([]);
+  const [caseHearings, setCaseHearings] = useState<CourtHearing[]>([]);
 
-  const router = useRouter()
-  const supabase = createClient()
-  const clientDisplayName = caseData.client?.name ? `${caseData.client.name}님` : '의뢰인님'
+  const router = useRouter();
+  const supabase = createClient();
+  const clientDisplayName = caseData.client?.name
+    ? `${caseData.client.name}님`
+    : "의뢰인님";
 
   // 대법원 스냅샷 조회
   const fetchScourtSnapshot = useCallback(async () => {
-    if (!caseData.court_case_number) return
+    if (!caseData.court_case_number) return;
 
-    setScourtLoading(true)
+    setScourtLoading(true);
     try {
-      const res = await fetch(`/api/admin/scourt/snapshot?caseId=${caseData.id}`)
-      const data = await res.json()
+      const res = await fetch(
+        `/api/admin/scourt/snapshot?caseId=${caseData.id}`,
+      );
+      const data = await res.json();
 
       if (data.success) {
-        setScourtSnapshot(data.snapshot)
-        setScourtSyncStatus(data.syncStatus)
+        setScourtSnapshot(data.snapshot);
+        setScourtSyncStatus(data.syncStatus);
       }
     } catch (error) {
-      console.error('스냅샷 조회 실패:', error)
+      console.error("스냅샷 조회 실패:", error);
     } finally {
-      setScourtLoading(false)
+      setScourtLoading(false);
     }
-  }, [caseData.id, caseData.court_case_number])
+  }, [caseData.id, caseData.court_case_number]);
 
   // 당사자 목록 조회 (사건개요 표시용)
   const fetchCaseParties = useCallback(async () => {
     try {
-      const res = await fetch(`/api/admin/cases/${caseData.id}/parties`)
-      const data = await res.json()
+      const res = await fetch(`/api/admin/cases/${caseData.id}/parties`);
+      const data = await res.json();
       if (data.parties) {
+        // case_clients에서 linked_party_id로 연결된 의뢰인 정보를 매핑
+        const clientByPartyId = new Map<
+          string,
+          {
+            id: string;
+            name: string;
+            phone?: string | null;
+            email?: string | null;
+          }
+        >();
+        if (data.caseClients && Array.isArray(data.caseClients)) {
+          data.caseClients.forEach(
+            (cc: {
+              linked_party_id?: string | null;
+              client?: {
+                id: string;
+                name: string;
+                phone?: string | null;
+                email?: string | null;
+              };
+            }) => {
+              if (cc.linked_party_id && cc.client) {
+                clientByPartyId.set(cc.linked_party_id, cc.client);
+              }
+            },
+          );
+        }
+
+        // parties에 clients 정보를 병합
+        const partiesWithClients = data.parties.map(
+          (party: (typeof data.parties)[0]) => {
+            const clientInfo = clientByPartyId.get(party.id);
+            return clientInfo ? { ...party, clients: clientInfo } : party;
+          },
+        );
+
         // 법적 표시 순서로 정렬 (원고측 → 피고측)
-        const sortedParties = [...data.parties].sort((a: typeof data.parties[0], b: typeof data.parties[0]) => {
-          const orderA = PARTY_TYPE_ORDER[a.party_type] ?? 99
-          const orderB = PARTY_TYPE_ORDER[b.party_type] ?? 99
-          if (orderA !== orderB) return orderA - orderB
-          return (a.party_order ?? 0) - (b.party_order ?? 0)
-        })
-        setCaseParties(sortedParties)
+        const sortedParties = [...partiesWithClients].sort(
+          (a: (typeof data.parties)[0], b: (typeof data.parties)[0]) => {
+            const orderA = PARTY_TYPE_ORDER[a.party_type] ?? 99;
+            const orderB = PARTY_TYPE_ORDER[b.party_type] ?? 99;
+            if (orderA !== orderB) return orderA - orderB;
+            return (a.party_order ?? 0) - (b.party_order ?? 0);
+          },
+        );
+        setCaseParties(sortedParties);
+
+        // case_clients 상태 저장 (의뢰인-당사자 연결 정보)
+        if (data.caseClients && Array.isArray(data.caseClients)) {
+          setCaseClients(data.caseClients);
+        }
       }
       // 대리인은 이제 각 당사자의 representatives JSONB에 포함됨
     } catch (error) {
-      console.error('당사자 조회 실패:', error)
+      console.error("당사자 조회 실패:", error);
     }
-  }, [caseData.id])
+  }, [caseData.id]);
 
-  // 심급/관련사건 연동 핸들러
-  const handleLinkRelatedCase = useCallback(async (caseInfo: {
-    caseNo: string;
-    courtName: string;
-    relationType: string;
-    encCsNo?: string;
-  }, showAlert = true): Promise<boolean> => {
-    if (!caseInfo.caseNo) {
-      if (showAlert) alert('사건번호가 없습니다')
-      return false
-    }
-
-    // 해당 사건번호를 로딩 상태에 추가
-    setLinkingCases(prev => new Set(prev).add(caseInfo.caseNo))
-    try {
-      // 1. 기존 사건 검색 (정확한 사건번호 매칭)
-      const searchRes = await fetch(
-        `/api/admin/cases/search?q=${encodeURIComponent(caseInfo.caseNo)}&limit=10`
-      )
-      const searchData = await searchRes.json()
-      // 정확히 일치하는 사건번호 찾기
-      const existingCase = (searchData.data || []).find(
-        (c: { id?: string; court_case_number?: string }) => c.court_case_number === caseInfo.caseNo
-      )
-
-      // 2. link-related API 호출
-      const res = await fetch('/api/admin/scourt/link-related', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceCaseId: caseData.id,
-          relatedCaseInfo: {
-            caseNumber: caseInfo.caseNo,
-            courtName: caseInfo.courtName,
-            relationType: caseInfo.relationType,
-            encCsNo: caseInfo.encCsNo,
-          },
-          action: existingCase ? 'link_existing' : 'create',
-          existingCaseId: existingCase?.id,
-          clientId: caseData.primary_client_id,  // client_id → primary_client_id로 변경
-        }),
-      })
-      const data = await res.json()
-
-      if (data.success) {
-        if (showAlert) {
-          alert(data.message)
-          // 스냅샷 새로고침하여 linkedCaseId 업데이트 → 알림 자동 제거
-          fetchScourtSnapshot()
-        }
-        return true
-      } else {
-        if (showAlert) alert(data.error || '연동 실패')
-        return false
+  // 심급/관련사건 연동 핸들러 (파라미터 버전)
+  const handleLinkRelatedCaseWithParams = useCallback(
+    async (
+      caseInfo: {
+        caseNo: string;
+        courtName: string;
+        relationType: string;
+        encCsNo?: string;
+      },
+      showAlert = true,
+    ): Promise<boolean> => {
+      if (!caseInfo.caseNo) {
+        if (showAlert) alert("사건번호가 없습니다");
+        return false;
       }
-    } catch (error) {
-      console.error('연동 오류:', error)
-      if (showAlert) alert('연동 중 오류가 발생했습니다')
-      return false
-    } finally {
-      // 해당 사건번호를 로딩 상태에서 제거
-      setLinkingCases(prev => {
-        const next = new Set(prev)
-        next.delete(caseInfo.caseNo)
-        return next
-      })
-    }
-  }, [caseData.id, caseData.primary_client_id, fetchScourtSnapshot])
+
+      // 해당 사건번호를 로딩 상태에 추가
+      setLinkingCases((prev) => new Set(prev).add(caseInfo.caseNo));
+      try {
+        // 1. 기존 사건 검색 (정확한 사건번호 매칭)
+        const searchRes = await fetch(
+          `/api/admin/cases/search?q=${encodeURIComponent(caseInfo.caseNo)}&limit=10`,
+        );
+        const searchData = await searchRes.json();
+        // 정확히 일치하는 사건번호 찾기
+        const existingCase = (searchData.data || []).find(
+          (c: { id?: string; court_case_number?: string }) =>
+            c.court_case_number === caseInfo.caseNo,
+        );
+
+        // 2. link-related API 호출
+        const res = await fetch("/api/admin/scourt/link-related", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sourceCaseId: caseData.id,
+            relatedCaseInfo: {
+              caseNumber: caseInfo.caseNo,
+              courtName: caseInfo.courtName,
+              relationType: caseInfo.relationType,
+              encCsNo: caseInfo.encCsNo,
+            },
+            action: existingCase ? "link_existing" : "create",
+            existingCaseId: existingCase?.id,
+            clientId: caseData.primary_client_id, // client_id → primary_client_id로 변경
+          }),
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (showAlert) {
+            alert(data.message);
+            // 스냅샷 새로고침하여 linkedCaseId 업데이트 → 알림 자동 제거
+            fetchScourtSnapshot();
+          }
+          return true;
+        } else {
+          if (showAlert) alert(data.error || "연동 실패");
+          return false;
+        }
+      } catch (error) {
+        console.error("연동 오류:", error);
+        if (showAlert) alert("연동 중 오류가 발생했습니다");
+        return false;
+      } finally {
+        // 해당 사건번호를 로딩 상태에서 제거
+        setLinkingCases((prev) => {
+          const next = new Set(prev);
+          next.delete(caseInfo.caseNo);
+          return next;
+        });
+      }
+    },
+    [caseData.id, caseData.primary_client_id, fetchScourtSnapshot],
+  );
 
   // 모두 연결 핸들러
-  const handleLinkAllRelatedCases = useCallback(async (cases: Array<{
-    caseNo: string;
-    courtName: string;
-    relationType: string;
-    encCsNo?: string;
-  }>) => {
-    if (cases.length === 0) {
-      alert('연결할 사건이 없습니다')
-      return
-    }
-
-    if (!confirm(`${cases.length}개의 사건을 모두 연결하시겠습니까?`)) {
-      return
-    }
-
-    setIsLinkingAll(true)
-    let successCount = 0
-    let failCount = 0
-
-    for (const caseInfo of cases) {
-      const success = await handleLinkRelatedCase(caseInfo, false)
-      if (success) {
-        successCount++
-      } else {
-        failCount++
+  const handleLinkAllRelatedCases = useCallback(
+    async (
+      cases: Array<{
+        caseNo: string;
+        courtName: string;
+        relationType: string;
+        encCsNo?: string;
+      }>,
+    ) => {
+      if (cases.length === 0) {
+        alert("연결할 사건이 없습니다");
+        return;
       }
-    }
 
-    setIsLinkingAll(false)
-    router.refresh()
-    fetchScourtSnapshot()
+      if (!confirm(`${cases.length}개의 사건을 모두 연결하시겠습니까?`)) {
+        return;
+      }
 
-    if (failCount === 0) {
-      alert(`${successCount}개 사건 연결 완료`)
-    } else {
-      alert(`연결 완료: ${successCount}개, 실패: ${failCount}개`)
-    }
-  }, [handleLinkRelatedCase, router, fetchScourtSnapshot])
+      setIsLinkingAll(true);
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const caseInfo of cases) {
+        const success = await handleLinkRelatedCaseWithParams(caseInfo, false);
+        if (success) {
+          successCount++;
+        } else {
+          failCount++;
+        }
+      }
+
+      setIsLinkingAll(false);
+      router.refresh();
+      fetchScourtSnapshot();
+
+      if (failCount === 0) {
+        alert(`${successCount}개 사건 연결 완료`);
+      } else {
+        alert(`연결 완료: ${successCount}개, 실패: ${failCount}개`);
+      }
+    },
+    [handleLinkRelatedCaseWithParams, router, fetchScourtSnapshot],
+  );
 
   // 당사자 표시용 데이터 - 알림 감지에서 사용하므로 먼저 정의
   const casePartiesWithPending = useMemo(() => {
-    if (Object.keys(pendingPartyEdits).length === 0) return caseParties
+    if (Object.keys(pendingPartyEdits).length === 0) return caseParties;
 
-    const partyById = new Map(caseParties.map(party => [party.id, party]))
-    const pendingPrimaryBySide = new Map<'plaintiff' | 'defendant', string>()
+    const partyById = new Map(caseParties.map((party) => [party.id, party]));
+    const pendingPrimaryBySide = new Map<"plaintiff" | "defendant", string>();
 
-    Object.values(pendingPartyEdits).forEach(edit => {
-      if (!edit.isPrimary) return
-      const party = partyById.get(edit.partyId)
-      const side = getPartySideFromType(party?.party_type || null)
-      if (side) pendingPrimaryBySide.set(side, edit.partyId)
-    })
+    Object.values(pendingPartyEdits).forEach((edit) => {
+      if (!edit.isPrimary) return;
+      const party = partyById.get(edit.partyId);
+      const side = getPartySideFromType(party?.party_type || null);
+      if (side) pendingPrimaryBySide.set(side, edit.partyId);
+    });
 
-    return caseParties.map(party => {
-      const edit = pendingPartyEdits[party.id]
-      const side = getPartySideFromType(party.party_type)
-      const forcedPrimaryId = side ? pendingPrimaryBySide.get(side) : null
-      const nextPrimary = forcedPrimaryId ? party.id === forcedPrimaryId : (edit ? edit.isPrimary : party.is_primary)
+    return caseParties.map((party) => {
+      const edit = pendingPartyEdits[party.id];
+      const side = getPartySideFromType(party.party_type);
+      const forcedPrimaryId = side ? pendingPrimaryBySide.get(side) : null;
+      const nextPrimary = forcedPrimaryId
+        ? party.id === forcedPrimaryId
+        : edit
+          ? edit.isPrimary
+          : party.is_primary;
 
-      if (!edit && !forcedPrimaryId) return party
+      if (!edit && !forcedPrimaryId) return party;
 
       return {
         ...party,
         party_name: edit?.nextName ?? party.party_name,
         is_primary: nextPrimary,
         manual_override: edit ? true : party.manual_override,
-      }
-    })
-  }, [caseParties, pendingPartyEdits])
+      };
+    });
+  }, [caseParties, pendingPartyEdits]);
 
   // 일반 탭에서 당사자 이름 수정 시작
-  const handlePartyEditFromGeneral = useCallback((partyId: string, partyLabel: string, currentName: string) => {
-    // 번호 prefix 제거하고 편집 가능한 부분만 추출
-    const nameWithoutNumber = currentName.replace(/^\d+\.\s*/, '')
-    const existingParty = casePartiesWithPending.find(party => party.id === partyId)
-    const isPrimary = existingParty?.is_primary || false
-    // 의뢰인 연결은 이제 case_clients 테이블에서 관리됨
-    // is_our_client, client_id는 case_parties에서 제거됨
+  const handlePartyEditFromGeneral = useCallback(
+    (partyId: string, partyLabel: string, currentName: string) => {
+      // 번호 prefix 제거하고 편집 가능한 부분만 추출
+      const nameWithoutNumber = currentName.replace(/^\d+\.\s*/, "");
+      const existingParty = casePartiesWithPending.find(
+        (party) => party.id === partyId,
+      );
+      const isPrimary = existingParty?.is_primary || false;
+      // 의뢰인 연결은 이제 case_clients 테이블에서 관리됨
+      // is_our_client, client_id는 case_parties에서 제거됨
 
-    setEditingPartyFromGeneral({ partyId, partyLabel, partyName: currentName, isPrimary })
-    setEditPartyNameInput(nameWithoutNumber)
-    setEditPartyPrimaryInput(isPrimary)
-    setEditPartyIsOurClient(false)  // deprecated - case_clients에서 관리
-    setEditPartyClientId(null)  // deprecated - case_clients에서 관리
-  }, [casePartiesWithPending])
+      setEditingPartyFromGeneral({
+        partyId,
+        partyLabel,
+        partyName: currentName,
+        isPrimary,
+      });
+      setEditPartyNameInput(nameWithoutNumber);
+      setEditPartyPrimaryInput(isPrimary);
+      setEditPartyIsOurClient(false); // deprecated - case_clients에서 관리
+      setEditPartyClientId(null); // deprecated - case_clients에서 관리
+    },
+    [casePartiesWithPending],
+  );
 
   // 일반 탭 당사자 이름 저장 (즉시 반영)
   const handleSavePartyFromGeneral = useCallback(async () => {
-    if (!editingPartyFromGeneral || !editPartyNameInput.trim()) return
+    if (!editingPartyFromGeneral || !editPartyNameInput.trim()) return;
 
-    const { partyId, partyLabel, partyName } = editingPartyFromGeneral
-    const nextIsPrimary = editPartyPrimaryInput
+    const { partyId, partyLabel, partyName } = editingPartyFromGeneral;
+    const nextIsPrimary = editPartyPrimaryInput;
 
     // 기존 party_name에서 번호 prefix 추출
-    const numberPrefixMatch = partyName.match(/^(\d+\.\s*)/)
-    const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : ''
-    const newPartyName = `${numberPrefix}${editPartyNameInput.trim()}`
+    const numberPrefixMatch = partyName.match(/^(\d+\.\s*)/);
+    const numberPrefix = numberPrefixMatch ? numberPrefixMatch[1] : "";
+    const newPartyName = `${numberPrefix}${editPartyNameInput.trim()}`;
 
-    setPendingPartyEdits(prev => ({
+    setPendingPartyEdits((prev) => ({
       ...prev,
       [partyId]: {
         partyId,
@@ -593,57 +765,65 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         originalName: partyName,
         nextName: newPartyName,
         isPrimary: nextIsPrimary,
-      }
-    }))
+      },
+    }));
 
-    setEditingPartyFromGeneral(null)
-    setEditPartyNameInput('')
-    setEditPartyPrimaryInput(false)
-    setEditPartyIsOurClient(false)
-    setEditPartyClientId(null)
-    setSavingPartyFromGeneral(true)
+    setEditingPartyFromGeneral(null);
+    setEditPartyNameInput("");
+    setEditPartyPrimaryInput(false);
+    setEditPartyIsOurClient(false);
+    setEditPartyClientId(null);
+    setSavingPartyFromGeneral(true);
 
     try {
       const res = await fetch(`/api/admin/cases/${caseData.id}/parties`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           partyId,
           party_name: newPartyName,
           is_primary: nextIsPrimary,
           // 의뢰인 연결(is_our_client, client_id)은 이제 case_clients API에서 별도 관리
         }),
-      })
+      });
 
       if (res.ok) {
-        const responseData = await res.json()
+        const responseData = await res.json();
         // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신 (fetchCaseParties 대신)
         if (responseData.data) {
-          setCaseParties(prev =>
-            prev.map(p => p.id === partyId ? { ...p, ...responseData.data } : p)
-          )
+          setCaseParties((prev) =>
+            prev.map((p) =>
+              p.id === partyId ? { ...p, ...responseData.data } : p,
+            ),
+          );
         }
-        setPendingPartyEdits(prev => {
-          const next = { ...prev }
-          delete next[partyId]
-          return next
-        })
-        router.refresh()
+        setPendingPartyEdits((prev) => {
+          const next = { ...prev };
+          delete next[partyId];
+          return next;
+        });
+        router.refresh();
       } else {
-        const data = await res.json()
-        console.error('당사자 저장 실패:', data.error)
+        const data = await res.json();
+        console.error("당사자 저장 실패:", data.error);
       }
     } catch (err) {
-      console.error('당사자 저장 중 오류:', err)
+      console.error("당사자 저장 중 오류:", err);
     } finally {
-      setSavingPartyFromGeneral(false)
+      setSavingPartyFromGeneral(false);
     }
-  }, [editingPartyFromGeneral, editPartyNameInput, editPartyPrimaryInput, caseData.id, router])
+  }, [
+    editingPartyFromGeneral,
+    editPartyNameInput,
+    editPartyPrimaryInput,
+    caseData.id,
+    router,
+  ]);
 
   const pendingPartyEditList = useMemo(
     () => Object.values(pendingPartyEdits),
-    [pendingPartyEdits]
-  )
+    [pendingPartyEdits],
+  );
 
   // 반대측에 기존 의뢰인이 있는지 감지 (경고 표시용, 차단하지 않음)
   // NOTE: 의뢰인 관계는 이제 case_clients 테이블에서 관리됨
@@ -651,646 +831,832 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const isOppositeSideClient = useMemo(() => {
     // 의뢰인 관계가 case_parties에서 case_clients로 이동했으므로
     // 이 경고 기능은 case_clients 연동 시 재구현
-    return false
-  }, [])
+    return false;
+  }, []);
 
   const handleSaveAllPartyEdits = useCallback(async () => {
-    if (pendingPartyEditList.length === 0) return
+    if (pendingPartyEditList.length === 0) return;
 
-    setSavingPartyFromGeneral(true)
+    setSavingPartyFromGeneral(true);
     try {
       const res = await fetch(`/api/admin/cases/${caseData.id}/parties`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          partyUpdates: pendingPartyEditList.map(edit => ({
+          partyUpdates: pendingPartyEditList.map((edit) => ({
             partyId: edit.partyId,
             party_name: edit.nextName,
             is_primary: edit.isPrimary,
           })),
         }),
-      })
+      });
 
       if (res.ok) {
-        const responseData = await res.json()
-        setPendingPartyEdits({})
+        const responseData = await res.json();
+        setPendingPartyEdits({});
         // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신 (fetchCaseParties 대신)
-        if (responseData.updatedParties && responseData.updatedParties.length > 0) {
+        if (
+          responseData.updatedParties &&
+          responseData.updatedParties.length > 0
+        ) {
           const updatedMap = new Map(
-            responseData.updatedParties.map((p: { id: string }) => [p.id, p])
-          )
-          setCaseParties(prev =>
-            prev.map(p => {
-              const updated = updatedMap.get(p.id)
-              return updated ? { ...p, ...updated } : p
-            })
-          )
+            responseData.updatedParties.map((p: { id: string }) => [p.id, p]),
+          );
+          setCaseParties((prev) =>
+            prev.map((p) => {
+              const updated = updatedMap.get(p.id);
+              return updated ? { ...p, ...updated } : p;
+            }),
+          );
         }
-        router.refresh()
+        router.refresh();
       } else {
-        const data = await res.json()
-        console.error('당사자 일괄 저장 실패:', data.error)
+        const data = await res.json();
+        console.error("당사자 일괄 저장 실패:", data.error);
       }
     } catch (err) {
-      console.error('당사자 일괄 저장 중 오류:', err)
+      console.error("당사자 일괄 저장 중 오류:", err);
     } finally {
-      setSavingPartyFromGeneral(false)
+      setSavingPartyFromGeneral(false);
     }
-  }, [pendingPartyEditList, caseData.id, router])
+  }, [pendingPartyEditList, caseData.id, router]);
 
   // 변호사 목록 조회 (출석변호사 선택용)
   const fetchTenantMembers = useCallback(async () => {
     try {
       const { data, error } = await supabase
-        .from('tenant_members')
-        .select('id, display_name, role')
-        .in('role', ['owner', 'lawyer'])
-        .order('display_name')
+        .from("tenant_members")
+        .select("id, display_name, role")
+        .in("role", ["owner", "lawyer"])
+        .order("display_name");
 
-      if (error) throw error
-      setTenantMembers(data || [])
+      if (error) throw error;
+      setTenantMembers(data || []);
     } catch (error) {
-      console.error('변호사 목록 조회 실패:', error)
+      console.error("변호사 목록 조회 실패:", error);
     }
-  }, [supabase])
+  }, [supabase]);
 
   // 출석변호사 변경
-  const _updateAttendingLawyer = async (hearingId: string, lawyerId: string | null) => {
+  const _updateAttendingLawyer = async (
+    hearingId: string,
+    lawyerId: string | null,
+  ) => {
     try {
       const { error } = await supabase
-        .from('court_hearings')
+        .from("court_hearings")
         .update({ attending_lawyer_id: lawyerId })
-        .eq('id', hearingId)
+        .eq("id", hearingId);
 
-      if (error) throw error
+      if (error) throw error;
 
       // 일정 목록 새로고침
-      await fetchAllSchedules()
-      setEditingLawyerHearingId(null)
+      await fetchAllSchedules();
+      setEditingLawyerHearingId(null);
     } catch (error) {
-      console.error('출석변호사 변경 실패:', error)
-      alert('출석변호사 변경에 실패했습니다.')
+      console.error("출석변호사 변경 실패:", error);
+      alert("출석변호사 변경에 실패했습니다.");
     }
-  }
+  };
 
   // 대법원 연동 모달 열기
   const openLinkModal = () => {
     // 원본 법원명 사용 (약자로 변환 시 sync API에서 인식 안됨)
-    setLinkCourtName(caseData.court_name || '')
-    setLinkCaseNumber(caseData.court_case_number || '')
-    setLinkPartyName(preferredPartyName)
-    setShowLinkModal(true)
-  }
+    setLinkCourtName(caseData.court_name || "");
+    setLinkCaseNumber(caseData.court_case_number || "");
+    setLinkPartyName(preferredPartyName);
+    setShowLinkModal(true);
+  };
+
+  // 에러 코드별 사용자 친화적 메시지
+  const getSyncErrorMessage = (
+    code?: string,
+    defaultMessage?: string,
+  ): string => {
+    switch (code) {
+      case "MISSING_CASE_ID":
+        return "사건 ID가 누락되었습니다. 페이지를 새로고침 후 다시 시도해주세요.";
+      case "INVALID_CASE_ID_FORMAT":
+        return "잘못된 사건 ID 형식입니다. 페이지를 새로고침 후 다시 시도해주세요.";
+      case "MISSING_CASE_NUMBER":
+        return "사건번호가 누락되었습니다.";
+      case "CASE_NOT_FOUND":
+        return "해당 사건을 찾을 수 없습니다. 사건이 삭제되었을 수 있습니다.";
+      case "INVALID_UUID":
+        return "잘못된 사건 ID입니다. 페이지를 새로고침 후 다시 시도해주세요.";
+      case "SERVER_CONFIG_ERROR":
+        return "서버 구성 오류가 발생했습니다. 관리자에게 문의해주세요.";
+      case "AUTH_ERROR":
+        return "API 인증 오류가 발생했습니다. 관리자에게 문의해주세요.";
+      case "DB_ERROR":
+        return "데이터베이스 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+      default:
+        return defaultMessage || "동기화 실패";
+    }
+  };
 
   // 대법원 동기화 실행
-  const handleScourtSync = async (params?: { courtName: string; caseNumber: string; partyName: string }) => {
+  const handleScourtSync = async (params?: {
+    courtName: string;
+    caseNumber: string;
+    partyName: string;
+  }) => {
     // 첫 연동 시 모달 표시
     if (!isLinked) {
       if (!params) {
-        openLinkModal()
-        return
+        openLinkModal();
+        return;
       }
     }
 
-    // 갱신 시에는 기존 데이터 사용
-    const courtName = params?.courtName || caseData.court_name
-    const caseNumber = params?.caseNumber || caseData.court_case_number
-    const partyName = params?.partyName || preferredPartyName || ''
-
-    if (!courtName || !caseNumber) {
-      openLinkModal()
-      return
+    // caseData.id 검증
+    if (!caseData.id) {
+      console.error("[CaseDetail] caseData.id가 없습니다:", caseData);
+      alert("사건 ID가 없습니다. 페이지를 새로고침 후 다시 시도해주세요.");
+      return;
     }
 
-    setScourtSyncing(true)
+    // 갱신 시에는 기존 데이터 사용
+    const courtName = params?.courtName || caseData.court_name;
+    const caseNumber = params?.caseNumber || caseData.court_case_number;
+    const partyName = params?.partyName || preferredPartyName || "";
+
+    if (!courtName || !caseNumber) {
+      openLinkModal();
+      return;
+    }
+
+    const requestBody = {
+      legalCaseId: caseData.id,
+      caseNumber,
+      courtName,
+      partyName,
+      forceRefresh: true,
+    };
+
+    console.log("[CaseDetail] 동기화 요청:", {
+      ...requestBody,
+      partyName: partyName ? "***" : undefined,
+    });
+
+    setScourtSyncing(true);
     try {
-      const res = await fetch('/api/admin/scourt/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          legalCaseId: caseData.id,
-          caseNumber,
-          courtName,
-          partyName,
-          forceRefresh: true,
-        }),
-      })
-      const data = await res.json()
+      const res = await fetch("/api/admin/scourt/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
+      const data = await res.json();
+
+      console.log("[CaseDetail] 동기화 응답:", {
+        status: res.status,
+        success: data.success,
+        code: data.code,
+        error: data.error,
+      });
 
       if (data.success) {
         // 동기화 성공 후 전체 페이지 새로고침
-        setShowLinkModal(false)
+        setShowLinkModal(false);
         // router.refresh()는 클라이언트 상태를 유지하므로 전체 reload 필요
-        window.location.reload()
+        window.location.reload();
       } else if (data.skipped) {
         // 최근 동기화됨
       } else {
         // 실패 시 모달 재표시
-        console.error('동기화 실패:', data.error)
+        console.error("[CaseDetail] 동기화 실패:", {
+          error: data.error,
+          code: data.code,
+          detail: data.detail,
+        });
+        const errorMessage = getSyncErrorMessage(data.code, data.error);
         if (!isLinked) {
-          alert(data.error || '연동 실패: 입력 정보를 확인해주세요.')
+          alert(errorMessage || "연동 실패: 입력 정보를 확인해주세요.");
         } else {
-          alert(data.error || '동기화 실패')
+          alert(errorMessage);
         }
       }
     } catch (error) {
-      console.error('동기화 실패:', error)
-      alert('동기화 중 오류가 발생했습니다.')
+      console.error("[CaseDetail] 동기화 네트워크 오류:", error);
+      alert(
+        "동기화 중 네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.",
+      );
     } finally {
-      setScourtSyncing(false)
+      setScourtSyncing(false);
     }
-  }
+  };
 
   // 연동 모달에서 확인 클릭
   const handleLinkConfirm = () => {
     if (!linkCaseNumber.trim()) {
-      alert('사건번호를 입력해주세요.')
-      return
+      alert("사건번호를 입력해주세요.");
+      return;
     }
     if (!linkCourtName.trim()) {
-      alert('법원명을 입력해주세요.')
-      return
+      alert("법원명을 입력해주세요.");
+      return;
     }
     if (!linkPartyName.trim()) {
-      alert('당사자명을 입력해주세요.')
-      return
+      alert("당사자명을 입력해주세요.");
+      return;
     }
-    setShowLinkModal(false)
+    setShowLinkModal(false);
     handleScourtSync({
       courtName: linkCourtName.trim(),
       caseNumber: linkCaseNumber.trim(),
       partyName: linkPartyName.trim(),
-    })
-  }
+    });
+  };
 
   // 종결 처리
   const handleFinalize = async () => {
-    if (!confirm('사건을 종결 상태로 변경하시겠습니까?\n종결 후에는 자동 갱신이 중단됩니다.')) return
+    if (
+      !confirm(
+        "사건을 종결 상태로 변경하시겠습니까?\n종결 후에는 자동 갱신이 중단됩니다.",
+      )
+    )
+      return;
 
     try {
       const res = await fetch(`/api/admin/cases/${caseData.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: '종결' })
-      })
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "종결" }),
+      });
 
       if (res.ok) {
-        router.refresh()
+        router.refresh();
       } else {
-        const data = await res.json()
-        alert(data.error || '종결 처리에 실패했습니다.')
+        const data = await res.json();
+        alert(data.error || "종결 처리에 실패했습니다.");
       }
     } catch (error) {
-      console.error('종결 처리 실패:', error)
-      alert('종결 처리 중 오류가 발생했습니다.')
+      console.error("종결 처리 실패:", error);
+      alert("종결 처리 중 오류가 발생했습니다.");
     }
-  }
+  };
 
   // 삭제 처리
   const handleDelete = async () => {
-    if (!confirm('정말로 이 사건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) return
+    if (
+      !confirm(
+        "정말로 이 사건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.",
+      )
+    )
+      return;
 
     try {
       const res = await fetch(`/api/admin/cases/${caseData.id}`, {
-        method: 'DELETE'
-      })
+        method: "DELETE",
+      });
 
       if (res.ok) {
-        router.push('/cases')
+        router.push("/cases");
       } else {
-        const data = await res.json()
-        alert(data.error || '삭제에 실패했습니다.')
+        const data = await res.json();
+        alert(data.error || "삭제에 실패했습니다.");
       }
     } catch (error) {
-      console.error('삭제 실패:', error)
-      alert('삭제 중 오류가 발생했습니다.')
+      console.error("삭제 실패:", error);
+      alert("삭제 중 오류가 발생했습니다.");
     }
-  }
+  };
 
   // SCOURT 사건 일반내용 탭 열기 (Puppeteer)
   const _handleOpenScourtCase = async () => {
     if (!caseData.court_case_number) {
-      alert('사건번호가 없습니다.')
-      return
+      alert("사건번호가 없습니다.");
+      return;
     }
 
-    setScourtOpening(true)
+    setScourtOpening(true);
     try {
-      const res = await fetch('/api/admin/scourt/open-case', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/admin/scourt/open-case", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           caseId: caseData.id,
           caseNumber: caseData.court_case_number,
         }),
-      })
-      const data = await res.json()
+      });
+      const data = await res.json();
 
       if (!data.success) {
-        alert(data.error || '사건 열기 실패')
+        alert(data.error || "사건 열기 실패");
       }
       // 성공 시 Puppeteer 브라우저 창이 자동으로 열림
     } catch (error) {
-      console.error('사건 열기 실패:', error)
-      alert('사건 열기 중 오류가 발생했습니다.')
+      console.error("사건 열기 실패:", error);
+      alert("사건 열기 중 오류가 발생했습니다.");
     } finally {
-      setScourtOpening(false)
+      setScourtOpening(false);
     }
-  }
+  };
 
   const fetchAllSchedules = useCallback(async () => {
     // case_id로 조회 - 사건번호 없어도 동작
-    if (!caseData.id) return
+    if (!caseData.id) return;
 
     try {
-      setLoading(true)
-      const unified: UnifiedScheduleItem[] = []
+      setLoading(true);
+      const unified: UnifiedScheduleItem[] = [];
 
       const { data: hearings, error: hearingError } = await supabase
-        .from('court_hearings')
-        .select(`
+        .from("court_hearings")
+        .select(
+          `
           *,
           attending_lawyer:attending_lawyer_id(id, display_name)
-        `)
-        .eq('case_id', caseData.id)
-        .order('hearing_date', { ascending: true })
+        `,
+        )
+        .eq("case_id", caseData.id)
+        .order("hearing_date", { ascending: true });
 
-      if (hearingError) throw hearingError
+      if (hearingError) throw hearingError;
 
       const { data: deadlines, error: deadlineError } = await supabase
-        .from('case_deadlines')
-        .select('*')
-        .eq('case_id', caseData.id)
-        .order('deadline_date', { ascending: true })
+        .from("case_deadlines")
+        .select("*")
+        .eq("case_id", caseData.id)
+        .order("deadline_date", { ascending: true });
 
-      if (deadlineError) throw deadlineError
+      if (deadlineError) throw deadlineError;
 
       // 알림용 데이터 저장
-      setCaseHearings(hearings as CourtHearing[] || [])
-      setCaseDeadlines(deadlines as CaseDeadline[] || [])
+      setCaseHearings((hearings as CourtHearing[]) || []);
+      setCaseDeadlines((deadlines as CaseDeadline[]) || []);
 
       // 기일 충돌 감지를 위한 모든 사건 기일 조회 (향후 30일)
-      const today = new Date()
-      const thirtyDaysLater = new Date(today)
-      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
+      const today = new Date();
+      const thirtyDaysLater = new Date(today);
+      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
 
       const { data: allHearingsData } = await supabase
-        .from('court_hearings')
-        .select(`
+        .from("court_hearings")
+        .select(
+          `
           *,
           legal_case:case_id(case_name, court_name)
-        `)
-        .gte('hearing_date', today.toISOString())
-        .lte('hearing_date', thirtyDaysLater.toISOString())
-        .eq('status', 'SCHEDULED')
-        .order('hearing_date', { ascending: true })
+        `,
+        )
+        .gte("hearing_date", today.toISOString())
+        .lte("hearing_date", thirtyDaysLater.toISOString())
+        .eq("status", "SCHEDULED")
+        .order("hearing_date", { ascending: true });
 
-      setAllHearings(allHearingsData as CourtHearing[] || [])
+      setAllHearings((allHearingsData as CourtHearing[]) || []);
 
       const { data: schedules } = await supabase
-        .from('general_schedules')
-        .select('*')
-        .eq('case_id', caseData.id)
-        .order('schedule_date', { ascending: true })
+        .from("general_schedules")
+        .select("*")
+        .eq("case_id", caseData.id)
+        .order("schedule_date", { ascending: true });
 
       if (hearings && hearings.length > 0) {
-        hearings.forEach(hearing => {
-          const date = new Date(hearing.hearing_date)
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          date.setHours(0, 0, 0, 0)
-          const daysUntil = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        hearings.forEach((hearing) => {
+          const date = new Date(hearing.hearing_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          date.setHours(0, 0, 0, 0);
+          const daysUntil = Math.ceil(
+            (date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+          );
 
           unified.push({
             id: hearing.id,
-            type: 'court_hearing',
+            type: "court_hearing",
             title: HEARING_TYPE_LABELS[hearing.hearing_type as HearingType],
-            date: hearing.hearing_date.split('T')[0],
+            date: hearing.hearing_date.split("T")[0],
             datetime: hearing.hearing_date,
             location: hearing.location,
             status: hearing.status,
             days_until: daysUntil,
             subtype: hearing.hearing_type,
-            source: hearing
-          })
-        })
+            source: hearing,
+          });
+        });
       }
 
       if (deadlines) {
-        deadlines.forEach(deadline => {
-          const date = new Date(deadline.deadline_date)
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          date.setHours(0, 0, 0, 0)
-          const daysUntil = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        deadlines.forEach((deadline) => {
+          const date = new Date(deadline.deadline_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          date.setHours(0, 0, 0, 0);
+          const daysUntil = Math.ceil(
+            (date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+          );
 
           unified.push({
             id: deadline.id,
-            type: 'deadline',
+            type: "deadline",
             title: DEADLINE_TYPE_LABELS[deadline.deadline_type as DeadlineType],
             date: deadline.deadline_date,
             datetime: `${deadline.deadline_date}T00:00:00`,
             status: deadline.status,
             days_until: daysUntil,
             subtype: deadline.deadline_type,
-            source: deadline
-          })
-        })
+            source: deadline,
+          });
+        });
       }
 
       if (schedules && schedules.length > 0) {
-        schedules.forEach(schedule => {
-          const date = new Date(schedule.schedule_date)
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          date.setHours(0, 0, 0, 0)
-          const daysUntil = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+        schedules.forEach((schedule) => {
+          const date = new Date(schedule.schedule_date);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          date.setHours(0, 0, 0, 0);
+          const daysUntil = Math.ceil(
+            (date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+          );
 
           unified.push({
             id: schedule.id,
-            type: 'schedule',
+            type: "schedule",
             title: schedule.title,
             date: schedule.schedule_date,
-            datetime: schedule.schedule_time ? `${schedule.schedule_date}T${schedule.schedule_time}` : undefined,
+            datetime: schedule.schedule_time
+              ? `${schedule.schedule_date}T${schedule.schedule_time}`
+              : undefined,
             location: schedule.location,
             days_until: daysUntil,
             subtype: schedule.schedule_type,
-            source: schedule
-          })
-        })
+            source: schedule,
+          });
+        });
       }
 
-      unified.sort((a, b) => a.date.localeCompare(b.date))
-      setUnifiedSchedules(unified)
+      unified.sort((a, b) => a.date.localeCompare(b.date));
+      setUnifiedSchedules(unified);
     } catch (error) {
-      console.error('일정 조회 실패:', error)
-      setUnifiedSchedules([])
+      console.error("일정 조회 실패:", error);
+      setUnifiedSchedules([]);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [caseData.id, supabase])
+  }, [caseData.id, supabase]);
 
+  // Batch 1: Critical data (parallel fetch for core display)
   useEffect(() => {
-    fetchAllSchedules()
-  }, [fetchAllSchedules])
+    const fetchCriticalData = async () => {
+      await Promise.all([
+        fetchAllSchedules(),
+        fetchScourtSnapshot(),
+        fetchCaseParties(),
+        fetchTenantMembers(),
+      ]);
+    };
+    fetchCriticalData();
+  }, [
+    fetchAllSchedules,
+    fetchScourtSnapshot,
+    fetchCaseParties,
+    fetchTenantMembers,
+  ]);
 
-  // 대법원 스냅샷 조회
+  // Batch 2: Secondary data (parallel fetch for supporting features)
   useEffect(() => {
-    fetchScourtSnapshot()
-  }, [fetchScourtSnapshot])
+    const fetchSecondaryData = async () => {
+      await Promise.all([
+        // Clients for modal
+        (async () => {
+          try {
+            const res = await fetch("/api/admin/clients");
+            const data = await res.json();
+            if (data.clients && Array.isArray(data.clients)) {
+              setClients(data.clients);
+            }
+          } catch (err) {
+            console.error("의뢰인 목록 조회 실패:", err);
+          }
+        })(),
+        // Payment totals
+        (async () => {
+          const { data, error } = await supabase
+            .from("payments")
+            .select("amount")
+            .eq("case_id", caseData.id);
 
-  // 당사자 목록 조회
-  useEffect(() => {
-    fetchCaseParties()
-  }, [fetchCaseParties])
-
-  // 변호사 목록 조회
-  useEffect(() => {
-    fetchTenantMembers()
-  }, [fetchTenantMembers])
-
-  // 의뢰인 목록 조회 (당사자 수정 모달용)
-  useEffect(() => {
-    const fetchClients = async () => {
-      try {
-        const res = await fetch('/api/admin/clients')
-        const data = await res.json()
-        if (data.clients && Array.isArray(data.clients)) {
-          setClients(data.clients)
-        }
-      } catch (err) {
-        console.error('의뢰인 목록 조회 실패:', err)
-      }
-    }
-    fetchClients()
-  }, [])
-
-  useEffect(() => {
-    const fetchPayments = async () => {
-      const { data, error } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('case_id', caseData.id)
-
-      if (!error && data) {
-        const total = data.reduce((sum, p) => sum + p.amount, 0)
-        setPaymentTotal(total)
-      }
-    }
-    fetchPayments()
-  }, [caseData.id, supabase])
-
-  // 삭제된 알림 조회
-  useEffect(() => {
-    const fetchDismissedNotices = async () => {
-      try {
-        const res = await fetch(`/api/admin/cases/${caseData.id}/notices`)
-        const data = await res.json()
-        if (data.success && data.dismissedNotices) {
-          setDismissedNoticeIds(new Set(data.dismissedNotices))
-        }
-      } catch (error) {
-        console.error('Failed to fetch dismissed notices:', error)
-      }
-    }
-    fetchDismissedNotices()
-  }, [caseData.id])
-
-  // 연동안함 관련사건 조회
-  useEffect(() => {
-    const fetchDismissedRelatedCases = async () => {
-      try {
-        const res = await fetch(`/api/admin/cases/${caseData.id}/related-cases`)
-        const data = await res.json()
-        if (data.success && data.dismissedRelatedCases) {
-          const dismissedSet = new Set<string>(
-            data.dismissedRelatedCases.map((d: { related_case_no: string; related_case_type: string }) =>
-              `${d.related_case_type}:${d.related_case_no}`
-            )
-          )
-          setDismissedRelatedCases(dismissedSet)
-        }
-      } catch (error) {
-        console.error('Failed to fetch dismissed related cases:', error)
-      }
-    }
-    fetchDismissedRelatedCases()
-  }, [caseData.id])
+          if (!error && data) {
+            const total = data.reduce((sum, p) => sum + p.amount, 0);
+            setPaymentTotal(total);
+          }
+        })(),
+        // Dismissed notices
+        (async () => {
+          try {
+            const res = await fetch(`/api/admin/cases/${caseData.id}/notices`);
+            const data = await res.json();
+            if (data.success && data.dismissedNotices) {
+              setDismissedNoticeIds(new Set(data.dismissedNotices));
+            }
+          } catch (error) {
+            console.error("Failed to fetch dismissed notices:", error);
+          }
+        })(),
+        // Dismissed related cases
+        (async () => {
+          try {
+            const res = await fetch(
+              `/api/admin/cases/${caseData.id}/related-cases`,
+            );
+            const data = await res.json();
+            if (data.success && data.dismissedRelatedCases) {
+              const dismissedSet = new Set<string>(
+                data.dismissedRelatedCases.map(
+                  (d: {
+                    related_case_no: string;
+                    related_case_type: string;
+                  }) => `${d.related_case_type}:${d.related_case_no}`,
+                ),
+              );
+              setDismissedRelatedCases(dismissedSet);
+            }
+          } catch (error) {
+            console.error("Failed to fetch dismissed related cases:", error);
+          }
+        })(),
+        // Contract files
+        (async () => {
+          try {
+            const res = await fetch(`/api/admin/cases/${caseData.id}/contracts`);
+            const data = await res.json();
+            if (data.success) {
+              setContractFiles(data.contracts || []);
+            }
+          } catch (error) {
+            console.error("Failed to fetch contract files:", error);
+          }
+        })(),
+      ]);
+    };
+    fetchSecondaryData();
+  }, [caseData.id, supabase]);
 
   const displayCaseParties = useMemo(() => {
-    if (casePartiesWithPending.length === 0) return casePartiesWithPending
+    if (casePartiesWithPending.length === 0) return casePartiesWithPending;
 
-    const clientFallbackName = caseData.client?.name?.trim() || ''
+    // 1순위: caseData.client?.name (캐시된 값)
+    let clientFallbackName = caseData.client?.name?.trim() || "";
 
-    const hasClientFallback = !!clientFallbackName && !isMaskedPartyName(clientFallbackName)
+    // 2순위: caseClients에서 primary client의 이름 가져오기
+    if (!clientFallbackName || isMaskedPartyName(clientFallbackName)) {
+      const primaryCaseClient = caseClients.find(cc => cc.is_primary_client);
+      if (primaryCaseClient?.client?.name) {
+        clientFallbackName = primaryCaseClient.client.name.trim();
+      }
+    }
 
-    if (!hasClientFallback) return casePartiesWithPending
+    // 3순위: caseClients의 첫 번째 클라이언트 (primary가 없는 경우)
+    if (!clientFallbackName || isMaskedPartyName(clientFallbackName)) {
+      const firstCaseClient = caseClients.find(cc => cc.client?.name);
+      if (firstCaseClient?.client?.name) {
+        clientFallbackName = firstCaseClient.client.name.trim();
+      }
+    }
+
+    const hasClientFallback =
+      !!clientFallbackName && !isMaskedPartyName(clientFallbackName);
+
+    // 1순위: case_clients.linked_party_id로 연결된 당사자 ID
+    const linkedPartyId = caseClients.find((cc) => cc.linked_party_id)?.linked_party_id;
+
+    if (!hasClientFallback) return casePartiesWithPending;
 
     const clientFirstChar = hasClientFallback
       ? normalizePartyNameForMatch(clientFallbackName).charAt(0)
-      : ''
+      : "";
 
     const charMatchedClient = clientFirstChar
-      ? casePartiesWithPending.filter(p => {
-          const rawName = p.party_name || ''
-          if (!isMaskedPartyName(rawName)) return false
-          const firstChar = normalizePartyNameForMatch(rawName).charAt(0)
-          return firstChar && firstChar === clientFirstChar
+      ? casePartiesWithPending.filter((p) => {
+          const rawName = p.party_name || "";
+          if (!isMaskedPartyName(rawName)) return false;
+          const firstChar = normalizePartyNameForMatch(rawName).charAt(0);
+          return firstChar && firstChar === clientFirstChar;
         })
-      : []
+      : [];
 
     const clientCharMatchId =
-      charMatchedClient.length === 1 ? charMatchedClient[0].id : null
+      charMatchedClient.length === 1 ? charMatchedClient[0].id : null;
 
-    const shouldIgnoreCharMatch = false
+    const shouldIgnoreCharMatch = false;
 
-    let usedClientFallback = false
-    let updated = false
+    let usedClientFallback = false;
+    let updated = false;
 
     const resolvePartySide = (party: (typeof caseParties)[number]) => {
-      const label = normalizePartyLabel(party.party_type_label || '')
+      const label = normalizePartyLabel(party.party_type_label || "");
       if (label) {
-        if (PLAINTIFF_SIDE_LABELS.has(label)) return 'plaintiff'
-        if (DEFENDANT_SIDE_LABELS.has(label)) return 'defendant'
+        if (PLAINTIFF_SIDE_LABELS.has(label)) return "plaintiff";
+        if (DEFENDANT_SIDE_LABELS.has(label)) return "defendant";
       }
-      if (PLAINTIFF_SIDE_TYPES.has(party.party_type)) return 'plaintiff'
-      if (DEFENDANT_SIDE_TYPES.has(party.party_type)) return 'defendant'
-      return null
-    }
+      if (PLAINTIFF_SIDE_TYPES.has(party.party_type)) return "plaintiff";
+      if (DEFENDANT_SIDE_TYPES.has(party.party_type)) return "defendant";
+      return null;
+    };
 
     const next = casePartiesWithPending.map((party) => {
       // clients 조인은 case_clients로 이동됨 - party_name 직접 사용
-      if (party.party_name && !isMaskedPartyName(party.party_name)) return party
+      if (party.party_name && !isMaskedPartyName(party.party_name))
+        return party;
 
-      const side = resolvePartySide(party)
-      let fallbackName: string | null = null
+      const side = resolvePartySide(party);
+      let fallbackName: string | null = null;
 
       if (!usedClientFallback && hasClientFallback) {
-        // is_our_client, client_id는 case_clients로 이동됨 - is_primary 사용
-        if (party.is_primary) {
-          fallbackName = clientFallbackName
-          usedClientFallback = true
+        // 1순위: linked_party_id로 직접 연결된 당사자
+        if (linkedPartyId && party.id === linkedPartyId) {
+          fallbackName = clientFallbackName;
+          usedClientFallback = true;
+        // 2순위: is_primary 플래그
+        } else if (party.is_primary) {
+          fallbackName = clientFallbackName;
+          usedClientFallback = true;
+        // 3순위: client_role과 측 일치
         } else if (caseData.client_role && side === caseData.client_role) {
-          fallbackName = clientFallbackName
-          usedClientFallback = true
-        } else if (!caseData.client_role && !shouldIgnoreCharMatch && clientCharMatchId === party.id) {
-          fallbackName = clientFallbackName
-          usedClientFallback = true
+          fallbackName = clientFallbackName;
+          usedClientFallback = true;
+        // 4순위: 문자 매칭 (client_role 없을 때만)
+        } else if (
+          !caseData.client_role &&
+          !shouldIgnoreCharMatch &&
+          clientCharMatchId === party.id
+        ) {
+          fallbackName = clientFallbackName;
+          usedClientFallback = true;
         }
       }
 
-      if (!fallbackName) return party
+      if (!fallbackName) return party;
 
-      updated = true
+      updated = true;
       return {
         ...party,
-        party_name: preservePrefix(party.party_name || '', fallbackName),
-      }
-    })
+        party_name: preservePrefix(party.party_name || "", fallbackName),
+      };
+    });
 
-    return updated ? next : casePartiesWithPending
-  }, [casePartiesWithPending, caseData.client?.name, caseData.client_role])
+    return updated ? next : casePartiesWithPending;
+  }, [casePartiesWithPending, caseData.client?.name, caseData.client_role, caseClients]);
 
   const casePartiesForDisplay = useMemo(() => {
     const scourtParties = displayCaseParties.filter(
-      p => p.scourt_party_index !== null && p.scourt_party_index !== undefined
-    )
-    return scourtParties.length > 0 ? scourtParties : displayCaseParties
-  }, [displayCaseParties])
+      (p) =>
+        p.scourt_party_index !== null && p.scourt_party_index !== undefined,
+    );
+    return scourtParties.length > 0 ? scourtParties : displayCaseParties;
+  }, [displayCaseParties]);
 
   // clients 조인은 case_clients로 이동됨 - party_name만 사용
   const getUnmaskedPartyName = (party?: { party_name?: string | null }) => {
-    if (!party) return null
-    const partyName = party.party_name?.trim() || ''
+    if (!party) return null;
+    const partyName = party.party_name?.trim() || "";
     if (partyName && !isMaskedPartyName(partyName)) {
-      return partyName.replace(/^\d+\.\s*/, '').trim()
+      return partyName.replace(/^\d+\.\s*/, "").trim();
     }
-    return null
-  }
+    return null;
+  };
 
   const primaryParties = useMemo(() => {
-    const parties = casePartiesForDisplay
+    const parties = casePartiesForDisplay;
     if (parties.length === 0) {
-      return { clientParty: null, opponentParty: null, clientSide: null }
+      return { clientParty: null, opponentParty: null, clientSide: null };
     }
 
-    const primaryBySide = new Map<string, typeof parties[number]>()
-    parties.forEach(p => {
-      const side = getPartySideFromType(p.party_type)
-      if (!side) return
+    const primaryBySide = new Map<string, (typeof parties)[number]>();
+    parties.forEach((p) => {
+      const side = getPartySideFromType(p.party_type);
+      if (!side) return;
       if (p.is_primary && !primaryBySide.has(side)) {
-        primaryBySide.set(side, p)
+        primaryBySide.set(side, p);
       }
-    })
+    });
 
-    let clientSide: 'plaintiff' | 'defendant' | null = caseData.client_role || null
+    let clientSide: "plaintiff" | "defendant" | null = null;
+
+    // 1순위: case_clients의 linked_party_id로 연결된 당사자 찾기
+    const linkedPartyId = caseClients.find((cc) => cc.linked_party_id)?.linked_party_id;
+    if (linkedPartyId) {
+      const linkedParty = parties.find((p) => p.id === linkedPartyId);
+      if (linkedParty) {
+        clientSide = getPartySideFromType(linkedParty.party_type);
+      }
+    }
+
+    // 2순위: is_primary로 판단
     if (!clientSide) {
-      // is_our_client는 case_clients로 이동됨 - is_primary 사용
-      const clientParty = parties.find(p => p.is_primary)
-      clientSide = clientParty ? getPartySideFromType(clientParty.party_type) : null
+      const primaryClientParty = parties.find((p) => p.is_primary);
+      clientSide = primaryClientParty
+        ? getPartySideFromType(primaryClientParty.party_type)
+        : null;
     }
 
-    const pickSideParty = (side: 'plaintiff' | 'defendant') => {
-      return primaryBySide.get(side) || parties.find(p => getPartySideFromType(p.party_type) === side) || null
+    // 3순위: client_role (레거시, 있으면 사용)
+    if (!clientSide && caseData.client_role) {
+      clientSide = caseData.client_role;
     }
+
+    const pickSideParty = (side: "plaintiff" | "defendant") => {
+      return (
+        primaryBySide.get(side) ||
+        parties.find((p) => getPartySideFromType(p.party_type) === side) ||
+        null
+      );
+    };
 
     // 의뢰인 당사자 결정: clientSide가 있으면 해당 측 당사자, 없으면 첫 번째 당사자
-    // NOTE: is_our_client는 case_clients로 이동됨. primary 당사자 또는 첫 번째 당사자 사용
-    const clientParty = clientSide ? pickSideParty(clientSide) : (parties.find(p => p.is_primary) || parties[0])
-    const opponentSide = clientSide ? (clientSide === 'plaintiff' ? 'defendant' : 'plaintiff') : null
-    const opponentParty = opponentSide ? pickSideParty(opponentSide) : (parties.find(p => !p.is_primary && p !== clientParty) || null)
+    const clientParty = clientSide
+      ? pickSideParty(clientSide)
+      : parties.find((p) => p.is_primary) || parties[0];
+    const opponentSide = clientSide
+      ? clientSide === "plaintiff"
+        ? "defendant"
+        : "plaintiff"
+      : null;
+    const opponentParty = opponentSide
+      ? pickSideParty(opponentSide)
+      : parties.find((p) => !p.is_primary && p !== clientParty) || null;
 
-    return { clientParty, opponentParty, clientSide }
-  }, [casePartiesForDisplay, caseData.client_role])
+    return { clientParty, opponentParty, clientSide };
+  }, [casePartiesForDisplay, caseClients, caseData.client_role]);
+
+  // ScourtGeneralInfoXml에 전달할 의뢰인 이름 (caseClients에서 가져옴)
+  const resolvedClientName = useMemo(() => {
+    // 1순위: caseData.client?.name (캐시된 값)
+    let name = caseData.client?.name?.trim() || "";
+
+    // 2순위: caseClients에서 primary client의 이름 가져오기
+    if (!name || isMaskedPartyName(name)) {
+      const primaryCaseClient = caseClients.find(cc => cc.is_primary_client);
+      if (primaryCaseClient?.client?.name) {
+        name = primaryCaseClient.client.name.trim();
+      }
+    }
+
+    // 3순위: caseClients의 첫 번째 클라이언트 (primary가 없는 경우)
+    if (!name || isMaskedPartyName(name)) {
+      const firstCaseClient = caseClients.find(cc => cc.client?.name);
+      if (firstCaseClient?.client?.name) {
+        name = firstCaseClient.client.name.trim();
+      }
+    }
+
+    return name && !isMaskedPartyName(name) ? name : undefined;
+  }, [caseData.client?.name, caseClients]);
 
   // 알림 감지
   useEffect(() => {
     // SCOURT 문서 데이터를 notice-detector 형식으로 변환
-    const scourtDocuments = (scourtSnapshot?.documents || []).map(doc => ({
+    const scourtDocuments = (scourtSnapshot?.documents || []).map((doc) => ({
       ofdocRcptYmd: doc.date,
-      content1: doc.submitter,  // 제출자
-      content2: doc.content,    // 서류명
-    }))
+      content1: doc.submitter, // 제출자
+      content2: doc.content, // 서류명
+    }));
 
     // 미등록 관련사건/심급사건 (case_relations에 없는 것)
     // linkedCaseId가 있어도 case_relations에 등록되지 않았으면 미등록으로 표시
-    const existingRelatedCaseIds = new Set((caseData.case_relations || []).map(r => r.related_case_id))
+    const existingRelatedCaseIds = new Set(
+      (caseData.case_relations || []).map((r) => r.related_case_id),
+    );
     const existingRelatedCaseNumbers = new Set(
       (caseData.case_relations || [])
-        .map(r => r.related_case?.court_case_number)
-        .filter(Boolean)
-    )
+        .map((r) => r.related_case?.court_case_number)
+        .filter(Boolean),
+    );
     const unlinkedRelatedCases = (scourtSnapshot?.relatedCases || []).filter(
       (c: { linkedCaseId?: string | null; caseNo?: string }) => {
         // case_relations에 linkedCaseId로 등록됨 → 제외
-        if (c.linkedCaseId && existingRelatedCaseIds.has(c.linkedCaseId)) return false
+        if (c.linkedCaseId && existingRelatedCaseIds.has(c.linkedCaseId))
+          return false;
         // case_relations에 사건번호로 등록됨 → 제외
-        if (c.caseNo && existingRelatedCaseNumbers.has(c.caseNo)) return false
-        return true
-      }
-    )
+        if (c.caseNo && existingRelatedCaseNumbers.has(c.caseNo)) return false;
+        return true;
+      },
+    );
     const existingAppealCaseIds = new Set(
       (caseData.case_relations || [])
-        .filter(r => r.relation_type_code === 'appeal')
-        .map(r => r.related_case_id)
-    )
+        .filter((r) => r.relation_type_code === "appeal")
+        .map((r) => r.related_case_id),
+    );
     const existingAppealCaseNumbers = new Set(
       (caseData.case_relations || [])
-        .filter(r => r.relation_type_code === 'appeal')
-        .map(r => r.related_case?.court_case_number)
-        .filter(Boolean)
-    )
+        .filter((r) => r.relation_type_code === "appeal")
+        .map((r) => r.related_case?.court_case_number)
+        .filter(Boolean),
+    );
     const unlinkedLowerCourt = (scourtSnapshot?.lowerCourt || []).filter(
       (c: { linkedCaseId?: string | null; caseNo?: string }) => {
-        if (c.linkedCaseId && existingAppealCaseIds.has(c.linkedCaseId)) return false
-        if (c.caseNo && existingAppealCaseNumbers.has(c.caseNo)) return false
-        return true
-      }
-    )
+        if (c.linkedCaseId && existingAppealCaseIds.has(c.linkedCaseId))
+          return false;
+        if (c.caseNo && existingAppealCaseNumbers.has(c.caseNo)) return false;
+        return true;
+      },
+    );
 
     const notices = detectCaseNotices({
       caseId: caseData.id,
-      courtName: caseData.court_name || '',
+      courtName: caseData.court_name || "",
       deadlines: caseDeadlines,
       hearings: caseHearings,
       allHearings: allHearings,
@@ -1299,279 +1665,391 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       scourtDocuments: scourtDocuments,
       clientPartyType: caseData.client_role || null,
       // 의뢰인 역할 확인용
-      clientRoleStatus: (caseData as { client_role_status?: 'provisional' | 'confirmed' }).client_role_status || null,
+      clientRoleStatus:
+        (caseData as { client_role_status?: "provisional" | "confirmed" })
+          .client_role_status || null,
       clientName: caseData.client?.name || null,
-      opponentName: getUnmaskedPartyName(primaryParties.opponentParty ?? undefined),
+      opponentName: getUnmaskedPartyName(
+        primaryParties.opponentParty ?? undefined,
+      ),
       // 미등록 관련사건/심급사건
       unlinkedRelatedCases,
       unlinkedLowerCourt,
-    })
-    setCaseNotices(notices)
+    });
+    setCaseNotices(notices);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseData.id, caseData.court_name, caseData.client_role, (caseData as { client_role_status?: string }).client_role_status, caseData.client?.name, caseData.case_relations, primaryParties.opponentParty, caseDeadlines, caseHearings, allHearings, scourtSnapshot])
+  }, [
+    caseData.id,
+    caseData.court_name,
+    caseData.client_role,
+    (caseData as { client_role_status?: string }).client_role_status,
+    caseData.client?.name,
+    caseData.case_relations,
+    primaryParties.opponentParty,
+    caseDeadlines,
+    caseHearings,
+    allHearings,
+    scourtSnapshot,
+  ]);
 
-  // 계약서 파일 조회
-  useEffect(() => {
-    const fetchContractFiles = async () => {
-      try {
-        const res = await fetch(`/api/admin/cases/${caseData.id}/contracts`)
-        const data = await res.json()
-        if (data.success) {
-          setContractFiles(data.contracts || [])
-        }
-      } catch (error) {
-        console.error('Failed to fetch contract files:', error)
-      }
-    }
-    fetchContractFiles()
-  }, [caseData.id])
 
   // 알림 삭제 핸들러
   const handleDismissNotice = async (notice: CaseNotice) => {
     try {
       const res = await fetch(`/api/admin/cases/${caseData.id}/notices`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ noticeId: notice.id })
-      })
-      const data = await res.json()
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noticeId: notice.id }),
+      });
+      const data = await res.json();
       if (data.success) {
-        setDismissedNoticeIds(prev => new Set([...prev, notice.id]))
+        setDismissedNoticeIds((prev) => new Set([...prev, notice.id]));
       }
     } catch (error) {
-      console.error('Failed to dismiss notice:', error)
+      console.error("Failed to dismiss notice:", error);
     }
-  }
+  };
+
+  // 관련사건 프리뷰 핸들러
+  const handleRelatedCasePreview = useCallback((notice: CaseNotice) => {
+    const caseNo =
+      notice.metadata?.relatedCaseNo || notice.metadata?.caseNo || "";
+    const courtName = notice.metadata?.courtName || "";
+    const relationType =
+      notice.metadata?.relationType ||
+      (notice.category === "unlinked_lower_court" ? "심급사건" : "관련사건");
+    const encCsNo = notice.metadata?.encCsNo;
+
+    setSelectedRelatedCase({
+      caseNo,
+      courtName,
+      relationType,
+      encCsNo,
+    });
+    setPreviewModalOpen(true);
+  }, []);
+
+  // 관련사건 연동 핸들러
+  const handleLinkRelatedCase = useCallback(async () => {
+    if (!selectedRelatedCase) return;
+    // Close modal and refresh
+    setPreviewModalOpen(false);
+    const caseNoForKey = selectedRelatedCase.caseNo;
+    setSelectedRelatedCase(null);
+    // The actual linking will be done via existing RelatedCaseConfirmModal flow
+    // For now, just trigger a snapshot refresh
+    await fetchScourtSnapshot();
+    // Remove from dismissed set if it was there
+    const caseType =
+      selectedRelatedCase.relationType === "심급사건"
+        ? "lower_court"
+        : "related_case";
+    setDismissedRelatedCases((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(`${caseType}:${caseNoForKey}`);
+      return newSet;
+    });
+  }, [selectedRelatedCase]);
+
+  // 관련사건 연동안함 핸들러 (모달용)
+  const handleDismissRelatedCaseFromModal = useCallback(async () => {
+    if (!selectedRelatedCase) return;
+    const caseType =
+      selectedRelatedCase.relationType === "심급사건"
+        ? "lower_court"
+        : "related_case";
+    try {
+      const res = await fetch(`/api/admin/cases/${caseData.id}/related-cases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          relatedCaseNo: selectedRelatedCase.caseNo,
+          relatedCaseType: caseType,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDismissedRelatedCases(
+          (prev) =>
+            new Set([...prev, `${caseType}:${selectedRelatedCase.caseNo}`]),
+        );
+      }
+    } catch (error) {
+      console.error("Failed to dismiss related case:", error);
+    }
+    setPreviewModalOpen(false);
+    setSelectedRelatedCase(null);
+  }, [selectedRelatedCase, caseData.id]);
 
   // 알림 액션 핸들러 (역할 확정 등)
-  const handleNoticeAction = async (notice: CaseNotice, actionType: string, metadata?: { opponentName?: string }) => {
+  const handleNoticeAction = async (
+    notice: CaseNotice,
+    actionType: string,
+    metadata?: { opponentName?: string },
+  ) => {
     // 의뢰인 역할 확정 처리
-    if (actionType === 'confirm_plaintiff' || actionType === 'confirm_defendant') {
-      const newRole = actionType === 'confirm_plaintiff' ? 'plaintiff' : 'defendant'
-      const opponentNameInput = metadata?.opponentName?.trim()
+    if (
+      actionType === "confirm_plaintiff" ||
+      actionType === "confirm_defendant"
+    ) {
+      const newRole =
+        actionType === "confirm_plaintiff" ? "plaintiff" : "defendant";
+      const opponentNameInput = metadata?.opponentName?.trim();
 
       if (opponentNameInput && primaryParties.opponentParty) {
-        const baseName = primaryParties.opponentParty.party_name || ''
-        const nextName = baseName ? preservePrefix(baseName, opponentNameInput) : opponentNameInput
+        const baseName = primaryParties.opponentParty.party_name || "";
+        const nextName = baseName
+          ? preservePrefix(baseName, opponentNameInput)
+          : opponentNameInput;
 
         try {
-          const partyId = primaryParties.opponentParty.id
+          const partyId = primaryParties.opponentParty.id;
           const res = await fetch(`/api/admin/cases/${caseData.id}/parties`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               partyId,
               party_name: nextName,
-            })
-          })
+            }),
+          });
 
           if (res.ok) {
-            const responseData = await res.json()
+            const responseData = await res.json();
             // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신 (fetchCaseParties 대신)
             if (responseData.data) {
-              setCaseParties(prev =>
-                prev.map(p => p.id === partyId ? { ...p, ...responseData.data } : p)
-              )
+              setCaseParties((prev) =>
+                prev.map((p) =>
+                  p.id === partyId ? { ...p, ...responseData.data } : p,
+                ),
+              );
             }
           } else {
-            const data = await res.json()
-            console.error('상대방 이름 저장 실패:', data.error)
+            const data = await res.json();
+            console.error("상대방 이름 저장 실패:", data.error);
           }
         } catch (error) {
-          console.error('상대방 이름 저장 중 오류:', error)
+          console.error("상대방 이름 저장 중 오류:", error);
         }
       }
 
       try {
         const res = await fetch(`/api/admin/cases/${caseData.id}/client-role`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             client_role: newRole,
-            status: 'confirmed',
-          })
-        })
+            status: "confirmed",
+          }),
+        });
 
-        const data = await res.json()
+        const data = await res.json();
         if (data.success) {
           // 페이지 새로고침으로 업데이트된 데이터 반영
-          router.refresh()
+          router.refresh();
         } else {
-          console.error('Failed to confirm client role:', data.error)
+          console.error("Failed to confirm client role:", data.error);
         }
       } catch (error) {
-        console.error('Failed to confirm client role:', error)
+        console.error("Failed to confirm client role:", error);
       }
-      return
+      return;
     }
 
     // 기일 충돌 등 다른 액션은 여기서 처리
-    console.log('Notice action:', notice.id, actionType)
-  }
+    console.log("Notice action:", notice.id, actionType);
+  };
 
   // 관련사건 연동안함 핸들러
-  const handleDismissRelatedCase = async (caseNo: string, caseType: 'lower_court' | 'related_case') => {
+  const handleDismissRelatedCase = async (
+    caseNo: string,
+    caseType: "lower_court" | "related_case",
+  ) => {
     try {
       const res = await fetch(`/api/admin/cases/${caseData.id}/related-cases`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           relatedCaseNo: caseNo,
-          relatedCaseType: caseType
-        })
-      })
-      const data = await res.json()
+          relatedCaseType: caseType,
+        }),
+      });
+      const data = await res.json();
       if (data.success) {
-        setDismissedRelatedCases(prev => new Set([...prev, `${caseType}:${caseNo}`]))
+        setDismissedRelatedCases(
+          (prev) => new Set([...prev, `${caseType}:${caseNo}`]),
+        );
       }
     } catch (error) {
-      console.error('Failed to dismiss related case:', error)
+      console.error("Failed to dismiss related case:", error);
     }
-  }
+  };
 
   // 삭제되지 않은 알림만 필터링
-  const filteredNotices = caseNotices.filter(n => !dismissedNoticeIds.has(n.id))
+  const filteredNotices = caseNotices.filter(
+    (n) => !dismissedNoticeIds.has(n.id),
+  );
 
   // 등록되지 않은 의뢰인 감지
   // NOTE: 의뢰인 관계는 이제 case_clients에서 관리됨
   // primary_client_id가 없으면 의뢰인이 등록되지 않은 것으로 간주
   const isUnregisteredClient = useMemo(() => {
-    return !caseData.primary_client_id && caseParties.some(p => p.is_primary)
-  }, [caseData.primary_client_id, caseParties])
+    return !caseData.primary_client_id && caseParties.some((p) => p.is_primary);
+  }, [caseData.primary_client_id, caseParties]);
 
   const formatCurrency = (amount: number | null) => {
-    if (!amount) return '-'
-    return `${amount.toLocaleString('ko-KR')}원`
-  }
+    if (!amount) return "-";
+    return `${amount.toLocaleString("ko-KR")}원`;
+  };
 
   const calculateOutstandingBalance = () => {
-    const retainer = caseData.retainer_fee || 0
-    const successFee = caseData.calculated_success_fee || 0
-    const received = (paymentTotal ?? caseData.total_received) || 0
-    return retainer + successFee - received
-  }
+    const retainer = caseData.retainer_fee || 0;
+    const successFee = caseData.calculated_success_fee || 0;
+    const received = (paymentTotal ?? caseData.total_received) || 0;
+    return retainer + successFee - received;
+  };
 
   const formatDate = (date: string | null) => {
-    if (!date) return '-'
-    const d = new Date(date)
-    const year = String(d.getFullYear()).slice(2)
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    return `${year}.${month}.${day}`
-  }
+    if (!date) return "-";
+    const d = new Date(date);
+    const year = String(d.getFullYear()).slice(2);
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}.${month}.${day}`;
+  };
 
   const _formatDateTime = (datetime: string) => {
-    const d = new Date(datetime)
-    const year = String(d.getFullYear()).slice(2)
-    const month = String(d.getMonth() + 1).padStart(2, '0')
-    const day = String(d.getDate()).padStart(2, '0')
-    const hour = String(d.getHours()).padStart(2, '0')
-    const minute = String(d.getMinutes()).padStart(2, '0')
-    return `${year}.${month}.${day} ${hour}:${minute}`
-  }
+    const d = new Date(datetime);
+    const year = String(d.getFullYear()).slice(2);
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const hour = String(d.getHours()).padStart(2, "0");
+    const minute = String(d.getMinutes()).padStart(2, "0");
+    return `${year}.${month}.${day} ${hour}:${minute}`;
+  };
 
   // 진행내용 일자 포맷 (YYYYMMDD -> YY.MM.DD)
   const formatProgressDate = (dateStr: string | null) => {
-    if (!dateStr) return '-'
+    if (!dateStr) return "-";
     // YYYYMMDD 형식
     if (dateStr.length === 8 && /^\d{8}$/.test(dateStr)) {
-      return `${dateStr.slice(2,4)}.${dateStr.slice(4,6)}.${dateStr.slice(6,8)}`
+      return `${dateStr.slice(2, 4)}.${dateStr.slice(4, 6)}.${dateStr.slice(6, 8)}`;
     }
     // YYYY-MM-DD 형식
     if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
-      return `${dateStr.slice(2,4)}.${dateStr.slice(5,7)}.${dateStr.slice(8,10)}`
+      return `${dateStr.slice(2, 4)}.${dateStr.slice(5, 7)}.${dateStr.slice(8, 10)}`;
     }
     // YYYY.MM.DD 형식
     if (/^\d{4}\.\d{2}\.\d{2}/.test(dateStr)) {
-      return `${dateStr.slice(2,4)}.${dateStr.slice(5,7)}.${dateStr.slice(8,10)}`
+      return `${dateStr.slice(2, 4)}.${dateStr.slice(5, 7)}.${dateStr.slice(8, 10)}`;
     }
     // "YYYY.MM.DD 도달" 같은 형식
-    const match = dateStr.match(/(\d{4})\.(\d{2})\.(\d{2})/)
+    const match = dateStr.match(/(\d{4})\.(\d{2})\.(\d{2})/);
     if (match) {
-      return dateStr.replace(match[0], `${match[1].slice(2)}.${match[2]}.${match[3]}`)
+      return dateStr.replace(
+        match[0],
+        `${match[1].slice(2)}.${match[2]}.${match[3]}`,
+      );
     }
-    return dateStr
-  }
+    return dateStr;
+  };
 
   // basicInfo 필드 조회 헬퍼 (한글/API 필드명 모두 지원)
-  const getBasicInfo = (koreanKey: string, apiKey?: string): string | number | undefined => {
-    if (!scourtSnapshot?.basicInfo) return undefined
-    const info = scourtSnapshot.basicInfo as Record<string, unknown>
-    const value = info[koreanKey] || (apiKey ? info[apiKey] : undefined)
-    if (typeof value === 'string' || typeof value === 'number') return value
-    return undefined
-  }
+  const getBasicInfo = (
+    koreanKey: string,
+    apiKey?: string,
+  ): string | number | undefined => {
+    if (!scourtSnapshot?.basicInfo) return undefined;
+    const info = scourtSnapshot.basicInfo as Record<string, unknown>;
+    const value = info[koreanKey] || (apiKey ? info[apiKey] : undefined);
+    if (typeof value === "string" || typeof value === "number") return value;
+    return undefined;
+  };
 
   // 사건 카테고리에 따른 당사자 라벨 결정 (스키마 기반)
-  const getPartyLabels = (): { plaintiff: string; defendant: string; isCriminal: boolean } => {
-    const courtCaseNum = caseData.court_case_number || ''
-    return getPartyLabelsFromSchema(courtCaseNum)
-  }
+  const getPartyLabels = (): {
+    plaintiff: string;
+    defendant: string;
+    isCriminal: boolean;
+  } => {
+    const courtCaseNum = caseData.court_case_number || "";
+    return getPartyLabelsFromSchema(courtCaseNum);
+  };
 
   const relatedCaseLinks = useMemo(() => {
-    const linkMap: Record<string, string> = {}
-    const relations = caseData.case_relations || []
+    const linkMap: Record<string, string> = {};
+    const relations = caseData.case_relations || [];
     relations.forEach((relation) => {
-      const relatedNumber = relation.related_case?.court_case_number
-      if (!relatedNumber) return
-      const normalized = normalizeCaseNumber(relatedNumber)
+      const relatedNumber = relation.related_case?.court_case_number;
+      if (!relatedNumber) return;
+      const normalized = normalizeCaseNumber(relatedNumber);
       if (normalized) {
-        linkMap[normalized] = relation.related_case_id
+        linkMap[normalized] = relation.related_case_id;
       }
-      linkMap[relatedNumber] = relation.related_case_id
-    })
-    return linkMap
-  }, [caseData.case_relations])
+      linkMap[relatedNumber] = relation.related_case_id;
+    });
+    return linkMap;
+  }, [caseData.case_relations]);
 
   const preferredPartyName = useMemo(() => {
-    const normalizePartyName = (name: string) => name.replace(/^\d+\.\s*/, '').trim()
-    const unmaskedParties = casePartiesForDisplay.filter(party => !isMaskedPartyName(party.party_name))
+    const normalizePartyName = (name: string) =>
+      name.replace(/^\d+\.\s*/, "").trim();
+    const unmaskedParties = casePartiesForDisplay.filter(
+      (party) => !isMaskedPartyName(party.party_name),
+    );
     // is_our_client는 case_clients로 이동됨 - is_primary 또는 첫 번째 당사자 사용
-    const preferredParty = unmaskedParties.find(party => party.is_primary) || unmaskedParties[0]
+    const preferredParty =
+      unmaskedParties.find((party) => party.is_primary) || unmaskedParties[0];
 
     if (preferredParty) {
-      return normalizePartyName(preferredParty.party_name)
+      return normalizePartyName(preferredParty.party_name);
     }
 
-    if (caseData.client?.name) return normalizePartyName(caseData.client.name)
-    return ''
-  }, [casePartiesForDisplay, caseData.client?.name])
+    if (caseData.client?.name) return normalizePartyName(caseData.client.name);
+    return "";
+  }, [casePartiesForDisplay, caseData.client?.name]);
 
   // 대리인 중 우리 사무소 소속인 경우만 필터링 (ScourtGeneralInfoXml의 RepresentativeOverride 형식으로 변환)
   const ourFirmRepresentatives = useMemo(() => {
     return caseRepresentatives
       .filter((rep) => rep.is_our_firm)
-      .map(rep => ({
+      .map((rep) => ({
         representative_name: rep.name,
         representative_type_label: rep.type_label,
         law_firm_name: rep.law_firm,
         is_our_firm: rep.is_our_firm,
-      }))
-  }, [caseRepresentatives])
+      }));
+  }, [caseRepresentatives]);
 
   // 진행내용 카테고리 분류 (SCOURT progCttDvs 필드 기반)
   // progCttDvs: 0=법원(검정), 1=기일(파랑), 2=명령(녹색), 3=제출(진빨강), 4=송달(주황)
-  const getProgressCategory = (item: ScourtProgressItem): 'hearing' | 'order' | 'submit' | 'delivery' | 'court' => {
+  const getProgressCategory = (
+    item: ScourtProgressItem,
+  ): "hearing" | "order" | "submit" | "delivery" | "court" => {
     // SCOURT progCttDvs 필드가 있으면 우선 사용
     if (item.progCttDvs !== undefined) {
       switch (item.progCttDvs) {
-        case '1': return 'hearing'   // 기일
-        case '2': return 'order'     // 명령
-        case '3': return 'submit'    // 제출
-        case '4': return 'delivery'  // 송달
-        case '0':
-        default: return 'court'      // 법원/기타
+        case "1":
+          return "hearing"; // 기일
+        case "2":
+          return "order"; // 명령
+        case "3":
+          return "submit"; // 제출
+        case "4":
+          return "delivery"; // 송달
+        case "0":
+        default:
+          return "court"; // 법원/기타
       }
     }
 
     // progCttDvs 없을 때 폴백: 내용 기반 분류 (기존 데이터 호환)
-    const content = item.content || ''
-    if (content.includes('송달')) return 'delivery'
-    if (content.includes('기일')) return 'hearing'
-    if (content.includes('명령')) return 'order'
-    if (content.includes('제출')) return 'submit'
-    return 'court'
-  }
+    const content = item.content || "";
+    if (content.includes("송달")) return "delivery";
+    if (content.includes("기일")) return "hearing";
+    if (content.includes("명령")) return "order";
+    if (content.includes("제출")) return "submit";
+    return "court";
+  };
 
   // 진행내용 색상 결정 (SCOURT와 동일한 색상) - 5색 분류 유지
   // - Blue (#003399): 기일 (progCttDvs=1)
@@ -1580,308 +2058,420 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   // - Orange (#CC6600): 송달 (progCttDvs=4)
   // - Black (#000000): 법원/기타 (progCttDvs=0)
   const getProgressColor = (item: ScourtProgressItem): string => {
-    const category = getProgressCategory(item)
+    const category = getProgressCategory(item);
     switch (category) {
-      case 'delivery': return '#CC6600'  // 송달
-      case 'hearing': return '#003399'   // 기일
-      case 'order': return '#336633'     // 명령
-      case 'submit': return '#660000'    // 제출
-      case 'court': return '#000000'     // 법원/기타
-      default: return '#000000'
+      case "delivery":
+        return "#CC6600"; // 송달
+      case "hearing":
+        return "#003399"; // 기일
+      case "order":
+        return "#336633"; // 명령
+      case "submit":
+        return "#660000"; // 제출
+      case "court":
+        return "#000000"; // 법원/기타
+      default:
+        return "#000000";
     }
-  }
+  };
 
   // 진행내용 필터링
   const filterProgress = (items: ScourtProgressItem[]) => {
-    if (progressFilter === 'all') return items
-    return items.filter(item => getProgressCategory(item) === progressFilter)
-  }
+    if (progressFilter === "all") return items;
+    return items.filter((item) => getProgressCategory(item) === progressFilter);
+  };
 
   // 당사자 이름 조회 (의뢰인 여부 포함)
-  const getPartyName = (role: 'plaintiff' | 'defendant', scourtName?: string) => {
+  const getPartyName = (
+    role: "plaintiff" | "defendant",
+    scourtName?: string,
+  ) => {
     // 1. client_role이 설정된 경우
-    const isClient = caseData.client_role === role
+    const isClient = caseData.client_role === role;
     if (isClient && caseData.client?.name) {
-      return { name: caseData.client.name, isClient: true }
+      return { name: caseData.client.name, isClient: true };
     }
 
     // 2. client_role이 없는 경우 - SCOURT 익명화 이름과 의뢰인 이름 매칭 시도
     // 단, parties 배열에서 유일하게 매칭되는 경우에만 적용
     if (!caseData.client_role && caseData.client?.name && scourtName) {
-      const clientFirstChar = caseData.client.name.charAt(0)
+      const clientFirstChar = caseData.client.name.charAt(0);
       // "1. 이OO" 형식에서 이름 추출
-      const cleanedScourtName = scourtName.replace(/^\d+\.\s*/, '').trim()
-      const scourtFirstChar = cleanedScourtName.charAt(0)
+      const cleanedScourtName = scourtName.replace(/^\d+\.\s*/, "").trim();
+      const scourtFirstChar = cleanedScourtName.charAt(0);
 
       // parties 배열에서 매칭되는 당사자 수 확인
-      interface PartyItem { btprNm?: string }
-      const basicInfo = scourtSnapshot?.basicInfo as { parties?: PartyItem[] } | undefined
-      const partiesArr = basicInfo?.parties || []
+      interface PartyItem {
+        btprNm?: string;
+      }
+      const basicInfo = scourtSnapshot?.basicInfo as
+        | { parties?: PartyItem[] }
+        | undefined;
+      const partiesArr = basicInfo?.parties || [];
       const matchingParties = partiesArr.filter((p: PartyItem) => {
-        const cleaned = (p.btprNm || '').replace(/^\d+\.\s*/, '').trim()
-        return cleaned.charAt(0) === clientFirstChar && isMaskedPartyName(cleaned)
-      })
+        const cleaned = (p.btprNm || "").replace(/^\d+\.\s*/, "").trim();
+        return (
+          cleaned.charAt(0) === clientFirstChar && isMaskedPartyName(cleaned)
+        );
+      });
 
       // 유일하게 매칭되는 경우에만 의뢰인으로 표시
-      if (matchingParties.length === 1 && clientFirstChar === scourtFirstChar && isMaskedPartyName(cleanedScourtName)) {
-        return { name: caseData.client.name, isClient: true }
+      if (
+        matchingParties.length === 1 &&
+        clientFirstChar === scourtFirstChar &&
+        isMaskedPartyName(cleanedScourtName)
+      ) {
+        return { name: caseData.client.name, isClient: true };
       }
     }
 
     if (scourtName) {
-      return { name: scourtName, isClient: false }
+      return { name: scourtName, isClient: false };
     }
-    return { name: '-', isClient: false }
-  }
+    return { name: "-", isClient: false };
+  };
 
   // 사건 상태 결정 (SCOURT 데이터 기반)
   const getCaseStatusInfo = () => {
     // 종국결과가 있으면 null 반환 (결과 배지가 별도로 표시되므로 "선고" 불필요)
-    if (getBasicInfo('종국결과', 'endRslt') || caseData.case_result) {
-      return null
+    if (getBasicInfo("종국결과", "endRslt") || caseData.case_result) {
+      return null;
     }
     // 기본 상태
-    return caseData.status === '진행중'
-      ? { label: '진행중', style: 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' }
-      : { label: caseData.status, style: 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]' }
-  }
+    return caseData.status === "진행중"
+      ? {
+          label: "진행중",
+          style: "bg-[var(--sage-muted)] text-[var(--sage-primary)]",
+        }
+      : {
+          label: caseData.status,
+          style: "bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]",
+        };
+  };
 
   // 당사자 정보에서 "의뢰인 v 상대방" 문자열 생성
   const _getPartyVsString = useCallback(() => {
     if (casePartiesForDisplay.length === 0) {
       // 당사자 정보 없으면 기존 데이터 사용
-      const clientName = caseData.client?.name || '의뢰인'
-      const opponentName = '상대방'
-      return `${clientName} v ${opponentName}`
+      const clientName = caseData.client?.name || "의뢰인";
+      const opponentName = "상대방";
+      return `${clientName} v ${opponentName}`;
     }
 
     // 의뢰인 찾기 (is_primary 또는 primary_client_name 사용)
     // NOTE: is_our_client는 case_clients로 이동됨
-    const ourClient = casePartiesForDisplay.find(p => p.is_primary) || casePartiesForDisplay[0]
-    const ourClientName = caseData.primary_client_name || ourClient?.party_name || caseData.client?.name || '의뢰인'
+    const ourClient =
+      casePartiesForDisplay.find((p) => p.is_primary) ||
+      casePartiesForDisplay[0];
+    const ourClientName =
+      caseData.primary_client_name ||
+      ourClient?.party_name ||
+      caseData.client?.name ||
+      "의뢰인";
 
     // 상대방 찾기 (의뢰인이 아닌 당사자)
-    const opponent = casePartiesForDisplay.find(p => p !== ourClient)
-    const opponentName = opponent?.party_name || '상대방'
+    const opponent = casePartiesForDisplay.find((p) => p !== ourClient);
+    const opponentName = opponent?.party_name || "상대방";
 
-    return `${ourClientName} v ${opponentName}`
-  }, [casePartiesForDisplay, caseData.primary_client_name, caseData.client?.name])
+    return `${ourClientName} v ${opponentName}`;
+  }, [
+    casePartiesForDisplay,
+    caseData.primary_client_name,
+    caseData.client?.name,
+  ]);
 
   // 당사자 정보 렌더링 (간소화)
   // 우선순위: case_parties (DB, SCOURT 라벨 반영) > 기존 fallback
   const renderPartyInfo = () => {
-    const partyLabels = getPartyLabels()
+    const partyLabels = getPartyLabels();
 
     // 번호 접두사 제거 함수 (예: "1. 정OO" -> "정OO")
-    const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, '')
-    const PARTY_NAME_SUFFIX_REGEX = /\s*외\s*\d+\s*(?:명)?\s*$/
+    const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, "");
+    const PARTY_NAME_SUFFIX_REGEX = /\s*외\s*\d+\s*(?:명)?\s*$/;
 
     // clients 조인은 case_clients로 이동됨 - party_name만 사용
-    const resolveCasePartyName = (party: (typeof casePartiesForDisplay)[number]) => {
-      const partyName = party.party_name?.trim()
-      if (partyName && !isMaskedPartyName(partyName)) return removeNumberPrefix(partyName)
-      return null
-    }
+    const resolveCasePartyName = (
+      party: (typeof casePartiesForDisplay)[number],
+    ) => {
+      const partyName = party.party_name?.trim();
+      if (partyName && !isMaskedPartyName(partyName))
+        return removeNumberPrefix(partyName);
+      return null;
+    };
 
     const applyDisplayName = (originalName: string, fullName: string) => {
-      const combined = originalName ? preservePrefix(originalName, fullName) : fullName
-      return removeNumberPrefix(combined)
-    }
+      const combined = originalName
+        ? preservePrefix(originalName, fullName)
+        : fullName;
+      return removeNumberPrefix(combined);
+    };
 
-    const getSideFromLabel = (label: string): 'plaintiff' | 'defendant' | null => {
-      const normalized = normalizePartyLabel(label)
-      if (PLAINTIFF_SIDE_LABELS.has(normalized)) return 'plaintiff'
-      if (DEFENDANT_SIDE_LABELS.has(normalized)) return 'defendant'
-      return null
-    }
+    const getSideFromLabel = (
+      label: string,
+    ): "plaintiff" | "defendant" | null => {
+      const normalized = normalizePartyLabel(label);
+      if (PLAINTIFF_SIDE_LABELS.has(normalized)) return "plaintiff";
+      if (DEFENDANT_SIDE_LABELS.has(normalized)) return "defendant";
+      return null;
+    };
 
-    const getCasePartyLabel = (party: (typeof casePartiesForDisplay)[number]) => (
+    const getCasePartyLabel = (party: (typeof casePartiesForDisplay)[number]) =>
       normalizePartyLabel(
         party.scourt_label_raw ||
-        party.party_type_label ||
-        PARTY_TYPE_LABELS[party.party_type as keyof typeof PARTY_TYPE_LABELS] ||
-        ''
-      )
-    )
+          party.party_type_label ||
+          PARTY_TYPE_LABELS[
+            party.party_type as keyof typeof PARTY_TYPE_LABELS
+          ] ||
+          "",
+      );
 
-    const getCasePartySide = (party: (typeof casePartiesForDisplay)[number]) => {
-      const labelSide = getSideFromLabel(getCasePartyLabel(party))
-      if (labelSide) return labelSide
-      if (PLAINTIFF_SIDE_TYPES.has(party.party_type)) return 'plaintiff'
-      if (DEFENDANT_SIDE_TYPES.has(party.party_type)) return 'defendant'
-      return null
-    }
+    const getCasePartySide = (
+      party: (typeof casePartiesForDisplay)[number],
+    ) => {
+      const labelSide = getSideFromLabel(getCasePartyLabel(party));
+      if (labelSide) return labelSide;
+      if (PLAINTIFF_SIDE_TYPES.has(party.party_type)) return "plaintiff";
+      if (DEFENDANT_SIDE_TYPES.has(party.party_type)) return "defendant";
+      return null;
+    };
 
-    const heroPartyLabels = new Set([
-      '원고', '피고', '채권자', '채무자', '신청인', '피신청인',
-      '항소인', '피항소인', '상고인', '피상고인', '항고인', '피항고인', '상대방',
-      '행위자', '보호소년',
-      '피고인', '피고인명',
-      '피해아동', '피해자',
-      '제3채무자'
-    ].map(label => normalizePartyLabel(label)))
+    const heroPartyLabels = new Set(
+      [
+        "원고",
+        "피고",
+        "채권자",
+        "채무자",
+        "신청인",
+        "피신청인",
+        "항소인",
+        "피항소인",
+        "상고인",
+        "피상고인",
+        "항고인",
+        "피항고인",
+        "상대방",
+        "행위자",
+        "보호소년",
+        "피고인",
+        "피고인명",
+        "피해아동",
+        "피해자",
+        "제3채무자",
+      ].map((label) => normalizePartyLabel(label)),
+    );
 
     // 1. scourtSnapshot에서 당사자 정보 추출
     //    rawData.dlt_btprtCttLst: 원본 당사자 목록 (btprDvsNm/btprtStndngNm이 실제 라벨)
     //    basicInfo.titRprsPtnr/titRprsRqstr: 대표 라벨 (신청인/피신청인 등)
     interface RawPartyItem {
-      btprDvsNm?: string      // 당사자 유형 (basicInfo.parties)
-      btprtDvsNm?: string     // 당사자 유형 (rawData.data.dlt_btprtCttLst)
-      btprtStndngNm?: string  // 당사자 구분 (대안 필드)
-      btprNm?: string         // 이름 (basicInfo.parties)
-      btprtNm?: string        // 이름 (rawData.data.dlt_btprtCttLst)
+      btprDvsNm?: string; // 당사자 유형 (basicInfo.parties)
+      btprtDvsNm?: string; // 당사자 유형 (rawData.data.dlt_btprtCttLst)
+      btprtStndngNm?: string; // 당사자 구분 (대안 필드)
+      btprNm?: string; // 이름 (basicInfo.parties)
+      btprtNm?: string; // 이름 (rawData.data.dlt_btprtCttLst)
     }
     interface BasicInfoWithLabelsAndParties {
-      parties?: RawPartyItem[]
-      titRprsPtnr?: string
-      titRprsRqstr?: string
+      parties?: RawPartyItem[];
+      titRprsPtnr?: string;
+      titRprsRqstr?: string;
     }
     interface RawDataWithParties {
       data?: {
-        dlt_btprtCttLst?: RawPartyItem[]
-      }
-      dlt_btprtCttLst?: RawPartyItem[]
+        dlt_btprtCttLst?: RawPartyItem[];
+      };
+      dlt_btprtCttLst?: RawPartyItem[];
     }
-    const scourtBasicInfo = scourtSnapshot?.basicInfo as BasicInfoWithLabelsAndParties | undefined
-    const scourtRawData = scourtSnapshot?.rawData as RawDataWithParties | undefined
+    const scourtBasicInfo = scourtSnapshot?.basicInfo as
+      | BasicInfoWithLabelsAndParties
+      | undefined;
+    const scourtRawData = scourtSnapshot?.rawData as
+      | RawDataWithParties
+      | undefined;
 
     // 원본 당사자 목록: rawData.data에서 먼저 시도, 없으면 rawData 직접, 없으면 basicInfo.parties 사용
-    const rawParties = scourtRawData?.data?.dlt_btprtCttLst || scourtRawData?.dlt_btprtCttLst || scourtBasicInfo?.parties || []
+    const rawParties =
+      scourtRawData?.data?.dlt_btprtCttLst ||
+      scourtRawData?.dlt_btprtCttLst ||
+      scourtBasicInfo?.parties ||
+      [];
 
-    const scourtLabelByIndex = new Map<number, string>()
-    const scourtLabelByNormalized = new Map<string, string>()
+    const scourtLabelByIndex = new Map<number, string>();
+    const scourtLabelByNormalized = new Map<string, string>();
 
     rawParties.forEach((p, index) => {
-      const rawLabel = p.btprtDvsNm || p.btprDvsNm || p.btprtStndngNm || ''
-      const normalizedLabel = normalizePartyLabel(rawLabel)
-      if (!normalizedLabel || normalizedLabel.startsWith('사건본인')) return
-      const displayLabel = rawLabel.trim() || normalizedLabel
-      scourtLabelByIndex.set(index, displayLabel)
+      const rawLabel = p.btprtDvsNm || p.btprDvsNm || p.btprtStndngNm || "";
+      const normalizedLabel = normalizePartyLabel(rawLabel);
+      if (!normalizedLabel || normalizedLabel.startsWith("사건본인")) return;
+      const displayLabel = rawLabel.trim() || normalizedLabel;
+      scourtLabelByIndex.set(index, displayLabel);
       if (!scourtLabelByNormalized.has(normalizedLabel)) {
-        scourtLabelByNormalized.set(normalizedLabel, displayLabel)
+        scourtLabelByNormalized.set(normalizedLabel, displayLabel);
       }
-    })
+    });
 
     const heroPartyTypes = new Set([
-      'plaintiff',
-      'defendant',
-      'creditor',
-      'debtor',
-      'applicant',
-      'respondent',
-      'actor',
-      'juvenile',
-      'accused',
-      'third_debtor',
-    ])
+      "plaintiff",
+      "defendant",
+      "creditor",
+      "debtor",
+      "applicant",
+      "respondent",
+      "actor",
+      "juvenile",
+      "accused",
+      "third_debtor",
+    ]);
 
-    const getFallbackLabel = (party: (typeof casePartiesForDisplay)[number]) => (
+    const getFallbackLabel = (party: (typeof casePartiesForDisplay)[number]) =>
       party.scourt_label_raw ||
       party.party_type_label ||
       PARTY_TYPE_LABELS[party.party_type as keyof typeof PARTY_TYPE_LABELS] ||
-      ''
-    )
+      "";
 
-    const getDisplayLabelForParty = (party: (typeof casePartiesForDisplay)[number]) => {
-      const fallbackLabel = getFallbackLabel(party)
-      const normalizedLabel = normalizePartyLabel(fallbackLabel)
-      if (party.scourt_party_index !== null && party.scourt_party_index !== undefined) {
-        const scourtLabel = scourtLabelByIndex.get(party.scourt_party_index)
-        if (scourtLabel) return scourtLabel
+    const getDisplayLabelForParty = (
+      party: (typeof casePartiesForDisplay)[number],
+    ) => {
+      const fallbackLabel = getFallbackLabel(party);
+      const normalizedLabel = normalizePartyLabel(fallbackLabel);
+      if (
+        party.scourt_party_index !== null &&
+        party.scourt_party_index !== undefined
+      ) {
+        const scourtLabel = scourtLabelByIndex.get(party.scourt_party_index);
+        if (scourtLabel) return scourtLabel;
       }
       if (normalizedLabel && scourtLabelByNormalized.has(normalizedLabel)) {
-        return scourtLabelByNormalized.get(normalizedLabel) || fallbackLabel
+        return scourtLabelByNormalized.get(normalizedLabel) || fallbackLabel;
       }
-      return fallbackLabel
-    }
+      return fallbackLabel;
+    };
 
     if (casePartiesForDisplay.length > 0) {
-      const sideGroups: Record<'plaintiff' | 'defendant', (typeof casePartiesForDisplay)[number][]> = {
+      const sideGroups: Record<
+        "plaintiff" | "defendant",
+        (typeof casePartiesForDisplay)[number][]
+      > = {
         plaintiff: [],
         defendant: [],
-      }
+      };
 
-      casePartiesForDisplay.forEach(party => {
-        const displayLabel = getDisplayLabelForParty(party)
-        if (!displayLabel) return
+      casePartiesForDisplay.forEach((party) => {
+        const displayLabel = getDisplayLabelForParty(party);
+        if (!displayLabel) return;
 
-        const normalizedLabel = normalizePartyLabel(displayLabel)
-        if (normalizedLabel.startsWith('사건본인')) return
+        const normalizedLabel = normalizePartyLabel(displayLabel);
+        if (normalizedLabel.startsWith("사건본인")) return;
 
-        if (!heroPartyLabels.has(normalizedLabel) && !heroPartyTypes.has(party.party_type || '')) {
-          return
+        if (
+          !heroPartyLabels.has(normalizedLabel) &&
+          !heroPartyTypes.has(party.party_type || "")
+        ) {
+          return;
         }
 
-        const side = getSideFromLabel(displayLabel) || getCasePartySide(party)
-        if (!side) return
-        sideGroups[side].push(party)
-      })
+        const side = getSideFromLabel(displayLabel) || getCasePartySide(party);
+        if (!side) return;
+        sideGroups[side].push(party);
+      });
 
       const resolveSideLabel = (
-        side: 'plaintiff' | 'defendant',
-        parties: (typeof casePartiesForDisplay)[number][]
+        side: "plaintiff" | "defendant",
+        parties: (typeof casePartiesForDisplay)[number][],
       ) => {
-        const scourtLabel = side === 'plaintiff'
-          ? scourtBasicInfo?.titRprsPtnr?.trim()
-          : scourtBasicInfo?.titRprsRqstr?.trim()
-        if (scourtLabel) return scourtLabel
+        const scourtLabel =
+          side === "plaintiff"
+            ? scourtBasicInfo?.titRprsPtnr?.trim()
+            : scourtBasicInfo?.titRprsRqstr?.trim();
+        if (scourtLabel) return scourtLabel;
 
         const labelFromParties = parties
-          .map(p => getDisplayLabelForParty(p))
-          .find(label => !!label)
-        if (labelFromParties) return labelFromParties
+          .map((p) => getDisplayLabelForParty(p))
+          .find((label) => !!label);
+        if (labelFromParties) return labelFromParties;
 
-        return side === 'plaintiff' ? partyLabels.plaintiff : partyLabels.defendant
-      }
+        return side === "plaintiff"
+          ? partyLabels.plaintiff
+          : partyLabels.defendant;
+      };
 
-      const buildSideGroup = (side: 'plaintiff' | 'defendant') => {
-        const parties = sideGroups[side]
-        if (parties.length === 0) return null
+      const buildSideGroup = (side: "plaintiff" | "defendant") => {
+        const parties = sideGroups[side];
+        if (parties.length === 0) return null;
 
-        const label = resolveSideLabel(side, parties)
-        if (!label) return null
+        const label = resolveSideLabel(side, parties);
+        if (!label) return null;
 
         // is_our_client는 case_clients로 이동됨 - is_primary 사용
-        const isClientSide = primaryParties.clientSide ? side === primaryParties.clientSide : parties.some(p => p.is_primary)
-        const primaryParty = parties.find(p => p.is_primary)
-        const preferredParty = primaryParty || parties.find(p => resolveCasePartyName(p)) || parties[0]
-        const baseName = preferredParty?.party_name || ''
+        const isClientSide = (() => {
+          // 1. Check explicit clientSide from primaryParties
+          if (primaryParties.clientSide) {
+            return side === primaryParties.clientSide;
+          }
+          // 2. Check if any party is marked as primary
+          if (parties.some((p) => p.is_primary)) {
+            return true;
+          }
+          // 3. Check if caseData.client_role matches this side
+          if (caseData.client_role) {
+            return caseData.client_role === side;
+          }
+          // 4. Fallback to false (no client indicator)
+          return false;
+        })();
+        const primaryParty = parties.find((p) => p.is_primary);
+        const preferredParty =
+          primaryParty ||
+          parties.find((p) => resolveCasePartyName(p)) ||
+          parties[0];
+        const baseName = preferredParty?.party_name || "";
 
-        let displayName = preferredParty?.party_name || '-'
-        if (isClientSide && caseData.client?.name && !isMaskedPartyName(caseData.client.name)) {
-          displayName = applyDisplayName(baseName, caseData.client.name)
+        let displayName = preferredParty?.party_name || "-";
+        if (
+          isClientSide &&
+          caseData.client?.name &&
+          !isMaskedPartyName(caseData.client.name)
+        ) {
+          displayName = applyDisplayName(baseName, caseData.client.name);
         } else {
-          const resolvedName = preferredParty ? resolveCasePartyName(preferredParty) : null
+          const resolvedName = preferredParty
+            ? resolveCasePartyName(preferredParty)
+            : null;
           if (resolvedName) {
-            displayName = applyDisplayName(baseName, resolvedName)
+            displayName = applyDisplayName(baseName, resolvedName);
           } else if (preferredParty?.party_name) {
-            displayName = removeNumberPrefix(preferredParty.party_name)
+            displayName = removeNumberPrefix(preferredParty.party_name);
           }
         }
 
-        const uniqueNames = new Set<string>()
-        parties.forEach(party => {
-          let nameForCount = party.party_name || ''
+        const uniqueNames = new Set<string>();
+        parties.forEach((party) => {
+          let nameForCount = party.party_name || "";
           // is_our_client, client_id는 case_clients로 이동됨
           // 의뢰인 이름이 필요한 경우 primary_client_name 또는 client.name 사용
-          if (party.is_primary && caseData.client?.name && !isMaskedPartyName(caseData.client.name)) {
-            nameForCount = caseData.client.name
+          if (
+            party.is_primary &&
+            caseData.client?.name &&
+            !isMaskedPartyName(caseData.client.name)
+          ) {
+            nameForCount = caseData.client.name;
           }
-          const resolvedName = resolveCasePartyName(party)
+          const resolvedName = resolveCasePartyName(party);
           if (resolvedName) {
-            nameForCount = resolvedName
+            nameForCount = resolvedName;
           }
-          const normalized = normalizePartyNameForMatch(nameForCount)
-          if (normalized) uniqueNames.add(normalized)
-        })
-        const uniqueCount = uniqueNames.size
-        const otherCount = Math.max(0, (uniqueCount || parties.length) - 1)
+          const normalized = normalizePartyNameForMatch(nameForCount);
+          if (normalized) uniqueNames.add(normalized);
+        });
+        const uniqueCount = uniqueNames.size;
+        const otherCount = Math.max(0, (uniqueCount || parties.length) - 1);
 
         if (otherCount === 0) {
-          displayName = displayName.replace(PARTY_NAME_SUFFIX_REGEX, '').trim() || displayName
+          displayName =
+            displayName.replace(PARTY_NAME_SUFFIX_REGEX, "").trim() ||
+            displayName;
         }
 
-        const hasOtherSuffix = PARTY_NAME_SUFFIX_REGEX.test(displayName)
+        const hasOtherSuffix = PARTY_NAME_SUFFIX_REGEX.test(displayName);
 
         return {
           label,
@@ -1889,18 +2479,20 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           isClient: isClientSide,
           otherCount,
           hasOtherSuffix,
-        }
-      }
+        };
+      };
 
-      const groups = [buildSideGroup('plaintiff'), buildSideGroup('defendant')]
-        .filter((group): group is NonNullable<typeof group> => Boolean(group))
+      const groups = [
+        buildSideGroup("plaintiff"),
+        buildSideGroup("defendant"),
+      ].filter((group): group is NonNullable<typeof group> => Boolean(group));
 
       if (groups.length > 0) {
         groups.sort((a, b) => {
-          if (a.isClient && !b.isClient) return -1
-          if (!a.isClient && b.isClient) return 1
-          return 0
-        })
+          if (a.isClient && !b.isClient) return -1;
+          if (!a.isClient && b.isClient) return 1;
+          return 0;
+        });
 
         return groups.map((group, idx) => (
           <div key={idx} className="flex items-center gap-2">
@@ -1916,41 +2508,55 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   >
                     {group.name}
                     {caseData.client?.phone && (
-                      <span className="ml-2 font-normal text-[var(--text-tertiary)]">{caseData.client.phone}</span>
+                      <span className="ml-2 font-normal text-[var(--text-tertiary)]">
+                        {caseData.client.phone}
+                      </span>
                     )}
                     {group.otherCount > 0 && !group.hasOtherSuffix && (
-                      <span className="font-normal text-[var(--text-tertiary)] ml-1">외 {group.otherCount}</span>
+                      <span className="font-normal text-[var(--text-tertiary)] ml-1">
+                        외 {group.otherCount}
+                      </span>
                     )}
                   </Link>
                 ) : (
                   <span className="text-sm font-semibold text-[var(--text-primary)]">
                     {group.name}
                     {group.otherCount > 0 && !group.hasOtherSuffix && (
-                      <span className="font-normal text-[var(--text-tertiary)] ml-1">외 {group.otherCount}</span>
+                      <span className="font-normal text-[var(--text-tertiary)] ml-1">
+                        외 {group.otherCount}
+                      </span>
                     )}
                   </span>
                 )}
               </>
             ) : (
               <>
-                <span className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded">{group.label}</span>
+                <span className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded">
+                  {group.label}
+                </span>
                 <span className="text-sm text-[var(--text-secondary)]">
                   {group.name}
                   {group.otherCount > 0 && !group.hasOtherSuffix && (
-                    <span className="text-[var(--text-tertiary)] ml-1">외 {group.otherCount}</span>
+                    <span className="text-[var(--text-tertiary)] ml-1">
+                      외 {group.otherCount}
+                    </span>
                   )}
                 </span>
               </>
             )}
           </div>
-        ))
+        ));
       }
     }
 
     // case_parties 데이터가 없으면 기존 로직 사용 (형사사건 포함)
     if (partyLabels.isCriminal) {
-      const defendantName = String(getBasicInfo('피고인명', 'dfndtNm') || getBasicInfo('피고', 'rspNm') || '-')
-      const isClient = caseData.client_role === 'defendant'
+      const defendantName = String(
+        getBasicInfo("피고인명", "dfndtNm") ||
+          getBasicInfo("피고", "rspNm") ||
+          "-",
+      );
+      const isClient = caseData.client_role === "defendant";
       return (
         <div className="flex items-center gap-2">
           {isClient ? (
@@ -1964,105 +2570,139 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             </>
           ) : (
             <>
-              <span className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded">{partyLabels.defendant}</span>
-              <span className="text-sm text-[var(--text-secondary)]">{defendantName}</span>
+              <span className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded">
+                {partyLabels.defendant}
+              </span>
+              <span className="text-sm text-[var(--text-secondary)]">
+                {defendantName}
+              </span>
             </>
           )}
         </div>
-      )
+      );
     }
 
     // SCOURT 스냅샷 기반 fallback
-    interface ScourtParty { btprDvsNm?: string; btprNm?: string }
-    const partiesBasicInfo = scourtSnapshot?.basicInfo as { parties?: ScourtParty[] } | undefined
-    const partiesArray = partiesBasicInfo?.parties || []
-    const plaintiffSideLabels = ['원고', '채권자', '신청인', '항고인', '항소인', '상고인']
-    const defendantSideLabels = ['피고', '채무자', '피신청인', '상대방', '피항고인', '피항소인', '피상고인']
+    interface ScourtParty {
+      btprDvsNm?: string;
+      btprNm?: string;
+    }
+    const partiesBasicInfo = scourtSnapshot?.basicInfo as
+      | { parties?: ScourtParty[] }
+      | undefined;
+    const partiesArray = partiesBasicInfo?.parties || [];
+    const plaintiffSideLabels = [
+      "원고",
+      "채권자",
+      "신청인",
+      "항고인",
+      "항소인",
+      "상고인",
+    ];
+    const defendantSideLabels = [
+      "피고",
+      "채무자",
+      "피신청인",
+      "상대방",
+      "피항고인",
+      "피항소인",
+      "피상고인",
+    ];
 
     // SCOURT 스냅샷에서 당사자 찾기 (라벨과 이름 함께 반환)
-    const findPartyByType = (types: string[]): { label: string; name: string } | null => {
+    const findPartyByType = (
+      types: string[],
+    ): { label: string; name: string } | null => {
       const found = partiesArray.find((p: ScourtParty) =>
-        types.some(t => p.btprDvsNm?.includes(t))
-      )
+        types.some((t) => p.btprDvsNm?.includes(t)),
+      );
       if (found) {
-        return { label: found.btprDvsNm || '', name: found.btprNm || '' }
+        return { label: found.btprDvsNm || "", name: found.btprNm || "" };
       }
-      return null
-    }
+      return null;
+    };
 
     const getPlaintiffInfo = (): { label: string; name: string } => {
       // SCOURT 스냅샷에서 원고측 당사자 찾기
-      const fromParties = findPartyByType(plaintiffSideLabels)
+      const fromParties = findPartyByType(plaintiffSideLabels);
       if (fromParties?.name) {
-        return { label: fromParties.label, name: fromParties.name }
+        return { label: fromParties.label, name: fromParties.name };
       }
       // basicInfo fallback
       const fromBasicInfo =
-        getBasicInfo('채권자', 'crdtNm') ||
-        getBasicInfo('신청인', 'aplcNm') ||
-        getBasicInfo('원고', 'aplNm')
+        getBasicInfo("채권자", "crdtNm") ||
+        getBasicInfo("신청인", "aplcNm") ||
+        getBasicInfo("원고", "aplNm");
       if (fromBasicInfo) {
-        return { label: partyLabels.plaintiff, name: String(fromBasicInfo) }
+        return { label: partyLabels.plaintiff, name: String(fromBasicInfo) };
       }
       // 첫 번째 당사자 fallback
       if (partiesArray[0]) {
-        return { label: partiesArray[0].btprDvsNm || partyLabels.plaintiff, name: partiesArray[0].btprNm || '-' }
+        return {
+          label: partiesArray[0].btprDvsNm || partyLabels.plaintiff,
+          name: partiesArray[0].btprNm || "-",
+        };
       }
-      return { label: partyLabels.plaintiff, name: '-' }
-    }
+      return { label: partyLabels.plaintiff, name: "-" };
+    };
 
     const getDefendantInfo = (): { label: string; name: string } => {
       // SCOURT 스냅샷에서 피고측 당사자 찾기
-      const fromParties = findPartyByType(defendantSideLabels)
+      const fromParties = findPartyByType(defendantSideLabels);
       if (fromParties?.name) {
-        return { label: fromParties.label, name: fromParties.name }
+        return { label: fromParties.label, name: fromParties.name };
       }
       // basicInfo fallback
       const fromBasicInfo =
-        getBasicInfo('채무자', 'dbtNm') ||
-        getBasicInfo('피신청인', 'rspNm') ||
-        getBasicInfo('피고', 'rspNm')
+        getBasicInfo("채무자", "dbtNm") ||
+        getBasicInfo("피신청인", "rspNm") ||
+        getBasicInfo("피고", "rspNm");
       if (fromBasicInfo) {
-        return { label: partyLabels.defendant, name: String(fromBasicInfo) }
+        return { label: partyLabels.defendant, name: String(fromBasicInfo) };
       }
       // 두 번째 당사자 fallback
       if (partiesArray[1]) {
-        return { label: partiesArray[1].btprDvsNm || partyLabels.defendant, name: partiesArray[1].btprNm || '-' }
+        return {
+          label: partiesArray[1].btprDvsNm || partyLabels.defendant,
+          name: partiesArray[1].btprNm || "-",
+        };
       }
-      return { label: partyLabels.defendant, name: '-' }
-    }
+      return { label: partyLabels.defendant, name: "-" };
+    };
 
-    const plaintiffData = getPlaintiffInfo()
-    const defendantData = getDefendantInfo()
-    const plaintiffInfo = getPartyName('plaintiff', plaintiffData.name)
-    const defendantInfo = getPartyName('defendant', defendantData.name)
+    const plaintiffData = getPlaintiffInfo();
+    const defendantData = getDefendantInfo();
+    const plaintiffInfo = getPartyName("plaintiff", plaintiffData.name);
+    const defendantInfo = getPartyName("defendant", defendantData.name);
 
     const parties = [
-      { role: 'plaintiff', label: plaintiffData.label, info: plaintiffInfo },
-      { role: 'defendant', label: defendantData.label, info: defendantInfo }
-    ]
+      { role: "plaintiff", label: plaintiffData.label, info: plaintiffInfo },
+      { role: "defendant", label: defendantData.label, info: defendantInfo },
+    ];
 
     parties.sort((a, b) => {
-      if (a.info.isClient && !b.info.isClient) return -1
-      if (!a.info.isClient && b.info.isClient) return 1
-      return 0
-    })
+      if (a.info.isClient && !b.info.isClient) return -1;
+      if (!a.info.isClient && b.info.isClient) return 1;
+      return 0;
+    });
 
     return parties.map((party) => (
-      <div key={party.role} className="flex items-center gap-2">
+      <div key={party.role} className="flex items-center gap-2 min-h-[32px]">
         {party.info.isClient ? (
           <>
-            <span className="text-xs px-2 py-0.5 bg-[var(--sage-muted)] text-[var(--sage-primary)] rounded font-medium">
+            <span className="text-xs px-2.5 py-1 bg-[var(--sage-muted)] text-[var(--sage-primary)] rounded-md font-semibold">
               의뢰인 {party.label}
             </span>
             {caseData.primary_client_id ? (
               <Link
                 href={`/clients/${caseData.primary_client_id}`}
-                className="text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--sage-primary)] hover:underline"
+                className="text-sm font-semibold text-[var(--text-primary)] hover:text-[var(--sage-primary)] hover:underline transition-colors"
               >
                 {party.info.name}
                 {caseData.client?.phone && (
-                  <span className="ml-2 font-normal text-[var(--text-tertiary)]">{caseData.client.phone}</span>
+                  <span className="ml-2 font-normal text-[var(--text-tertiary)]">
+                    {caseData.client.phone}
+                  </span>
                 )}
               </Link>
             ) : (
@@ -2073,247 +2713,99 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           </>
         ) : (
           <>
-            <span className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded">{party.label}</span>
-            <span className="text-sm text-[var(--text-secondary)]">{party.info.name}</span>
+            <span className="text-xs px-2.5 py-1 bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded-md font-medium">
+              {party.label}
+            </span>
+            <span className="text-sm text-[var(--text-secondary)] font-medium">
+              {party.info.name}
+            </span>
           </>
         )}
       </div>
-    ))
-  }
+    ));
+  };
 
   return (
     <>
-    <div className="page-container max-w-4xl">
-        {/* Hero Section - 디자인 시스템 적용 */}
-        <div className="card p-8 mb-6">
-          {/* 상단: 상태 뱃지들 */}
-          <div className="flex items-center gap-2 mb-4">
-            {caseData.office && (
-              <span className="badge-status badge-info">
-                {caseData.office}
-              </span>
-            )}
-            {(() => {
-              const statusInfo = getCaseStatusInfo()
-              if (!statusInfo) return null
-              return (
-                <span className={`badge-status ${caseData.status === '진행중' ? 'badge-success' : 'badge-info'}`}>
-                  {statusInfo.label}
-                </span>
-              )
-            })()}
-            {/* 심급 표시 */}
-            {(() => {
-              const category = getCaseCategory(caseData.court_case_number || '')
-              const isApplicationCase = ['신청', '집행', '가사신청'].includes(category)
-              if (isApplicationCase || !caseData.case_level || ['신청', '기타'].includes(caseData.case_level)) {
-                return null
-              }
-              return (
-                <span className="badge-status badge-info">
-                  {caseData.case_level}
-                </span>
-              )
-            })()}
-            {/* 병합구분 표시 */}
-            {(() => {
-              const mrgrDvs = scourtSnapshot?.basicInfo?.['병합구분'] || scourtSnapshot?.basicInfo?.mrgrDvs
-              return mrgrDvs && mrgrDvs !== '없음' && (
-                <span className="badge-status badge-info">
-                  {mrgrDvs}
-                </span>
-              )
-            })()}
-            {/* 종국결과/확정 뱃지 */}
-            {(getBasicInfo('종국결과', 'endRslt') || caseData.case_result) && (
-              <span className="badge-status badge-warning">
-                {getBasicInfo('종국결과', 'endRslt') || caseData.case_result}
-                {getBasicInfo('종국일', 'endDt') && (
-                  <span className="ml-1 opacity-75">({formatProgressDate(String(getBasicInfo('종국일', 'endDt')))})</span>
-                )}
-              </span>
-            )}
-            {getBasicInfo('확정일', 'cfrmDt') && (
-              <span className="badge-status badge-info">
-                {formatProgressDate(String(getBasicInfo('확정일', 'cfrmDt')))} 확정
-              </span>
-            )}
-          </div>
-
-          {/* 메인 타이틀: 법원 사건번호 */}
-          <h1 className="text-display text-[var(--text-primary)] mb-2">
-            {getCourtAbbrev(caseData.court_name)} {caseData.court_case_number}
-          </h1>
-
-          {/* 사건명 */}
-          <p className="text-subheading text-[var(--text-secondary)] mb-5">
-            {getBasicInfo('사건명', 'csNm') || caseData.scourt_case_name || caseData.case_name}
-          </p>
-
-          {/* 당사자 정보 - 간소화 */}
-          <div className="flex flex-wrap gap-4 mb-6">
-            {renderPartyInfo()}
-          </div>
-
-          {/* Quick Actions Bar */}
-          <div className="flex items-center gap-3 pt-5 border-t border-[var(--border-default)]">
-            {/* 서류 폴더 */}
-            {caseData.onedrive_folder_url && (
-              <a
-                href={caseData.onedrive_folder_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-secondary"
-              >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7.71 3.5l1.6 1.5h5.36a1.5 1.5 0 0 1 1.5 1.5v1h2.33a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 17V5a1.5 1.5 0 0 1 1.5-1.5h2.21z"/>
-                </svg>
-                서류 폴더
-              </a>
-            )}
-
-            {/* 대법원 갱신/연동 */}
-            {isLinked ? (
-              <button
-                onClick={() => handleScourtSync()}
-                disabled={scourtSyncing}
-                className="btn btn-secondary disabled:opacity-50"
-              >
-                {scourtSyncing ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                )}
-                {scourtSyncing ? '갱신 중...' : '갱신'}
-              </button>
-            ) : (
-              <button
-                onClick={() => handleScourtSync()}
-                disabled={scourtSyncing}
-                className="btn btn-secondary disabled:opacity-50"
-              >
-                {scourtSyncing ? (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-                  </svg>
-                )}
-                {scourtSyncing ? '연동 중...' : '대법원 연동'}
-              </button>
-            )}
-
-            {/* 우측 버튼 그룹 */}
-            <div className="flex items-center gap-2 ml-auto">
-              {/* 종결 버튼 (진행중일 때만) */}
-              {caseData.status === '진행중' && (
-                <button
-                  onClick={handleFinalize}
-                  className="btn btn-ghost"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  종결
-                </button>
-              )}
-
-              {/* 삭제 버튼 */}
-              <button
-                onClick={handleDelete}
-                className="btn btn-danger-ghost"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                삭제
-              </button>
-
-              {/* 수정 버튼 */}
-              <button
-                onClick={() => router.push(`/cases/${caseData.id}/edit`)}
-                className="btn btn-ghost"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                수정
-              </button>
-            </div>
-
-            {/* 최종 갱신 시각 */}
-            {scourtSyncStatus?.lastSync && (
-              <span className="text-xs text-[var(--text-muted)]">
-                {(() => {
-                  const d = new Date(scourtSyncStatus.lastSync)
-                  const now = new Date()
-                  const diffMs = now.getTime() - d.getTime()
-                  const diffMins = Math.floor(diffMs / 60000)
-                  const diffHours = Math.floor(diffMs / 3600000)
-                  const diffDays = Math.floor(diffMs / 86400000)
-
-                  if (diffMins < 1) return '방금 전'
-                  if (diffMins < 60) return `${diffMins}분 전`
-                  if (diffHours < 24) return `${diffHours}시간 전`
-                  if (diffDays < 7) return `${diffDays}일 전`
-                  return `${d.getMonth() + 1}/${d.getDate()}`
-                })()}
-              </span>
-            )}
-          </div>
-        </div>
+      <div className="page-container max-w-4xl">
+        {/* Hero Section - Extracted Component */}
+        <CaseHeroSection
+          caseData={caseData}
+          casePartiesForDisplay={casePartiesForDisplay}
+          primaryParties={primaryParties}
+          scourtSnapshot={scourtSnapshot}
+          scourtSyncStatus={scourtSyncStatus}
+          isLinked={!!isLinked}
+          scourtSyncing={scourtSyncing}
+          onScourtSync={() => handleScourtSync()}
+          onFinalize={handleFinalize}
+          onDelete={handleDelete}
+          caseClients={caseClients}
+        />
 
         {/* Segmented Control - 디자인 시스템 탭 */}
         <div className="segmented-control mb-6">
           {[
-            { key: 'notice', label: '알림' },
-            { key: 'general', label: '일반' },
-            { key: 'progress', label: '진행' },
-          ].map(tab => (
+            { key: "notice", label: "알림" },
+            { key: "general", label: "일반" },
+            { key: "progress", label: "진행" },
+          ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as TabType)}
               className={`segmented-control-item ${
-                activeTab === tab.key ? 'active' : ''
+                activeTab === tab.key ? "active" : ""
               }`}
             >
               {tab.label}
-              {tab.key === 'general' && scourtSnapshot?.rawData && (
-                <span className={`ml-1.5 text-xs ${activeTab === tab.key ? 'text-[var(--sage-primary)]' : 'text-[var(--text-muted)]'}`}>
+              {tab.key === "general" && scourtSnapshot?.rawData && (
+                <span
+                  className={`ml-1.5 text-xs ${activeTab === tab.key ? "text-[var(--sage-primary)]" : "text-[var(--text-muted)]"}`}
+                >
                   ●
                 </span>
               )}
-              {tab.key === 'progress' && scourtSnapshot?.progress && scourtSnapshot.progress.length > 0 && (
-                <span className={`ml-1.5 text-xs ${activeTab === tab.key ? 'text-[var(--sage-primary)]' : 'text-[var(--text-muted)]'}`}>
-                  {scourtSnapshot.progress.length}
-                </span>
-              )}
+              {tab.key === "progress" &&
+                scourtSnapshot?.progress &&
+                scourtSnapshot.progress.length > 0 && (
+                  <span
+                    className={`ml-1.5 text-xs ${activeTab === tab.key ? "text-[var(--sage-primary)]" : "text-[var(--text-muted)]"}`}
+                  >
+                    {scourtSnapshot.progress.length}
+                  </span>
+                )}
             </button>
           ))}
         </div>
 
         {/* 탭 콘텐츠 */}
         {/* 알림 탭 */}
-        {activeTab === 'notice' && (
+        {activeTab === "notice" && (
           <div className="space-y-4">
             {/* 의뢰인 연락처 미입력 알림 */}
             {caseData.client && !caseData.client.phone && (
               <div className="bg-[var(--color-warning-muted)] border border-[var(--color-warning)]/30 rounded-xl px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <svg className="w-5 h-5 text-[var(--color-warning)] flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                  <svg
+                    className="w-5 h-5 text-[var(--color-warning)] flex-shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
+                    />
                   </svg>
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-[var(--text-primary)]">의뢰인 연락처가 등록되지 않았습니다</p>
-                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">알림톡/SMS 발송을 위해 연락처를 입력해주세요</p>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
+                      의뢰인 연락처가 등록되지 않았습니다
+                    </p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                      알림톡/SMS 발송을 위해 연락처를 입력해주세요
+                    </p>
                   </div>
                   <button
                     onClick={() => router.push(`/cases/${caseData.id}/edit`)}
@@ -2326,251 +2818,449 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             )}
 
             {/* 알림 섹션 */}
-            <CaseNoticeSection notices={filteredNotices} onAction={handleNoticeAction} onDismiss={handleDismissNotice} />
+            <CaseNoticeSection
+              notices={filteredNotices}
+              onAction={handleNoticeAction}
+              onDismiss={handleDismissNotice}
+              onRelatedCasePreview={handleRelatedCasePreview}
+            />
 
             {/* 심급내용 (원심) - SCOURT + case_relations */}
             {(() => {
               // case_relations에서 심급 관계 (appeal 타입) 추출
               const appealRelations = (caseData.case_relations || []).filter(
-                r => r.relation_type_code === 'appeal'
-              )
-              const linkedCaseIds = new Set(appealRelations.map(r => r.related_case_id))
+                (r) => r.relation_type_code === "appeal",
+              );
+              const linkedCaseIds = new Set(
+                appealRelations.map((r) => r.related_case_id),
+              );
               const linkedCaseNumbers = new Set(
                 appealRelations
-                  .map(r => r.related_case?.court_case_number)
-                  .filter(Boolean)
-              )
-              interface LowerCourtItem { linkedCaseId?: string; caseNo?: string; courtName?: string; court?: string; encCsNo?: string; result?: string; resultDate?: string }
-              const filteredLowerCourt = ((scourtSnapshot?.lowerCourt || []) as LowerCourtItem[]).filter(
-                (item: LowerCourtItem) => {
-                  // 이미 연동됨 → 제외
-                  if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
-                  if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
-                  // 연동안함 처리됨 → 제외
-                  if (item.caseNo && dismissedRelatedCases.has(`lower_court:${item.caseNo}`)) return false
-                  return true
-                }
-              )
+                  .map((r) => r.related_case?.court_case_number)
+                  .filter(Boolean),
+              );
+              interface LowerCourtItem {
+                linkedCaseId?: string;
+                caseNo?: string;
+                courtName?: string;
+                court?: string;
+                encCsNo?: string;
+                result?: string;
+                resultDate?: string;
+              }
+              const filteredLowerCourt = (
+                (scourtSnapshot?.lowerCourt || []) as LowerCourtItem[]
+              ).filter((item: LowerCourtItem) => {
+                // 이미 연동됨 → 제외
+                if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId))
+                  return false;
+                if (item.caseNo && linkedCaseNumbers.has(item.caseNo))
+                  return false;
+                // 연동안함 처리됨 → 제외
+                if (
+                  item.caseNo &&
+                  dismissedRelatedCases.has(`lower_court:${item.caseNo}`)
+                )
+                  return false;
+                return true;
+              });
 
               // 미연동 심급사건 목록 (모두연결용)
-              const unlinkdLowerCourt = filteredLowerCourt.filter((item: LowerCourtItem) => !item.linkedCaseId)
+              const unlinkdLowerCourt = filteredLowerCourt.filter(
+                (item: LowerCourtItem) => !item.linkedCaseId,
+              );
 
               // 스냅샷이 비어있어도 case_relations에 심급 관계가 있으면 표시
-              const hasAppealData = filteredLowerCourt.length > 0 || appealRelations.length > 0
+              const hasAppealData =
+                filteredLowerCourt.length > 0 || appealRelations.length > 0;
 
-              return hasAppealData && (
-                <div className="card overflow-hidden">
-                  <div className="px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1 h-4 bg-[var(--sage-primary)] rounded-full" />
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">심급</h3>
+              return (
+                hasAppealData && (
+                  <div className="card overflow-hidden">
+                    <div className="px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1 h-4 bg-[var(--sage-primary)] rounded-full" />
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                          심급
+                        </h3>
+                      </div>
+                      {unlinkdLowerCourt.length > 1 && (
+                        <button
+                          onClick={() =>
+                            handleLinkAllRelatedCases(
+                              unlinkdLowerCourt.map((item: LowerCourtItem) => ({
+                                caseNo: item.caseNo || "",
+                                courtName: item.courtName || item.court || "",
+                                relationType: "하심사건",
+                                encCsNo: item.encCsNo,
+                              })),
+                            )
+                          }
+                          disabled={isLinkingAll || linkingCases.size > 0}
+                          className="text-xs px-3 py-1 bg-[var(--sage-primary)] text-white hover:bg-[var(--sage-primary-hover)] rounded transition-colors disabled:opacity-50"
+                        >
+                          {isLinkingAll
+                            ? "연동 중..."
+                            : `모두연결 (${unlinkdLowerCourt.length})`}
+                        </button>
+                      )}
                     </div>
-                    {unlinkdLowerCourt.length > 1 && (
-                      <button
-                        onClick={() => handleLinkAllRelatedCases(
-                          unlinkdLowerCourt.map((item: LowerCourtItem) => ({
-                            caseNo: item.caseNo || '',
-                            courtName: item.courtName || item.court || '',
-                            relationType: '하심사건',
-                            encCsNo: item.encCsNo,
-                          }))
-                        )}
-                        disabled={isLinkingAll || linkingCases.size > 0}
-                        className="text-xs px-3 py-1 bg-[var(--sage-primary)] text-white hover:bg-[var(--sage-primary-hover)] rounded transition-colors disabled:opacity-50"
-                      >
-                        {isLinkingAll ? '연동 중...' : `모두연결 (${unlinkdLowerCourt.length})`}
-                      </button>
-                    )}
-                  </div>
-                  <table className="w-full border-t border-[var(--border-default)]">
-                    <thead>
-                      <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
-                        <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">법원</th>
-                        <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">사건번호</th>
-                        <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">결과</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-subtle)]">
-                      {/* case_relations에서 가져온 이미 연결된 심급사건 */}
-                      {appealRelations.map((rel) => (
-                        <tr key={`appeal-rel-${rel.id}`} className="hover:bg-[var(--bg-hover)] bg-[var(--sage-muted)]/30">
-                          <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
-                            {rel.related_case?.case_level || rel.relation_type || '-'}
-                          </td>
-                          <td className="px-5 py-3 text-sm">
-                            <button
-                              onClick={() => router.push(`/cases/${rel.related_case_id}`)}
-                              className="text-[var(--sage-primary)] hover:text-[var(--sage-primary)] font-medium flex items-center gap-1"
-                            >
-                              {rel.related_case?.court_case_number || rel.related_case?.case_name || '-'}
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                              </svg>
-                            </button>
-                          </td>
-                          <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
-                            {rel.related_case?.case_result || rel.related_case?.status || '-'}
-                          </td>
+                    <table className="w-full border-t border-[var(--border-default)]">
+                      <thead>
+                        <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
+                          <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">
+                            법원
+                          </th>
+                          <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">
+                            사건번호
+                          </th>
+                          <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">
+                            결과
+                          </th>
                         </tr>
-                      ))}
-                      {/* 스냅샷에서 가져온 미연결 심급사건 */}
-                      {filteredLowerCourt.map((item: LowerCourtItem, idx: number) => (
-                        <tr key={`lower-${idx}`} className="hover:bg-[var(--bg-hover)]">
-                          <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">{item.courtName || item.court || '-'}</td>
-                          <td className="px-5 py-3 text-sm">
-                            {item.linkedCaseId ? (
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border-subtle)]">
+                        {/* case_relations에서 가져온 이미 연결된 심급사건 */}
+                        {appealRelations.map((rel) => (
+                          <tr
+                            key={`appeal-rel-${rel.id}`}
+                            className="hover:bg-[var(--bg-hover)] bg-[var(--sage-muted)]/30"
+                          >
+                            <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
+                              {rel.related_case?.case_level ||
+                                rel.relation_type ||
+                                "-"}
+                            </td>
+                            <td className="px-5 py-3 text-sm">
                               <button
-                                onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
+                                onClick={() =>
+                                  router.push(`/cases/${rel.related_case_id}`)
+                                }
                                 className="text-[var(--sage-primary)] hover:text-[var(--sage-primary)] font-medium flex items-center gap-1"
                               >
-                                {item.caseNo || '-'}
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                {rel.related_case?.court_case_number ||
+                                  rel.related_case?.case_name ||
+                                  "-"}
+                                <svg
+                                  className="w-3.5 h-3.5"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"
+                                  />
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                                  />
                                 </svg>
                               </button>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[var(--text-primary)]">{item.caseNo || '-'}</span>
-                                <button
-                                  onClick={() => handleLinkRelatedCase({
-                                    caseNo: item.caseNo || '',
-                                    courtName: item.courtName || item.court || '',
-                                    relationType: '하심사건',
-                                    encCsNo: item.encCsNo,
-                                  })}
-                                  disabled={linkingCases.has(item.caseNo || '') || isLinkingAll}
-                                  className="text-xs px-2 py-0.5 bg-[var(--sage-muted)] text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded transition-colors disabled:opacity-50"
-                                >
-                                  {linkingCases.has(item.caseNo || '') ? '연동 중...' : '등록'}
-                                </button>
-                                <button
-                                  onClick={() => handleDismissRelatedCase(item.caseNo || '', 'lower_court')}
-                                  disabled={isLinkingAll}
-                                  className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] rounded transition-colors disabled:opacity-50"
-                                >
-                                  연동안함
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
-                            {item.resultDate ? `${formatProgressDate(item.resultDate)} ` : ''}
-                            {item.result || '-'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )
+                            </td>
+                            <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
+                              {rel.related_case?.case_result ||
+                                rel.related_case?.status ||
+                                "-"}
+                            </td>
+                          </tr>
+                        ))}
+                        {/* 스냅샷에서 가져온 미연결 심급사건 */}
+                        {filteredLowerCourt.map(
+                          (item: LowerCourtItem, idx: number) => (
+                            <tr
+                              key={`lower-${idx}`}
+                              className="hover:bg-[var(--bg-hover)]"
+                            >
+                              <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
+                                {item.courtName || item.court || "-"}
+                              </td>
+                              <td className="px-5 py-3 text-sm">
+                                {item.linkedCaseId ? (
+                                  <button
+                                    onClick={() =>
+                                      router.push(`/cases/${item.linkedCaseId}`)
+                                    }
+                                    className="text-[var(--sage-primary)] hover:text-[var(--sage-primary)] font-medium flex items-center gap-1"
+                                  >
+                                    {item.caseNo || "-"}
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"
+                                      />
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                                      />
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[var(--text-primary)]">
+                                      {item.caseNo || "-"}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        handleLinkRelatedCaseWithParams({
+                                          caseNo: item.caseNo || "",
+                                          courtName:
+                                            item.courtName || item.court || "",
+                                          relationType: "하심사건",
+                                          encCsNo: item.encCsNo,
+                                        })
+                                      }
+                                      disabled={
+                                        linkingCases.has(item.caseNo || "") ||
+                                        isLinkingAll
+                                      }
+                                      className="text-xs px-2 py-0.5 bg-[var(--sage-muted)] text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded transition-colors disabled:opacity-50"
+                                    >
+                                      {linkingCases.has(item.caseNo || "")
+                                        ? "연동 중..."
+                                        : "등록"}
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDismissRelatedCase(
+                                          item.caseNo || "",
+                                          "lower_court",
+                                        )
+                                      }
+                                      disabled={isLinkingAll}
+                                      className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] rounded transition-colors disabled:opacity-50"
+                                    >
+                                      연동안함
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
+                                {item.resultDate
+                                  ? `${formatProgressDate(item.resultDate)} `
+                                  : ""}
+                                {item.result || "-"}
+                              </td>
+                            </tr>
+                          ),
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              );
             })()}
 
             {/* 관련사건 - SCOURT */}
             {(() => {
-              const linkedCaseIds = new Set((caseData.case_relations || []).map(r => r.related_case_id))
+              const linkedCaseIds = new Set(
+                (caseData.case_relations || []).map((r) => r.related_case_id),
+              );
               const linkedCaseNumbers = new Set(
                 (caseData.case_relations || [])
-                  .map(r => r.related_case?.court_case_number)
-                  .filter(Boolean)
-              )
-              interface RelatedCaseItem { linkedCaseId?: string; caseNo?: string; case_number?: string; caseName?: string; court_name?: string; relation?: string; relation_type?: string; encCsNo?: string }
-              const filteredRelatedCases = ((scourtSnapshot?.relatedCases || []) as RelatedCaseItem[]).filter(
-                (item: RelatedCaseItem) => {
-                  // 이미 연동됨 → 제외
-                  if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false
-                  if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false
-                  // 연동안함 처리됨 → 제외
-                  const caseNo = item.caseNo || item.case_number
-                  if (caseNo && dismissedRelatedCases.has(`related_case:${caseNo}`)) return false
-                  return true
-                }
-              )
+                  .map((r) => r.related_case?.court_case_number)
+                  .filter(Boolean),
+              );
+              interface RelatedCaseItem {
+                linkedCaseId?: string;
+                caseNo?: string;
+                case_number?: string;
+                caseName?: string;
+                court_name?: string;
+                relation?: string;
+                relation_type?: string;
+                encCsNo?: string;
+              }
+              const filteredRelatedCases = (
+                (scourtSnapshot?.relatedCases || []) as RelatedCaseItem[]
+              ).filter((item: RelatedCaseItem) => {
+                // 이미 연동됨 → 제외
+                if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId))
+                  return false;
+                if (item.caseNo && linkedCaseNumbers.has(item.caseNo))
+                  return false;
+                // 연동안함 처리됨 → 제외
+                const caseNo = item.caseNo || item.case_number;
+                if (
+                  caseNo &&
+                  dismissedRelatedCases.has(`related_case:${caseNo}`)
+                )
+                  return false;
+                return true;
+              });
 
               // 미연동 관련사건 목록 (모두연결용)
-              const unlinkedRelatedCases = filteredRelatedCases.filter((item: RelatedCaseItem) => !item.linkedCaseId)
+              const unlinkedRelatedCases = filteredRelatedCases.filter(
+                (item: RelatedCaseItem) => !item.linkedCaseId,
+              );
 
-              return filteredRelatedCases.length > 0 && (
-                <div className="card overflow-hidden">
-                  <div className="px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1 h-4 bg-[var(--sage-primary)] rounded-full" />
-                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">관련사건</h3>
+              return (
+                filteredRelatedCases.length > 0 && (
+                  <div className="card overflow-hidden">
+                    <div className="px-4 py-3 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-1 h-4 bg-[var(--sage-primary)] rounded-full" />
+                        <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                          관련사건
+                        </h3>
+                      </div>
+                      {unlinkedRelatedCases.length > 1 && (
+                        <button
+                          onClick={() =>
+                            handleLinkAllRelatedCases(
+                              unlinkedRelatedCases.map(
+                                (item: RelatedCaseItem) => ({
+                                  caseNo: item.caseNo || item.case_number || "",
+                                  courtName:
+                                    item.caseName || item.court_name || "",
+                                  relationType:
+                                    item.relation ||
+                                    item.relation_type ||
+                                    "관련사건",
+                                  encCsNo: item.encCsNo,
+                                }),
+                              ),
+                            )
+                          }
+                          disabled={isLinkingAll || linkingCases.size > 0}
+                          className="text-xs px-3 py-1 bg-[var(--sage-primary)] text-white hover:bg-[var(--sage-primary-hover)] rounded transition-colors disabled:opacity-50"
+                        >
+                          {isLinkingAll
+                            ? "연동 중..."
+                            : `모두연결 (${unlinkedRelatedCases.length})`}
+                        </button>
+                      )}
                     </div>
-                    {unlinkedRelatedCases.length > 1 && (
-                      <button
-                        onClick={() => handleLinkAllRelatedCases(
-                          unlinkedRelatedCases.map((item: RelatedCaseItem) => ({
-                            caseNo: item.caseNo || item.case_number || '',
-                            courtName: item.caseName || item.court_name || '',
-                            relationType: item.relation || item.relation_type || '관련사건',
-                            encCsNo: item.encCsNo,
-                          }))
+                    <table className="w-full border-t border-[var(--border-default)]">
+                      <thead>
+                        <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
+                          <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left w-24">
+                            구분
+                          </th>
+                          <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">
+                            법원
+                          </th>
+                          <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">
+                            사건번호
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--border-subtle)]">
+                        {filteredRelatedCases.map(
+                          (item: RelatedCaseItem, idx: number) => (
+                            <tr
+                              key={`related-${idx}`}
+                              className="hover:bg-[var(--bg-hover)]"
+                            >
+                              <td className="px-5 py-3 text-sm text-[var(--sage-primary)] font-medium">
+                                {item.relation ||
+                                  item.relation_type ||
+                                  "관련사건"}
+                              </td>
+                              <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
+                                {item.caseName || item.court_name || "-"}
+                              </td>
+                              <td className="px-5 py-3 text-sm">
+                                {item.linkedCaseId ? (
+                                  <button
+                                    onClick={() =>
+                                      router.push(`/cases/${item.linkedCaseId}`)
+                                    }
+                                    className="text-[var(--sage-primary)] hover:text-[var(--sage-primary)] font-medium flex items-center gap-1"
+                                  >
+                                    {item.caseNo || item.case_number || "-"}
+                                    <svg
+                                      className="w-3.5 h-3.5"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101"
+                                      />
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+                                      />
+                                    </svg>
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[var(--text-primary)]">
+                                      {item.caseNo || item.case_number || "-"}
+                                    </span>
+                                    <button
+                                      onClick={() =>
+                                        handleLinkRelatedCaseWithParams({
+                                          caseNo:
+                                            item.caseNo ||
+                                            item.case_number ||
+                                            "",
+                                          courtName:
+                                            item.caseName ||
+                                            item.court_name ||
+                                            "",
+                                          relationType:
+                                            item.relation ||
+                                            item.relation_type ||
+                                            "관련사건",
+                                          encCsNo: item.encCsNo,
+                                        })
+                                      }
+                                      disabled={
+                                        linkingCases.has(
+                                          item.caseNo || item.case_number || "",
+                                        ) || isLinkingAll
+                                      }
+                                      className="text-xs px-2 py-0.5 bg-[var(--sage-muted)] text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded transition-colors disabled:opacity-50"
+                                    >
+                                      {linkingCases.has(
+                                        item.caseNo || item.case_number || "",
+                                      )
+                                        ? "연동 중..."
+                                        : "등록"}
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleDismissRelatedCase(
+                                          item.caseNo || item.case_number || "",
+                                          "related_case",
+                                        )
+                                      }
+                                      disabled={isLinkingAll}
+                                      className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] rounded transition-colors disabled:opacity-50"
+                                    >
+                                      연동안함
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ),
                         )}
-                        disabled={isLinkingAll || linkingCases.size > 0}
-                        className="text-xs px-3 py-1 bg-[var(--sage-primary)] text-white hover:bg-[var(--sage-primary-hover)] rounded transition-colors disabled:opacity-50"
-                      >
-                        {isLinkingAll ? '연동 중...' : `모두연결 (${unlinkedRelatedCases.length})`}
-                      </button>
-                    )}
-                  </div>
-                  <table className="w-full border-t border-[var(--border-default)]">
-                    <thead>
-                      <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
-                        <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left w-24">구분</th>
-                        <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">법원</th>
-                        <th className="px-5 py-2 text-xs font-medium text-[var(--text-tertiary)] text-left">사건번호</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border-subtle)]">
-                      {filteredRelatedCases.map((item: RelatedCaseItem, idx: number) => (
-                        <tr key={`related-${idx}`} className="hover:bg-[var(--bg-hover)]">
-                          <td className="px-5 py-3 text-sm text-[var(--sage-primary)] font-medium">{item.relation || item.relation_type || '관련사건'}</td>
-                          <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">{item.caseName || item.court_name || '-'}</td>
-                          <td className="px-5 py-3 text-sm">
-                              {item.linkedCaseId ? (
-                                <button
-                                  onClick={() => router.push(`/cases/${item.linkedCaseId}`)}
-                                  className="text-[var(--sage-primary)] hover:text-[var(--sage-primary)] font-medium flex items-center gap-1"
-                                >
-                                  {item.caseNo || item.case_number || '-'}
-                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.172 13.828a4 4 0 015.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                  </svg>
-                                </button>
-                              ) : (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-[var(--text-primary)]">{item.caseNo || item.case_number || '-'}</span>
-                                  <button
-                                    onClick={() => handleLinkRelatedCase({
-                                      caseNo: item.caseNo || item.case_number || '',
-                                      courtName: item.caseName || item.court_name || '',
-                                      relationType: item.relation || item.relation_type || '관련사건',
-                                      encCsNo: item.encCsNo,
-                                    })}
-                                    disabled={linkingCases.has(item.caseNo || item.case_number || '') || isLinkingAll}
-                                    className="text-xs px-2 py-0.5 bg-[var(--sage-muted)] text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded transition-colors disabled:opacity-50"
-                                  >
-                                    {linkingCases.has(item.caseNo || item.case_number || '') ? '연동 중...' : '등록'}
-                                  </button>
-                                  <button
-                                    onClick={() => handleDismissRelatedCase(item.caseNo || item.case_number || '', 'related_case')}
-                                    disabled={isLinkingAll}
-                                    className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] rounded transition-colors disabled:opacity-50"
-                                  >
-                                    연동안함
-                                  </button>
-                                </div>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
                       </tbody>
                     </table>
-                </div>
-              )
+                  </div>
+                )
+              );
             })()}
 
             {/* 계약 */}
@@ -2579,8 +3269,12 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               <div className="px-4 py-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="w-1 h-4 bg-[var(--sage-primary)] rounded-full" />
-                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">계약</h3>
-                  <span className="text-xs text-[var(--text-muted)]">({caseData.contract_number || '관리번호 없음'})</span>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                    계약
+                  </h3>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    ({caseData.contract_number || "관리번호 없음"})
+                  </span>
                 </div>
                 <button
                   onClick={() => setShowPaymentModal(true)}
@@ -2594,7 +3288,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               {isUnregisteredClient && (
                 <div className="border-t border-[var(--border-default)] px-4 py-3 bg-[var(--bg-tertiary)]">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm text-[var(--text-secondary)]">등록되지 않은 의뢰인입니다</p>
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      등록되지 않은 의뢰인입니다
+                    </p>
                     <button
                       onClick={() => setShowPaymentModal(true)}
                       className="text-sm text-[var(--sage-primary)] hover:text-[var(--sage-primary)] font-medium"
@@ -2608,38 +3304,74 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               {/* 테이블 */}
               <div className="border-t border-[var(--border-default)] text-sm">
                 <div className="grid grid-cols-4 border-b border-[var(--border-subtle)]">
-                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">계약일</div>
-                  <div className="px-4 py-2">{formatDate(caseData.contract_date)}</div>
-                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">의뢰인</div>
+                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">
+                    계약일
+                  </div>
                   <div className="px-4 py-2">
-                    <button className="text-[var(--sage-primary)] hover:underline" onClick={() => caseData.client && router.push(`/clients/${caseData.primary_client_id}`)}>
-                      {caseData.client?.name || '-'}
+                    {formatDate(caseData.contract_date)}
+                  </div>
+                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">
+                    의뢰인
+                  </div>
+                  <div className="px-4 py-2">
+                    <button
+                      className="text-[var(--sage-primary)] hover:underline"
+                      onClick={() =>
+                        caseData.client &&
+                        router.push(`/clients/${caseData.primary_client_id}`)
+                      }
+                    >
+                      {caseData.client?.name || "-"}
                     </button>
                   </div>
                 </div>
                 <div className="grid grid-cols-4 border-b border-[var(--border-subtle)]">
-                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">착수금</div>
-                  <div className="px-4 py-2 font-medium">{formatCurrency(caseData.retainer_fee)}</div>
-                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">성공보수</div>
-                  <div className="px-4 py-2 font-medium">{formatCurrency(caseData.calculated_success_fee)}</div>
+                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">
+                    착수금
+                  </div>
+                  <div className="px-4 py-2 font-medium">
+                    {formatCurrency(caseData.retainer_fee)}
+                  </div>
+                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">
+                    성공보수
+                  </div>
+                  <div className="px-4 py-2 font-medium">
+                    {formatCurrency(caseData.calculated_success_fee)}
+                  </div>
                 </div>
                 <div className="grid grid-cols-4 border-b border-[var(--border-subtle)]">
-                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">입금액</div>
-                  <div className="px-4 py-2 font-medium">{formatCurrency(paymentTotal ?? caseData.total_received)}</div>
-                  <div className={`px-4 py-2 text-[var(--text-tertiary)] text-xs ${calculateOutstandingBalance() > 0 ? 'bg-[var(--color-danger-muted)]' : 'bg-[var(--bg-tertiary)]'}`}>미수금</div>
-                  <div className={`px-4 py-2 font-medium ${calculateOutstandingBalance() > 0 ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]' : ''}`}>
+                  <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">
+                    입금액
+                  </div>
+                  <div className="px-4 py-2 font-medium">
+                    {formatCurrency(paymentTotal ?? caseData.total_received)}
+                  </div>
+                  <div
+                    className={`px-4 py-2 text-[var(--text-tertiary)] text-xs ${calculateOutstandingBalance() > 0 ? "bg-[var(--color-danger-muted)]" : "bg-[var(--bg-tertiary)]"}`}
+                  >
+                    미수금
+                  </div>
+                  <div
+                    className={`px-4 py-2 font-medium ${calculateOutstandingBalance() > 0 ? "bg-[var(--color-danger-muted)] text-[var(--color-danger)]" : ""}`}
+                  >
                     {formatCurrency(calculateOutstandingBalance())}
                   </div>
                 </div>
                 {caseData.success_fee_agreement && (
                   <div className="grid grid-cols-4 border-b border-[var(--border-subtle)]">
-                    <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">성공보수약정</div>
-                    <div className="px-4 py-2 col-span-3">{caseData.success_fee_agreement}</div>
+                    <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">
+                      성공보수약정
+                    </div>
+                    <div className="px-4 py-2 col-span-3">
+                      {caseData.success_fee_agreement}
+                    </div>
                   </div>
                 )}
                 {contractFiles.length > 0 && (
                   <div className="grid grid-cols-4">
-                    <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">계약서</div>
+                    <div className="px-4 py-2 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] text-xs">
+                      계약서
+                    </div>
                     <div className="px-4 py-2 col-span-3 space-y-1">
                       {contractFiles.map((file) => (
                         <a
@@ -2649,8 +3381,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                           rel="noopener noreferrer"
                           className="flex items-center gap-1.5 text-[var(--sage-primary)] hover:underline"
                         >
-                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                          <svg
+                            className="w-3.5 h-3.5"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path
+                              fillRule="evenodd"
+                              d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
+                              clipRule="evenodd"
+                            />
                           </svg>
                           {file.file_name}
                         </a>
@@ -2666,10 +3406,14 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               <div className="card overflow-hidden">
                 <div className="px-4 py-3 flex items-center gap-2">
                   <div className="w-1 h-4 bg-[var(--sage-primary)] rounded-full" />
-                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">메모</h3>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                    메모
+                  </h3>
                 </div>
                 <div className="px-4 pb-4">
-                  <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{caseData.notes}</p>
+                  <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                    {caseData.notes}
+                  </p>
                 </div>
               </div>
             )}
@@ -2677,7 +3421,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         )}
 
         {/* 일반 탭 - SCOURT 일반내용 (XML 기반) */}
-        {activeTab === 'general' && (
+        {activeTab === "general" && (
           <div className="card p-5">
             {pendingPartyEditList.length > 0 && !savingPartyFromGeneral && (
               <div className="mb-4 rounded-lg border border-[var(--sage-primary)]/10 bg-[var(--sage-muted)] px-4 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -2697,25 +3441,39 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                     disabled={savingPartyFromGeneral}
                     className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--sage-primary)] text-white hover:bg-[var(--sage-primary-hover)] disabled:opacity-50"
                   >
-                    {savingPartyFromGeneral ? '저장 중...' : '모두 저장'}
+                    {savingPartyFromGeneral ? "저장 중..." : "모두 저장"}
                   </button>
                 </div>
               </div>
             )}
             {!caseData.court_case_number ? (
-              <div className="py-12 text-center text-[var(--text-muted)]">
-                사건번호를 먼저 등록해주세요
+              <div className="text-center py-8">
+                <span className="text-sm text-[var(--text-muted)]">
+                  사건번호를 먼저 등록해주세요
+                </span>
               </div>
             ) : scourtLoading ? (
-              <div className="py-12 text-center text-[var(--text-muted)]">로딩 중...</div>
+              <div className="text-center py-8">
+                <span className="text-sm text-[var(--text-muted)]">
+                  로딩 중...
+                </span>
+              </div>
             ) : !(isLinked || scourtSyncStatus?.isLinked) ? (
-              <div className="py-12 text-center">
-                <p className="text-[var(--text-muted)] mb-4">대법원 연동이 필요합니다</p>
+              <div className="text-center py-8">
+                <span className="text-sm text-[var(--text-muted)]">
+                  대법원 연동이 필요합니다
+                </span>
               </div>
             ) : !scourtSnapshot?.rawData ? (
-              <div className="py-12 text-center">
-                <p className="text-[var(--text-muted)] mb-4">일반내용 데이터가 없습니다</p>
-                <p className="text-[var(--text-muted)] text-sm">사건을 다시 동기화해주세요</p>
+              <div className="text-center py-8">
+                <div className="space-y-1">
+                  <p className="text-sm text-[var(--text-muted)]">
+                    일반내용 데이터가 없습니다
+                  </p>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    사건을 다시 동기화해주세요
+                  </p>
+                </div>
               </div>
             ) : (
               <ScourtGeneralInfoXml
@@ -2726,102 +3484,159 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 relatedCaseLinks={relatedCaseLinks}
                 onPartyEdit={handlePartyEditFromGeneral}
                 caseParties={casePartiesForDisplay}
+                clientName={resolvedClientName}
+                clientSide={primaryParties.clientSide || undefined}
               />
             )}
           </div>
         )}
 
         {/* 진행 탭 - 5색 분류 유지 */}
-        {activeTab === 'progress' && (
+        {activeTab === "progress" && (
           <div className="card p-5">
             {!caseData.court_case_number ? (
-              <div className="py-12 text-center text-[var(--text-muted)]">
-                사건번호를 먼저 등록해주세요
+              <div className="text-center py-8">
+                <span className="text-sm text-[var(--text-muted)]">
+                  사건번호를 먼저 등록해주세요
+                </span>
               </div>
             ) : scourtLoading ? (
-              <div className="py-12 text-center text-[var(--text-muted)]">로딩 중...</div>
-            ) : !(isLinked || scourtSyncStatus?.isLinked) ? (
-              <div className="py-12 text-center">
-                <p className="text-[var(--text-muted)] mb-4">대법원 연동이 필요합니다</p>
-                <button
-                  onClick={() => handleScourtSync()}
-                  disabled={scourtSyncing}
-                  className="btn btn-primary disabled:opacity-50"
-                >
-                  대법원 연동하기
-                </button>
+              <div className="text-center py-8">
+                <span className="text-sm text-[var(--text-muted)]">
+                  로딩 중...
+                </span>
               </div>
-            ) : !scourtSnapshot || !scourtSnapshot.progress || scourtSnapshot.progress.length === 0 ? (
-              <div className="py-12 text-center text-[var(--text-muted)]">
-                진행내용이 없습니다
+            ) : !(isLinked || scourtSyncStatus?.isLinked) ? (
+              <div className="text-center py-8">
+                <div className="space-y-3">
+                  <span className="text-sm text-[var(--text-muted)]">
+                    대법원 연동이 필요합니다
+                  </span>
+                  <div>
+                    <button
+                      onClick={() => handleScourtSync()}
+                      disabled={scourtSyncing}
+                      className="btn btn-primary disabled:opacity-50"
+                    >
+                      대법원 연동하기
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : !scourtSnapshot ||
+              !scourtSnapshot.progress ||
+              scourtSnapshot.progress.length === 0 ? (
+              <div className="text-center py-8">
+                <span className="text-sm text-[var(--text-muted)]">
+                  진행내용이 없습니다
+                </span>
               </div>
             ) : (
               <>
                 {/* 필터 탭 */}
                 <div className="flex flex-wrap gap-2 mb-5">
                   {[
-                    { key: 'all', label: '전체' },
-                    { key: 'hearing', label: '기일', color: '#003399' },
-                    { key: 'order', label: '명령', color: '#336633' },
-                    { key: 'submit', label: '제출', color: '#660000' },
-                    { key: 'delivery', label: '송달', color: '#CC6600' },
-                    { key: 'court', label: '법원', color: '#000000' },
-                  ].map(tab => {
-                    const isActive = progressFilter === tab.key
-                    const count = tab.key === 'all'
-                      ? scourtSnapshot.progress.length
-                      : scourtSnapshot.progress.filter(item => getProgressCategory(item) === tab.key).length
+                    { key: "all", label: "전체" },
+                    { key: "hearing", label: "기일", color: "#003399" },
+                    { key: "order", label: "명령", color: "#336633" },
+                    { key: "submit", label: "제출", color: "#660000" },
+                    { key: "delivery", label: "송달", color: "#CC6600" },
+                    { key: "court", label: "법원", color: "#000000" },
+                  ].map((tab) => {
+                    const isActive = progressFilter === tab.key;
+                    const count =
+                      tab.key === "all"
+                        ? scourtSnapshot.progress.length
+                        : scourtSnapshot.progress.filter(
+                            (item) => getProgressCategory(item) === tab.key,
+                          ).length;
 
-                    if (tab.key !== 'all' && count === 0) return null
+                    if (tab.key !== "all" && count === 0) return null;
 
                     return (
                       <button
                         key={tab.key}
                         onClick={() => {
-                          setProgressFilter(tab.key as typeof progressFilter)
-                          setShowProgressDetail(false)
+                          setProgressFilter(tab.key as typeof progressFilter);
+                          setShowProgressDetail(false);
                         }}
                         className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                           isActive
-                            ? 'text-white'
-                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
+                            ? "text-white"
+                            : "bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]"
                         }`}
-                        style={isActive && tab.color ? { backgroundColor: tab.color } : isActive ? { backgroundColor: '#87A96B' } : {}}
+                        style={
+                          isActive && tab.color
+                            ? { backgroundColor: tab.color }
+                            : isActive
+                              ? { backgroundColor: "#87A96B" }
+                              : {}
+                        }
                       >
                         {tab.label}
-                        <span className={`ml-1 ${isActive ? 'opacity-80' : 'text-[var(--text-muted)]'}`}>
+                        <span
+                          className={`ml-1 ${isActive ? "opacity-80" : "text-[var(--text-muted)]"}`}
+                        >
                           {count}
                         </span>
                       </button>
-                    )
+                    );
                   })}
                 </div>
 
                 {/* 진행내용 테이블 */}
                 {(() => {
-                  const filteredItems = filterProgress(scourtSnapshot.progress)
-                  const displayItems = showProgressDetail ? filteredItems : filteredItems.slice(0, 15)
+                  const filteredItems = filterProgress(scourtSnapshot.progress);
+                  const displayItems = showProgressDetail
+                    ? filteredItems
+                    : filteredItems.slice(0, 15);
 
                   return filteredItems.length > 0 ? (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b border-[var(--border-default)]">
-                            <th className="py-2 px-3 text-left text-[var(--text-tertiary)] font-medium w-24">일자</th>
-                            <th className="py-2 px-3 text-left text-[var(--text-tertiary)] font-medium">내용</th>
-                            <th className="py-2 px-3 text-left text-[var(--text-tertiary)] font-medium w-24">결과</th>
+                            <th className="px-4 py-2.5 text-left text-[var(--text-tertiary)] font-medium w-24">
+                              일자
+                            </th>
+                            <th className="px-4 py-2.5 text-left text-[var(--text-tertiary)] font-medium">
+                              내용
+                            </th>
+                            <th className="px-4 py-2.5 text-left text-[var(--text-tertiary)] font-medium w-24">
+                              결과
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
                           {displayItems.map((item, idx) => {
-                            const textColor = getProgressColor(item)
+                            const textColor = getProgressColor(item);
                             return (
-                              <tr key={idx} className="border-b border-[var(--border-subtle)] last:border-0">
-                                <td className="py-2.5 px-3 font-medium whitespace-nowrap" style={{ color: textColor }}>{formatProgressDate(item.date)}</td>
-                                <td className="py-2.5 px-3 leading-relaxed" style={{ color: textColor }}>{item.content || '-'}</td>
-                                <td className="py-2.5 px-3" style={{ color: textColor }}>{item.result ? formatProgressDate(item.result) : '-'}</td>
+                              <tr
+                                key={idx}
+                                className="border-b border-[var(--border-subtle)] last:border-0"
+                              >
+                                <td
+                                  className="px-4 py-3 font-medium whitespace-nowrap"
+                                  style={{ color: textColor }}
+                                >
+                                  {formatProgressDate(item.date)}
+                                </td>
+                                <td
+                                  className="px-4 py-3 leading-relaxed"
+                                  style={{ color: textColor }}
+                                >
+                                  {item.content || "-"}
+                                </td>
+                                <td
+                                  className="px-4 py-3"
+                                  style={{ color: textColor }}
+                                >
+                                  {item.result
+                                    ? formatProgressDate(item.result)
+                                    : "-"}
+                                </td>
                               </tr>
-                            )
+                            );
                           })}
                         </tbody>
                       </table>
@@ -2835,16 +3650,17 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                       )}
                     </div>
                   ) : (
-                    <div className="py-8 text-center text-[var(--text-muted)] text-sm">
-                      해당 카테고리의 진행내용이 없습니다.
+                    <div className="text-center py-8">
+                      <span className="text-sm text-[var(--text-muted)]">
+                        해당 카테고리의 진행내용이 없습니다
+                      </span>
                     </div>
-                  )
+                  );
                 })()}
               </>
             )}
           </div>
         )}
-
       </div>
 
       {/* Unified Schedule Modal */}
@@ -2852,8 +3668,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         isOpen={showScheduleModal}
         onClose={() => setShowScheduleModal(false)}
         onSuccess={() => {
-          fetchAllSchedules()
-          setShowScheduleModal(false)
+          fetchAllSchedules();
+          setShowScheduleModal(false);
         }}
         prefilledCaseId={caseData.id}
         prefilledCaseNumber={caseData.court_case_number || undefined}
@@ -2862,14 +3678,29 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       <HearingDetailModal
         isOpen={showHearingModal}
         onClose={() => {
-          setShowHearingModal(false)
-          setSelectedHearing(null)
+          setShowHearingModal(false);
+          setSelectedHearing(null);
         }}
         onSuccess={() => {
-          fetchAllSchedules()
+          fetchAllSchedules();
         }}
         hearing={selectedHearing}
       />
+
+      {/* Related Case Preview Modal */}
+      {selectedRelatedCase && (
+        <RelatedCasePreviewModal
+          isOpen={previewModalOpen}
+          onClose={() => {
+            setPreviewModalOpen(false);
+            setSelectedRelatedCase(null);
+          }}
+          relatedCaseInfo={selectedRelatedCase}
+          sourceCaseId={caseData.id}
+          onLink={handleLinkRelatedCase}
+          onDismiss={handleDismissRelatedCaseFromModal}
+        />
+      )}
 
       {/* Report Modal */}
       {reportModal && (
@@ -2889,8 +3720,18 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 className="absolute top-3 right-3 p-1 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
                 aria-label="닫기"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -2911,33 +3752,42 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 </div>
                 <div className="flex gap-4">
                   <span className="w-14 text-[var(--text-tertiary)]">사안</span>
-                  <span>{`${reportModal.court || '해당법원'} ${reportModal.caseNumber || '해당사건번호'}`}</span>
+                  <span>{`${reportModal.court || "해당법원"} ${reportModal.caseNumber || "해당사건번호"}`}</span>
                 </div>
                 <div className="flex gap-4">
-                  <span className="w-14 text-[var(--text-tertiary)]">변론기일</span>
-                  <span>{reportModal.date ? (() => {
-                    const d = new Date(reportModal.date)
-                    return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
-                  })() : '-'}</span>
+                  <span className="w-14 text-[var(--text-tertiary)]">
+                    변론기일
+                  </span>
+                  <span>
+                    {reportModal.date
+                      ? (() => {
+                          const d = new Date(reportModal.date);
+                          return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+                        })()
+                      : "-"}
+                  </span>
                 </div>
               </div>
 
               <div className="border-t border-[var(--border-subtle)] pt-4 space-y-3">
                 <p>
-                  {clientDisplayName.replace('님', '')}님이 의뢰하신 위 사건에 대하여 다음과 같이 변론기일보고를 드립니다.
+                  {clientDisplayName.replace("님", "")}님이 의뢰하신 위 사건에
+                  대하여 다음과 같이 변론기일보고를 드립니다.
                 </p>
 
                 <p className="text-center font-semibold">다음</p>
 
                 <div className="whitespace-pre-wrap min-h-[160px]">
-                  {reportModal.report || '등록된 보고서가 없습니다.'}
+                  {reportModal.report || "등록된 보고서가 없습니다."}
                 </div>
 
                 <p className="text-center text-[var(--text-tertiary)]">
-                  {reportModal.date ? (() => {
-                    const d = new Date(reportModal.date)
-                    return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
-                  })() : ''}
+                  {reportModal.date
+                    ? (() => {
+                        const d = new Date(reportModal.date);
+                        return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+                      })()
+                    : ""}
                 </p>
 
                 <div className="text-right mt-6 space-y-1">
@@ -2951,7 +3801,9 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                       className="h-12 w-12"
                     />
                   </div>
-                  <p className="text-xs text-[var(--text-tertiary)]">담당 변호사</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">
+                    담당 변호사
+                  </p>
                 </div>
               </div>
             </div>
@@ -2978,8 +3830,18 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 onClick={() => setShowLinkModal(false)}
                 className="btn-close"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -3008,23 +3870,25 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   type="text"
                   value={linkCourtName}
                   onChange={(e) => {
-                    setLinkCourtName(e.target.value)
-                    setShowCourtDropdown(true)
+                    setLinkCourtName(e.target.value);
+                    setShowCourtDropdown(true);
                   }}
                   onFocus={() => setShowCourtDropdown(true)}
-                  onBlur={() => setTimeout(() => setShowCourtDropdown(false), 150)}
+                  onBlur={() =>
+                    setTimeout(() => setShowCourtDropdown(false), 150)
+                  }
                   placeholder="검색 또는 선택..."
                   className="form-input w-full"
                 />
                 {showCourtDropdown && filteredCourts.length > 0 && (
                   <div className="absolute z-50 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                    {filteredCourts.map(c => (
+                    {filteredCourts.map((c) => (
                       <div
                         key={c.code}
                         className="px-3 py-2 text-sm cursor-pointer hover:bg-[var(--bg-hover)] text-[var(--text-primary)]"
                         onMouseDown={() => {
-                          setLinkCourtName(getCourtAbbrev(c.name))
-                          setShowCourtDropdown(false)
+                          setLinkCourtName(getCourtAbbrev(c.name));
+                          setShowCourtDropdown(false);
                         }}
                       >
                         {getCourtAbbrev(c.name)}
@@ -3045,7 +3909,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                   onChange={(e) => setLinkPartyName(e.target.value)}
                   placeholder="원고 또는 피고 이름"
                   className="form-input w-full"
-                  onKeyDown={(e) => e.key === 'Enter' && handleLinkConfirm()}
+                  onKeyDown={(e) => e.key === "Enter" && handleLinkConfirm()}
                 />
                 <p className="form-hint">
                   대법원 나의사건검색에서 사건을 찾기 위한 당사자명입니다.
@@ -3062,16 +3926,36 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               </button>
               <button
                 onClick={handleLinkConfirm}
-                disabled={scourtSyncing || !linkCaseNumber.trim() || !linkCourtName.trim() || !linkPartyName.trim()}
+                disabled={
+                  scourtSyncing ||
+                  !linkCaseNumber.trim() ||
+                  !linkCourtName.trim() ||
+                  !linkPartyName.trim()
+                }
                 className="btn btn-primary disabled:opacity-50"
               >
                 {scourtSyncing && (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="w-4 h-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                 )}
-                {scourtSyncing ? '연동 중...' : '연동하기'}
+                {scourtSyncing ? "연동 중..." : "연동하기"}
               </button>
             </div>
           </div>
@@ -3086,16 +3970,26 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               <h3 className="modal-title">당사자 수정</h3>
               <button
                 onClick={() => {
-                  setEditingPartyFromGeneral(null)
-                  setEditPartyNameInput('')
-                  setEditPartyPrimaryInput(false)
-                  setEditPartyIsOurClient(false)
-                  setEditPartyClientId(null)
+                  setEditingPartyFromGeneral(null);
+                  setEditPartyNameInput("");
+                  setEditPartyPrimaryInput(false);
+                  setEditPartyIsOurClient(false);
+                  setEditPartyClientId(null);
                 }}
                 className="btn-close"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
@@ -3126,36 +4020,48 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                     type="checkbox"
                     checked={editPartyIsOurClient}
                     onChange={(e) => {
-                      setEditPartyIsOurClient(e.target.checked)
+                      setEditPartyIsOurClient(e.target.checked);
                       if (!e.target.checked) {
-                        setEditPartyClientId(null)
+                        setEditPartyClientId(null);
                       }
                     }}
                     className="h-4 w-4 rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
                   />
-                  <label htmlFor="party-is-our-client" className="text-sm text-[var(--text-secondary)]">
+                  <label
+                    htmlFor="party-is-our-client"
+                    className="text-sm text-[var(--text-secondary)]"
+                  >
                     의뢰인으로 설정
                   </label>
                 </div>
                 {isOppositeSideClient && !editPartyIsOurClient && (
                   <p className="text-xs text-[var(--color-warning)] ml-6 flex items-start gap-1">
                     <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                    <span>현재 반대측 당사자가 의뢰인으로 설정되어 있습니다.
-                    이 당사자를 의뢰인으로 설정하면 기존 의뢰인 설정이 해제됩니다.</span>
+                    <span>
+                      현재 반대측 당사자가 의뢰인으로 설정되어 있습니다. 이
+                      당사자를 의뢰인으로 설정하면 기존 의뢰인 설정이
+                      해제됩니다.
+                    </span>
                   </p>
                 )}
 
                 {editPartyIsOurClient && (
                   <div className="ml-6">
-                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">의뢰인 연결</label>
+                    <label className="block text-xs text-[var(--text-tertiary)] mb-1">
+                      의뢰인 연결
+                    </label>
                     <select
-                      value={editPartyClientId || ''}
-                      onChange={(e) => setEditPartyClientId(e.target.value || null)}
+                      value={editPartyClientId || ""}
+                      onChange={(e) =>
+                        setEditPartyClientId(e.target.value || null)
+                      }
                       className="w-full px-3 py-2 border border-[var(--border-default)] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)] focus:border-transparent"
                     >
                       <option value="">선택...</option>
                       {clients.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -3172,7 +4078,10 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                     onChange={(e) => setEditPartyPrimaryInput(e.target.checked)}
                     className="h-4 w-4 rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
                   />
-                  <label htmlFor="party-primary" className="text-sm text-[var(--text-secondary)]">
+                  <label
+                    htmlFor="party-primary"
+                    className="text-sm text-[var(--text-secondary)]"
+                  >
                     당사자 대표로 표시
                   </label>
                 </div>
@@ -3181,11 +4090,11 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             <div className="px-6 py-4 bg-[var(--bg-tertiary)] flex justify-end gap-2">
               <button
                 onClick={() => {
-                  setEditingPartyFromGeneral(null)
-                  setEditPartyNameInput('')
-                  setEditPartyPrimaryInput(false)
-                  setEditPartyIsOurClient(false)
-                  setEditPartyClientId(null)
+                  setEditingPartyFromGeneral(null);
+                  setEditPartyNameInput("");
+                  setEditPartyPrimaryInput(false);
+                  setEditPartyIsOurClient(false);
+                  setEditPartyClientId(null);
                 }}
                 className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-xl hover:bg-[var(--bg-hover)] transition-colors"
               >
@@ -3197,17 +4106,32 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 className="px-4 py-2 text-sm font-medium text-white bg-[var(--sage-primary)] rounded-xl hover:bg-[var(--sage-primary-hover)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
               >
                 {savingPartyFromGeneral && (
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  <svg
+                    className="w-4 h-4 animate-spin"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
                   </svg>
                 )}
-                {savingPartyFromGeneral ? '저장 중...' : '저장'}
+                {savingPartyFromGeneral ? "저장 중..." : "저장"}
               </button>
             </div>
           </div>
         </div>
       )}
     </>
-  )
+  );
 }

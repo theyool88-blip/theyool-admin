@@ -58,7 +58,10 @@ export interface CaseNotice {
   }
 }
 
-// 카테고리별 아이콘 매핑
+/**
+ * @deprecated Use NOTICE_ICONS from '@/lib/icons/notice-icons' instead
+ * Legacy emoji icons kept for backwards compatibility
+ */
 export const NOTICE_CATEGORY_ICONS: Record<NoticeCategory, string> = {
   next_hearing: '📅',
   deadline: '⏰',

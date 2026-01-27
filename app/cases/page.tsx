@@ -85,11 +85,11 @@ export default async function CasesPage() {
   // casesData 변환: parties 객체 추가
   const casesWithParties: TransformedCase[] = (casesData || []).map((c) => {
     const caseData = c as CaseData
-    const parties = c.case_parties || []
-    const clients = c.case_clients || []
+    const parties = caseData.case_parties || []
+    const clients = caseData.case_clients || []
 
     // 의뢰인: 캐시 필드 사용 (fallback: client JOIN)
-    const ourClientName = c.primary_client_name || c.client?.name
+    const ourClientName = caseData.primary_client_name || caseData.client?.name
 
     // 상대방: case_clients → case_parties 연결로 조회
     const primaryClientLink = clients.find((cc: CaseClient) => cc.is_primary_client)
@@ -97,8 +97,8 @@ export default async function CasesPage() {
     const clientParty = parties.find((p: CaseParty) => p.id === clientPartyId)
     const clientPartyType = clientParty?.party_type
 
-    let opponent = null
-    let opponentLabel = null
+    let opponent: string | null = null
+    let opponentLabel: string | null = null
     if (clientPartyType) {
       const opponentType = clientPartyType === 'plaintiff' ? 'defendant' : 'plaintiff'
       const opponentParty = parties.find((p: CaseParty) =>
@@ -116,19 +116,31 @@ export default async function CasesPage() {
     }
 
     return {
-      ...c,
+      id: caseData.id,
+      case_name: caseData.case_name,
+      court_case_number: caseData.court_case_number,
+      court_name: caseData.court_name,
+      case_level: caseData.case_level,
+      main_case_id: caseData.main_case_id,
+      status: caseData.status,
+      primary_client_id: caseData.primary_client_id,
+      primary_client_name: caseData.primary_client_name,
+      created_at: caseData.created_at,
+      updated_at: caseData.updated_at,
+      tenant_id: caseData.tenant_id,
+      client: caseData.client,
       parties: {
         ourClient: ourClientName || null,
         ourClientLabel: clientParty?.party_type_label || null,
         opponent,
         opponentLabel,
       }
-    }
+    } as TransformedCase
   })
 
   return (
     <AdminLayoutClient>
-      <CasesList initialCases={casesWithParties as any} />
+      <CasesList initialCases={casesWithParties} />
     </AdminLayoutClient>
   )
 }

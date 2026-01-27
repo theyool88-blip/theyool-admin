@@ -44,17 +44,14 @@ export interface ApiEvent {
   location?: string | null
   reference_id?: string | null
   case_name?: string | null
-  client_name?: string | null  // 의뢰인명 (primary_client_name)
-  deadline_type_label?: string | null  // 마감일 타입명 (뱃지 표시용)
   case_id?: string | null
   description?: string | null
   status?: string | null
   attending_lawyer_id?: string | null
   attending_lawyer_name?: string | null
-  scourt_type_raw?: string | null
-  scourt_result_raw?: string | null  // 기일결과 (continued, settled, adjourned 등)
   video_participant_side?: string | null
-  our_client_side?: string | null  // 의뢰인 측 (plaintiff_side, defendant_side)
+  our_client_name?: string | null  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
+  sort_priority?: number | null
 }
 
 // ========================================
@@ -76,15 +73,12 @@ export interface BigCalendarEvent {
   caseId?: string
   caseNumber?: string
   caseName?: string
-  clientName?: string  // 의뢰인명
-  deadlineTypeLabel?: string  // 마감일 타입명 (뱃지 표시용)
   status?: string
   attendingLawyerId?: string
   attendingLawyerName?: string
-  scourtTypeRaw?: string
-  scourtResultRaw?: string
   videoParticipantSide?: string
-  ourClientSide?: string
+  ourClientName?: string  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
+  sortPriority?: number
   daysUntil?: number
 }
 
@@ -109,10 +103,8 @@ export interface ScheduleXEvent {
   status?: string
   attendingLawyerId?: string
   attendingLawyerName?: string
-  scourtTypeRaw?: string
-  scourtResultRaw?: string
   videoParticipantSide?: string
-  ourClientSide?: string
+  ourClientName?: string  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
   daysUntil?: number
 }
 
@@ -137,10 +129,8 @@ export interface UnifiedSchedule {
   event_subtype?: string
   attending_lawyer_id?: string
   attending_lawyer_name?: string
-  scourt_type_raw?: string
-  scourt_result_raw?: string
   video_participant_side?: string
-  our_client_side?: string
+  our_client_name?: string  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
 }
 
 // ========================================

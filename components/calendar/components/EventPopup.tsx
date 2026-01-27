@@ -7,10 +7,8 @@ import type { BigCalendarEvent } from '../types'
 import { HEARING_TYPE_LABELS, NO_LAWYER_ATTENDANCE_TYPES } from '../types'
 import { formatDaysUntil } from '@/types/court-hearing'
 import {
-  isPostponedHearing,
   getVideoBadgeInfo,
   shortenCourtLocation,
-  removeVideoDeviceText,
 } from '../utils/eventTransformers'
 
 // 기일결과 한글 변환
@@ -135,32 +133,25 @@ function EventPopupComponent({
     caseNumber,
     caseId,
     caseName,
-    clientName,
+    status,
     attendingLawyerName,
-    scourtResultRaw,
-    scourtTypeRaw,
     videoParticipantSide,
-    ourClientSide,
+    ourClientName,
     daysUntil,
   } = event
 
-  const isPostponed = isPostponedHearing(scourtResultRaw)
+  const isPostponed = status === 'adjourned'
   const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
-  const videoBadge = getVideoBadgeInfo(scourtTypeRaw, videoParticipantSide, ourClientSide)
-
-  // 기일결과 한글 변환
-  const resultLabelKr = scourtResultRaw ? (RESULT_LABELS[scourtResultRaw] || scourtResultRaw) : ''
+  const videoBadge = getVideoBadgeInfo(videoParticipantSide)
 
   const subtypeLabel = eventSubtype ? HEARING_TYPE_LABELS[eventSubtype] || '' : ''
-  const typeLabel = scourtTypeRaw
-    ? removeVideoDeviceText(scourtTypeRaw)
-    : subtypeLabel || getEventTypeLabel(eventType)
+  const typeLabel = subtypeLabel || getEventTypeLabel(eventType)
 
   // 결과 뱃지 클래스 (MonthEvent.tsx와 동일)
   const getResultBadgeClass = () => {
     if (isPostponed) return 'event-label-postponed'
-    if (eventSubtype === 'HEARING_JUDGMENT' && resultLabelKr) return 'event-label-judgment'
+    if (eventSubtype === 'HEARING_JUDGMENT') return 'event-label-judgment'
     if (isNoAttendanceRequired) return 'event-label-no-attendance'
     return 'event-label-hearing'
   }
@@ -191,20 +182,20 @@ function EventPopupComponent({
         <div className="flex items-start gap-3 p-4 border-b border-[var(--border-subtle)]">
           <div className={`w-3 h-3 rounded-full flex-shrink-0 mt-1 ${getIndicatorColor()}`} />
           <div className="flex-1 min-w-0">
-            {/* 제목: [기일타입] [결과] (결과 있을 때) */}
+            {/* 제목: [기일타입] */}
             <div className={`flex items-center gap-1.5 flex-wrap ${isPostponed ? 'opacity-70' : ''}`}>
               <h3 className={`font-semibold text-sm text-[var(--text-primary)] leading-tight`}>
                 {typeLabel}
               </h3>
-              {resultLabelKr && (
+              {isPostponed && (
                 <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${getResultBadgeClass()}`}>
-                  {resultLabelKr}
+                  연기
                 </span>
               )}
             </div>
-            {/* 부제목: 의뢰인 사건명 */}
+            {/* 부제목: 의뢰인명 또는 사건명 */}
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">
-              {clientName || caseName || title}
+              {ourClientName || caseName || title}
             </p>
           </div>
           <button

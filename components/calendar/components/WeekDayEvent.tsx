@@ -5,7 +5,6 @@ import type { BigCalendarEvent } from '../types'
 import { HEARING_TYPE_LABELS, NO_LAWYER_ATTENDANCE_TYPES } from '../types'
 import { formatDaysUntil } from '@/types/court-hearing'
 import {
-  isPostponedHearing,
   getVideoBadgeInfo,
   getShortCourt,
   getShortTitle,
@@ -29,17 +28,15 @@ function WeekDayEventComponent({ event, isSelected }: WeekDayEventProps) {
     eventSubtype,
     location,
     caseNumber,
-    scourtResultRaw,
-    scourtTypeRaw,
+    status,
     videoParticipantSide,
-    ourClientSide,
     daysUntil,
   } = event
 
-  const isPostponed = isPostponedHearing(scourtResultRaw)
+  const isPostponed = status === 'adjourned'
   const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
-  const videoBadge = getVideoBadgeInfo(scourtTypeRaw, videoParticipantSide, ourClientSide)
+  const videoBadge = getVideoBadgeInfo(videoParticipantSide)
 
   // Get type label
   const subtypeLabel = eventSubtype ? HEARING_TYPE_LABELS[eventSubtype] || eventSubtype : ''

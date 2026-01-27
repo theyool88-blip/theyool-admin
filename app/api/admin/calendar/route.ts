@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant } from '@/lib/api/with-tenant'
 
-// 캘린더에서 실제로 사용하는 컬럼만 정의
+// 캘린더에서 실제로 사용하는 컬럼만 정의 (unified_calendar 뷰 기준)
 const CALENDAR_COLUMNS = [
   'id',
   'event_type',
@@ -14,15 +14,12 @@ const CALENDAR_COLUMNS = [
   'case_id',
   'reference_id',
   'case_name',
-  'client_name',
-  'deadline_type_label',
+  'description',
   'status',
   'attending_lawyer_id',
   'attending_lawyer_name',
-  'scourt_type_raw',
-  'scourt_result_raw',
   'video_participant_side',
-  'our_client_side',
+  'our_client_name',
   'sort_priority',
 ].join(', ')
 

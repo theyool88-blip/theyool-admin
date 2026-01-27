@@ -53,15 +53,12 @@ export function convertToBigCalendarEvent(event: ApiEvent): BigCalendarEvent {
     caseId: event.case_id || undefined,
     caseNumber: event.reference_id || undefined,
     caseName: event.case_name || undefined,
-    clientName: event.client_name || undefined,
-    deadlineTypeLabel: event.deadline_type_label || undefined,
     status: event.status || undefined,
     attendingLawyerId: event.attending_lawyer_id || undefined,
     attendingLawyerName: event.attending_lawyer_name || undefined,
-    scourtTypeRaw: event.scourt_type_raw || undefined,
-    scourtResultRaw: event.scourt_result_raw || undefined,
     videoParticipantSide: event.video_participant_side || undefined,
-    ourClientSide: event.our_client_side || undefined,
+    ourClientName: event.our_client_name || undefined,
+    sortPriority: event.sort_priority || undefined,
     daysUntil,
   }
 }
@@ -95,10 +92,8 @@ export function convertToUnifiedSchedule(event: BigCalendarEvent): UnifiedSchedu
     event_subtype: event.eventSubtype,
     attending_lawyer_id: event.attendingLawyerId,
     attending_lawyer_name: event.attendingLawyerName,
-    scourt_type_raw: event.scourtTypeRaw,
-    scourt_result_raw: event.scourtResultRaw,
     video_participant_side: event.videoParticipantSide,
-    our_client_side: event.ourClientSide,
+    our_client_name: event.ourClientName,
   }
 }
 
@@ -145,21 +140,13 @@ export function removeVideoDeviceText(text: string): string {
  * Get video badge info
  */
 export function getVideoBadgeInfo(
-  scourtTypeRaw?: string,
-  videoParticipantSide?: string,
-  ourClientSide?: string
+  videoParticipantSide?: string
 ): { show: boolean; label: string; color: string } | null {
-  if (scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치') || videoParticipantSide === 'both') {
-    return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
+  if (videoParticipantSide === 'both') {
+    return { show: true, label: '쌍방화상', color: 'bg-purple-100 text-purple-700' }
   }
-  if (videoParticipantSide && ourClientSide) {
-    if (videoParticipantSide === ourClientSide) {
-      return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
-    }
-    return null
-  }
-  if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
-    return { show: true, label: '화상', color: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' }
+  if (videoParticipantSide === 'plaintiff_side' || videoParticipantSide === 'defendant_side') {
+    return { show: true, label: '일방화상', color: 'bg-purple-50 text-purple-600' }
   }
   return null
 }
@@ -233,9 +220,9 @@ export function getScheduleTypeColor(
   type: string,
   hearingType?: string,
   eventSubtype?: string,
-  scourtResultRaw?: string
+  status?: string
 ): string {
-  if (type === 'court_hearing' && isPostponedHearing(scourtResultRaw)) {
+  if (type === 'court_hearing' && status === 'adjourned') {
     return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-l-[var(--border-default)]'
   }
   if (type === 'court_hearing' && hearingType === 'HEARING_LAWYER_MEETING') {
@@ -252,7 +239,7 @@ export function getScheduleTypeColor(
     case 'consultation': return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)]'
     case 'meeting': return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
     case 'court_hearing': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
-    case 'deadline': return 'bg-orange-50 text-orange-700 border-l-orange-500'
+    case 'deadline': return 'bg-[var(--color-warning-muted)] text-[var(--color-warning)] border-l-[var(--color-warning)]'
     default: return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
   }
 }

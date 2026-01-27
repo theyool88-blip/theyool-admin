@@ -4,7 +4,6 @@ import { memo } from 'react'
 import type { BigCalendarEvent } from '../types'
 import { HEARING_TYPE_LABELS, NO_LAWYER_ATTENDANCE_TYPES } from '../types'
 import {
-  isPostponedHearing,
   getVideoBadgeInfo,
   getShortCourt,
   extractClientName,
@@ -89,17 +88,14 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
     eventType,
     eventSubtype,
     location,
-    scourtResultRaw,
-    scourtTypeRaw,
+    status,
     videoParticipantSide,
-    ourClientSide,
-    clientName: eventClientName,
-    deadlineTypeLabel,
+    ourClientName,
   } = event
 
-  const isPostponed = isPostponedHearing(scourtResultRaw)
+  const isPostponed = status === 'adjourned'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
-  const videoBadge = getVideoBadgeInfo(scourtTypeRaw, videoParticipantSide, ourClientSide)
+  const videoBadge = getVideoBadgeInfo(videoParticipantSide)
 
   // Get time string (only for timed events)
   const timeStr = !allDay
@@ -109,47 +105,31 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
   // Get display components
   const displayLabel = getDisplayLabel(eventType, eventSubtype)
   const shortCourt = eventType === 'COURT_HEARING' ? getShortCourt(location) : ''
-  // 의뢰인명: DB에서 가져온 clientName 우선, 없으면 title에서 추출
-  const clientName = eventClientName || extractClientName(title)
-
-  // 기일결과 한글 변환 (영문 enum은 한글로, 한글은 그대로)
-  const resultLabelKr = scourtResultRaw ? (RESULT_LABELS[scourtResultRaw] || scourtResultRaw) : ''
+  // 의뢰인명: DB에서 가져온 ourClientName 우선, 없으면 title에서 추출
+  const clientName = ourClientName || extractClientName(title)
 
   // Build display text and badge label
   let displayText = ''
   let badgeLabel = ''
-  let resultLabel = '' // 기일결과 (결과가 있을 때만, 화살표 없이)
 
   if (eventType === 'DEADLINE') {
-    // 마감일: deadlineTypeLabel을 뱃지로 표시 (D-day 대신)
-    badgeLabel = deadlineTypeLabel || '기한'
+    // 마감일: '기한'을 뱃지로 표시
+    badgeLabel = '기한'
     displayText = clientName
   } else if (allDay) {
     // 종일 이벤트: 라벨 제목 (시간 없음)
     badgeLabel = displayLabel
     displayText = clientName
-    // 기일결과가 있으면 별도 뱃지로 표시 (본래 기일 타입 유지)
-    if (eventType === 'COURT_HEARING' && resultLabelKr) {
-      resultLabel = resultLabelKr
-    }
   } else {
     // 시간 이벤트: 시간 법원 의뢰인 (라벨은 뱃지로 표시)
     badgeLabel = displayLabel
     const parts = [timeStr, shortCourt, clientName].filter(Boolean)
     displayText = parts.join(' ')
-    // 기일결과가 있으면 별도 뱃지로 표시 (본래 기일 타입 유지)
-    if (eventType === 'COURT_HEARING' && resultLabelKr) {
-      resultLabel = resultLabelKr
-    }
   }
 
   // ===== 종일 이벤트: 색상 바 스타일 =====
   if (allDay) {
-    // 선고기일 결과가 있으면 Purple 바 사용
-    const isJudgmentWithResult = eventSubtype === 'HEARING_JUDGMENT' && resultLabel && !isPostponed
-    const barColorClass = isJudgmentWithResult
-      ? 'event-bar-judgment'
-      : getBarColorClass(eventType, eventSubtype, isPostponed, isNoAttendanceRequired)
+    const barColorClass = getBarColorClass(eventType, eventSubtype, isPostponed, isNoAttendanceRequired)
 
     return (
       <div
@@ -163,15 +143,10 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
       >
         <span className="truncate">
           {badgeLabel || ''}
-          {resultLabel && (
-            <span className="ml-0.5 px-1 rounded text-[10px] bg-white/30 text-inherit">
-              {resultLabel}
-            </span>
-          )}
           {videoBadge && !isPostponed && (
             <span className="ml-0.5 text-[8px] px-0.5 rounded event-badge-video">화</span>
           )}
-          {(badgeLabel || videoBadge || resultLabel) && ' '}
+          {(badgeLabel || videoBadge) && ' '}
           <span className={isPostponed ? 'line-through' : ''}>{displayText}</span>
         </span>
       </div>
@@ -181,10 +156,6 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
   // ===== 시간 이벤트: 라벨 뱃지 + 텍스트 스타일 =====
   // 연기/기일변경된 경우 회색 스타일 적용
   const labelBadgeClass = getLabelBadgeClass(eventType, eventSubtype, isPostponed, isNoAttendanceRequired)
-
-  // 선고기일 결과는 Purple로 표시 (연기 제외)
-  const isJudgmentResult = eventSubtype === 'HEARING_JUDGMENT' && resultLabel && !isPostponed
-  const resultBadgeClass = isJudgmentResult ? 'event-label-judgment' : labelBadgeClass
 
   return (
     <div
@@ -197,11 +168,6 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
       {badgeLabel && (
         <span className={`text-[10px] px-1 py-0 rounded flex-shrink-0 font-medium ${labelBadgeClass}`}>
           {badgeLabel}
-        </span>
-      )}
-      {resultLabel && (
-        <span className={`text-[10px] px-1 py-0 rounded flex-shrink-0 font-medium ${resultBadgeClass}`}>
-          {resultLabel}
         </span>
       )}
       {videoBadge && !isPostponed && (

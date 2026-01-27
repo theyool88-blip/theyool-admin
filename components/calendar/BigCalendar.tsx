@@ -15,7 +15,7 @@ import type { Profile, BigCalendarEvent, UnifiedSchedule, Holiday } from './type
 import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { useCalendarNavigation } from './hooks/useCalendarNavigation'
 import { useEventActions } from './hooks/useEventActions'
-import { convertToUnifiedSchedule, isPostponedHearing, getVideoBadgeInfo, shortenCourtLocation, getScheduleTypeLabel, getScheduleTypeColor, removeVideoDeviceText } from './utils/eventTransformers'
+import { convertToUnifiedSchedule, getVideoBadgeInfo, shortenCourtLocation, getScheduleTypeLabel, getScheduleTypeColor } from './utils/eventTransformers'
 import { CalendarToolbar } from './components/CalendarToolbar'
 import { MonthEvent } from './components/MonthEvent'
 import { WeekDayEvent } from './components/WeekDayEvent'
@@ -387,7 +387,7 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
 
   // Custom event prop getter for event styling
   const eventPropGetter = useCallback((event: BigCalendarEvent) => {
-    const isPostponed = isPostponedHearing(event.scourtResultRaw)
+    const isPostponed = event.status === 'adjourned'
     const isLawyerMeeting = event.eventSubtype === 'HEARING_LAWYER_MEETING'
     const isNoAttendance = ['HEARING_JUDGMENT', 'HEARING_INVESTIGATION', 'HEARING_PARENTING'].includes(event.eventSubtype || '')
 

@@ -39,13 +39,8 @@ interface UnifiedSchedule {
   event_subtype?: string // consultation의 경우 pending_visit, confirmed_visit 등
   attending_lawyer_id?: string // 출석변호사 ID
   attending_lawyer_name?: string // 출석변호사 이름
-  // SCOURT 원본 데이터 (나의사건검색 동일 표시용)
-  scourt_type_raw?: string // 원본 기일명 (예: "제1회 변론기일")
-  scourt_result_raw?: string // 원본 결과 (예: "다음기일지정(2025.02.15)")
-  hearing_sequence?: number // 기일 회차
-  // 화상 참여자 정보
   video_participant_side?: string // 화상 참여자 측: plaintiff_side, defendant_side, both, null
-  our_client_side?: string // 의뢰인 측: plaintiff_side, defendant_side
+  our_client_name?: string // 의뢰인명
 }
 
 interface TenantMember {
@@ -75,17 +70,10 @@ const NO_LAWYER_ATTENDANCE_TYPES = [
   'HEARING_PARENTING',     // 상담/교육 기일: 당사자만 참석 (부모교육 등)
 ] as const
 
-// 변호사 출석 불필요 여부 체크 (scourt_type_raw 기반 추가 체크)
-const NO_LAWYER_ATTENDANCE_KEYWORDS = ['조정조치'] // 조정조치기일: 당사자만 참석
-
 function isNoLawyerAttendanceRequired(schedule: UnifiedSchedule): boolean {
-  // 1. 기일 유형으로 체크
+  // 기일 유형으로 체크
   if (NO_LAWYER_ATTENDANCE_TYPES.includes(schedule.hearing_type as typeof NO_LAWYER_ATTENDANCE_TYPES[number])) {
     return true
-  }
-  // 2. scourt_type_raw에 특정 키워드 포함 체크 (조정조치기일 등)
-  if (schedule.scourt_type_raw) {
-    return NO_LAWYER_ATTENDANCE_KEYWORDS.some(keyword => schedule.scourt_type_raw!.includes(keyword))
   }
   return false
 }
@@ -202,11 +190,8 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
           status?: string | null
           attending_lawyer_id?: string | null
           attending_lawyer_name?: string | null
-          scourt_type_raw?: string | null
-          scourt_result_raw?: string | null
-          hearing_sequence?: number | null
           video_participant_side?: string | null
-          our_client_side?: string | null
+          our_client_name?: string | null
         }) => {
           let scheduleType: ScheduleType
           let hearing_type: string | undefined
@@ -248,13 +233,8 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             event_subtype: event.event_subtype ?? undefined, // pending_visit, confirmed_callback 등
             attending_lawyer_id: event.attending_lawyer_id ?? undefined,
             attending_lawyer_name: event.attending_lawyer_name ?? undefined,
-            // SCOURT 원본 데이터
-            scourt_type_raw: event.scourt_type_raw ?? undefined,
-            scourt_result_raw: event.scourt_result_raw ?? undefined,
-            hearing_sequence: event.hearing_sequence ?? undefined,
-            // 화상 참여자 정보
             video_participant_side: event.video_participant_side ?? undefined,
-            our_client_side: event.our_client_side ?? undefined,
+            our_client_name: event.our_client_name ?? undefined,
           })
         })
       }
@@ -353,47 +333,20 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
     }
   }
 
-  // 화상장치 관련 텍스트 제거 (예: "[일방 화상장치]", "[쌍방 화상장치]", "제1회 변론기일 [일방 화상장치]")
-  const removeVideoDeviceText = (text: string) => {
-    return text.replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, '').trim()
-  }
-
   // 화상기일 배지 정보 반환
-  // 우리(의뢰인)가 화상일 때만 [화상] 배지 표시
-  const getVideoBadgeInfo = (scourtTypeRaw?: string, videoParticipantSide?: string, ourClientSide?: string): { show: boolean; label: string; color: string } | null => {
-    // 쌍방 화상기일 → 우리도 화상이므로 표시
-    if (scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치') || videoParticipantSide === 'both') {
-      return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
+  const getVideoBadgeInfo = (videoParticipantSide?: string): { show: boolean; label: string; color: string } | null => {
+    if (videoParticipantSide === 'both') {
+      return { show: true, label: '쌍방화상', color: 'bg-purple-100 text-purple-700' }
     }
-
-    // 일방 화상기일
-    if (videoParticipantSide && ourClientSide) {
-      // 우리(의뢰인)가 화상일 때만 표시
-      if (videoParticipantSide === ourClientSide) {
-        return { show: true, label: '화상', color: 'bg-purple-100 text-purple-700' }
-      }
-      // 상대방만 화상이면 표시 안 함
-      return null
+    if (videoParticipantSide === 'plaintiff_side' || videoParticipantSide === 'defendant_side') {
+      return { show: true, label: '일방화상', color: 'bg-purple-50 text-purple-600' }
     }
-
-    // 일방 화상기일이지만 참여자 정보가 없는 경우 (판단 불가)
-    if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
-      return { show: true, label: '화상', color: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' }
-    }
-
     return null
-  }
-
-  // 쌍방 화상장치 여부 확인 (하위호환)
-  const isBilateralVideoHearing = (scourtTypeRaw?: string) => {
-    return scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치')
   }
 
   // 캘린더 셀용 짧은 제목 (예: "(변론기일) 김OO" → "(변론) 김OO")
   const getShortTitle = (title: string) => {
     return title
-      // 화상장치 관련 텍스트 제거 (예: "[일방 화상장치]", "[쌍방 화상장치]")
-      .replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, ' ')
       .replace('변론기일', '변론')
       .replace('조정기일', '조정')
       .replace('선고기일', '선고')
@@ -476,16 +429,9 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
     return location
   }
 
-  // 기일 연기/변경 여부 확인
-  const isPostponedHearing = (result?: string): boolean => {
-    if (!result) return false
-    const keywords = ['기일변경', '연기', '취하', '취소', '변경지정']
-    return keywords.some(kw => result.includes(kw))
-  }
-
-  const getScheduleTypeColor = (type: ScheduleType, hearingType?: string, eventSubtype?: string, scourt_result_raw?: string) => {
-    // 연기된 기일: 흐린 회색 (기일변경, 연기, 취하, 취소 등 - 비활성 느낌)
-    if (type === 'court_hearing' && isPostponedHearing(scourt_result_raw)) {
+  const getScheduleTypeColor = (type: ScheduleType, hearingType?: string, eventSubtype?: string, status?: string) => {
+    // 연기된 기일: 흐린 회색 (status === 'adjourned')
+    if (type === 'court_hearing' && status === 'adjourned') {
       return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-l-[var(--border-default)]'
     }
 
@@ -878,7 +824,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                     {daySchedules.slice(0, 4).map((schedule) => (
                       <div
                         key={schedule.id}
-                        className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} leading-tight cursor-pointer`}
+                        className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.status)} leading-tight cursor-pointer`}
                         title={`${schedule.time?.slice(0, 5) || ''} ${schedule.title} ${schedule.location ? '- ' + schedule.location : ''}`}
                         onClick={(e) => {
                           e.stopPropagation()
@@ -890,7 +836,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         <div className="font-medium truncate">
                           {schedule.time?.slice(0, 5)}
                           {(() => {
-                            const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side, schedule.our_client_side)
+                            const badge = getVideoBadgeInfo(schedule.video_participant_side)
                             return badge ? (
                               <span className={`ml-0.5 px-1 py-0.5 ${badge.color} text-[8px] font-bold rounded`}>{badge.label}</span>
                             ) : null
@@ -997,7 +943,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                       {daySchedules.slice(0, 2).map((schedule) => (
                         <div
                           key={schedule.id}
-                          className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} leading-tight`}
+                          className={`text-[9px] px-1 py-0.5 rounded border-l-2 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.status)} leading-tight`}
                           title={`${schedule.time?.slice(0, 5) || ''} ${schedule.title} ${schedule.location ? '- ' + schedule.location : ''}`}
                         >
                           <div className="font-medium truncate">
@@ -1064,7 +1010,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                 return (
                   <div
                     key={schedule.id}
-                    className={`p-2.5 rounded-lg border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} hover:shadow-md transition-all cursor-pointer border border-[var(--border-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]`}
+                    className={`p-2.5 rounded-lg border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.status)} hover:shadow-md transition-all cursor-pointer border border-[var(--border-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]`}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -1196,15 +1142,12 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   >
                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/90 shadow-sm">
-                        {/* 법원기일: 연기시 "기일연기", 아니면 scourt_type_raw 우선 표시 (화상장치 텍스트 제거) */}
-                        {schedule.type === 'court_hearing' && isPostponedHearing(schedule.scourt_result_raw)
+                        {schedule.type === 'court_hearing' && schedule.status === 'adjourned'
                           ? '기일연기'
-                          : schedule.type === 'court_hearing' && schedule.scourt_type_raw
-                            ? removeVideoDeviceText(schedule.scourt_type_raw)
-                            : getScheduleTypeLabel(schedule.type, schedule.location)}
+                          : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>
                       {(() => {
-                        const badge = getVideoBadgeInfo(schedule.scourt_type_raw, schedule.video_participant_side, schedule.our_client_side)
+                        const badge = getVideoBadgeInfo(schedule.video_participant_side)
                         return badge ? (
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${badge.color}`}>
                             {badge.label}
@@ -1242,15 +1185,6 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         <span className="truncate">{shortenCourtLocation(schedule.location)}</span>
-                      </p>
-                    )}
-                    {/* SCOURT 기일 결과 표시 (예: "다음기일지정(2025.02.15)", "변론종결") */}
-                    {schedule.type === 'court_hearing' && schedule.scourt_result_raw && (
-                      <p className="text-[10px] text-[var(--sage-primary)] flex items-center gap-1 mt-0.5">
-                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="truncate">결과: {schedule.scourt_result_raw}</span>
                       </p>
                     )}
                     {/* 출석변호사 표시 및 변경 (법원기일만, 변호사 출석 불필요 기일 제외) */}

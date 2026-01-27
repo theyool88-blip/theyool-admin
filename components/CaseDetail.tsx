@@ -470,6 +470,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [allHearings, setAllHearings] = useState<CourtHearing[]>([]);
   const [caseDeadlines, setCaseDeadlines] = useState<CaseDeadline[]>([]);
   const [caseHearings, setCaseHearings] = useState<CourtHearing[]>([]);
+  const [rawDataLoaded, setRawDataLoaded] = useState(false);
+  const [rawDataLoading, setRawDataLoading] = useState(false);
 
   const router = useRouter();
   const supabase = createClient();
@@ -498,6 +500,39 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       setScourtLoading(false);
     }
   }, [caseData.id, caseData.court_case_number]);
+
+  // rawData 별도 조회 (일반 탭 활성화 시) - raw_data 컬럼만 직접 조회
+  const fetchScourtRawData = useCallback(async () => {
+    if (!caseData.court_case_number || rawDataLoaded || rawDataLoading) return;
+
+    setRawDataLoading(true);
+    try {
+      // raw_data 컬럼만 직접 조회 (불필요한 쿼리 제거)
+      const { data, error } = await supabase
+        .from("scourt_case_snapshots")
+        .select("raw_data, basic_info")
+        .eq("legal_case_id", caseData.id)
+        .order("scraped_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!error && data) {
+        // raw_data가 있으면 사용, 없으면 basic_info에서 추출 시도
+        const rawData = data.raw_data || null;
+        if (rawData) {
+          setScourtSnapshot(prev => prev ? {
+            ...prev,
+            rawData
+          } : null);
+          setRawDataLoaded(true);
+        }
+      }
+    } catch (error) {
+      console.error("rawData 조회 실패:", error);
+    } finally {
+      setRawDataLoading(false);
+    }
+  }, [caseData.id, caseData.court_case_number, rawDataLoaded, rawDataLoading, supabase]);
 
   // 당사자 목록 조회 (사건개요 표시용)
   const fetchCaseParties = useCallback(async () => {
@@ -1186,25 +1221,48 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       setCaseHearings((hearings as CourtHearing[]) || []);
       setCaseDeadlines((deadlines as CaseDeadline[]) || []);
 
-      // 기일 충돌 감지를 위한 모든 사건 기일 조회 (향후 30일)
-      const today = new Date();
-      const thirtyDaysLater = new Date(today);
-      thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+      // 기일 충돌 감지: 현재 사건의 기일 날짜에만 다른 사건의 기일이 있는지 확인
+      const scheduledHearings = (hearings as CourtHearing[] || []).filter(h => h.status === 'SCHEDULED');
 
-      const { data: allHearingsData } = await supabase
-        .from("court_hearings")
-        .select(
-          `
-          *,
-          legal_case:case_id(case_name, court_name)
-        `,
-        )
-        .gte("hearing_date", today.toISOString())
-        .lte("hearing_date", thirtyDaysLater.toISOString())
-        .eq("status", "SCHEDULED")
-        .order("hearing_date", { ascending: true });
+      if (scheduledHearings.length > 0) {
+        // 현재 사건의 기일 날짜들 추출 (YYYY-MM-DD 형식)
+        const hearingDates = [...new Set(
+          scheduledHearings.map(h => h.hearing_date.split('T')[0])
+        )];
 
-      setAllHearings((allHearingsData as CourtHearing[]) || []);
+        // 날짜 범위로 필터링 (가장 이른 날짜 ~ 가장 늦은 날짜)
+        const sortedDates = hearingDates.sort();
+        const startDate = sortedDates[0] + 'T00:00:00';
+        const endDate = sortedDates[sortedDates.length - 1] + 'T23:59:59';
+
+        const { data: conflictingHearings } = await supabase
+          .from("court_hearings")
+          .select(
+            `
+            *,
+            legal_case:case_id(case_name, court_name)
+          `,
+          )
+          .neq("case_id", caseData.id)
+          .eq("status", "SCHEDULED")
+          .gte("hearing_date", startDate)
+          .lte("hearing_date", endDate)
+          .order("hearing_date", { ascending: true });
+
+        // 실제 날짜 매칭 (클라이언트 사이드 필터)
+        const actualConflicts = (conflictingHearings || []).filter(h =>
+          hearingDates.includes(h.hearing_date.split('T')[0])
+        );
+
+        // 충돌하는 기일 + 현재 사건 기일을 합쳐서 allHearings에 저장
+        const allHearingsForConflict = [
+          ...(hearings as CourtHearing[] || []),
+          ...actualConflicts
+        ];
+        setAllHearings(allHearingsForConflict as CourtHearing[]);
+      } else {
+        setAllHearings([]);
+      }
 
       const { data: schedules } = await supabase
         .from("general_schedules")
@@ -1394,111 +1452,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     fetchSecondaryData();
   }, [caseData.id, supabase]);
 
+  // 일반 탭 활성화 시 rawData lazy loading
+  useEffect(() => {
+    if (activeTab === 'general' && scourtSyncStatus?.isLinked && !rawDataLoaded && !rawDataLoading) {
+      fetchScourtRawData();
+    }
+  }, [activeTab, scourtSyncStatus?.isLinked, rawDataLoaded, rawDataLoading, fetchScourtRawData]);
+
   const displayCaseParties = useMemo(() => {
-    if (casePartiesWithPending.length === 0) return casePartiesWithPending;
-
-    // 1순위: caseData.client?.name (캐시된 값)
-    let clientFallbackName = caseData.client?.name?.trim() || "";
-
-    // 2순위: caseClients에서 primary client의 이름 가져오기
-    if (!clientFallbackName || isMaskedPartyName(clientFallbackName)) {
-      const primaryCaseClient = caseClients.find(cc => cc.is_primary_client);
-      if (primaryCaseClient?.client?.name) {
-        clientFallbackName = primaryCaseClient.client.name.trim();
-      }
-    }
-
-    // 3순위: caseClients의 첫 번째 클라이언트 (primary가 없는 경우)
-    if (!clientFallbackName || isMaskedPartyName(clientFallbackName)) {
-      const firstCaseClient = caseClients.find(cc => cc.client?.name);
-      if (firstCaseClient?.client?.name) {
-        clientFallbackName = firstCaseClient.client.name.trim();
-      }
-    }
-
-    const hasClientFallback =
-      !!clientFallbackName && !isMaskedPartyName(clientFallbackName);
-
-    // 1순위: case_clients.linked_party_id로 연결된 당사자 ID
-    const linkedPartyId = caseClients.find((cc) => cc.linked_party_id)?.linked_party_id;
-
-    if (!hasClientFallback) return casePartiesWithPending;
-
-    const clientFirstChar = hasClientFallback
-      ? normalizePartyNameForMatch(clientFallbackName).charAt(0)
-      : "";
-
-    const charMatchedClient = clientFirstChar
-      ? casePartiesWithPending.filter((p) => {
-          const rawName = p.party_name || "";
-          if (!isMaskedPartyName(rawName)) return false;
-          const firstChar = normalizePartyNameForMatch(rawName).charAt(0);
-          return firstChar && firstChar === clientFirstChar;
-        })
-      : [];
-
-    const clientCharMatchId =
-      charMatchedClient.length === 1 ? charMatchedClient[0].id : null;
-
-    const shouldIgnoreCharMatch = false;
-
-    let usedClientFallback = false;
-    let updated = false;
-
-    const resolvePartySide = (party: (typeof caseParties)[number]) => {
-      const label = normalizePartyLabel(party.party_type_label || "");
-      if (label) {
-        if (PLAINTIFF_SIDE_LABELS.has(label)) return "plaintiff";
-        if (DEFENDANT_SIDE_LABELS.has(label)) return "defendant";
-      }
-      if (PLAINTIFF_SIDE_TYPES.has(party.party_type)) return "plaintiff";
-      if (DEFENDANT_SIDE_TYPES.has(party.party_type)) return "defendant";
-      return null;
-    };
-
-    const next = casePartiesWithPending.map((party) => {
-      // clients 조인은 case_clients로 이동됨 - party_name 직접 사용
-      if (party.party_name && !isMaskedPartyName(party.party_name))
-        return party;
-
-      const side = resolvePartySide(party);
-      let fallbackName: string | null = null;
-
-      if (!usedClientFallback && hasClientFallback) {
-        // 1순위: linked_party_id로 직접 연결된 당사자
-        if (linkedPartyId && party.id === linkedPartyId) {
-          fallbackName = clientFallbackName;
-          usedClientFallback = true;
-        // 2순위: is_primary 플래그
-        } else if (party.is_primary) {
-          fallbackName = clientFallbackName;
-          usedClientFallback = true;
-        // 3순위: client_role과 측 일치
-        } else if (caseData.client_role && side === caseData.client_role) {
-          fallbackName = clientFallbackName;
-          usedClientFallback = true;
-        // 4순위: 문자 매칭 (client_role 없을 때만)
-        } else if (
-          !caseData.client_role &&
-          !shouldIgnoreCharMatch &&
-          clientCharMatchId === party.id
-        ) {
-          fallbackName = clientFallbackName;
-          usedClientFallback = true;
-        }
-      }
-
-      if (!fallbackName) return party;
-
-      updated = true;
-      return {
-        ...party,
-        party_name: preservePrefix(party.party_name || "", fallbackName),
-      };
-    });
-
-    return updated ? next : casePartiesWithPending;
-  }, [casePartiesWithPending, caseData.client?.name, caseData.client_role, caseClients]);
+    return casePartiesWithPending;
+  }, [casePartiesWithPending]);
 
   const casePartiesForDisplay = useMemo(() => {
     const scourtParties = displayCaseParties.filter(
@@ -2020,6 +1983,79 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       }));
   }, [caseRepresentatives]);
 
+  // 심급사건 관련 - appealRelations
+  const appealRelations = useMemo(() => {
+    return (caseData.case_relations || []).filter(
+      (r) => r.relation_type_code === "appeal"
+    );
+  }, [caseData.case_relations]);
+
+  // 심급사건 필터링
+  const filteredLowerCourt = useMemo(() => {
+    interface LowerCourtItem {
+      linkedCaseId?: string | null;
+      caseNo?: string;
+      courtName?: string;
+      court?: string;
+      result?: string;
+      resultDate?: string;
+      encCsNo?: string;
+    }
+
+    const linkedCaseIds = new Set(appealRelations.map((r) => r.related_case_id));
+    const linkedCaseNumbers = new Set(
+      appealRelations.map((r) => r.related_case?.court_case_number).filter(Boolean)
+    );
+
+    return ((scourtSnapshot?.lowerCourt || []) as LowerCourtItem[]).filter((item) => {
+      if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false;
+      if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false;
+      if (item.caseNo && dismissedRelatedCases.has(`lower_court:${item.caseNo}`)) return false;
+      return true;
+    });
+  }, [scourtSnapshot?.lowerCourt, appealRelations, dismissedRelatedCases]);
+
+  // 미연동 심급사건 목록
+  const unlinkedLowerCourt = useMemo(() => {
+    return filteredLowerCourt.filter((item) => !item.linkedCaseId);
+  }, [filteredLowerCourt]);
+
+  // 관련사건 필터링
+  const filteredRelatedCases = useMemo(() => {
+    interface RelatedCaseItem {
+      linkedCaseId?: string;
+      caseNo?: string;
+      case_number?: string;
+      caseName?: string;
+      court_name?: string;
+      relation?: string;
+      relation_type?: string;
+      encCsNo?: string;
+    }
+
+    const linkedCaseIds = new Set(
+      (caseData.case_relations || []).map((r) => r.related_case_id)
+    );
+    const linkedCaseNumbers = new Set(
+      (caseData.case_relations || [])
+        .map((r) => r.related_case?.court_case_number)
+        .filter(Boolean)
+    );
+
+    return ((scourtSnapshot?.relatedCases || []) as RelatedCaseItem[]).filter((item) => {
+      if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId)) return false;
+      if (item.caseNo && linkedCaseNumbers.has(item.caseNo)) return false;
+      const caseNo = item.caseNo || item.case_number;
+      if (caseNo && dismissedRelatedCases.has(`related_case:${caseNo}`)) return false;
+      return true;
+    });
+  }, [scourtSnapshot?.relatedCases, caseData.case_relations, dismissedRelatedCases]);
+
+  // 미연동 관련사건 목록
+  const unlinkedRelatedCases = useMemo(() => {
+    return filteredRelatedCases.filter((item) => !item.linkedCaseId);
+  }, [filteredRelatedCases]);
+
   // 진행내용 카테고리 분류 (SCOURT progCttDvs 필드 기반)
   // progCttDvs: 0=법원(검정), 1=기일(파랑), 2=명령(녹색), 3=제출(진빨강), 4=송달(주황)
   const getProgressCategory = (
@@ -2200,10 +2236,16 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     };
 
     const applyDisplayName = (originalName: string, fullName: string) => {
+      // 방어: fullName이 비어있거나 마스킹되면 원본 사용
+      if (!fullName || !fullName.trim() || isMaskedPartyName(fullName)) {
+        return originalName ? removeNumberPrefix(originalName) : '-';
+      }
       const combined = originalName
         ? preservePrefix(originalName, fullName)
         : fullName;
-      return removeNumberPrefix(combined);
+      const result = removeNumberPrefix(combined);
+      // 방어: 결과가 유효하지 않으면 원본 사용
+      return result && result.trim() ? result : (originalName ? removeNumberPrefix(originalName) : '-');
     };
 
     const getSideFromLabel = (
@@ -2469,6 +2511,14 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           displayName =
             displayName.replace(PARTY_NAME_SUFFIX_REGEX, "").trim() ||
             displayName;
+        }
+
+        // 최종 방어: displayName이 "1. 피고 2." 같은 깨진 형태인지 확인
+        const isBrokenFormat = /^\d+\.\s*[가-힣]+\s+\d+\.?$/.test(displayName);
+        if (isBrokenFormat || !displayName || displayName === '-') {
+          displayName = preferredParty?.party_name
+            ? removeNumberPrefix(preferredParty.party_name)
+            : '-';
         }
 
         const hasOtherSuffix = PARTY_NAME_SUFFIX_REGEX.test(displayName);
@@ -2827,49 +2877,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
             {/* 심급내용 (원심) - SCOURT + case_relations */}
             {(() => {
-              // case_relations에서 심급 관계 (appeal 타입) 추출
-              const appealRelations = (caseData.case_relations || []).filter(
-                (r) => r.relation_type_code === "appeal",
-              );
-              const linkedCaseIds = new Set(
-                appealRelations.map((r) => r.related_case_id),
-              );
-              const linkedCaseNumbers = new Set(
-                appealRelations
-                  .map((r) => r.related_case?.court_case_number)
-                  .filter(Boolean),
-              );
-              interface LowerCourtItem {
-                linkedCaseId?: string;
-                caseNo?: string;
-                courtName?: string;
-                court?: string;
-                encCsNo?: string;
-                result?: string;
-                resultDate?: string;
-              }
-              const filteredLowerCourt = (
-                (scourtSnapshot?.lowerCourt || []) as LowerCourtItem[]
-              ).filter((item: LowerCourtItem) => {
-                // 이미 연동됨 → 제외
-                if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId))
-                  return false;
-                if (item.caseNo && linkedCaseNumbers.has(item.caseNo))
-                  return false;
-                // 연동안함 처리됨 → 제외
-                if (
-                  item.caseNo &&
-                  dismissedRelatedCases.has(`lower_court:${item.caseNo}`)
-                )
-                  return false;
-                return true;
-              });
-
-              // 미연동 심급사건 목록 (모두연결용)
-              const unlinkdLowerCourt = filteredLowerCourt.filter(
-                (item: LowerCourtItem) => !item.linkedCaseId,
-              );
-
               // 스냅샷이 비어있어도 case_relations에 심급 관계가 있으면 표시
               const hasAppealData =
                 filteredLowerCourt.length > 0 || appealRelations.length > 0;
@@ -2884,11 +2891,11 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                           심급
                         </h3>
                       </div>
-                      {unlinkdLowerCourt.length > 1 && (
+                      {unlinkedLowerCourt.length > 1 && (
                         <button
                           onClick={() =>
                             handleLinkAllRelatedCases(
-                              unlinkdLowerCourt.map((item: LowerCourtItem) => ({
+                              unlinkedLowerCourt.map((item) => ({
                                 caseNo: item.caseNo || "",
                                 courtName: item.courtName || item.court || "",
                                 relationType: "하심사건",
@@ -2901,7 +2908,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                         >
                           {isLinkingAll
                             ? "연동 중..."
-                            : `모두연결 (${unlinkdLowerCourt.length})`}
+                            : `모두연결 (${unlinkedLowerCourt.length})`}
                         </button>
                       )}
                     </div>
@@ -2971,7 +2978,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                         ))}
                         {/* 스냅샷에서 가져온 미연결 심급사건 */}
                         {filteredLowerCourt.map(
-                          (item: LowerCourtItem, idx: number) => (
+                          (item, idx: number) => (
                             <tr
                               key={`lower-${idx}`}
                               className="hover:bg-[var(--bg-hover)]"
@@ -3064,49 +3071,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
               );
             })()}
 
-            {/* 관련사건 - SCOURT */}
+            {/* 관련사건 - SCOURT (전체 너비) */}
             {(() => {
-              const linkedCaseIds = new Set(
-                (caseData.case_relations || []).map((r) => r.related_case_id),
-              );
-              const linkedCaseNumbers = new Set(
-                (caseData.case_relations || [])
-                  .map((r) => r.related_case?.court_case_number)
-                  .filter(Boolean),
-              );
-              interface RelatedCaseItem {
-                linkedCaseId?: string;
-                caseNo?: string;
-                case_number?: string;
-                caseName?: string;
-                court_name?: string;
-                relation?: string;
-                relation_type?: string;
-                encCsNo?: string;
-              }
-              const filteredRelatedCases = (
-                (scourtSnapshot?.relatedCases || []) as RelatedCaseItem[]
-              ).filter((item: RelatedCaseItem) => {
-                // 이미 연동됨 → 제외
-                if (item.linkedCaseId && linkedCaseIds.has(item.linkedCaseId))
-                  return false;
-                if (item.caseNo && linkedCaseNumbers.has(item.caseNo))
-                  return false;
-                // 연동안함 처리됨 → 제외
-                const caseNo = item.caseNo || item.case_number;
-                if (
-                  caseNo &&
-                  dismissedRelatedCases.has(`related_case:${caseNo}`)
-                )
-                  return false;
-                return true;
-              });
-
-              // 미연동 관련사건 목록 (모두연결용)
-              const unlinkedRelatedCases = filteredRelatedCases.filter(
-                (item: RelatedCaseItem) => !item.linkedCaseId,
-              );
-
               return (
                 filteredRelatedCases.length > 0 && (
                   <div className="card overflow-hidden">
@@ -3122,7 +3088,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                           onClick={() =>
                             handleLinkAllRelatedCases(
                               unlinkedRelatedCases.map(
-                                (item: RelatedCaseItem) => ({
+                                (item) => ({
                                   caseNo: item.caseNo || item.case_number || "",
                                   courtName:
                                     item.caseName || item.court_name || "",
@@ -3160,7 +3126,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                       </thead>
                       <tbody className="divide-y divide-[var(--border-subtle)]">
                         {filteredRelatedCases.map(
-                          (item: RelatedCaseItem, idx: number) => (
+                          (item, idx: number) => (
                             <tr
                               key={`related-${idx}`}
                               className="hover:bg-[var(--bg-hover)]"
@@ -3463,6 +3429,15 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                 <span className="text-sm text-[var(--text-muted)]">
                   대법원 연동이 필요합니다
                 </span>
+              </div>
+            ) : rawDataLoading ? (
+              <div className="text-center py-8">
+                <div className="space-y-2">
+                  <div className="animate-spin inline-block w-6 h-6 border-2 border-[var(--sage-primary)] border-t-transparent rounded-full"></div>
+                  <p className="text-sm text-[var(--text-muted)]">
+                    일반내용 로딩 중...
+                  </p>
+                </div>
               </div>
             ) : !scourtSnapshot?.rawData ? (
               <div className="text-center py-8">

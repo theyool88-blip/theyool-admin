@@ -18,44 +18,6 @@ interface CaseClient {
   is_primary_client: boolean
 }
 
-interface Client {
-  id: string
-  name: string
-}
-
-interface PartiesInfo {
-  ourClient: string | null
-  ourClientLabel: string | null
-  opponent: string | null
-  opponentLabel: string | null
-}
-
-interface LegalCaseBase {
-  id: string
-  case_name: string
-  court_case_number: string | null
-  court_name: string | null
-  case_level: string | null
-  main_case_id: string | null
-  status: string
-  primary_client_id: string | null
-  primary_client_name: string | null
-  created_at: string
-  updated_at: string
-  tenant_id: string
-}
-
-interface CaseData extends LegalCaseBase {
-  client?: Client
-  case_parties?: CaseParty[]
-  case_clients?: CaseClient[]
-}
-
-interface TransformedCase extends LegalCaseBase {
-  client?: Client
-  parties: PartiesInfo
-}
-
 export default async function CasesPage() {
   // 테넌트 컨텍스트 조회 (impersonation 포함)
   const tenantContext = await getCurrentTenantContext()
@@ -83,59 +45,50 @@ export default async function CasesPage() {
   const { data: casesData } = await query.order('created_at', { ascending: false })
 
   // casesData 변환: parties 객체 추가
-  const casesWithParties: TransformedCase[] = (casesData || []).map((c) => {
-    const caseData = c as CaseData
-    const parties = caseData.case_parties || []
-    const clients = caseData.case_clients || []
+  const casesWithParties = (casesData || []).map((c) => {
+    const parties = (c.case_parties || []) as CaseParty[]
+    const clients = (c.case_clients || []) as CaseClient[]
 
     // 의뢰인: 캐시 필드 사용 (fallback: client JOIN)
-    const ourClientName = caseData.primary_client_name || caseData.client?.name
+    const clientData = c.client as { id: string; name: string } | null
+    const ourClientName = c.primary_client_name || clientData?.name
 
     // 상대방: case_clients → case_parties 연결로 조회
-    const primaryClientLink = clients.find((cc: CaseClient) => cc.is_primary_client)
+    const primaryClientLink = clients.find((cc) => cc.is_primary_client)
     const clientPartyId = primaryClientLink?.linked_party_id
-    const clientParty = parties.find((p: CaseParty) => p.id === clientPartyId)
+    const clientParty = parties.find((p) => p.id === clientPartyId)
     const clientPartyType = clientParty?.party_type
 
     let opponent: string | null = null
     let opponentLabel: string | null = null
     if (clientPartyType) {
       const opponentType = clientPartyType === 'plaintiff' ? 'defendant' : 'plaintiff'
-      const opponentParty = parties.find((p: CaseParty) =>
+      const opponentParty = parties.find((p) =>
         p.party_type === opponentType && p.is_primary
-      ) || parties.find((p: CaseParty) => p.party_type === opponentType)
+      ) || parties.find((p) => p.party_type === opponentType)
       opponent = opponentParty?.party_name || null
       opponentLabel = opponentParty?.party_type_label || null
     } else {
       // Fallback: 레거시 데이터 - 의뢰인명과 다른 당사자를 상대방으로
-      const opponentParty = parties.find((p: CaseParty) =>
+      const opponentParty = parties.find((p) =>
         p.party_name !== ourClientName
       )
       opponent = opponentParty?.party_name || null
       opponentLabel = opponentParty?.party_type_label || null
     }
 
+    // case_parties, case_clients는 제외하고 나머지 필드 유지
+    const { case_parties: _, case_clients: __, ...rest } = c
+
     return {
-      id: caseData.id,
-      case_name: caseData.case_name,
-      court_case_number: caseData.court_case_number,
-      court_name: caseData.court_name,
-      case_level: caseData.case_level,
-      main_case_id: caseData.main_case_id,
-      status: caseData.status,
-      primary_client_id: caseData.primary_client_id,
-      primary_client_name: caseData.primary_client_name,
-      created_at: caseData.created_at,
-      updated_at: caseData.updated_at,
-      tenant_id: caseData.tenant_id,
-      client: caseData.client,
+      ...rest,
       parties: {
         ourClient: ourClientName || null,
         ourClientLabel: clientParty?.party_type_label || null,
         opponent,
         opponentLabel,
       }
-    } as TransformedCase
+    }
   })
 
   return (

@@ -31,14 +31,14 @@
 ### Step 1: Supabase SQL Editor 접속
 
 1. Supabase Dashboard 접속: https://supabase.com/dashboard
-2. 프로젝트 선택: `theyool-admin`
+2. 프로젝트 선택: `luseed`
 3. 좌측 메뉴 → `SQL Editor` 클릭
 
 ---
 
 ### Step 2: cases 테이블에 case_number 컬럼 추가
 
-**파일**: `/Users/hskim/theyool-admin/scripts/manual-add-case-number.sql`
+**파일**: `/Users/hskim/luseed/scripts/manual-add-case-number.sql`
 
 ```sql
 -- cases 테이블에 case_number 컬럼 추가
@@ -70,7 +70,7 @@ Success. No rows returned
 
 ### Step 3: unified_calendar VIEW 업데이트
 
-**파일**: `/Users/hskim/theyool-admin/supabase/migrations/20251123_update_unified_calendar_view.sql`
+**파일**: `/Users/hskim/luseed/supabase/migrations/20251123_update_unified_calendar_view.sql`
 
 **주요 변경사항**:
 - `event_type_kr`: 한글 종류명 추가 (변론기일, 상소기간 등)

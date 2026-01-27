@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import ClientEditForm from '@/components/ClientEditForm'
+import AdminLayoutClient from '@/components/AdminLayoutClient'
 
 export default async function ClientEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,5 +40,9 @@ export default async function ClientEditPage({ params }: { params: Promise<{ id:
     display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
   }
 
-  return <ClientEditForm profile={profile as any} clientData={clientData} />
+  return (
+    <AdminLayoutClient>
+      <ClientEditForm profile={profile as any} clientData={clientData} />
+    </AdminLayoutClient>
+  )
 }

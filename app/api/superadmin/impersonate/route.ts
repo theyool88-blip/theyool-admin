@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { withSuperAdmin } from '@/lib/api/with-super-admin';
+import { signToken, verifyToken, isTokenExpired } from '@/lib/auth/impersonation-token';
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// POST: 테넌트 대리 접속 토큰 생성
-export async function POST(request: NextRequest) {
+// POST: 테넌트 대리 접속 토큰 생성 (슈퍼 어드민 인증 필요)
+export const POST = withSuperAdmin(async (request: NextRequest, { superAdmin }) => {
   try {
     const { tenantId } = await request.json();
 
@@ -40,16 +42,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 대리 접속 토큰 생성 (간단한 JWT-like 토큰)
-    const impersonationToken = Buffer.from(JSON.stringify({
+    // 서명된 대리 접속 토큰 생성
+    const impersonationToken = signToken({
       tenantId: tenant.id,
       tenantName: tenant.name,
       tenantSlug: tenant.slug,
       impersonatedAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(), // 1시간 만료
-    })).toString('base64');
+      superAdminUserId: superAdmin.userId, // 대리 접속을 시작한 슈퍼어드민 ID 기록
+    });
 
-    // 쿠키에 대리 접속 토큰 저장 (NextResponse 사용)
+    // 쿠키에 대리 접속 토큰 저장
     const response = NextResponse.json({
       success: true,
       data: {
@@ -61,9 +64,9 @@ export async function POST(request: NextRequest) {
     });
 
     response.cookies.set('sa_impersonate', impersonationToken, {
-      httpOnly: false, // 클라이언트에서 읽을 수 있도록
+      httpOnly: true, // XSS 공격 방지
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict', // CSRF 방지 강화
       maxAge: 60 * 60, // 1시간
       path: '/',
     });
@@ -76,7 +79,7 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});
 
 // DELETE: 대리 접속 종료
 export async function DELETE() {
@@ -87,9 +90,9 @@ export async function DELETE() {
     });
 
     response.cookies.set('sa_impersonate', '', {
-      httpOnly: false,
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'strict',
       maxAge: 0, // 즉시 만료
       path: '/',
     });
@@ -117,37 +120,52 @@ export async function GET() {
       });
     }
 
-    try {
-      const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-      const expiresAt = new Date(decoded.expiresAt);
+    // 서명된 토큰 검증
+    const payload = verifyToken(token);
 
-      if (expiresAt < new Date()) {
-        // 토큰 만료
-        cookieStore.delete('sa_impersonate');
-        return NextResponse.json({
-          success: true,
-          data: { isImpersonating: false },
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        data: {
-          isImpersonating: true,
-          tenantId: decoded.tenantId,
-          tenantName: decoded.tenantName,
-          tenantSlug: decoded.tenantSlug,
-          impersonatedAt: decoded.impersonatedAt,
-          expiresAt: decoded.expiresAt,
-        },
-      });
-    } catch {
-      cookieStore.delete('sa_impersonate');
-      return NextResponse.json({
+    if (!payload) {
+      // 토큰 검증 실패 시 쿠키 삭제
+      const response = NextResponse.json({
         success: true,
         data: { isImpersonating: false },
       });
+      response.cookies.set('sa_impersonate', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 0,
+        path: '/',
+      });
+      return response;
     }
+
+    // 토큰 만료 확인
+    if (isTokenExpired(payload)) {
+      const response = NextResponse.json({
+        success: true,
+        data: { isImpersonating: false },
+      });
+      response.cookies.set('sa_impersonate', '', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 0,
+        path: '/',
+      });
+      return response;
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        isImpersonating: true,
+        tenantId: payload.tenantId,
+        tenantName: payload.tenantName,
+        tenantSlug: payload.tenantSlug,
+        impersonatedAt: payload.impersonatedAt,
+        expiresAt: payload.expiresAt,
+      },
+    });
   } catch (error) {
     console.error('Check impersonation error:', error);
     return NextResponse.json(

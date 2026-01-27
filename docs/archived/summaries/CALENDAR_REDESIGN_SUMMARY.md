@@ -231,13 +231,13 @@ border-gray-200
 
 ## File Changes
 
-### /Users/hskim/theyool-admin/components/WeeklyCalendar.tsx
+### /Users/hskim/luseed/components/WeeklyCalendar.tsx
 - 전체 레이아웃 재구성
 - 일정 카드 디자인 변경
 - 색상 팔레트 업데이트
 - 타이포그래피 개선
 
-### /Users/hskim/theyool-admin/components/MonthlyCalendar.tsx
+### /Users/hskim/luseed/components/MonthlyCalendar.tsx
 - 전체 레이아웃 재구성
 - 도트 인디케이터 추가
 - 선택된 날짜 패널 재디자인

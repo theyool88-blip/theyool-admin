@@ -302,7 +302,7 @@
 ## 파일 구조
 
 ```
-/Users/hskim/theyool-admin/
+/Users/hskim/luseed/
 ├── types/
 │   └── court-hearing.ts                    # TypeScript 타입 정의
 ├── lib/

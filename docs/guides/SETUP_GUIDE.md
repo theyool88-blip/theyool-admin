@@ -2,7 +2,7 @@
 
 **Last Updated**: 2025-12-02
 
-theyool-admin 프로젝트 초기 설정 및 개발 환경 구성 가이드입니다.
+luseed 프로젝트 초기 설정 및 개발 환경 구성 가이드입니다.
 
 ---
 
@@ -19,8 +19,8 @@ theyool-admin 프로젝트 초기 설정 및 개발 환경 구성 가이드입�
 ### 1. 프로젝트 클론
 
 ```bash
-git clone https://github.com/your-repo/theyool-admin.git
-cd theyool-admin
+git clone https://github.com/your-repo/luseed.git
+cd luseed
 ```
 
 ### 2. 의존성 설치
@@ -135,7 +135,7 @@ node scripts/test-payments-system.js
 ## 프로젝트 구조
 
 ```
-theyool-admin/
+luseed/
 ├── app/              # Next.js App Router
 │   ├── admin/        # 관리자 페이지
 │   ├── api/          # API 라우트

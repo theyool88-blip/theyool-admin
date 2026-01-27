@@ -561,24 +561,24 @@ onClick={async () => {
 ## 9. Critical Files for Implementation
 
 ### 주요 수정 파일
-1. **UnifiedScheduleModal.tsx** (`/Users/hskim/theyool-admin/components/UnifiedScheduleModal.tsx`)
+1. **UnifiedScheduleModal.tsx** (`/Users/hskim/luseed/components/UnifiedScheduleModal.tsx`)
    - 이유: 모든 기능을 통합하는 핵심 컴포넌트
    - 작업: EditScheduleData 확장, 동적 폼 렌더링, 통합 제출 로직
 
-2. **Dashboard.tsx** (`/Users/hskim/theyool-admin/components/Dashboard.tsx`)
+2. **Dashboard.tsx** (`/Users/hskim/luseed/components/Dashboard.tsx`)
    - 이유: 메인 대시보드의 이벤트 클릭 핸들러 통합
    - 작업: onScheduleClick 단일화, 기존 모달 제거
 
-3. **MonthlyCalendar.tsx** (`/Users/hskim/theyool-admin/components/MonthlyCalendar.tsx`)
+3. **MonthlyCalendar.tsx** (`/Users/hskim/luseed/components/MonthlyCalendar.tsx`)
    - 이유: 월간 캘린더의 이벤트 클릭 핸들러 통합
    - 작업: onClick 단일화, ConsultationScheduleModal 제거
 
 ### 참고 파일
-4. **HearingDetailModal.tsx** (`/Users/hskim/theyool-admin/components/HearingDetailModal.tsx`)
+4. **HearingDetailModal.tsx** (`/Users/hskim/luseed/components/HearingDetailModal.tsx`)
    - 이유: report/result/status UI 패턴 참고
    - 작업: 기능 이전 후 삭제
 
-5. **ConsultationScheduleModal.tsx** (`/Users/hskim/theyool-admin/components/ConsultationScheduleModal.tsx`)
+5. **ConsultationScheduleModal.tsx** (`/Users/hskim/luseed/components/ConsultationScheduleModal.tsx`)
    - 이유: 예약 가능 시간 조회 로직 참고
    - 작업: 기능 이전 후 삭제
 

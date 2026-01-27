@@ -24,6 +24,34 @@ const SCOURT_XML_BASE_URL = "https://ssgo.scourt.go.kr/ssgo/ui";
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+// ============================================================================
+// 상수 (분산 락 / Rate Limiting)
+// ============================================================================
+
+const MAX_SCOURT_CONCURRENT = 3; // 전체 인스턴스 합산 최대 동시 요청
+const DOWNLOAD_TIMEOUT_MS = 10000; // 10초 타임아웃
+const MAX_POLL_ATTEMPTS = 6; // 최대 폴링 횟수
+const INITIAL_POLL_DELAY_MS = 100; // 초기 폴링 딜레이 (exponential backoff)
+const MAX_RETRY_COUNT = 3; // 무한 재귀 방지 최대 재시도 횟수
+
+// ============================================================================
+// 에러 클래스
+// ============================================================================
+
+export class RateLimitExceededError extends Error {
+  constructor(public xmlPath: string) {
+    super(`Rate limit exceeded for XML download: ${xmlPath}`);
+    this.name = 'RateLimitExceededError';
+  }
+}
+
+export class DownloadTimeoutError extends Error {
+  constructor(public xmlPath: string) {
+    super(`Download timeout for XML: ${xmlPath}`);
+    this.name = 'DownloadTimeoutError';
+  }
+}
+
 // WebSquare XML 여부 감지
 function hasWebSquareMarkers(xmlContent: string): boolean {
   return /<w2:|<xf:|<xforms:|<w2:dataMap|<dataMap|<w2:wframe/i.test(xmlContent);
@@ -99,6 +127,181 @@ export async function downloadXmlFromScourt(xmlPath: string): Promise<string> {
   }
 
   return xmlContent;
+}
+
+// ============================================================================
+// 통합 함수: 분산 락 + Rate Limit + 다운로드 (무한 재귀 방지)
+// ============================================================================
+
+/**
+ * XML 다운로드 with 분산 락 + 글로벌 Rate Limiting
+ */
+export async function downloadXmlWithProtection(
+  xmlPath: string,
+  caseType?: string,
+  _retryCount: number = 0
+): Promise<string> {
+  // 무한 재귀 방지: 최대 재시도 횟수 체크
+  if (_retryCount >= MAX_RETRY_COUNT) {
+    throw new Error(`Max retry count (${MAX_RETRY_COUNT}) exceeded for XML: ${xmlPath}`);
+  }
+
+  const supabase = await createClient();
+
+  // Step 1: 분산 락 획득 시도
+  const { data: slotStatus, error: slotError } = await supabase
+    .rpc('try_acquire_xml_download_slot', { p_xml_path: xmlPath });
+
+  if (slotError) {
+    console.error('[XML] Failed to acquire download slot:', slotError);
+    throw new Error(`Failed to acquire download slot: ${slotError.message}`);
+  }
+
+  // Step 1a: 이미 캐시됨
+  if (slotStatus === 'already_cached') {
+    const cached = await getCachedXml(xmlPath);
+    if (cached?.xml_content && cached.xml_content !== '__DOWNLOADING__') {
+      return cached.xml_content;
+    }
+    // 캐시가 없거나 무효 -> 다시 시도 (재귀, 카운터 증가)
+    console.warn(`[XML] Cache inconsistency for ${xmlPath}, retry ${_retryCount + 1}/${MAX_RETRY_COUNT}`);
+    return downloadXmlWithProtection(xmlPath, caseType, _retryCount + 1);
+  }
+
+  // Step 1b: 다른 인스턴스가 다운로드 중 -> 캐시 폴링 (exponential backoff)
+  if (slotStatus === 'downloading') {
+    console.log(`[XML] Another instance downloading, polling cache: ${xmlPath}`);
+    return await pollCacheWithExponentialBackoff(xmlPath);
+  }
+
+  // Step 1c: 락 획득 성공 -> 다운로드 진행
+  console.log(`[XML] Download slot acquired: ${xmlPath}`);
+
+  try {
+    // Step 2: Rate limit 슬롯 획득
+    const xmlContent = await downloadWithGlobalRateLimit(xmlPath);
+
+    // Step 3: 캐시 저장 (다운로드 완료)
+    const { error: completeError } = await supabase.rpc('complete_xml_download', {
+      p_xml_path: xmlPath,
+      p_xml_content: xmlContent,
+      p_case_type: caseType || null,
+    });
+
+    if (completeError) {
+      console.error('[XML] Failed to complete download:', completeError);
+    }
+
+    console.log(`[XML] Download completed and cached: ${xmlPath}`);
+    return xmlContent;
+
+  } catch (error) {
+    // 다운로드 실패 -> 마커 제거 (다른 인스턴스가 재시도 가능)
+    await supabase.rpc('abort_xml_download', { p_xml_path: xmlPath });
+    throw error;
+  }
+}
+
+/**
+ * 캐시 폴링 (Exponential Backoff)
+ */
+async function pollCacheWithExponentialBackoff(xmlPath: string): Promise<string> {
+  let delay = INITIAL_POLL_DELAY_MS;
+
+  for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+    await new Promise(r => setTimeout(r, delay));
+
+    const cached = await getCachedXml(xmlPath);
+    if (cached?.xml_content && cached.xml_content !== '__DOWNLOADING__') {
+      console.log(`[XML] Cache poll success after ${attempt + 1} attempts: ${xmlPath}`);
+      return cached.xml_content;
+    }
+
+    delay *= 2; // Exponential backoff
+  }
+
+  throw new DownloadTimeoutError(xmlPath);
+}
+
+/**
+ * 글로벌 Rate Limiting 적용 다운로드
+ */
+async function downloadWithGlobalRateLimit(xmlPath: string): Promise<string> {
+  const supabase = await createClient();
+
+  // Rate limit 슬롯 획득 시도 (최대 5회, 총 ~5초)
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { data: slotAcquired, error } = await supabase.rpc('try_acquire_scourt_slot', {
+      max_concurrent: MAX_SCOURT_CONCURRENT
+    });
+
+    if (error) {
+      console.error('[XML] Rate limit check error:', error);
+      throw new Error(`Rate limit check failed: ${error.message}`);
+    }
+
+    if (slotAcquired) {
+      try {
+        return await downloadXmlFromScourtWithTimeout(xmlPath, DOWNLOAD_TIMEOUT_MS);
+      } finally {
+        // 슬롯 해제 (성공/실패 모두)
+        await supabase.rpc('release_scourt_slot');
+      }
+    }
+
+    // 슬롯 획득 실패 -> 대기 후 재시도 (1초 간격)
+    console.log(`[XML] Rate limit, retry ${attempt + 1}/5 for ${xmlPath}`);
+    await new Promise(r => setTimeout(r, 1000));
+  }
+
+  // 5회 시도 후에도 실패 -> RateLimitExceededError
+  throw new RateLimitExceededError(xmlPath);
+}
+
+/**
+ * 타임아웃 포함 대법원 다운로드
+ */
+async function downloadXmlFromScourtWithTimeout(
+  xmlPath: string,
+  timeoutMs: number
+): Promise<string> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const url = `${SCOURT_XML_BASE_URL}/${xmlPath}`;
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": USER_AGENT,
+        Accept: "application/xml, text/xml, */*",
+      },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to download XML: ${url} (${response.status})`);
+    }
+
+    const contentType = response.headers.get("content-type");
+    const xmlContent = await response.text();
+
+    if (isHtmlResponse(xmlContent, contentType)) {
+      throw new Error(`Unexpected HTML response from: ${url}`);
+    }
+
+    if (!isWebSquareXml(xmlContent)) {
+      throw new Error(`Invalid XML content from: ${url}`);
+    }
+
+    return xmlContent;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new DownloadTimeoutError(xmlPath);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 // ============================================================================

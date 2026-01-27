@@ -96,7 +96,7 @@ className="hover:shadow-sm border-{color}-100 hover:border-{color}-300"
 ```
 
 ## Files Modified
-- `/Users/hskim/theyool-admin/app/admin/page.tsx`
+- `/Users/hskim/luseed/app/admin/page.tsx`
 
 ## Visual Consistency Checklist
 - [x] AdminHeader component integrated

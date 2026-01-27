@@ -107,66 +107,66 @@ export default function RecurringTemplateFormModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--bg-secondary)] rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-sage-200">
-          <h2 className="text-lg font-semibold text-sage-800">{title}</h2>
+        <div className="flex items-center justify-between p-6 border-b border-[var(--border-subtle)]">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h2>
           <button
             onClick={onClose}
-            className="text-sage-400 hover:text-sage-600 transition-colors"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)]/20 rounded-lg text-[var(--color-danger)] text-sm">
               {error}
             </div>
           )}
 
           <div className="space-y-4">
             {/* 템플릿명 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                템플릿명 <span className="text-red-500">*</span>
+            <div className="form-group">
+              <label className="form-label">
+                템플릿명 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="예: 사무실 임대료"
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
                 required
               />
             </div>
 
             {/* 금액 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                금액 <span className="text-red-500">*</span>
+            <div className="form-group">
+              <label className="form-label">
+                금액 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <input
                 type="number"
                 value={formData.amount}
                 onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                 placeholder="예: 1000000"
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
                 required
               />
             </div>
 
             {/* 카테고리 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                카테고리 <span className="text-red-500">*</span>
+            <div className="form-group">
+              <label className="form-label">
+                카테고리 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <select
                 value={formData.expense_category}
                 onChange={(e) => setFormData({ ...formData, expense_category: e.target.value })}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
                 required
               >
                 <option value="">선택하세요</option>
@@ -177,8 +177,8 @@ export default function RecurringTemplateFormModal({
             </div>
 
             {/* 세부 카테고리 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
+            <div className="form-group">
+              <label className="form-label">
                 세부 카테고리
               </label>
               <input
@@ -186,19 +186,19 @@ export default function RecurringTemplateFormModal({
                 value={formData.subcategory}
                 onChange={(e) => setFormData({ ...formData, subcategory: e.target.value })}
                 placeholder="예: 천안사무실"
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
               />
             </div>
 
             {/* 지역 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
+            <div className="form-group">
+              <label className="form-label">
                 지역
               </label>
               <select
                 value={formData.office_location}
                 onChange={(e) => setFormData({ ...formData, office_location: e.target.value })}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
               >
                 <option value="">선택하세요</option>
                 {LOCATIONS.map(loc => (
@@ -208,8 +208,8 @@ export default function RecurringTemplateFormModal({
             </div>
 
             {/* 공급업체명 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
+            <div className="form-group">
+              <label className="form-label">
                 공급업체명
               </label>
               <input
@@ -217,55 +217,57 @@ export default function RecurringTemplateFormModal({
                 value={formData.vendor_name}
                 onChange={(e) => setFormData({ ...formData, vendor_name: e.target.value })}
                 placeholder="예: 건물주"
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
               />
             </div>
 
             {/* 매월 발생일 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                매월 발생일 <span className="text-red-500">*</span>
+            <div className="form-group">
+              <label className="form-label">
+                매월 발생일 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <select
                 value={formData.day_of_month}
                 onChange={(e) => setFormData({ ...formData, day_of_month: e.target.value })}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
               >
                 {Array.from({ length: 28 }, (_, i) => i + 1).map(day => (
                   <option key={day} value={day}>{day}일</option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-sage-500">
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
                 월말이 28일보다 짧은 경우 마지막 날에 자동 생성됩니다
               </p>
             </div>
 
             {/* 시작일 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                시작일 <span className="text-red-500">*</span>
+            <div className="form-group">
+              <label className="form-label">
+                시작일 <span className="text-[var(--color-danger)]">*</span>
               </label>
               <input
                 type="date"
                 value={formData.start_date}
                 onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
+                style={{ colorScheme: 'light' }}
                 required
               />
             </div>
 
             {/* 종료일 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
+            <div className="form-group">
+              <label className="form-label">
                 종료일 (선택사항)
               </label>
               <input
                 type="date"
                 value={formData.end_date}
                 onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors"
+                className="form-input"
+                style={{ colorScheme: 'light' }}
               />
-              <p className="mt-1 text-xs text-sage-500">
+              <p className="mt-1 text-xs text-[var(--text-muted)]">
                 비워두면 무기한으로 설정됩니다
               </p>
             </div>
@@ -277,16 +279,16 @@ export default function RecurringTemplateFormModal({
                 id="is_active"
                 checked={formData.is_active}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                className="w-4 h-4 text-sage-600 border-sage-300 rounded focus:ring-sage-500"
+                className="w-4 h-4 accent-[var(--sage-primary)] rounded"
               />
-              <label htmlFor="is_active" className="text-sm font-medium text-sage-700">
+              <label htmlFor="is_active" className="text-sm font-medium text-[var(--text-secondary)]">
                 활성화 (자동 생성 대상에 포함)
               </label>
             </div>
 
             {/* 메모 */}
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
+            <div className="form-group">
+              <label className="form-label">
                 메모
               </label>
               <textarea
@@ -294,7 +296,7 @@ export default function RecurringTemplateFormModal({
                 onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
                 rows={3}
                 placeholder="템플릿 설명이나 메모"
-                className="w-full px-4 py-2 border border-sage-200 rounded-lg text-sm focus:border-sage-500 focus:ring-1 focus:ring-sage-500 focus:outline-none transition-colors resize-none"
+                className="form-input resize-none"
               />
             </div>
           </div>
@@ -304,7 +306,7 @@ export default function RecurringTemplateFormModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 min-h-[44px] px-4 py-2 text-sage-700 bg-white border border-sage-300 rounded-lg hover:bg-sage-50 transition-colors font-medium text-sm"
+              className="btn btn-secondary flex-1"
               disabled={loading}
             >
               취소
@@ -312,7 +314,7 @@ export default function RecurringTemplateFormModal({
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 min-h-[44px] px-4 py-2 text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors disabled:bg-sage-400 disabled:cursor-not-allowed font-medium text-sm"
+              className="btn btn-primary flex-1"
             >
               {loading ? '저장 중...' : '저장'}
             </button>

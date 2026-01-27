@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isAuthenticated } from '@/lib/auth/auth';
+import { withTenant } from '@/lib/api/with-tenant';
 
 // Response Types
 interface CaseDetail {
@@ -61,22 +61,22 @@ interface CaseDetailResponse {
   scourt_updates: ScourtUpdate[];
 }
 
-export async function GET(
+export const GET = withTenant(async (
   request: NextRequest,
-  { params }: { params: Promise<{ clientId: string; caseId: string }> }
-) {
+  { tenant, params }
+) => {
   try {
-    // Authentication check
-    const authenticated = await isAuthenticated();
-    if (!authenticated) {
+    const supabase = createAdminClient();
+    const clientId = params?.clientId;
+    const caseId = params?.caseId;
+
+    // Validate required params
+    if (!clientId || !caseId) {
       return NextResponse.json(
-        { error: '인증이 필요합니다.' },
-        { status: 401 }
+        { error: 'clientId와 caseId가 필요합니다.' },
+        { status: 400 }
       );
     }
-
-    const supabase = createAdminClient();
-    const { clientId, caseId } = await params;
 
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -87,8 +87,8 @@ export async function GET(
       );
     }
 
-    // 1. 사건 조회 (해당 의뢰인의 사건인지 확인)
-    const { data: caseDetail, error: caseError } = await supabase
+    // 1. 사건 조회 (해당 의뢰인의 사건인지 확인, 테넌트 격리 적용)
+    let caseQuery = supabase
       .from('legal_cases')
       .select(`
         id,
@@ -104,8 +104,14 @@ export async function GET(
         scourt_unread_updates
       `)
       .eq('id', caseId)
-      .eq('client_id', clientId)
-      .single();
+      .eq('primary_client_id', clientId);
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      caseQuery = caseQuery.eq('tenant_id', tenant.tenantId);
+    }
+
+    const { data: caseDetail, error: caseError } = await caseQuery.single();
 
     if (caseError) {
       console.error('[Case Detail] Case fetch error:', {
@@ -262,4 +268,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});

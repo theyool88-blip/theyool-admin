@@ -183,21 +183,21 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="card p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-            <Bell className="w-5 h-5 text-purple-600" />
+          <div className="w-10 h-10 rounded-lg bg-[var(--sage-muted)] flex items-center justify-center">
+            <Bell className="w-5 h-5 text-[var(--sage-primary)]" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">알림 설정</h2>
-            <p className="text-xs text-gray-500">Slack, 이메일 알림 설정</p>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">알림 설정</h2>
+            <p className="text-xs text-[var(--text-tertiary)]">Slack, 이메일 알림 설정</p>
           </div>
         </div>
         <button
           onClick={handleSave}
           disabled={saving}
-          className="h-9 px-4 text-sm font-medium text-white bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
+          className="btn btn-primary flex items-center gap-2"
         >
           {saving ? (
             <>
@@ -215,36 +215,36 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
 
       {/* Alerts */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mb-4 p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded-lg flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-[var(--color-danger)] flex-shrink-0" />
+          <p className="text-sm text-[var(--color-danger)]">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-          <p className="text-sm text-green-600">{success}</p>
+        <div className="mb-4 p-3 bg-[var(--color-success-muted)] border border-[var(--color-success)] rounded-lg flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-[var(--color-success)] flex-shrink-0" />
+          <p className="text-sm text-[var(--color-success)]">{success}</p>
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center gap-2 text-gray-500">
+        <div className="flex items-center gap-2 text-[var(--text-tertiary)]">
           <RefreshCw className="w-4 h-4 animate-spin" />
           <span className="text-sm">로딩 중...</span>
         </div>
       ) : (
         <div className="space-y-6">
           {/* Slack 설정 */}
-          <div className="border border-gray-200 rounded-lg p-4">
+          <div className="border border-[var(--border-default)] rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded bg-[#4A154B] flex items-center justify-center">
                   <span className="text-white text-xs font-bold">S</span>
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">Slack</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Slack</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">
                     {settings.slackWebhookUrl ? '연결됨' : '연결되지 않음'}
                   </p>
                 </div>
@@ -258,7 +258,7 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                   }
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                <div className="w-9 h-5 bg-[var(--bg-tertiary)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
               </label>
             </div>
 
@@ -266,19 +266,19 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
               <div className="space-y-3">
                 {settings.slackWebhookUrl && !showWebhookInput ? (
                   <div className="flex items-center gap-2">
-                    <code className="flex-1 p-2 bg-gray-50 border border-gray-200 rounded text-xs font-mono text-gray-600 truncate">
+                    <code className="flex-1 p-2 bg-[var(--bg-primary)] border border-[var(--border-default)] rounded text-xs font-mono text-[var(--text-secondary)] truncate">
                       {settings.slackWebhookUrl}
                     </code>
                     <button
                       onClick={() => setShowWebhookInput(true)}
-                      className="text-xs text-purple-600 hover:underline whitespace-nowrap"
+                      className="text-xs text-[var(--sage-primary)] hover:underline whitespace-nowrap"
                     >
                       변경
                     </button>
                     <button
                       onClick={() => handleTest('slack')}
                       disabled={testing === 'slack'}
-                      className="h-8 px-3 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 disabled:opacity-50 flex items-center gap-1"
+                      className="btn btn-secondary h-8 px-3 text-xs flex items-center gap-1"
                     >
                       {testing === 'slack' ? (
                         <RefreshCw className="w-3 h-3 animate-spin" />
@@ -295,7 +295,7 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                       value={newWebhookUrl}
                       onChange={(e) => setNewWebhookUrl(e.target.value)}
                       placeholder="https://hooks.slack.com/services/..."
-                      className="flex-1 h-9 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-purple-500"
+                      className="form-input flex-1"
                     />
                     {showWebhookInput && (
                       <button
@@ -303,14 +303,14 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                           setShowWebhookInput(false);
                           setNewWebhookUrl('');
                         }}
-                        className="text-xs text-gray-500 hover:underline"
+                        className="text-xs text-[var(--text-tertiary)] hover:underline"
                       >
                         취소
                       </button>
                     )}
                   </div>
                 )}
-                <p className="text-xs text-gray-500">
+                <p className="text-caption">
                   Slack 앱에서 Incoming Webhook URL을 생성하세요.
                 </p>
               </div>
@@ -318,15 +318,15 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
           </div>
 
           {/* 이메일 설정 */}
-          <div className="border border-gray-200 rounded-lg p-4">
+          <div className="border border-[var(--border-default)] rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded bg-blue-500 flex items-center justify-center">
+                <div className="w-8 h-8 rounded bg-[var(--sage-primary)] flex items-center justify-center">
                   <Mail className="w-4 h-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-gray-900">이메일</p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-sm font-medium text-[var(--text-primary)]">이메일</p>
+                  <p className="text-xs text-[var(--text-tertiary)]">
                     {settings.emailRecipients.length}명 수신
                   </p>
                 </div>
@@ -340,7 +340,7 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                   }
                   className="sr-only peer"
                 />
-                <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
+                <div className="w-9 h-5 bg-[var(--bg-tertiary)] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
               </label>
             </div>
 
@@ -352,12 +352,12 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                     {settings.emailRecipients.map((email) => (
                       <span
                         key={email}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 text-sm text-gray-700 rounded"
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--bg-tertiary)] text-sm text-[var(--text-secondary)] rounded"
                       >
                         {email}
                         <button
                           onClick={() => removeEmail(email)}
-                          className="text-gray-400 hover:text-red-500"
+                          className="text-[var(--text-muted)] hover:text-[var(--color-danger)]"
                         >
                           ×
                         </button>
@@ -374,12 +374,12 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                     onChange={(e) => setNewEmail(e.target.value)}
                     placeholder="이메일 주소 입력"
                     onKeyPress={(e) => e.key === 'Enter' && addEmail()}
-                    className="flex-1 h-9 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-purple-500"
+                    className="form-input flex-1"
                   />
                   <button
                     onClick={addEmail}
                     disabled={!newEmail.trim()}
-                    className="h-9 px-3 text-sm font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 disabled:opacity-50"
+                    className="btn btn-secondary h-9 px-3"
                   >
                     추가
                   </button>
@@ -387,7 +387,7 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                     <button
                       onClick={() => handleTest('email')}
                       disabled={testing === 'email'}
-                      className="h-9 px-3 text-xs font-medium text-purple-600 bg-purple-50 rounded hover:bg-purple-100 disabled:opacity-50 flex items-center gap-1"
+                      className="btn btn-secondary h-9 px-3 text-xs flex items-center gap-1"
                     >
                       {testing === 'email' ? (
                         <RefreshCw className="w-3 h-3 animate-spin" />
@@ -404,9 +404,9 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
 
           {/* 알림 유형 설정 */}
           <div>
-            <h3 className="text-sm font-medium text-gray-900 mb-3">알림 받을 이벤트</h3>
+            <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">알림 받을 이벤트</h3>
             <div className="space-y-2">
-              <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+              <label className="flex items-center gap-3 p-3 bg-[var(--bg-primary)] rounded-lg cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.alertOnNewConsultation}
@@ -416,13 +416,13 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                       alertOnNewConsultation: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-[var(--sage-primary)] rounded focus:ring-[var(--sage-primary)]"
                 />
-                <MessageSquare className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-700">새 상담 신청</span>
+                <MessageSquare className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-sm text-[var(--text-secondary)]">새 상담 신청</span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+              <label className="flex items-center gap-3 p-3 bg-[var(--bg-primary)] rounded-lg cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.alertOnNewBooking}
@@ -432,13 +432,13 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                       alertOnNewBooking: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-[var(--sage-primary)] rounded focus:ring-[var(--sage-primary)]"
                 />
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-700">새 예약</span>
+                <Calendar className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-sm text-[var(--text-secondary)]">새 예약</span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+              <label className="flex items-center gap-3 p-3 bg-[var(--bg-primary)] rounded-lg cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.alertOnAnomaly}
@@ -448,13 +448,13 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                       alertOnAnomaly: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-[var(--sage-primary)] rounded focus:ring-[var(--sage-primary)]"
                 />
-                <AlertTriangle className="w-4 h-4 text-gray-400" />
-                <span className="text-sm text-gray-700">이상 패턴 감지</span>
+                <AlertTriangle className="w-4 h-4 text-[var(--text-muted)]" />
+                <span className="text-sm text-[var(--text-secondary)]">이상 패턴 감지</span>
               </label>
 
-              <label className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg cursor-pointer">
+              <label className="flex items-center gap-3 p-3 bg-[var(--bg-primary)] rounded-lg cursor-pointer">
                 <input
                   type="checkbox"
                   checked={settings.dailyReportEnabled}
@@ -464,11 +464,11 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                       dailyReportEnabled: e.target.checked,
                     })
                   }
-                  className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                  className="w-4 h-4 text-[var(--sage-primary)] rounded focus:ring-[var(--sage-primary)]"
                 />
-                <FileText className="w-4 h-4 text-gray-400" />
+                <FileText className="w-4 h-4 text-[var(--text-muted)]" />
                 <div className="flex-1 flex items-center justify-between">
-                  <span className="text-sm text-gray-700">일일 리포트</span>
+                  <span className="text-sm text-[var(--text-secondary)]">일일 리포트</span>
                   {settings.dailyReportEnabled && (
                     <input
                       type="time"
@@ -479,7 +479,7 @@ export default function AlertSettings({ hasHomepage }: AlertSettingsProps) {
                           dailyReportTime: e.target.value,
                         })
                       }
-                      className="h-7 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-purple-500"
+                      className="form-input h-7 px-2 text-xs"
                     />
                   )}
                 </div>

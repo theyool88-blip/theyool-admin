@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant, withTenantId } from '@/lib/api/with-tenant'
 
-export async function GET() {
+export const GET = withTenant(async (request: NextRequest, { tenant }) => {
   try {
     const supabase = createAdminClient()
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('recurring_templates')
       .select('*')
       .order('is_active', { ascending: false })
       .order('name', { ascending: true })
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      query = query.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data, error } = await query
 
     if (error) {
       console.error('Error fetching recurring templates:', error)
@@ -27,16 +35,19 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+})
 
-export async function POST(request: NextRequest) {
+export const POST = withTenant(async (request: NextRequest, { tenant }) => {
   try {
     const supabase = createAdminClient()
     const body = await request.json()
 
+    // 테넌트 ID 자동 할당
+    const dataWithTenant = withTenantId(body, tenant)
+
     const { data, error } = await supabase
       .from('recurring_templates')
-      .insert([body])
+      .insert([dataWithTenant])
       .select()
       .single()
 
@@ -56,4 +67,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

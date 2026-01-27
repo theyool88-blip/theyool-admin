@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import CaseDetail from '@/components/CaseDetail'
+import AdminLayoutClient from '@/components/AdminLayoutClient'
 
 export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -122,5 +123,9 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
     case_relations: allRelations
   }
 
-  return <CaseDetail caseData={caseDataWithRelations} />
+  return (
+    <AdminLayoutClient>
+      <CaseDetail caseData={caseDataWithRelations} />
+    </AdminLayoutClient>
+  )
 }

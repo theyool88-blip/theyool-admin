@@ -73,7 +73,7 @@ psql "postgresql://postgres:[YOUR-PASSWORD]@db.kqqyipnlkmmprfgygauk.supabase.co:
 ### 임포트 실행
 
 ```bash
-cd /Users/hskim/theyool-admin
+cd /Users/hskim/luseed
 npx ts-node scripts/import-expense-data.ts
 ```
 

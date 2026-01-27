@@ -161,15 +161,15 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="card p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
-            <PieChart className="w-5 h-5 text-violet-600" />
+          <div className="w-10 h-10 rounded-lg bg-[var(--color-info-muted)] flex items-center justify-center">
+            <PieChart className="w-5 h-5 text-[var(--color-info)]" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">고급 분석</h2>
-            <p className="text-xs text-gray-500">전환율 및 상세 인사이트</p>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">고급 분석</h2>
+            <p className="text-caption">전환율 및 상세 인사이트</p>
           </div>
         </div>
 
@@ -177,7 +177,7 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value as '7d' | '30d' | '90d')}
-            className="h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-violet-500"
+            className="form-input h-8 px-2 text-xs"
           >
             <option value="7d">최근 7일</option>
             <option value="30d">최근 30일</option>
@@ -186,7 +186,7 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
           <button
             onClick={() => fetchData(activeTab)}
             disabled={loading}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+            className="btn-ghost p-2"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -194,15 +194,15 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
       </div>
 
       {/* 탭 네비게이션 */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="flex gap-1 mb-6 border-b border-[var(--border-default)]">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors ${
               activeTab === tab.id
-                ? 'text-violet-600 border-violet-600'
-                : 'text-gray-500 border-transparent hover:text-gray-700'
+                ? 'text-[var(--sage-primary)] border-[var(--sage-primary)]'
+                : 'text-[var(--text-tertiary)] border-transparent hover:text-[var(--text-secondary)]'
             }`}
           >
             {tab.icon}
@@ -212,14 +212,14 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mb-4 p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded-lg">
+          <p className="text-sm text-[var(--color-danger)]">{error}</p>
         </div>
       )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+          <RefreshCw className="w-6 h-6 animate-spin text-[var(--text-muted)]" />
         </div>
       ) : (
         <div>
@@ -228,12 +228,12 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
             <div className="space-y-6">
               {/* 주요 지표 */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-[var(--bg-primary)] rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <Users className="w-5 h-5 text-blue-500" />
+                    <Users className="w-5 h-5 text-[var(--color-info)]" />
                     <span
                       className={`text-xs font-medium ${
-                        overview.changes.visitors >= 0 ? 'text-green-600' : 'text-red-600'
+                        overview.changes.visitors >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'
                       }`}
                     >
                       {overview.changes.visitors >= 0 ? (
@@ -244,18 +244,18 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
                       {formatChange(overview.changes.visitors)}
                     </span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">
                     {overview.current.visitors.toLocaleString()}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">방문자</p>
+                  <p className="text-caption mt-1">방문자</p>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-[var(--bg-primary)] rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <MessageSquare className="w-5 h-5 text-green-500" />
+                    <MessageSquare className="w-5 h-5 text-[var(--color-success)]" />
                     <span
                       className={`text-xs font-medium ${
-                        overview.changes.consultations >= 0 ? 'text-green-600' : 'text-red-600'
+                        overview.changes.consultations >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'
                       }`}
                     >
                       {overview.changes.consultations >= 0 ? (
@@ -266,38 +266,38 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
                       {formatChange(overview.changes.consultations)}
                     </span>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">
                     {overview.current.consultations.toLocaleString()}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">상담 신청</p>
+                  <p className="text-caption mt-1">상담 신청</p>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="p-4 bg-[var(--bg-primary)] rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <Calendar className="w-5 h-5 text-purple-500" />
+                    <Calendar className="w-5 h-5 text-[var(--color-info)]" />
                   </div>
-                  <p className="text-2xl font-bold text-gray-900">
+                  <p className="text-2xl font-bold text-[var(--text-primary)]">
                     {overview.current.bookings.toLocaleString()}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">예약 완료</p>
+                  <p className="text-caption mt-1">예약 완료</p>
                 </div>
 
-                <div className="p-4 bg-violet-50 rounded-lg">
+                <div className="p-4 bg-[var(--sage-muted)] rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <Target className="w-5 h-5 text-violet-500" />
+                    <Target className="w-5 h-5 text-[var(--sage-primary)]" />
                     <span
                       className={`text-xs font-medium ${
-                        overview.changes.conversionRate >= 0 ? 'text-green-600' : 'text-red-600'
+                        overview.changes.conversionRate >= 0 ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'
                       }`}
                     >
                       {overview.changes.conversionRate >= 0 ? '+' : ''}
                       {overview.changes.conversionRate.toFixed(2)}%p
                     </span>
                   </div>
-                  <p className="text-2xl font-bold text-violet-600">
+                  <p className="text-2xl font-bold text-[var(--sage-primary)]">
                     {overview.current.conversionRate.toFixed(2)}%
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">전환율</p>
+                  <p className="text-caption mt-1">전환율</p>
                 </div>
               </div>
             </div>
@@ -316,11 +316,11 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
                     <div key={step.name} className="relative">
                       <div className="flex items-center gap-3">
                         <div className="w-24 text-right">
-                          <span className="text-sm font-medium text-gray-700">{step.name}</span>
+                          <span className="text-sm font-medium text-[var(--text-secondary)]">{step.name}</span>
                         </div>
-                        <div className="flex-1 h-10 bg-gray-100 rounded-lg overflow-hidden relative">
+                        <div className="flex-1 h-10 bg-[var(--bg-tertiary)] rounded-lg overflow-hidden relative">
                           <div
-                            className="h-full bg-gradient-to-r from-violet-500 to-violet-400 transition-all duration-500"
+                            className="h-full bg-gradient-to-r from-[var(--sage-primary)] to-[var(--sage-secondary)] transition-all duration-500"
                             style={{ width: `${width}%` }}
                           />
                           <div className="absolute inset-0 flex items-center px-3">
@@ -330,11 +330,11 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
                           </div>
                         </div>
                         <div className="w-20 text-right">
-                          <span className="text-sm text-gray-500">{step.rate.toFixed(1)}%</span>
+                          <span className="text-sm text-[var(--text-tertiary)]">{step.rate.toFixed(1)}%</span>
                         </div>
                       </div>
                       {idx < funnel.funnel.length - 1 && step.dropoff > 0 && (
-                        <div className="ml-28 my-1 text-xs text-red-500 flex items-center gap-1">
+                        <div className="ml-28 my-1 text-xs text-[var(--color-danger)] flex items-center gap-1">
                           <ArrowRight className="w-3 h-3" />
                           {step.dropoff.toFixed(1)}% 이탈
                         </div>
@@ -346,14 +346,14 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
 
               {/* 인사이트 */}
               {funnel.insights.length > 0 && (
-                <div className="p-4 bg-amber-50 rounded-lg">
-                  <h4 className="text-sm font-medium text-amber-800 mb-2 flex items-center gap-1">
+                <div className="p-4 bg-[var(--color-warning-muted)] rounded-lg">
+                  <h4 className="text-sm font-medium text-[var(--color-warning)] mb-2 flex items-center gap-1">
                     <Lightbulb className="w-4 h-4" />
                     인사이트
                   </h4>
                   <ul className="space-y-1">
                     {funnel.insights.map((insight, idx) => (
-                      <li key={idx} className="text-sm text-amber-700">
+                      <li key={idx} className="text-sm text-[var(--color-warning)]">
                         • {insight}
                       </li>
                     ))}
@@ -368,35 +368,35 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 font-medium text-gray-700">소스</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-700">방문자</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-700">상담</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-700">예약</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-700">전환율</th>
+                  <tr className="border-b border-[var(--border-default)]">
+                    <th className="text-left py-2 px-3 font-medium text-[var(--text-secondary)]">소스</th>
+                    <th className="text-right py-2 px-3 font-medium text-[var(--text-secondary)]">방문자</th>
+                    <th className="text-right py-2 px-3 font-medium text-[var(--text-secondary)]">상담</th>
+                    <th className="text-right py-2 px-3 font-medium text-[var(--text-secondary)]">예약</th>
+                    <th className="text-right py-2 px-3 font-medium text-[var(--text-secondary)]">전환율</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sources.map((source) => (
-                    <tr key={source.source} className="border-b border-gray-100">
-                      <td className="py-2 px-3 font-medium text-gray-900">{source.source}</td>
-                      <td className="py-2 px-3 text-right text-gray-600">
+                    <tr key={source.source} className="border-b border-[var(--border-subtle)]">
+                      <td className="py-2 px-3 font-medium text-[var(--text-primary)]">{source.source}</td>
+                      <td className="py-2 px-3 text-right text-[var(--text-secondary)]">
                         {source.visitors.toLocaleString()}
                       </td>
-                      <td className="py-2 px-3 text-right text-gray-600">
+                      <td className="py-2 px-3 text-right text-[var(--text-secondary)]">
                         {source.consultations.toLocaleString()}
                       </td>
-                      <td className="py-2 px-3 text-right text-gray-600">
+                      <td className="py-2 px-3 text-right text-[var(--text-secondary)]">
                         {source.bookings.toLocaleString()}
                       </td>
                       <td className="py-2 px-3 text-right">
                         <span
                           className={`font-medium ${
                             source.conversionRate >= 3
-                              ? 'text-green-600'
+                              ? 'text-[var(--color-success)]'
                               : source.conversionRate >= 1
-                                ? 'text-amber-600'
-                                : 'text-gray-600'
+                                ? 'text-[var(--color-warning)]'
+                                : 'text-[var(--text-secondary)]'
                           }`}
                         >
                           {source.conversionRate.toFixed(2)}%
@@ -414,39 +414,39 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left py-2 px-3 font-medium text-gray-700">페이지</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-700">조회수</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-700">평균 체류</th>
-                    <th className="text-right py-2 px-3 font-medium text-gray-700">스크롤</th>
+                  <tr className="border-b border-[var(--border-default)]">
+                    <th className="text-left py-2 px-3 font-medium text-[var(--text-secondary)]">페이지</th>
+                    <th className="text-right py-2 px-3 font-medium text-[var(--text-secondary)]">조회수</th>
+                    <th className="text-right py-2 px-3 font-medium text-[var(--text-secondary)]">평균 체류</th>
+                    <th className="text-right py-2 px-3 font-medium text-[var(--text-secondary)]">스크롤</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pages.map((page) => (
-                    <tr key={page.pagePath} className="border-b border-gray-100">
+                    <tr key={page.pagePath} className="border-b border-[var(--border-subtle)]">
                       <td className="py-2 px-3">
                         <div>
-                          <p className="font-medium text-gray-900 truncate max-w-xs">
+                          <p className="font-medium text-[var(--text-primary)] truncate max-w-xs">
                             {page.pagePath}
                           </p>
-                          <p className="text-xs text-gray-500">{page.pageType}</p>
+                          <p className="text-caption">{page.pageType}</p>
                         </div>
                       </td>
-                      <td className="py-2 px-3 text-right text-gray-600">
+                      <td className="py-2 px-3 text-right text-[var(--text-secondary)]">
                         {page.views.toLocaleString()}
                       </td>
-                      <td className="py-2 px-3 text-right text-gray-600">
+                      <td className="py-2 px-3 text-right text-[var(--text-secondary)]">
                         {formatTime(page.avgTimeOnPage)}
                       </td>
                       <td className="py-2 px-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <div className="w-16 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div className="w-16 h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                             <div
-                              className="h-full bg-violet-500"
+                              className="h-full bg-[var(--sage-primary)]"
                               style={{ width: `${page.avgScrollDepth}%` }}
                             />
                           </div>
-                          <span className="text-gray-600">{page.avgScrollDepth}%</span>
+                          <span className="text-[var(--text-secondary)]">{page.avgScrollDepth}%</span>
                         </div>
                       </td>
                     </tr>
@@ -461,11 +461,11 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
             <div className="space-y-6">
               {/* 최적 시간대 */}
               {timeData.bestTimes.length > 0 && (
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h4 className="text-sm font-medium text-green-800 mb-2">최적 시간대</h4>
+                <div className="p-4 bg-[var(--color-success-muted)] rounded-lg">
+                  <h4 className="text-sm font-medium text-[var(--color-success)] mb-2">최적 시간대</h4>
                   <ul className="space-y-1">
                     {timeData.bestTimes.map((time, idx) => (
-                      <li key={idx} className="text-sm text-green-700">
+                      <li key={idx} className="text-sm text-[var(--color-success)]">
                         • {time}
                       </li>
                     ))}
@@ -475,7 +475,7 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
 
               {/* 시간대별 히트맵 */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">시간대별 방문</h4>
+                <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">시간대별 방문</h4>
                 <div className="flex gap-1">
                   {timeData.hourly.map((h) => {
                     const maxVisitors = Math.max(...timeData.hourly.map((x) => x.visitors)) || 1;
@@ -490,7 +490,7 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
                         }}
                         title={`${h.hour}시: ${h.visitors}명 방문, ${h.consultations}건 상담`}
                       >
-                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] text-gray-500">
+                        <span className="absolute bottom-0 left-1/2 -translate-x-1/2 text-[10px] text-[var(--text-tertiary)]">
                           {h.hour}
                         </span>
                       </div>
@@ -501,7 +501,7 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
 
               {/* 요일별 */}
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">요일별 방문</h4>
+                <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-3">요일별 방문</h4>
                 <div className="flex gap-2">
                   {timeData.daily.map((d) => {
                     const maxVisitors = Math.max(...timeData.daily.map((x) => x.visitors)) || 1;
@@ -509,16 +509,16 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
 
                     return (
                       <div key={d.dayOfWeek} className="flex-1 flex flex-col items-center">
-                        <div className="w-full h-20 bg-gray-100 rounded relative flex items-end">
+                        <div className="w-full h-20 bg-[var(--bg-tertiary)] rounded relative flex items-end">
                           <div
-                            className="w-full bg-violet-400 rounded transition-all"
+                            className="w-full bg-[var(--sage-secondary)] rounded transition-all"
                             style={{ height: `${height}%` }}
                           />
                         </div>
-                        <span className="text-xs text-gray-500 mt-1">
+                        <span className="text-caption mt-1">
                           {dayNames[d.dayOfWeek]}
                         </span>
-                        <span className="text-xs font-medium text-gray-700">{d.visitors}</span>
+                        <span className="text-xs font-medium text-[var(--text-secondary)]">{d.visitors}</span>
                       </div>
                     );
                   })}
@@ -531,8 +531,8 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
           {((activeTab === 'sources' && sources.length === 0) ||
             (activeTab === 'pages' && pages.length === 0)) && (
             <div className="text-center py-8">
-              <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-sm text-gray-500">분석할 데이터가 없습니다</p>
+              <BarChart3 className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3" />
+              <p className="text-body text-[var(--text-tertiary)]">분석할 데이터가 없습니다</p>
             </div>
           )}
         </div>

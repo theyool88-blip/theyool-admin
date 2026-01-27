@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isAuthenticated } from '@/lib/auth/auth';
+import { withTenant } from '@/lib/api/with-tenant';
 
 // Response Types
 interface ClientInfo {
@@ -61,38 +61,35 @@ interface ClientPreviewResponse {
   upcomingDeadlines: UpcomingDeadline[];
 }
 
-export async function GET(
+export const GET = withTenant(async (
   request: NextRequest,
-  { params }: { params: Promise<{ clientId: string }> }
-) {
+  { tenant, params }
+) => {
   try {
-    // Authentication check
-    const authenticated = await isAuthenticated();
-    if (!authenticated) {
-      return NextResponse.json(
-        { error: '인증이 필요합니다.' },
-        { status: 401 }
-      );
-    }
-
-    const supabase = createAdminClient();
-    const { clientId } = await params;
+    const clientId = params?.clientId;
 
     // Validate clientId format (UUID)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(clientId)) {
+    if (!clientId || !uuidRegex.test(clientId)) {
       return NextResponse.json(
         { error: '유효하지 않은 의뢰인 ID입니다.' },
         { status: 400 }
       );
     }
 
-    // 1. 의뢰인 정보 조회
-    const { data: client, error: clientError } = await supabase
+    const supabase = createAdminClient();
+
+    // 1. 의뢰인 정보 조회 (테넌트 격리)
+    let clientQuery = supabase
       .from('clients')
       .select('id, name, phone, email, address, birth_date, resident_number, bank_account, client_type, company_name, registration_number')
-      .eq('id', clientId)
-      .single();
+      .eq('id', clientId);
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      clientQuery = clientQuery.eq('tenant_id', tenant.tenantId);
+    }
+
+    const { data: client, error: clientError } = await clientQuery.single();
 
     if (clientError) {
       console.error('[Client Preview] Client fetch error:', {
@@ -113,21 +110,32 @@ export async function GET(
       );
     }
 
-    // 2. 의뢰인의 사건 목록 조회 (primary_client_id 또는 case_clients 테이블 사용)
+    // 2. 의뢰인의 사건 목록 조회 (테넌트 격리)
     // 먼저 case_clients에서 해당 의뢰인이 연결된 사건 ID 목록 조회
-    const { data: clientCases } = await supabase
+    let caseClientsQuery = supabase
       .from('case_clients')
       .select('case_id')
       .eq('client_id', clientId);
 
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      caseClientsQuery = caseClientsQuery.eq('tenant_id', tenant.tenantId);
+    }
+
+    const { data: clientCases } = await caseClientsQuery;
     const caseIdsFromClientTable = clientCases?.map(cc => cc.case_id) || [];
 
-    // primary_client_id로도 조회 (레거시 호환)
-    const { data: cases, error: casesError } = await supabase
+    // primary_client_id로도 조회 (레거시 호환, 테넌트 격리)
+    let casesQuery = supabase
       .from('legal_cases')
       .select('id, case_name, contract_number, case_type, status, office, contract_date, created_at, onedrive_folder_url')
       .or(`primary_client_id.eq.${clientId}${caseIdsFromClientTable.length > 0 ? `,id.in.(${caseIdsFromClientTable.join(',')})` : ''}`)
       .order('created_at', { ascending: false });
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      casesQuery = casesQuery.eq('tenant_id', tenant.tenantId);
+    }
+
+    const { data: cases, error: casesError } = await casesQuery;
 
     if (casesError) {
       console.error('[Client Preview] Cases fetch error:', {
@@ -145,10 +153,12 @@ export async function GET(
     futureDate.setDate(futureDate.getDate() + 30);
     const futureDateStr = futureDate.toISOString().split('T')[0];
 
-    // 3. 다가오는 재판기일 조회 (30일 이내)
+    // 3. 다가오는 재판기일 조회 (30일 이내, 테넌트 격리)
     let upcomingHearings: UpcomingHearing[] = [];
 
     if (caseIds.length > 0) {
+      // court_hearings는 tenant_id 컬럼이 없음 - case_id FK를 통해 테넌트 격리
+      // caseIds가 이미 테넌트별로 필터링되었으므로 추가 필터 불필요
       const { data: hearings, error: hearingsError } = await supabase
         .from('court_hearings')
         .select(`
@@ -194,10 +204,12 @@ export async function GET(
       }
     }
 
-    // 4. 다가오는 기한 조회 (30일 이내, 미완료만)
+    // 4. 다가오는 기한 조회 (30일 이내, 미완료만, 테넌트 격리)
     let upcomingDeadlines: UpcomingDeadline[] = [];
 
     if (caseIds.length > 0) {
+      // case_deadlines는 tenant_id 컬럼이 없음 - case_id FK를 통해 테넌트 격리
+      // caseIds가 이미 테넌트별로 필터링되었으므로 추가 필터 불필요
       const { data: deadlines, error: deadlinesError } = await supabase
         .from('case_deadlines')
         .select(`
@@ -259,4 +271,4 @@ export async function GET(
       { status: 500 }
     );
   }
-}
+});

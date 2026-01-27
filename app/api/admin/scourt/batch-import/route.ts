@@ -95,7 +95,7 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
       if (skipExisting) {
         let caseQuery = supabase
           .from('legal_cases')
-          .select('id, enc_cs_no')
+          .select('id, scourt_enc_cs_no')
           .eq('court_case_number', pc.caseNumber);
 
         if (!tenant.isSuperAdmin && tenant.tenantId) {
@@ -104,7 +104,7 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
 
         const { data: existingCase } = await caseQuery.maybeSingle();
 
-        if (existingCase?.enc_cs_no) {
+        if (existingCase?.scourt_enc_cs_no) {
           console.log(`  ⏭️ 스킵: 이미 SCOURT 연동됨`);
           results.push({
             caseNumber: pc.caseNumber,

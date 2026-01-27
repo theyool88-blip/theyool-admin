@@ -1,12 +1,11 @@
 'use client'
 
 // Temporal API polyfill for Schedule-X (MUST be imported before Schedule-X)
+// Force set globalThis.Temporal to ensure instanceof checks work correctly
 import { Temporal } from '@js-temporal/polyfill'
-if (typeof (globalThis as Record<string, unknown>).Temporal === 'undefined') {
-  (globalThis as Record<string, unknown>).Temporal = Temporal
-}
+;(globalThis as Record<string, unknown>).Temporal = Temporal
 
-import { useEffect, useState, useCallback, useMemo, useRef, createContext, useContext } from 'react'
+import { useEffect, useLayoutEffect, useState, useCallback, useMemo, useRef, createContext, useContext, memo, startTransition } from 'react'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { formatDaysUntil } from '@/types/court-hearing'
@@ -20,10 +19,14 @@ import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { createResizePlugin } from '@schedule-x/resize'
 import { createCurrentTimePlugin } from '@schedule-x/current-time'
 import { createCalendarControlsPlugin } from '@schedule-x/calendar-controls'
+// Note: event-modal plugin removed to prevent flickering
+// import { createEventModalPlugin } from '@schedule-x/event-modal'
 import '@schedule-x/theme-default/dist/index.css'
 
 // Custom components
 import ScheduleXEventCard, { ScheduleXEventChip } from './calendar/ScheduleXEventCard'
+// Note: EventModal removed - using custom detail panel instead
+// import EventModal from './calendar/EventModal'
 import ScheduleListView from './ScheduleListView'
 import UnifiedScheduleModal, { type EditScheduleData } from './UnifiedScheduleModal'
 
@@ -288,26 +291,46 @@ function toTemporalDate(dateStr: string): Temporal.PlainDate | Temporal.ZonedDat
   return Temporal.PlainDate.from(dateStr)
 }
 
-// Convert API event to Schedule-X format
+// Convert API event to Schedule-X format (returns Temporal objects for Schedule-X v4)
 function convertToScheduleXEvent(event: ApiEvent): ScheduleXEvent {
   const eventType = EVENT_TYPE_CALENDAR_MAP[event.event_type] || 'meeting'
   const hasTime = event.event_time && event.event_time !== '00:00' && event.event_time !== '00:00:00'
 
-  let start: string
-  let end: string
+  // Parse date parts
+  const [year, month, day] = event.event_date.split('-').map(Number)
+
+  let start: Temporal.PlainDate | Temporal.ZonedDateTime
+  let end: Temporal.PlainDate | Temporal.ZonedDateTime
 
   if (hasTime) {
     const timeStr = event.event_time!.slice(0, 5)
-    start = `${event.event_date} ${timeStr}`
     const [hours, minutes] = timeStr.split(':').map(Number)
+
+    // Create Temporal.ZonedDateTime for timed events
+    start = Temporal.ZonedDateTime.from({
+      year, month, day,
+      hour: hours || 0,
+      minute: minutes || 0,
+      second: 0,
+      timeZone: 'Asia/Seoul',
+    })
+
     // 기본 이벤트 길이: 30분
-    const totalMinutes = minutes + 30
-    const endHours = Math.min(hours + Math.floor(totalMinutes / 60), 23)
+    const totalMinutes = (minutes || 0) + 30
+    const endHours = Math.min((hours || 0) + Math.floor(totalMinutes / 60), 23)
     const endMinutes = totalMinutes % 60
-    end = `${event.event_date} ${String(endHours).padStart(2, '0')}:${String(endMinutes).padStart(2, '0')}`
+
+    end = Temporal.ZonedDateTime.from({
+      year, month, day,
+      hour: endHours,
+      minute: endMinutes,
+      second: 0,
+      timeZone: 'Asia/Seoul',
+    })
   } else {
-    start = event.event_date
-    end = event.event_date
+    // Create Temporal.PlainDate for all-day events
+    start = Temporal.PlainDate.from({ year, month, day })
+    end = Temporal.PlainDate.from({ year, month, day })
   }
 
   // Calculate daysUntil for deadlines
@@ -475,7 +498,8 @@ interface CalendarInnerProps {
   onCalendarControlsReady: (controls: CalendarControls) => void
 }
 
-function CalendarInner({
+// Memoized CalendarInner to prevent unnecessary re-renders
+const CalendarInner = memo(function CalendarInner({
   events,
   holidayMap,
   isDark,
@@ -490,6 +514,7 @@ function CalendarInner({
   const controlsReadyRef = useRef(false)
 
   // Create plugins (memoized)
+  // Note: event-modal plugin removed to prevent flickering - using custom detail panel instead
   const calendarControls = useMemo(() => createCalendarControlsPlugin(), [])
   const dragAndDropPlugin = useMemo(() => createDragAndDropPlugin(15), [])
   const resizePlugin = useMemo(() => createResizePlugin(15), [])
@@ -505,7 +530,7 @@ function CalendarInner({
     return basePlugins
   }, [calendarControls, dragAndDropPlugin, resizePlugin, currentTimePlugin, viewMode])
 
-  // Convert events to Temporal format
+  // Convert events to Temporal format (if needed - events from convertToScheduleXEvent are already Temporal)
   const temporalEvents = useMemo(() => {
     return events.map(event => ({
       ...event,
@@ -514,8 +539,14 @@ function CalendarInner({
     }))
   }, [events])
 
-  // Convert selectedDate to Temporal.PlainDate for Schedule-X (v3+ requires Temporal object)
-  const selectedDateTemporal = Temporal.PlainDate.from(format(selectedDate, 'yyyy-MM-dd'))
+  // Memoize selectedDate conversion to prevent creating new Temporal object every render
+  const selectedDateTemporal = useMemo(() => {
+    return Temporal.PlainDate.from({
+      year: selectedDate.getFullYear(),
+      month: selectedDate.getMonth() + 1,
+      day: selectedDate.getDate(),
+    })
+  }, [selectedDate])
 
   // Create calendar app
   const calendar = useNextCalendarApp({
@@ -567,8 +598,9 @@ function CalendarInner({
     },
   }, plugins)
 
-  // Update events dynamically
-  useEffect(() => {
+  // Update events dynamically - use useLayoutEffect to prevent flickering
+  // useLayoutEffect runs synchronously after DOM mutations but before browser paint
+  useLayoutEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
       return
@@ -607,11 +639,26 @@ function CalendarInner({
           monthGridDayName: MonthGridDayNameComponent,
           weekGridDate: WeekGridDateComponent,
           weekGridHour: WeekGridHourComponent,
+          // Note: eventModal removed - using custom detail panel instead to prevent flickering
         }}
       />
     </CalendarContext.Provider>
   )
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison: return true if props are equal (should NOT re-render)
+  // This prevents flickering when parent re-renders due to unrelated state changes
+  return (
+    prevProps.events === nextProps.events &&
+    prevProps.holidayMap === nextProps.holidayMap &&
+    prevProps.isDark === nextProps.isDark &&
+    prevProps.viewMode === nextProps.viewMode &&
+    prevProps.selectedDate === nextProps.selectedDate &&
+    prevProps.onEventClick === nextProps.onEventClick &&
+    prevProps.onEventUpdate === nextProps.onEventUpdate &&
+    prevProps.onClickDate === nextProps.onClickDate &&
+    prevProps.onCalendarControlsReady === nextProps.onCalendarControlsReady
+  )
+})
 
 // ========================================
 // Main Component
@@ -838,10 +885,14 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
     }
   }, [fetchSchedules])
 
-  // Handle event click
+  // Handle event click - use startTransition to prevent blocking the UI
   const handleEventClick = useCallback((event: ScheduleXEvent) => {
     const eventDate = new Date(getEventDateString(event.start))
-    setSelectedDate(eventDate)
+    // Use startTransition to mark this as a non-urgent update
+    // This allows React to keep the calendar UI responsive while updating the detail panel
+    startTransition(() => {
+      setSelectedDate(eventDate)
+    })
   }, [])
 
   // Get holiday for a day
@@ -860,10 +911,14 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
 
   const selectedDaySchedules = selectedDate ? getSchedulesForDay(selectedDate) : []
 
-  // Handle date click
+  // Handle date click - use startTransition to prevent blocking the UI
   const handleDateClick = useCallback((date: Date) => {
     const scrollY = window.scrollY
-    setSelectedDate(date)
+    // Use startTransition to mark this as a non-urgent update
+    startTransition(() => {
+      setSelectedDate(date)
+    })
+    // Preserve scroll position after state update
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         window.scrollTo(0, scrollY)
@@ -1403,7 +1458,7 @@ export default function ScheduleXCalendarComponent({ profile: _profile }: Schedu
 
           {/* Selected date detail panel */}
           {selectedDate && (
-            <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] mt-3 shadow-sm overflow-hidden" style={{ overflowAnchor: 'none' }}>
+            <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] mt-3 shadow-sm overflow-hidden">
               {/* Header */}
               <div
                 className="flex justify-between items-center px-3 py-2.5 cursor-pointer hover:bg-[var(--bg-hover)] transition-colors"

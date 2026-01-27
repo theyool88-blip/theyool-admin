@@ -20,6 +20,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const caseId = searchParams.get('caseId');
+    const includeRawData = searchParams.get('includeRawData') === 'true';
 
     if (!caseId) {
       return NextResponse.json(
@@ -30,14 +31,22 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // 최신 스냅샷 조회
-    const { data: snapshot, error: snapshotError } = await supabase
-      .from('scourt_case_snapshots')
-      .select('*')
-      .eq('legal_case_id', caseId)
-      .order('scraped_at', { ascending: false })
-      .limit(1)
-      .single();
+    // 최신 스냅샷 조회 (includeRawData에 따라 raw_data 제외 가능)
+    const { data: snapshot, error: snapshotError } = includeRawData
+      ? await supabase
+          .from('scourt_case_snapshots')
+          .select('*')
+          .eq('legal_case_id', caseId)
+          .order('scraped_at', { ascending: false })
+          .limit(1)
+          .single()
+      : await supabase
+          .from('scourt_case_snapshots')
+          .select('id, scraped_at, case_type, basic_info, hearings, progress, documents, lower_court, related_cases')
+          .eq('legal_case_id', caseId)
+          .order('scraped_at', { ascending: false })
+          .limit(1)
+          .single();
 
     if (snapshotError && snapshotError.code !== 'PGRST116') {
       console.error('스냅샷 조회 에러:', snapshotError);
@@ -65,7 +74,7 @@ export async function GET(request: NextRequest) {
     // 프로필 케이스 연동 여부 확인
     const { data: profileCase } = await supabase
       .from('scourt_profile_cases')
-      .select('id, profile_id, enc_cs_no, wmonid')
+      .select('id, profile_id, scourt_enc_cs_no, wmonid')
       .eq('legal_case_id', caseId)
       .limit(1)
       .single();
@@ -74,7 +83,9 @@ export async function GET(request: NextRequest) {
     const hearingsData = transformHearings(snapshot?.hearings || []);
     const progressData = transformProgress(snapshot?.progress || []);
 
-    const rawData = snapshot?.raw_data || extractRawData(snapshot?.basic_info) || null;
+    const rawData = includeRawData
+      ? (snapshot?.raw_data || extractRawData(snapshot?.basic_info) || null)
+      : undefined;
 
     return NextResponse.json({
       success: true,
@@ -89,7 +100,7 @@ export async function GET(request: NextRequest) {
         documents: snapshot.documents || [],
         lowerCourt: snapshot.lower_court || [],
         relatedCases: snapshot.related_cases || [],
-        rawData,  // XML 렌더링용 원본 데이터
+        ...(includeRawData && { rawData }),  // XML 렌더링용 원본 데이터 (선택적)
       } : null,
       updates: updates || [],
       syncStatus: {
@@ -132,7 +143,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient();
 
-    // 사건 정보 조회 (enc_cs_no, wmonid, court_case_number 등)
+    // 사건 정보 조회 (scourt_enc_cs_no, wmonid, court_case_number 등)
     const { data: legalCase, error: caseError } = await supabase
       .from('legal_cases')
       .select('id, court_case_number, court_name, scourt_enc_cs_no, scourt_wmonid')

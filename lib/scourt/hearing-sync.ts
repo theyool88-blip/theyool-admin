@@ -87,18 +87,22 @@ const SCOURT_HEARING_TYPE_MAP: Record<string, HearingType> = {
 // ============================================================
 
 const SCOURT_RESULT_MAP: Record<string, HearingResult> = {
-  '속행': 'CONTINUED',
-  '변론속행': 'CONTINUED',
-  '조정속행': 'CONTINUED',
-  '종결': 'CONCLUDED',
-  '변론종결': 'CONCLUDED',
-  '조정종결': 'CONCLUDED',
-  '조정성립': 'CONCLUDED',
-  '연기': 'POSTPONED',
-  '기일연기': 'POSTPONED',
-  '취하': 'DISMISSED',
-  '각하': 'DISMISSED',
-  '기각': 'DISMISSED',
+  '속행': 'continued',
+  '변론속행': 'continued',
+  '조정속행': 'continued',
+  '종결': 'settled',
+  '변론종결': 'settled',
+  '조정종결': 'settled',
+  '조정성립': 'settled',
+  '화해성립': 'settled',
+  '연기': 'adjourned',
+  '기일연기': 'adjourned',
+  '휴정': 'adjourned',
+  '취하': 'withdrawn',
+  '각하': 'dismissed',
+  '기각': 'dismissed',
+  '판결선고': 'judgment',
+  '선고': 'judgment',
 };
 
 // ============================================================
@@ -176,10 +180,12 @@ export function mapScourtResult(scourtResult: string | undefined): HearingResult
 
   // 부분 매칭 시도
   const resultLC = scourtResult.toLowerCase();
-  if (resultLC.includes('속행')) return 'CONTINUED';
-  if (resultLC.includes('종결') || resultLC.includes('성립')) return 'CONCLUDED';
-  if (resultLC.includes('연기')) return 'POSTPONED';
-  if (resultLC.includes('취하') || resultLC.includes('각하') || resultLC.includes('기각')) return 'DISMISSED';
+  if (resultLC.includes('속행')) return 'continued';
+  if (resultLC.includes('종결') || resultLC.includes('성립') || resultLC.includes('화해')) return 'settled';
+  if (resultLC.includes('연기') || resultLC.includes('휴정')) return 'adjourned';
+  if (resultLC.includes('취하')) return 'withdrawn';
+  if (resultLC.includes('각하') || resultLC.includes('기각')) return 'dismissed';
+  if (resultLC.includes('선고') || resultLC.includes('판결')) return 'judgment';
 
   return null;
 }
@@ -392,7 +398,7 @@ export async function syncHearingsToCourtHearings(
       // 기존 기일 확인 (case_id + 해시로 검색)
       const { data: existing } = await supabase
         .from('court_hearings')
-        .select('id, result, status, scourt_type_raw, scourt_result_raw')
+        .select('id, result, status, scourt_type_raw')
         .eq('case_id', caseId)
         .eq('scourt_hearing_hash', hash)
         .single();
@@ -403,8 +409,7 @@ export async function syncHearingsToCourtHearings(
         const needsUpdate =
           (hearingResult && existing.result !== hearingResult) ||
           (hearingStatus !== existing.status) ||
-          (!existing.scourt_type_raw && hearing.type) ||
-          (hearing.result && existing.scourt_result_raw !== hearing.result);
+          (!existing.scourt_type_raw && hearing.type);
 
         if (needsUpdate) {
           const updateData: Record<string, unknown> = {};
@@ -417,10 +422,12 @@ export async function syncHearingsToCourtHearings(
           // SCOURT 원본 데이터 업데이트
           if (!existing.scourt_type_raw && hearing.type) {
             updateData.scourt_type_raw = hearing.type;
-            updateData.hearing_sequence = extractHearingSequence(hearing.type);
-          }
-          if (hearing.result && existing.scourt_result_raw !== hearing.result) {
-            updateData.scourt_result_raw = hearing.result;
+            updateData.scourt_raw_data = {
+              type: hearing.type,
+              result: hearing.result,
+              location: hearing.location,
+              sequence: extractHearingSequence(hearing.type),
+            };
           }
 
           const { error: updateError } = await supabase
@@ -456,12 +463,15 @@ export async function syncHearingsToCourtHearings(
           location: hearing.location || null,
           result: hearingResult,
           status: hearingStatus,
-          source: 'scourt',
           scourt_hearing_hash: hash,
           // SCOURT 원본 데이터 저장 (나의사건검색 동일 표시용)
           scourt_type_raw: hearing.type || null,              // "제1회 변론기일"
-          scourt_result_raw: hearing.result || null,          // "다음기일지정(2025.02.15)"
-          hearing_sequence: extractHearingSequence(hearing.type || ''),
+          scourt_raw_data: {
+            type: hearing.type,
+            result: hearing.result,
+            location: hearing.location,
+            sequence: extractHearingSequence(hearing.type || ''),
+          },
           notes: null,  // 원본은 scourt_type_raw에 저장
           // 화상 참여자 정보
           video_participant_side: videoParticipantSide,
@@ -483,7 +493,12 @@ export async function syncHearingsToCourtHearings(
         }
       }
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[syncHearingsToCourtHearings] Error:', error);
+      const errorMsg = error instanceof Error
+        ? error.message
+        : (typeof error === 'object' && error !== null)
+          ? JSON.stringify(error)
+          : String(error);
       result.errors.push(`${hearing.date} ${hearing.type}: ${errorMsg}`);
       result.success = false;
     }

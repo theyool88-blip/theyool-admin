@@ -142,14 +142,14 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
 
     // 참석하지 않는 법원기일(선고기일, 부모교육)은 회색으로 표시
     if (type === 'trial' && (eventSubtype === 'HEARING_JUDGMENT' || eventSubtype === 'HEARING_PARENTING')) {
-      return 'bg-gray-50 text-gray-600 border-l-gray-400'
+      return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
     }
 
     switch (type) {
-      case 'trial': return 'bg-sage-50 text-sage-700 border-l-sage-400'
-      case 'consultation': return 'bg-blue-50 text-blue-700 border-l-blue-400'
-      case 'meeting': return 'bg-orange-50 text-orange-700 border-l-orange-400'
-      default: return 'bg-gray-50 text-gray-700 border-l-gray-400'
+      case 'trial': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
+      case 'consultation': return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)]'
+      case 'meeting': return 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-l-[var(--border-strong)]'
+      default: return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
     }
   }
 
@@ -167,10 +167,10 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h2 className="text-lg font-semibold text-sage-800 mb-4">이번 주 일정</h2>
+      <div className="bg-[var(--bg-secondary)] rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold text-[var(--sage-primary)] mb-4">이번 주 일정</h2>
         <div className="flex justify-center items-center h-64">
-          <p className="text-sage-500">일정을 불러오는 중...</p>
+          <p className="text-[var(--sage-primary)]">일정을 불러오는 중...</p>
         </div>
       </div>
     )
@@ -220,17 +220,17 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
     <div className="card-sage shadow-sage">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-xl font-semibold text-sage-800 mb-1">
+          <h2 className="text-xl font-semibold text-[var(--sage-primary)] mb-1">
             주간 일정
           </h2>
-          <p className="text-sm text-sage-600">
+          <p className="text-sm text-[var(--sage-primary)]">
             {getDateRangeText()}
           </p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={goToPreviousWeek}
-            className="p-2 text-sage-600 hover:text-sage-800 hover:bg-sage-50 rounded-lg transition-all"
+            className="p-2 text-[var(--sage-primary)] hover:text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded-lg transition-all"
             title="이전 주"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -239,13 +239,13 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
           </button>
           <button
             onClick={goToThisWeek}
-            className="px-3 py-2 text-sm font-medium text-sage-700 hover:text-sage-900 hover:bg-sage-50 rounded-lg transition-all"
+            className="px-3 py-2 text-sm font-medium text-[var(--sage-primary)] hover:text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded-lg transition-all"
           >
             {getCenterButtonText()}
           </button>
           <button
             onClick={goToNextWeek}
-            className="p-2 text-sage-600 hover:text-sage-800 hover:bg-sage-50 rounded-lg transition-all"
+            className="p-2 text-[var(--sage-primary)] hover:text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded-lg transition-all"
             title="다음 주"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -254,13 +254,13 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
           </button>
           <button
             onClick={fetchSchedules}
-            className="px-4 py-2 text-sm font-medium text-sage-600 hover:text-sage-900 hover:bg-sage-50 rounded-lg transition-all ml-auto"
+            className="px-4 py-2 text-sm font-medium text-[var(--sage-primary)] hover:text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] rounded-lg transition-all ml-auto"
           >
             새로고침
           </button>
           <a
             href="/schedules"
-            className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-all shadow-sm hover:shadow-md"
+            className="px-4 py-2 text-sm font-medium text-white bg-[var(--sage-primary)] rounded-lg hover:bg-[var(--sage-primary)] transition-all shadow-sm hover:shadow-md"
           >
             전체보기
           </a>
@@ -281,9 +281,9 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
               key={index}
               className="min-h-[220px] group"
             >
-              <div className="text-center mb-3 pb-2 border-b border-sage-100">
+              <div className="text-center mb-3 pb-2 border-b border-[var(--border-subtle)]">
                 <p className={`text-sm font-semibold uppercase tracking-wider mb-1 ${
-                  isHoliday ? 'text-red-500' : 'text-sage-600'
+                  isHoliday ? 'text-[var(--color-danger)]' : 'text-[var(--sage-primary)]'
                 }`} style={isHoliday ? { color: holidayColor } : undefined}>
                   {format(day, 'EEE', { locale: ko })}
                 </p>
@@ -292,11 +292,11 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                   className={`inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors text-base ${
                     isToday
                       ? isHoliday
-                        ? 'text-red-600 font-bold'
-                        : 'bg-sage-600 text-white font-bold hover:bg-sage-700'
+                        ? 'text-[var(--color-danger)] font-bold'
+                        : 'bg-[var(--sage-primary)] text-white font-bold hover:bg-[var(--sage-primary)]'
                       : isHoliday
-                      ? 'text-red-500 font-bold hover:bg-red-50 cursor-pointer'
-                      : 'text-sage-900 font-semibold hover:bg-sage-50 cursor-pointer'
+                      ? 'text-[var(--color-danger)] font-bold hover:bg-[var(--color-danger-muted)] cursor-pointer'
+                      : 'text-[var(--sage-primary)] font-semibold hover:bg-[var(--sage-muted)] cursor-pointer'
                   }`}
                   style={
                     isHoliday
@@ -312,7 +312,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                 </button>
                 {isHoliday && (
                   <p
-                    className="text-[11px] text-red-500 font-medium mt-1 truncate px-1"
+                    className="text-[11px] text-[var(--color-danger)] font-medium mt-1 truncate px-1"
                     style={{ color: holidayColor }}
                     title={holidayName}
                   >
@@ -323,7 +323,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
 
               <div className="space-y-1.5">
                 {daySchedules.length === 0 ? (
-                  <p className="text-sm text-gray-400 text-center mt-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-sm text-[var(--text-muted)] text-center mt-8 opacity-0 group-hover:opacity-100 transition-opacity">
                     일정 없음
                   </p>
                 ) : (
@@ -344,7 +344,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                           </span>
                           {schedule.scheduled_time && (
                             <>
-                              <span className="text-gray-400">·</span>
+                              <span className="text-[var(--text-muted)]">·</span>
                               <span className="text-[11px] font-semibold">
                                 {schedule.scheduled_time.slice(0, 5)}
                               </span>
@@ -364,7 +364,7 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
                     <button
                       type="button"
                       onClick={() => onViewAll && onViewAll(day, daySchedules)}
-                      className="text-[11px] text-center text-sage-600 font-medium py-1 w-full hover:text-sage-800"
+                      className="text-[11px] text-center text-[var(--sage-primary)] font-medium py-1 w-full hover:text-[var(--sage-primary)]"
                     >
                       {daySchedules.length > 5 ? `+${daySchedules.length - 5}` : '+'}
                     </button>
@@ -378,11 +378,11 @@ export default function WeeklyCalendar({ initialSchedules, onScheduleClick, onDa
 
       {schedules.length === 0 && (
         <div className="text-center mt-12 py-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-100 rounded-full mb-4">
-            
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[var(--bg-tertiary)] rounded-full mb-4">
+
           </div>
-          <p className="text-gray-600 font-medium">이번 주에 등록된 일정이 없습니다.</p>
-          <p className="text-sm text-gray-500 mt-2">일정 관리 페이지에서 새 일정을 추가하세요.</p>
+          <p className="text-[var(--text-secondary)] font-medium">이번 주에 등록된 일정이 없습니다.</p>
+          <p className="text-sm text-[var(--text-tertiary)] mt-2">일정 관리 페이지에서 새 일정을 추가하세요.</p>
         </div>
       )}
     </div>

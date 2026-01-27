@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { confirmPaymentsBatch } from '@/lib/supabase/payments-aggregation'
+import { withTenant } from '@/lib/api/with-tenant'
+import { confirmPaymentsBatchWithTenant } from '@/lib/supabase/payments-aggregation'
 
 interface BatchConfirmBody {
   paymentIds: string[]
@@ -10,18 +10,10 @@ interface BatchConfirmBody {
 /**
  * POST /api/admin/payments/confirm-batch
  *
- * 입금 일괄 확인 처리
+ * 입금 일괄 확인 처리 (테넌트 격리 적용)
  * Body: { paymentIds: string[], confirmedBy: string }
  */
-export async function POST(request: NextRequest) {
-  // Auth check
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
+export const POST = withTenant(async (request: NextRequest, { tenant }) => {
   try {
     const body = (await request.json()) as Partial<BatchConfirmBody>
     const { paymentIds, confirmedBy } = body
@@ -40,7 +32,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await confirmPaymentsBatch(paymentIds, confirmedBy)
+    // 테넌트 ID 전달
+    const tenantId = !tenant.isSuperAdmin && tenant.tenantId ? tenant.tenantId : undefined
+
+    const result = await confirmPaymentsBatchWithTenant(paymentIds, confirmedBy, tenantId)
 
     if (!result.success) {
       return NextResponse.json(
@@ -63,4 +58,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     )
   }
-}
+})

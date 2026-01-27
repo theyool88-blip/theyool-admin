@@ -43,7 +43,7 @@ async function runMigration() {
       if (testError) {
         console.error('❌ 테스트 삽입 실패:', testError)
         console.log('\n⚠️  Supabase Dashboard에서 수동으로 마이그레이션을 실행해주세요.')
-        console.log('   마이그레이션 파일: /Users/hskim/theyool-admin/supabase/migrations/20251124_create_payments_table.sql\n')
+        console.log('   마이그레이션 파일: /Users/hskim/luseed/supabase/migrations/20251124_create_payments_table.sql\n')
         process.exit(1)
       } else {
         console.log('✅ 테스트 삽입 성공!')
@@ -58,7 +58,7 @@ async function runMigration() {
       console.log('   Supabase Dashboard에서 SQL을 직접 실행해주세요.\n')
       console.log('1. https://supabase.com/dashboard/project/kqqyipnlkmmprfgygauk/sql/new 접속')
       console.log('2. 아래 파일의 내용을 붙여넣기:')
-      console.log('   /Users/hskim/theyool-admin/supabase/migrations/20251124_create_payments_table.sql\n')
+      console.log('   /Users/hskim/luseed/supabase/migrations/20251124_create_payments_table.sql\n')
       process.exit(1)
     }
 

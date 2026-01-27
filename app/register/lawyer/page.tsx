@@ -162,20 +162,20 @@ export default function LawyerRegistrationPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-4">
         <div className="w-full max-w-md text-center">
-          <div className="bg-white border border-gray-200 rounded-lg p-8">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+          <div className="card p-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-success-muted)] flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-[var(--color-success)]" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900 mb-2">가입이 완료되었습니다</h1>
-            <p className="text-sm text-gray-600 mb-6">
+            <h1 className="text-xl font-bold text-[var(--text-primary)] mb-2">가입이 완료되었습니다</h1>
+            <p className="text-sm text-[var(--text-secondary)] mb-6">
               입력하신 이메일({formData.email})로 인증 메일이 발송되었습니다.<br />
               이메일 인증 후 로그인해주세요.
             </p>
             <button
               onClick={() => router.push('/login')}
-              className="w-full h-10 text-sm font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors"
+              className="btn btn-primary w-full h-10"
             >
               로그인 페이지로 이동
             </button>
@@ -186,13 +186,13 @@ export default function LawyerRegistrationPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-4 py-8">
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-6">
-          <Scale className="w-10 h-10 mx-auto text-sage-600 mb-3" />
-          <h1 className="text-xl font-bold text-gray-900">변호사 회원가입</h1>
-          <p className="text-sm text-gray-500 mt-1">사건관리 시스템을 시작해보세요</p>
+          <Scale className="w-10 h-10 mx-auto text-[var(--sage-primary)] mb-3" />
+          <h1 className="text-xl font-bold text-[var(--text-primary)]">변호사 회원가입</h1>
+          <p className="text-sm text-[var(--text-tertiary)] mt-1">사건관리 시스템을 시작해보세요</p>
         </div>
 
         {/* Progress Steps */}
@@ -202,8 +202,8 @@ export default function LawyerRegistrationPage() {
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                   step >= s
-                    ? 'bg-sage-600 text-white'
-                    : 'bg-gray-200 text-gray-500'
+                    ? 'bg-[var(--sage-primary)] text-white'
+                    : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
                 }`}
               >
                 {s}
@@ -211,7 +211,7 @@ export default function LawyerRegistrationPage() {
               {s < 3 && (
                 <div
                   className={`w-12 h-0.5 mx-1 transition-colors ${
-                    step > s ? 'bg-sage-600' : 'bg-gray-200'
+                    step > s ? 'bg-[var(--sage-primary)]' : 'bg-[var(--bg-tertiary)]'
                   }`}
                 />
               )}
@@ -220,62 +220,62 @@ export default function LawyerRegistrationPage() {
         </div>
 
         {/* Form Card */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="card p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
-              <p className="text-sm text-red-600">{error}</p>
+            <div className="mb-4 p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-[var(--color-danger)] mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-[var(--color-danger)]">{error}</p>
             </div>
           )}
 
           {/* Step 1: 기본 정보 */}
           {step === 1 && (
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">기본 정보</h2>
+              <h2 className="text-base font-semibold text-[var(--text-primary)] mb-4">기본 정보</h2>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                <label className="form-label">
                   이메일 *
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                   <input
                     type="email"
                     value={formData.email}
                     onChange={(e) => updateForm('email', e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                    className="form-input pl-10"
                     placeholder="lawyer@example.com"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  비밀번호 * <span className="font-normal text-gray-500">(8자 이상, 영문+숫자)</span>
+                <label className="form-label">
+                  비밀번호 * <span className="font-normal text-[var(--text-tertiary)]">(8자 이상, 영문+숫자)</span>
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                   <input
                     type="password"
                     value={formData.password}
                     onChange={(e) => updateForm('password', e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                    className="form-input pl-10"
                     placeholder="비밀번호 입력"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                <label className="form-label">
                   비밀번호 확인 *
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                   <input
                     type="password"
                     value={formData.passwordConfirm}
                     onChange={(e) => updateForm('passwordConfirm', e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                    className="form-input pl-10"
                     placeholder="비밀번호 재입력"
                   />
                 </div>
@@ -283,32 +283,32 @@ export default function LawyerRegistrationPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  <label className="form-label">
                     이름 *
                   </label>
                   <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                     <input
                       type="text"
                       value={formData.name}
                       onChange={(e) => updateForm('name', e.target.value)}
-                      className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                      className="form-input pl-10"
                       placeholder="홍길동"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                    등록번호 <span className="font-normal text-gray-500">(선택)</span>
+                  <label className="form-label">
+                    등록번호 <span className="font-normal text-[var(--text-tertiary)]">(선택)</span>
                   </label>
                   <div className="relative">
-                    <Scale className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Scale className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                     <input
                       type="text"
                       value={formData.barNumber}
                       onChange={(e) => updateForm('barNumber', e.target.value)}
-                      className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                      className="form-input pl-10"
                       placeholder="12345"
                     />
                   </div>
@@ -316,16 +316,16 @@ export default function LawyerRegistrationPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  연락처 <span className="font-normal text-gray-500">(선택)</span>
+                <label className="form-label">
+                  연락처 <span className="font-normal text-[var(--text-tertiary)]">(선택)</span>
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                   <input
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => updateForm('phone', e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                    className="form-input pl-10"
                     placeholder="010-1234-5678"
                   />
                 </div>
@@ -336,10 +336,10 @@ export default function LawyerRegistrationPage() {
           {/* Step 2: 사무소 정보 */}
           {step === 2 && (
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">사무소 정보</h2>
+              <h2 className="text-base font-semibold text-[var(--text-primary)] mb-4">사무소 정보</h2>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-2">
+                <label className="form-label mb-2">
                   사무소 유형 *
                 </label>
                 <div className="grid grid-cols-2 gap-3">
@@ -348,15 +348,15 @@ export default function LawyerRegistrationPage() {
                     onClick={() => updateForm('officeType', 'individual')}
                     className={`p-4 rounded border-2 transition-colors ${
                       formData.officeType === 'individual'
-                        ? 'border-sage-500 bg-sage-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)]'
+                        : 'border-[var(--border-default)] hover:border-[var(--border-subtle)]'
                     }`}
                   >
-                    <User className={`w-6 h-6 mx-auto mb-2 ${formData.officeType === 'individual' ? 'text-sage-600' : 'text-gray-400'}`} />
-                    <p className={`text-sm font-medium ${formData.officeType === 'individual' ? 'text-sage-700' : 'text-gray-700'}`}>
+                    <User className={`w-6 h-6 mx-auto mb-2 ${formData.officeType === 'individual' ? 'text-[var(--sage-primary)]' : 'text-[var(--text-muted)]'}`} />
+                    <p className={`text-sm font-medium ${formData.officeType === 'individual' ? 'text-[var(--sage-primary)]' : 'text-[var(--text-secondary)]'}`}>
                       개인 사무소
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">1인 운영</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">1인 운영</p>
                   </button>
 
                   <button
@@ -364,83 +364,83 @@ export default function LawyerRegistrationPage() {
                     onClick={() => updateForm('officeType', 'firm')}
                     className={`p-4 rounded border-2 transition-colors ${
                       formData.officeType === 'firm'
-                        ? 'border-sage-500 bg-sage-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)]'
+                        : 'border-[var(--border-default)] hover:border-[var(--border-subtle)]'
                     }`}
                   >
-                    <Building2 className={`w-6 h-6 mx-auto mb-2 ${formData.officeType === 'firm' ? 'text-sage-600' : 'text-gray-400'}`} />
-                    <p className={`text-sm font-medium ${formData.officeType === 'firm' ? 'text-sage-700' : 'text-gray-700'}`}>
+                    <Building2 className={`w-6 h-6 mx-auto mb-2 ${formData.officeType === 'firm' ? 'text-[var(--sage-primary)]' : 'text-[var(--text-muted)]'}`} />
+                    <p className={`text-sm font-medium ${formData.officeType === 'firm' ? 'text-[var(--sage-primary)]' : 'text-[var(--text-secondary)]'}`}>
                       법무법인
                     </p>
-                    <p className="text-xs text-gray-500 mt-1">팀원 초대 가능</p>
+                    <p className="text-xs text-[var(--text-tertiary)] mt-1">팀원 초대 가능</p>
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                <label className="form-label">
                   사무소명 *
                 </label>
                 <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                   <input
                     type="text"
                     value={formData.officeName}
                     onChange={(e) => updateForm('officeName', e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                    className="form-input pl-10"
                     placeholder={formData.officeType === 'firm' ? '법무법인 OOO' : 'OOO 법률사무소'}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  사무소 전화번호 <span className="font-normal text-gray-500">(선택)</span>
+                <label className="form-label">
+                  사무소 전화번호 <span className="font-normal text-[var(--text-tertiary)]">(선택)</span>
                 </label>
                 <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                   <input
                     type="tel"
                     value={formData.officePhone}
                     onChange={(e) => updateForm('officePhone', e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                    className="form-input pl-10"
                     placeholder="02-1234-5678"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                  사무소 주소 <span className="font-normal text-gray-500">(선택)</span>
+                <label className="form-label">
+                  사무소 주소 <span className="font-normal text-[var(--text-tertiary)]">(선택)</span>
                 </label>
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
                   <input
                     type="text"
                     value={formData.officeAddress}
                     onChange={(e) => updateForm('officeAddress', e.target.value)}
-                    className="w-full h-10 pl-10 pr-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500"
+                    className="form-input pl-10"
                     placeholder="서울특별시 강남구..."
                   />
                 </div>
               </div>
 
               {/* 홈페이지 서비스 옵션 */}
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <div className="mt-6 p-4 bg-[var(--bg-primary)] rounded-lg border border-[var(--border-default)]">
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
                     id="wantHomepage"
                     checked={formData.wantHomepage}
                     onChange={(e) => updateForm('wantHomepage', e.target.checked)}
-                    className="mt-1 w-4 h-4 text-sage-600 rounded border-gray-300 focus:ring-sage-500"
+                    className="mt-1 w-4 h-4 text-[var(--sage-primary)] rounded border-[var(--border-default)] focus:ring-[var(--sage-primary)]"
                   />
                   <label htmlFor="wantHomepage" className="cursor-pointer">
                     <div className="flex items-center gap-2 mb-1">
-                      <Globe className="w-4 h-4 text-sage-600" />
-                      <span className="text-sm font-medium text-gray-900">홈페이지 서비스 연결</span>
+                      <Globe className="w-4 h-4 text-[var(--sage-primary)]" />
+                      <span className="text-sm font-medium text-[var(--text-primary)]">홈페이지 서비스 연결</span>
                     </div>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-[var(--text-tertiary)]">
                       법률사무소 홈페이지를 함께 운영하면 온라인 상담 예약을 받을 수 있습니다.
                       나중에 설정할 수 있습니다.
                     </p>
@@ -453,34 +453,34 @@ export default function LawyerRegistrationPage() {
           {/* Step 3: 약관 동의 */}
           {step === 3 && (
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">약관 동의</h2>
+              <h2 className="text-base font-semibold text-[var(--text-primary)] mb-4">약관 동의</h2>
 
               {/* 입력 정보 요약 */}
-              <div className="p-4 bg-gray-50 rounded-lg mb-6">
-                <h3 className="text-xs font-medium text-gray-500 mb-3">가입 정보 확인</h3>
+              <div className="p-4 bg-[var(--bg-primary)] rounded-lg mb-6">
+                <h3 className="text-xs font-medium text-[var(--text-tertiary)] mb-3">가입 정보 확인</h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">이메일</span>
-                    <span className="text-gray-900">{formData.email}</span>
+                    <span className="text-[var(--text-tertiary)]">이메일</span>
+                    <span className="text-[var(--text-primary)]">{formData.email}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">이름</span>
-                    <span className="text-gray-900">{formData.name}</span>
+                    <span className="text-[var(--text-tertiary)]">이름</span>
+                    <span className="text-[var(--text-primary)]">{formData.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">사무소</span>
-                    <span className="text-gray-900">{formData.officeName}</span>
+                    <span className="text-[var(--text-tertiary)]">사무소</span>
+                    <span className="text-[var(--text-primary)]">{formData.officeName}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">사무소 유형</span>
-                    <span className="text-gray-900">
+                    <span className="text-[var(--text-tertiary)]">사무소 유형</span>
+                    <span className="text-[var(--text-primary)]">
                       {formData.officeType === 'firm' ? '법무법인' : '개인 사무소'}
                     </span>
                   </div>
                   {formData.wantHomepage && (
                     <div className="flex justify-between">
-                      <span className="text-gray-500">홈페이지 서비스</span>
-                      <span className="text-sage-600">신청</span>
+                      <span className="text-[var(--text-tertiary)]">홈페이지 서비스</span>
+                      <span className="text-[var(--sage-primary)]">신청</span>
                     </div>
                   )}
                 </div>
@@ -488,35 +488,35 @@ export default function LawyerRegistrationPage() {
 
               {/* 약관 동의 */}
               <div className="space-y-3">
-                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                <label className="flex items-start gap-3 p-3 border border-[var(--border-default)] rounded cursor-pointer hover:bg-[var(--bg-hover)]">
                   <input
                     type="checkbox"
                     checked={formData.agreeTerms}
                     onChange={(e) => updateForm('agreeTerms', e.target.checked)}
-                    className="mt-0.5 w-4 h-4 text-sage-600 rounded border-gray-300 focus:ring-sage-500"
+                    className="mt-0.5 w-4 h-4 text-[var(--sage-primary)] rounded border-[var(--border-default)] focus:ring-[var(--sage-primary)]"
                   />
                   <div className="flex-1">
-                    <span className="text-sm text-gray-700">
-                      서비스 이용약관에 동의합니다 <span className="text-red-500">*</span>
+                    <span className="text-sm text-[var(--text-secondary)]">
+                      서비스 이용약관에 동의합니다 <span className="text-[var(--color-danger)]">*</span>
                     </span>
-                    <Link href="/terms" className="text-xs text-sage-600 hover:underline ml-2">
+                    <Link href="/terms" className="text-xs text-[var(--sage-primary)] hover:underline ml-2">
                       보기
                     </Link>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded cursor-pointer hover:bg-gray-50">
+                <label className="flex items-start gap-3 p-3 border border-[var(--border-default)] rounded cursor-pointer hover:bg-[var(--bg-hover)]">
                   <input
                     type="checkbox"
                     checked={formData.agreePrivacy}
                     onChange={(e) => updateForm('agreePrivacy', e.target.checked)}
-                    className="mt-0.5 w-4 h-4 text-sage-600 rounded border-gray-300 focus:ring-sage-500"
+                    className="mt-0.5 w-4 h-4 text-[var(--sage-primary)] rounded border-[var(--border-default)] focus:ring-[var(--sage-primary)]"
                   />
                   <div className="flex-1">
-                    <span className="text-sm text-gray-700">
-                      개인정보 처리방침에 동의합니다 <span className="text-red-500">*</span>
+                    <span className="text-sm text-[var(--text-secondary)]">
+                      개인정보 처리방침에 동의합니다 <span className="text-[var(--color-danger)]">*</span>
                     </span>
-                    <Link href="/privacy" className="text-xs text-sage-600 hover:underline ml-2">
+                    <Link href="/privacy" className="text-xs text-[var(--sage-primary)] hover:underline ml-2">
                       보기
                     </Link>
                   </div>
@@ -532,7 +532,7 @@ export default function LawyerRegistrationPage() {
                 type="button"
                 onClick={handleBack}
                 disabled={loading}
-                className="flex-1 h-10 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                className="btn btn-secondary flex-1 h-10"
               >
                 이전
               </button>
@@ -542,7 +542,7 @@ export default function LawyerRegistrationPage() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="flex-1 h-10 text-sm font-medium text-white bg-sage-600 rounded hover:bg-sage-700 transition-colors flex items-center justify-center gap-2"
+                className="btn btn-primary flex-1 h-10 flex items-center justify-center gap-2"
               >
                 다음
                 <ArrowRight className="w-4 h-4" />
@@ -552,7 +552,7 @@ export default function LawyerRegistrationPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={loading}
-                className="flex-1 h-10 text-sm font-medium text-white bg-sage-600 rounded hover:bg-sage-700 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+                className="btn btn-primary flex-1 h-10 flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
@@ -575,9 +575,9 @@ export default function LawyerRegistrationPage() {
 
         {/* Footer */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-[var(--text-tertiary)]">
             이미 계정이 있으신가요?{' '}
-            <Link href="/login" className="text-sage-600 hover:underline font-medium">
+            <Link href="/login" className="text-[var(--sage-primary)] hover:underline font-medium">
               로그인
             </Link>
           </p>

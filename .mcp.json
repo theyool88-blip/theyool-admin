@@ -1,13 +1,21 @@
 {
   "mcpServers": {
     "supabase": {
-      "type": "stdio",
+      "url": "https://mcp.supabase.com/mcp?project_ref=feqxrodutqwliucfllgr",
+      "headers": {
+        "Authorization": "Bearer sbp_9fd79e06015fd4eeb22f63f75b88845af8111252"
+      }
+    },
+    "context7": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@supabase/mcp-server-supabase@latest"
-      ],
-      "env": {}
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "github": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-e", "GITHUB_PERSONAL_ACCESS_TOKEN", "ghcr.io/github/github-mcp-server"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "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"
+      }
     }
   }
 }

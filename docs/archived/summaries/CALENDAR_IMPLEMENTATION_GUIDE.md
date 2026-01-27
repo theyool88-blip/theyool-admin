@@ -3,7 +3,7 @@
 ## 개선된 파일
 
 ### 1. WeeklyCalendar.tsx
-**위치**: `/Users/hskim/theyool-admin/components/WeeklyCalendar.tsx`
+**위치**: `/Users/hskim/luseed/components/WeeklyCalendar.tsx`
 
 **주요 변경사항**:
 - 컨테이너: `rounded-xl shadow-sm border border-gray-100`
@@ -13,7 +13,7 @@
 - 색상: 50번대 배경 + 700번대 텍스트
 
 ### 2. MonthlyCalendar.tsx
-**위치**: `/Users/hskim/theyool-admin/components/MonthlyCalendar.tsx`
+**위치**: `/Users/hskim/luseed/components/MonthlyCalendar.tsx`
 
 **주요 변경사항**:
 - 도트 인디케이터 추가 (getScheduleTypeDot 함수)

@@ -3,7 +3,7 @@
  */
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
-dotenv.config({ path: "/Users/hskim/theyool-admin/.env.local" });
+dotenv.config({ path: "/Users/hskim/luseed/.env.local" });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

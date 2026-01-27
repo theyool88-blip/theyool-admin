@@ -58,10 +58,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] px-4">
       <div className="w-full max-w-sm">
         {/* Login Card */}
-        <div className="bg-white border border-gray-200 rounded-lg p-8">
+        <div className="card p-8">
           {/* Logo */}
           <div className="text-center mb-10">
             <div className="flex justify-center">
@@ -77,7 +77,7 @@ export default function LoginPage() {
                 priority
               />
             </div>
-            <p className="text-xs text-gray-500 tracking-wide">
+            <p className="text-xs text-[var(--text-tertiary)] tracking-wide">
               SEE Direction & Details
             </p>
           </div>
@@ -85,13 +85,13 @@ export default function LoginPage() {
           {/* Login Form */}
           <form className="space-y-4" onSubmit={handleLogin}>
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded px-3 py-2">
-                <p className="text-xs text-red-600">{error}</p>
+              <div className="bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded px-3 py-2">
+                <p className="text-xs text-[var(--color-danger)]">{error}</p>
               </div>
             )}
 
             <div>
-              <label htmlFor="email" className="block text-xs font-medium text-gray-700 mb-1.5">
+              <label htmlFor="email" className="form-label">
                 이메일
               </label>
               <input
@@ -102,14 +102,14 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500 transition-colors"
+                className="form-input"
                 placeholder="admin@theyool.com"
                 disabled={loading}
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-xs font-medium text-gray-700 mb-1.5">
+              <label htmlFor="password" className="form-label">
                 비밀번호
               </label>
               <input
@@ -120,7 +120,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-9 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500 focus:ring-1 focus:ring-sage-500 transition-colors"
+                className="form-input"
                 placeholder="비밀번호 입력"
                 disabled={loading}
               />
@@ -129,7 +129,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-9 mt-2 text-sm font-medium text-white bg-sage-600 rounded hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="btn btn-primary w-full h-9 mt-2"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -148,10 +148,10 @@ export default function LoginPage() {
 
         {/* Footer */}
         <div className="mt-6 text-center">
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-[var(--text-muted)]">
             관리자 전용 시스템입니다
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-[var(--text-muted)] mt-1">
             &copy; 2025 LUSEED
           </p>
         </div>

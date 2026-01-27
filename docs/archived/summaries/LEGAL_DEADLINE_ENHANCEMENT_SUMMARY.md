@@ -206,7 +206,7 @@ v_deadline_date := calculate_legal_deadline(
 ### Step 3: 테스트
 
 ```bash
-cd /Users/hskim/theyool-admin
+cd /Users/hskim/luseed
 npx tsx scripts/test-legal-deadline-calculation.ts
 ```
 

@@ -153,35 +153,41 @@ export const GET = withTenant(async (request, { tenant }) => {
     }
 
     // 4. Action Items (긴급 알림)
+    // court_hearings와 case_deadlines는 tenant_id 컬럼이 없음
+    // case_id FK를 통해 테넌트 격리 (allCases에서 이미 테넌트별 필터링됨)
     let upcomingHearings: UpcomingHearing[] = []
     let upcomingDeadlines: UpcomingDeadline[] = []
 
+    const tenantCaseIds = allCases?.map(c => c.id) || []
+
     try {
-      let hearingsQuery = adminSupabase
-        .from('court_hearings')
-        .select('id, hearing_date, case_id')
-        .gte('hearing_date', now.toISOString().split('T')[0])
-        .lte('hearing_date', new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .order('hearing_date', { ascending: true })
-        .limit(5)
-      hearingsQuery = addTenantFilter(hearingsQuery)
-      const { data: hearings } = await hearingsQuery
-      upcomingHearings = hearings || []
+      if (tenantCaseIds.length > 0) {
+        const { data: hearings } = await adminSupabase
+          .from('court_hearings')
+          .select('id, hearing_date, case_id')
+          .in('case_id', tenantCaseIds)
+          .gte('hearing_date', now.toISOString().split('T')[0])
+          .lte('hearing_date', new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+          .order('hearing_date', { ascending: true })
+          .limit(5)
+        upcomingHearings = hearings || []
+      }
     } catch (error) {
       console.log('Court hearings table not available', error)
     }
 
     try {
-      let deadlinesQuery = adminSupabase
-        .from('case_deadlines')
-        .select('id, deadline_date, case_id')
-        .gte('deadline_date', now.toISOString().split('T')[0])
-        .lte('deadline_date', new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-        .order('deadline_date', { ascending: true })
-        .limit(5)
-      deadlinesQuery = addTenantFilter(deadlinesQuery)
-      const { data: deadlines } = await deadlinesQuery
-      upcomingDeadlines = deadlines || []
+      if (tenantCaseIds.length > 0) {
+        const { data: deadlines } = await adminSupabase
+          .from('case_deadlines')
+          .select('id, deadline_date, case_id')
+          .in('case_id', tenantCaseIds)
+          .gte('deadline_date', now.toISOString().split('T')[0])
+          .lte('deadline_date', new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
+          .order('deadline_date', { ascending: true })
+          .limit(5)
+        upcomingDeadlines = deadlines || []
+      }
     } catch (error) {
       console.log('Case deadlines table not available', error)
     }

@@ -213,7 +213,7 @@ export default function ConsultationAvailability() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-600"></div>
+        <div className="animate-spin rounded-full h-6 w-6 border-2 border-[var(--border-default)] border-t-[var(--text-secondary)]"></div>
       </div>
     );
   }
@@ -221,13 +221,13 @@ export default function ConsultationAvailability() {
   return (
     <div className="space-y-4">
       {/* Sub-tabs */}
-      <div className="flex bg-gray-100 rounded-lg p-0.5 w-fit">
+      <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-0.5 w-fit">
         <button
           onClick={() => setActiveSubTab('weekly')}
           className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
             activeSubTab === 'weekly'
-              ? 'bg-white shadow-sm font-medium text-gray-900'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-[var(--bg-secondary)] shadow-sm font-medium text-[var(--text-primary)]'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
           }`}
         >
           주간 일정
@@ -236,8 +236,8 @@ export default function ConsultationAvailability() {
           onClick={() => setActiveSubTab('exceptions')}
           className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
             activeSubTab === 'exceptions'
-              ? 'bg-white shadow-sm font-medium text-gray-900'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-[var(--bg-secondary)] shadow-sm font-medium text-[var(--text-primary)]'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
           }`}
         >
           예외 날짜
@@ -246,8 +246,8 @@ export default function ConsultationAvailability() {
           onClick={() => setActiveSubTab('modal_settings')}
           className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
             activeSubTab === 'modal_settings'
-              ? 'bg-white shadow-sm font-medium text-gray-900'
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'bg-[var(--bg-secondary)] shadow-sm font-medium text-[var(--text-primary)]'
+              : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
           }`}
         >
           모달 설정
@@ -258,19 +258,19 @@ export default function ConsultationAvailability() {
       {activeSubTab === 'weekly' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
+            <p className="text-caption">
               매주 반복되는 기본 상담 가능 시간을 설정합니다.
             </p>
             <button
               onClick={() => setShowAddModal(true)}
-              className="px-3 py-1.5 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+              className="btn btn-primary text-sm"
             >
               + 일정 추가
             </button>
           </div>
 
           {/* Display schedules by day */}
-          <div className="bg-white rounded-lg border border-gray-200 divide-y divide-gray-100">
+          <div className="card divide-y divide-[var(--border-subtle)]">
             {([1, 2, 3, 4, 5, 0, 6] as DayOfWeek[]).map((dayOfWeek) => {
               const daySchedules = schedulesByDay[dayOfWeek];
               const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -278,11 +278,11 @@ export default function ConsultationAvailability() {
               return (
                 <div key={dayOfWeek} className="px-4 py-3">
                   <div className="flex items-center justify-between">
-                    <span className={`text-sm font-medium ${isWeekend ? 'text-red-500' : 'text-gray-900'}`}>
+                    <span className={`text-sm font-medium ${isWeekend ? 'text-[var(--color-danger)]' : 'text-[var(--text-primary)]'}`}>
                       {DAY_OF_WEEK_LABELS[dayOfWeek]}
                     </span>
                     {daySchedules.length === 0 && (
-                      <span className="text-xs text-gray-400">휴무</span>
+                      <span className="text-xs text-[var(--text-muted)]">휴무</span>
                     )}
                   </div>
 
@@ -291,10 +291,10 @@ export default function ConsultationAvailability() {
                       {daySchedules.map((schedule) => (
                         <div
                           key={schedule.id}
-                          className="flex items-center justify-between py-1.5 px-3 bg-gray-50 rounded-lg"
+                          className="flex items-center justify-between py-1.5 px-3 bg-[var(--bg-primary)] rounded-lg"
                         >
                           <div className="flex items-center gap-3">
-                            <span className="text-sm text-gray-700">
+                            <span className="text-sm text-[var(--text-secondary)]">
                               {schedule.start_time} - {schedule.end_time}
                             </span>
                             {schedule.lawyer_name && (
@@ -303,19 +303,19 @@ export default function ConsultationAvailability() {
                               </span>
                             )}
                             {schedule.office_location && (
-                              <span className="text-xs px-1.5 py-0.5 bg-green-100 text-green-700 rounded">
+                              <span className="text-xs px-1.5 py-0.5 bg-[var(--color-success-muted)] text-[var(--color-success)] rounded">
                                 {schedule.office_location}
                               </span>
                             )}
                             {!schedule.is_available && (
-                              <span className="text-xs px-1.5 py-0.5 bg-red-100 text-red-700 rounded">
+                              <span className="text-xs px-1.5 py-0.5 bg-[var(--color-danger-muted)] text-[var(--color-danger)] rounded">
                                 비활성
                               </span>
                             )}
                           </div>
                           <button
                             onClick={() => handleDeleteSchedule(schedule.id)}
-                            className="text-red-500 hover:text-red-700 text-xs"
+                            className="text-[var(--color-danger)] hover:opacity-80 text-xs"
                           >
                             삭제
                           </button>
@@ -334,56 +334,56 @@ export default function ConsultationAvailability() {
       {activeSubTab === 'exceptions' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs text-gray-500">
+            <p className="text-caption">
               특정 날짜의 휴무 또는 특별 운영 시간을 설정합니다.
             </p>
             <button
               onClick={() => setShowExceptionModal(true)}
-              className="px-3 py-1.5 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+              className="btn btn-primary text-sm"
             >
               + 예외 추가
             </button>
           </div>
 
-          <div className="bg-white rounded-lg border border-gray-200">
+          <div className="card">
             {dateExceptions.length === 0 ? (
-              <div className="py-12 text-center text-gray-400 text-sm">
+              <div className="py-12 text-center text-[var(--text-muted)] text-sm">
                 설정된 예외가 없습니다.
               </div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {dateExceptions.map((exception) => (
                   <div
                     key={exception.id}
                     className="flex items-center justify-between px-4 py-3"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-900">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
                         {exception.exception_date}
                       </span>
                       {exception.start_time && exception.end_time && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-[var(--text-tertiary)]">
                           {exception.start_time} - {exception.end_time}
                         </span>
                       )}
                       <span
                         className={`text-xs px-1.5 py-0.5 rounded ${
                           exception.is_blocked
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-green-100 text-green-700'
+                            ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]'
+                            : 'bg-[var(--color-success-muted)] text-[var(--color-success)]'
                         }`}
                       >
                         {exception.is_blocked ? '휴무' : '특별 운영'}
                       </span>
                       {exception.reason && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-[var(--text-tertiary)]">
                           {exception.reason}
                         </span>
                       )}
                     </div>
                     <button
                       onClick={() => handleDeleteException(exception.id)}
-                      className="text-red-500 hover:text-red-700 text-xs"
+                      className="text-[var(--color-danger)] hover:opacity-80 text-xs"
                     >
                       삭제
                     </button>
@@ -400,16 +400,16 @@ export default function ConsultationAvailability() {
         <div className="space-y-4">
           {settingsLoading ? (
             <div className="py-12 text-center">
-              <div className="animate-spin inline-block rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-600"></div>
+              <div className="animate-spin inline-block rounded-full h-6 w-6 border-2 border-[var(--border-default)] border-t-[var(--text-secondary)]"></div>
             </div>
           ) : (
             <>
               {/* 전화 응대 설정 */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">
+              <div className="card p-4">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
                   전화 응대 설정
                 </h3>
-                <p className="text-xs text-gray-500 mb-4">
+                <p className="text-caption mb-4">
                   홈페이지에서 전화 상담 모달의 동작을 설정합니다.
                 </p>
 
@@ -417,8 +417,8 @@ export default function ConsultationAvailability() {
                   {/* 전화 상담 활성화 */}
                   <div className="flex items-center justify-between py-2">
                     <div>
-                      <label className="text-sm text-gray-700">전화 상담 활성화</label>
-                      <p className="text-xs text-gray-400">비활성화 시 홈페이지에서 전화 모달이 표시되지 않습니다.</p>
+                      <label className="text-sm text-[var(--text-secondary)]">전화 상담 활성화</label>
+                      <p className="text-xs text-[var(--text-muted)]">비활성화 시 홈페이지에서 전화 모달이 표시되지 않습니다.</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -429,15 +429,15 @@ export default function ConsultationAvailability() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sage-600"></div>
+                      <div className="w-9 h-5 bg-[var(--bg-tertiary)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[var(--border-default)] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
                     </label>
                   </div>
 
                   {/* 부재시 자동 전환 */}
-                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between py-2 border-t border-[var(--border-subtle)]">
                     <div>
-                      <label className="text-sm text-gray-700">부재시 자동 전환</label>
-                      <p className="text-xs text-gray-400">영업시간 외 또는 전화를 받지 못할 때 상담 예약 폼으로 안내합니다.</p>
+                      <label className="text-sm text-[var(--text-secondary)]">부재시 자동 전환</label>
+                      <p className="text-xs text-[var(--text-muted)]">영업시간 외 또는 전화를 받지 못할 때 상담 예약 폼으로 안내합니다.</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -448,14 +448,14 @@ export default function ConsultationAvailability() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sage-600"></div>
+                      <div className="w-9 h-5 bg-[var(--bg-tertiary)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[var(--border-default)] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
                     </label>
                   </div>
 
                   {/* 전환 대기 시간 */}
-                  <div className="py-2 border-t border-gray-100">
-                    <label className="block text-sm text-gray-700 mb-1">전환 대기 시간 (초)</label>
-                    <p className="text-xs text-gray-400 mb-2">전화 연결 후 지정된 시간이 지나면 상담 예약 폼 안내가 표시됩니다.</p>
+                  <div className="py-2 border-t border-[var(--border-subtle)]">
+                    <label className="form-label mb-1">전환 대기 시간 (초)</label>
+                    <p className="text-xs text-[var(--text-muted)] mb-2">전화 연결 후 지정된 시간이 지나면 상담 예약 폼 안내가 표시됩니다.</p>
                     <input
                       type="number"
                       value={phoneSettings.fallback_delay_seconds}
@@ -467,17 +467,17 @@ export default function ConsultationAvailability() {
                       }
                       min="5"
                       max="60"
-                      className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                      className="form-input w-24"
                     />
                   </div>
 
                   {/* 영업 시간 */}
-                  <div className="py-2 border-t border-gray-100">
-                    <label className="block text-sm text-gray-700 mb-3">전화 응대 가능 시간</label>
+                  <div className="py-2 border-t border-[var(--border-subtle)]">
+                    <label className="form-label mb-3">전화 응대 가능 시간</label>
 
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">시작</label>
+                        <label className="block text-xs text-[var(--text-tertiary)] mb-1">시작</label>
                         <input
                           type="time"
                           value={phoneSettings.business_hours.start}
@@ -487,11 +487,11 @@ export default function ConsultationAvailability() {
                               business_hours: { ...phoneSettings.business_hours, start: e.target.value },
                             })
                           }
-                          className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                          className="form-input w-full"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">종료</label>
+                        <label className="block text-xs text-[var(--text-tertiary)] mb-1">종료</label>
                         <input
                           type="time"
                           value={phoneSettings.business_hours.end}
@@ -501,14 +501,14 @@ export default function ConsultationAvailability() {
                               business_hours: { ...phoneSettings.business_hours, end: e.target.value },
                             })
                           }
-                          className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                          className="form-input w-full"
                         />
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 mb-3">
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">점심 시작</label>
+                        <label className="block text-xs text-[var(--text-tertiary)] mb-1">점심 시작</label>
                         <input
                           type="time"
                           value={phoneSettings.business_hours.lunch_start || '12:00'}
@@ -518,11 +518,11 @@ export default function ConsultationAvailability() {
                               business_hours: { ...phoneSettings.business_hours, lunch_start: e.target.value },
                             })
                           }
-                          className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                          className="form-input w-full"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs text-gray-500 mb-1">점심 종료</label>
+                        <label className="block text-xs text-[var(--text-tertiary)] mb-1">점심 종료</label>
                         <input
                           type="time"
                           value={phoneSettings.business_hours.lunch_end || '13:00'}
@@ -532,13 +532,13 @@ export default function ConsultationAvailability() {
                               business_hours: { ...phoneSettings.business_hours, lunch_end: e.target.value },
                             })
                           }
-                          className="w-full px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                          className="form-input w-full"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs text-gray-500 mb-2">영업일</label>
+                      <label className="block text-xs text-[var(--text-tertiary)] mb-2">영업일</label>
                       <div className="flex gap-1.5">
                         {['일', '월', '화', '수', '목', '금', '토'].map((day, index) => (
                           <button
@@ -555,8 +555,8 @@ export default function ConsultationAvailability() {
                             }}
                             className={`w-8 h-8 rounded-full text-xs font-medium transition-colors ${
                               phoneSettings.business_hours.days.includes(index)
-                                ? 'bg-sage-600 text-white'
-                                : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                                ? 'bg-[var(--sage-primary)] text-white'
+                                : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)]'
                             }`}
                           >
                             {day}
@@ -567,10 +567,10 @@ export default function ConsultationAvailability() {
                   </div>
 
                   {/* 공휴일 자동 전환 */}
-                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between py-2 border-t border-[var(--border-subtle)]">
                     <div>
-                      <label className="text-sm text-gray-700">공휴일 자동 전환</label>
-                      <p className="text-xs text-gray-400">공휴일에는 자동으로 상담 예약 폼으로 안내합니다.</p>
+                      <label className="text-sm text-[var(--text-secondary)]">공휴일 자동 전환</label>
+                      <p className="text-xs text-[var(--text-muted)]">공휴일에는 자동으로 상담 예약 폼으로 안내합니다.</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -581,14 +581,14 @@ export default function ConsultationAvailability() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sage-600"></div>
+                      <div className="w-9 h-5 bg-[var(--bg-tertiary)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[var(--border-default)] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
                     </label>
                   </div>
 
                   <button
                     onClick={() => saveSettings('phone_availability', phoneSettings)}
                     disabled={settingsSaving}
-                    className="w-full py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors disabled:opacity-50"
+                    className="btn btn-primary w-full"
                   >
                     {settingsSaving ? '저장 중...' : '전화 응대 설정 저장'}
                   </button>
@@ -596,11 +596,11 @@ export default function ConsultationAvailability() {
               </div>
 
               {/* 모달 동작 설정 */}
-              <div className="bg-white rounded-lg border border-gray-200 p-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-1">
+              <div className="card p-4">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">
                   모달 동작 설정
                 </h3>
-                <p className="text-xs text-gray-500 mb-4">
+                <p className="text-caption mb-4">
                   홈페이지 상담 모달의 표시 방식을 설정합니다.
                 </p>
 
@@ -608,8 +608,8 @@ export default function ConsultationAvailability() {
                   {/* 전화 모달 활성화 */}
                   <div className="flex items-center justify-between py-2">
                     <div>
-                      <label className="text-sm text-gray-700">전화 연결 모달 표시</label>
-                      <p className="text-xs text-gray-400">홈페이지에서 전화 버튼 클릭 시 카운트다운 모달을 표시합니다.</p>
+                      <label className="text-sm text-[var(--text-secondary)]">전화 연결 모달 표시</label>
+                      <p className="text-xs text-[var(--text-muted)]">홈페이지에서 전화 버튼 클릭 시 카운트다운 모달을 표시합니다.</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -620,15 +620,15 @@ export default function ConsultationAvailability() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sage-600"></div>
+                      <div className="w-9 h-5 bg-[var(--bg-tertiary)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[var(--border-default)] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
                     </label>
                   </div>
 
                   {/* 상담 예약 폼 모달 */}
-                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between py-2 border-t border-[var(--border-subtle)]">
                     <div>
-                      <label className="text-sm text-gray-700">상담 예약 폼 모달 표시</label>
-                      <p className="text-xs text-gray-400">홈페이지에서 상담 예약 버튼 클릭 시 예약 폼 모달을 표시합니다.</p>
+                      <label className="text-sm text-[var(--text-secondary)]">상담 예약 폼 모달 표시</label>
+                      <p className="text-xs text-[var(--text-muted)]">홈페이지에서 상담 예약 버튼 클릭 시 예약 폼 모달을 표시합니다.</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -639,15 +639,15 @@ export default function ConsultationAvailability() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sage-600"></div>
+                      <div className="w-9 h-5 bg-[var(--bg-tertiary)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[var(--border-default)] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
                     </label>
                   </div>
 
                   {/* 카운트다운 표시 */}
-                  <div className="flex items-center justify-between py-2 border-t border-gray-100">
+                  <div className="flex items-center justify-between py-2 border-t border-[var(--border-subtle)]">
                     <div>
-                      <label className="text-sm text-gray-700">카운트다운 표시</label>
-                      <p className="text-xs text-gray-400">전화 연결 전 카운트다운 애니메이션을 표시합니다.</p>
+                      <label className="text-sm text-[var(--text-secondary)]">카운트다운 표시</label>
+                      <p className="text-xs text-[var(--text-muted)]">전화 연결 전 카운트다운 애니메이션을 표시합니다.</p>
                     </div>
                     <label className="relative inline-flex items-center cursor-pointer">
                       <input
@@ -658,14 +658,14 @@ export default function ConsultationAvailability() {
                         }
                         className="sr-only peer"
                       />
-                      <div className="w-9 h-5 bg-gray-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-sage-600"></div>
+                      <div className="w-9 h-5 bg-[var(--bg-tertiary)] rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[var(--border-default)] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[var(--sage-primary)]"></div>
                     </label>
                   </div>
 
                   {/* 카운트다운 시간 */}
-                  <div className="py-2 border-t border-gray-100">
-                    <label className="block text-sm text-gray-700 mb-1">카운트다운 시간 (초)</label>
-                    <p className="text-xs text-gray-400 mb-2">전화 연결 전 표시되는 카운트다운 시간입니다.</p>
+                  <div className="py-2 border-t border-[var(--border-subtle)]">
+                    <label className="form-label mb-1">카운트다운 시간 (초)</label>
+                    <p className="text-xs text-[var(--text-muted)] mb-2">전화 연결 전 표시되는 카운트다운 시간입니다.</p>
                     <input
                       type="number"
                       value={modalConfig.countdown_seconds}
@@ -677,14 +677,14 @@ export default function ConsultationAvailability() {
                       }
                       min="3"
                       max="10"
-                      className="w-24 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                      className="form-input w-24"
                     />
                   </div>
 
                   <button
                     onClick={() => saveSettings('modal_config', modalConfig)}
                     disabled={settingsSaving}
-                    className="w-full py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors disabled:opacity-50"
+                    className="btn btn-primary w-full"
                   >
                     {settingsSaving ? '저장 중...' : '모달 설정 저장'}
                   </button>
@@ -766,14 +766,14 @@ function AddWeeklyScheduleModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-sm">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900">주간 일정 추가</h3>
+      <div className="card w-full max-w-sm">
+        <div className="px-5 py-4 border-b border-[var(--border-subtle)]">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">주간 일정 추가</h3>
         </div>
 
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">요일</label>
+            <label className="form-label mb-1.5">요일</label>
             <select
               value={formData.day_of_week}
               onChange={(e) =>
@@ -782,7 +782,7 @@ function AddWeeklyScheduleModal({
                   day_of_week: parseInt(e.target.value) as DayOfWeek,
                 })
               }
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+              className="form-input w-full"
             >
               {Object.entries(DAY_OF_WEEK_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -794,33 +794,33 @@ function AddWeeklyScheduleModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">시작</label>
+              <label className="form-label mb-1.5">시작</label>
               <input
                 type="time"
                 value={formData.start_time}
                 onChange={(e) =>
                   setFormData({ ...formData, start_time: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                className="form-input w-full"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">종료</label>
+              <label className="form-label mb-1.5">종료</label>
               <input
                 type="time"
                 value={formData.end_time}
                 onChange={(e) =>
                   setFormData({ ...formData, end_time: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                className="form-input w-full"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">예약 단위 (분)</label>
+            <label className="form-label mb-1.5">예약 단위 (분)</label>
             <input
               type="number"
               value={formData.slot_duration_minutes}
@@ -832,12 +832,12 @@ function AddWeeklyScheduleModal({
               }
               min="15"
               step="15"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+              className="form-input w-full"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">변호사 (선택)</label>
+            <label className="form-label mb-1.5">변호사 (선택)</label>
             <select
               value={formData.lawyer_name || ''}
               onChange={(e) =>
@@ -846,7 +846,7 @@ function AddWeeklyScheduleModal({
                   lawyer_name: (e.target.value as LawyerName) || undefined,
                 })
               }
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+              className="form-input w-full"
             >
               <option value="">모든 변호사</option>
               {lawyerNames.map((name) => (
@@ -858,7 +858,7 @@ function AddWeeklyScheduleModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">사무소 (선택)</label>
+            <label className="form-label mb-1.5">사무소 (선택)</label>
             <select
               value={formData.office_location || ''}
               onChange={(e) =>
@@ -867,7 +867,7 @@ function AddWeeklyScheduleModal({
                   office_location: (e.target.value as OfficeLocation) || undefined,
                 })
               }
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+              className="form-input w-full"
             >
               <option value="">모든 사무소</option>
               {officeLocations.map((location) => (
@@ -879,13 +879,13 @@ function AddWeeklyScheduleModal({
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">메모 (선택)</label>
+            <label className="form-label mb-1.5">메모 (선택)</label>
             <textarea
               value={formData.notes || ''}
               onChange={(e) =>
                 setFormData({ ...formData, notes: e.target.value })
               }
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500 resize-none"
+              className="form-input w-full resize-none"
               rows={2}
             />
           </div>
@@ -894,13 +894,13 @@ function AddWeeklyScheduleModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              className="btn btn-secondary flex-1"
             >
               취소
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+              className="btn btn-primary flex-1"
             >
               추가
             </button>
@@ -947,27 +947,27 @@ function AddExceptionModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-sm">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900">예외 날짜 추가</h3>
+      <div className="card w-full max-w-sm">
+        <div className="px-5 py-4 border-b border-[var(--border-subtle)]">
+          <h3 className="text-sm font-semibold text-[var(--text-primary)]">예외 날짜 추가</h3>
         </div>
 
         <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">날짜</label>
+            <label className="form-label mb-1.5">날짜</label>
             <input
               type="date"
               value={formData.exception_date}
               onChange={(e) =>
                 setFormData({ ...formData, exception_date: e.target.value })
               }
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+              className="form-input w-full"
               required
             />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">유형</label>
+            <label className="form-label mb-1.5">유형</label>
             <select
               value={formData.is_blocked ? 'blocked' : 'available'}
               onChange={(e) =>
@@ -976,7 +976,7 @@ function AddExceptionModal({
                   is_blocked: e.target.value === 'blocked',
                 })
               }
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+              className="form-input w-full"
             >
               <option value="blocked">휴무 (예약 불가)</option>
               <option value="available">특별 운영 (예약 가능)</option>
@@ -985,31 +985,31 @@ function AddExceptionModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">시작 (선택)</label>
+              <label className="form-label mb-1.5">시작 (선택)</label>
               <input
                 type="time"
                 value={formData.start_time || ''}
                 onChange={(e) =>
                   setFormData({ ...formData, start_time: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                className="form-input w-full"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1.5">종료 (선택)</label>
+              <label className="form-label mb-1.5">종료 (선택)</label>
               <input
                 type="time"
                 value={formData.end_time || ''}
                 onChange={(e) =>
                   setFormData({ ...formData, end_time: e.target.value })
                 }
-                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+                className="form-input w-full"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">사유</label>
+            <label className="form-label mb-1.5">사유</label>
             <input
               type="text"
               value={formData.reason || ''}
@@ -1017,7 +1017,7 @@ function AddExceptionModal({
                 setFormData({ ...formData, reason: e.target.value })
               }
               placeholder="예: 설날 연휴, 임시 휴무"
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sage-500"
+              className="form-input w-full"
             />
           </div>
 
@@ -1025,13 +1025,13 @@ function AddExceptionModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+              className="btn btn-secondary flex-1"
             >
               취소
             </button>
             <button
               type="submit"
-              className="flex-1 py-2 text-sm bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+              className="btn btn-primary flex-1"
             >
               추가
             </button>

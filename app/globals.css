@@ -295,7 +295,7 @@ textarea::placeholder {
 
 .metric-card-value {
   font-size: 1.75rem;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.02em;
   color: var(--text-primary);
   line-height: 1.2;
@@ -566,24 +566,24 @@ textarea::placeholder {
 }
 
 .empty-state-icon {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 16px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
   color: var(--text-muted);
 }
 
 .empty-state-title {
-  font-size: var(--font-subheading);
+  font-size: var(--font-body);
   font-weight: 500;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .empty-state-description {
-  font-size: var(--font-body);
+  font-size: var(--font-caption);
   color: var(--text-tertiary);
   max-width: 300px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .empty-state-action {
@@ -972,6 +972,10 @@ textarea::placeholder {
 
 .segmented-control-item {
   flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   padding: 10px 16px;
   font-size: var(--font-body);
   font-weight: 500;
@@ -991,6 +995,116 @@ textarea::placeholder {
   background: var(--bg-secondary);
   color: var(--text-primary);
   box-shadow: var(--shadow-sm);
+}
+
+/* ===== CASE HERO STEP INDICATOR ===== */
+.case-step-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 360px;
+  margin: 0 auto;
+}
+
+.case-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.case-step-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-caption);
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.case-step-circle.active {
+  background: var(--sage-primary);
+  color: white;
+  box-shadow: var(--shadow-sage);
+}
+
+.case-step-circle.past {
+  background: var(--sage-muted);
+  color: var(--sage-primary);
+}
+
+.case-step-circle.future {
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-default);
+}
+
+.case-step-label {
+  margin-top: 6px;
+  font-size: var(--font-caption);
+  font-weight: 500;
+  transition: color 0.2s ease;
+}
+
+.case-step-connector {
+  flex: 1;
+  height: 2px;
+  margin: 0 12px;
+  border-radius: 1px;
+  transition: background 0.3s ease;
+}
+
+.case-step-connector.active {
+  background: var(--sage-primary);
+}
+
+.case-step-connector.inactive {
+  background: var(--border-default);
+}
+
+/* ===== METRIC MINI CARDS ===== */
+.metric-mini-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  transition: all 0.2s ease;
+}
+
+.metric-mini-card:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-xs);
+}
+
+.metric-mini-card-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.metric-mini-card-icon.info {
+  background: var(--color-info-muted);
+  color: var(--color-info);
+}
+
+.metric-mini-card-icon.warning {
+  background: var(--color-warning-muted);
+  color: var(--color-warning);
+}
+
+.metric-mini-card-icon.sage {
+  background: var(--sage-muted);
+  color: var(--sage-primary);
 }
 
 /* ===== MODAL SYSTEM ===== */
@@ -2187,6 +2301,38 @@ select:focus-visible {
   font-weight: 500;
 }
 
+/* Status badges (compact version without dot) */
+.badge-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.badge-status.badge-info {
+  background: var(--color-info-muted);
+  color: var(--color-info);
+}
+
+.badge-status.badge-success {
+  background: var(--color-success-muted);
+  color: var(--color-success);
+}
+
+.badge-status.badge-warning {
+  background: var(--color-warning-muted);
+  color: var(--color-warning);
+}
+
+.badge-status.badge-danger {
+  background: var(--color-danger-muted);
+  color: var(--color-danger);
+}
+
 /* Old table classes */
 .table-sage thead {
   background: var(--bg-tertiary);
@@ -2431,479 +2577,4 @@ select:focus-visible {
 /* Impersonation Banner */
 body:has(.impersonation-banner-active) .impersonation-wrapper {
   padding-top: 44px;
-}
-
-/* ===== SCHEDULE-X THEME (Sage Green + Sunsama Style) ===== */
-/* Schedule-X CSS Variables Override */
-.sx__calendar-wrapper {
-  /* Primary Brand Color - Sage Green */
-  --sx-color-primary: var(--sage-primary);
-  --sx-color-on-primary: #ffffff;
-  --sx-color-primary-container: var(--sage-muted);
-  --sx-color-on-primary-container: var(--sage-primary);
-
-  /* Secondary Colors */
-  --sx-color-secondary: var(--text-secondary);
-  --sx-color-on-secondary: #ffffff;
-  --sx-color-secondary-container: var(--bg-tertiary);
-  --sx-color-on-secondary-container: var(--text-primary);
-
-  /* Surface Colors */
-  --sx-color-surface: var(--bg-secondary);
-  --sx-color-surface-dim: var(--bg-tertiary);
-  --sx-color-surface-bright: var(--bg-secondary);
-  --sx-color-on-surface: var(--text-primary);
-  --sx-color-surface-container: var(--bg-tertiary);
-  --sx-color-surface-container-low: var(--bg-secondary);
-  --sx-color-surface-container-high: var(--bg-tertiary);
-  --sx-color-background: var(--bg-secondary);
-  --sx-color-on-background: var(--text-primary);
-
-  /* Outline Colors */
-  --sx-color-outline: var(--border-default);
-  --sx-color-outline-variant: var(--border-subtle);
-
-  /* Neutral Colors */
-  --sx-color-neutral: var(--text-tertiary);
-  --sx-color-neutral-variant: var(--text-muted);
-
-  /* Internal Colors */
-  --sx-internal-color-gray-ripple-background: var(--bg-hover);
-  --sx-internal-color-light-gray: var(--bg-tertiary);
-  --sx-internal-color-text: var(--text-primary);
-
-  /* Border */
-  --sx-border: 1px solid var(--border-subtle);
-
-  /* Typography - Sunsama Style */
-  font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-
-  /* Rounded corners - More Sunsama-like */
-  --sx-rounding-extra-small: var(--radius-sm);
-  --sx-rounding-small: var(--radius-md);
-  --sx-rounding-extra-large: var(--radius-xl);
-
-  /* Shadows */
-  --sx-box-shadow-level3: var(--shadow-lg);
-}
-
-/* Dark mode support */
-[data-theme="dark"] .sx__calendar-wrapper {
-  --sx-color-primary: var(--sage-primary);
-  --sx-color-on-primary: #ffffff;
-  --sx-color-primary-container: var(--sage-muted);
-  --sx-color-on-primary-container: var(--sage-primary);
-  --sx-color-surface: var(--bg-secondary);
-  --sx-color-surface-dim: var(--bg-primary);
-  --sx-color-surface-bright: var(--bg-tertiary);
-  --sx-color-on-surface: var(--text-primary);
-  --sx-color-background: var(--bg-secondary);
-  --sx-color-on-background: var(--text-primary);
-  --sx-internal-color-text: var(--text-primary);
-}
-
-/* Schedule-X Calendar Wrapper */
-.sx__calendar-wrapper {
-  border-radius: var(--radius-xl);
-  overflow: hidden;
-  border: 1px solid var(--border-subtle);
-  background: var(--bg-secondary);
-}
-
-/* Calendar Header - Sunsama Style */
-.sx__calendar__header {
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-subtle);
-  padding: 12px 16px;
-}
-
-.sx__calendar__header button {
-  color: var(--text-secondary);
-  border-radius: var(--radius-md);
-  transition: all 0.15s ease;
-}
-
-.sx__calendar__header button:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.sx__calendar__header .sx__date-range-picker__heading {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Day of week headers */
-.sx__week-grid__day-name {
-  color: var(--text-tertiary);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-/* Time axis */
-.sx__time-grid-day__time-axis {
-  color: var(--text-tertiary);
-  font-size: 11px;
-}
-
-/* Day grid cells */
-.sx__month-grid-day,
-.sx__week-grid__day {
-  border-color: var(--border-subtle);
-  transition: background 0.15s ease;
-}
-
-.sx__month-grid-day:hover,
-.sx__week-grid__day:hover {
-  background: var(--bg-hover);
-}
-
-/* Today indicator */
-.sx__month-grid-day--is-today .sx__month-grid-day__day-number,
-.sx__week-grid__day--is-today {
-  background: var(--sage-primary);
-  color: white;
-  border-radius: 50%;
-}
-
-/* Weekend styling */
-.sx__month-grid-day--weekend {
-  background: var(--bg-tertiary);
-}
-
-/* Event Styling - Sunsama Minimal Style */
-.sx__event {
-  border-radius: var(--radius-md);
-  transition: all 0.15s ease;
-  border-left: 3px solid var(--sage-primary);
-  background: var(--sage-muted);
-  color: var(--text-primary);
-  font-size: 12px;
-  padding: 4px 8px;
-}
-
-.sx__event:hover {
-  box-shadow: var(--shadow-sm);
-  transform: translateY(-1px);
-}
-
-.sx__event__title {
-  font-weight: 500;
-  color: var(--text-primary);
-  line-height: 1.3;
-}
-
-.sx__event__time {
-  font-size: 10px;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-/* Event colors by type */
-.sx__event[data-event-type="court_hearing"],
-.sx__event[data-event-type="trial"] {
-  background: var(--sage-muted);
-  border-left-color: var(--sage-primary);
-}
-
-.sx__event[data-event-type="consultation"] {
-  background: var(--color-info-muted);
-  border-left-color: var(--color-info);
-}
-
-.sx__event[data-event-type="deadline"] {
-  background: var(--color-warning-muted);
-  border-left-color: var(--color-warning);
-}
-
-.sx__event[data-event-type="meeting"] {
-  background: var(--bg-tertiary);
-  border-left-color: var(--text-muted);
-}
-
-/* Lawyer meeting - teal */
-.sx__event[data-event-subtype="HEARING_LAWYER_MEETING"] {
-  background: rgba(20, 184, 166, 0.15);
-  border-left-color: rgb(20, 184, 166);
-}
-
-/* No attendance required (HEARING_JUDGMENT, HEARING_PARENTING) */
-.sx__event[data-event-subtype="HEARING_JUDGMENT"],
-.sx__event[data-event-subtype="HEARING_PARENTING"],
-.sx__event[data-event-subtype="HEARING_INVESTIGATION"] {
-  background: var(--bg-tertiary);
-  border-left-color: var(--text-muted);
-  opacity: 0.7;
-}
-
-/* Event modal - Sunsama style side panel */
-.sx__event-modal {
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-default);
-  box-shadow: var(--shadow-xl);
-  background: var(--bg-secondary);
-  overflow: hidden;
-}
-
-.sx__event-modal__header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  background: var(--bg-tertiary);
-}
-
-.sx__event-modal__body {
-  padding: 20px;
-}
-
-.sx__event-modal__close-button {
-  border-radius: var(--radius-md);
-  color: var(--text-tertiary);
-}
-
-.sx__event-modal__close-button:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-/* View selector buttons */
-.sx__view-selection__item {
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  padding: 6px 12px;
-  transition: all 0.15s ease;
-}
-
-.sx__view-selection__item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.sx__view-selection__item--active {
-  background: var(--sage-muted);
-  color: var(--sage-primary);
-}
-
-/* Date picker */
-.sx__date-picker-popup {
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--border-default);
-  box-shadow: var(--shadow-lg);
-  background: var(--bg-secondary);
-}
-
-/* Drag and drop */
-.sx__event--dragging {
-  opacity: 0.8;
-  box-shadow: var(--shadow-md);
-  transform: scale(1.02);
-}
-
-/* Resize handles */
-.sx__event__resize-handle {
-  background: var(--sage-primary);
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-
-.sx__event:hover .sx__event__resize-handle {
-  opacity: 1;
-}
-
-/* Month view specific */
-.sx__month-grid-day__events-more {
-  font-size: 11px;
-  color: var(--sage-primary);
-  font-weight: 500;
-}
-
-/* Current time indicator */
-.sx__time-grid-day__current-time-indicator {
-  background: var(--color-danger);
-}
-
-.sx__time-grid-day__current-time-indicator::before {
-  background: var(--color-danger);
-  border-radius: 50%;
-}
-
-/* Responsive adjustments */
-@media (max-width: 640px) {
-  .sx__calendar-wrapper {
-    border-radius: var(--radius-lg);
-  }
-
-  .sx__event {
-    font-size: 11px;
-    padding: 2px 6px;
-  }
-
-  .sx__event__time {
-    display: none;
-  }
-}
-
-/* Animation for Sunsama feel */
-.sx__month-grid-day,
-.sx__week-grid__day,
-.sx__event {
-  animation: fadeIn 0.2s ease;
-}
-
-/* ===== SCHEDULE-X WEEKEND & HOLIDAY STYLING ===== */
-
-/* Today button emphasis */
-.sx__calendar__header .sx__today-button {
-  background: var(--sage-primary) !important;
-  color: white !important;
-  font-weight: 600;
-  border-radius: var(--radius-md);
-  padding: 6px 14px;
-  transition: all 0.15s ease;
-}
-
-.sx__calendar__header .sx__today-button:hover {
-  background: var(--sage-primary-hover) !important;
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
-}
-
-/* Schedule-X header styling */
-.sx__calendar__header {
-  padding: 12px 16px;
-}
-
-/* Date picker heading - Korean format styling */
-.sx__date-range-picker__heading {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* Weekend styling using Schedule-X's weekend class */
-.sx__month-grid-day--weekend {
-  background-color: rgba(100, 116, 139, 0.04);
-}
-
-/* Today indicator override - make sure it stays sage green */
-.sx__month-grid-day--is-today .sx__month-grid-day__day-number {
-  background: var(--sage-primary) !important;
-  color: white !important;
-}
-
-/* Dark mode weekend styling */
-[data-theme="dark"] .sx__month-grid-day--weekend {
-  background-color: rgba(100, 116, 139, 0.08);
-}
-
-/* Week view - ensure 7 days visible with proper spacing */
-.sx__week-grid {
-  min-width: 100%;
-  min-height: 700px;
-}
-
-.sx__week-grid__day {
-  min-width: 0;
-  flex: 1;
-}
-
-/* Calendar overall height and padding */
-.sx__calendar-content {
-  min-height: 600px;
-  padding: 8px;
-}
-
-@media (min-width: 1024px) {
-  .sx__calendar-content {
-    min-height: 750px;
-  }
-
-  .sx__week-grid {
-    min-height: 800px;
-  }
-}
-
-/* Improved drag and drop feedback */
-.sx__event--dragging {
-  cursor: grabbing !important;
-  opacity: 0.9;
-  box-shadow: var(--shadow-lg);
-  transform: scale(1.02) rotate(1deg);
-  z-index: 1000 !important;
-}
-
-.sx__calendar-wrapper .dragging-active .sx__month-grid-day:hover,
-.sx__calendar-wrapper .dragging-active .sx__week-grid__day:hover {
-  background: var(--sage-muted) !important;
-  outline: 2px dashed var(--sage-primary);
-  outline-offset: -2px;
-}
-
-/* Drop success indicator */
-.sx__event--dropped {
-  animation: dropSuccess 0.3s ease;
-}
-
-@keyframes dropSuccess {
-  0% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 2px var(--sage-primary);
-  }
-  100% {
-    transform: scale(1);
-    box-shadow: none;
-  }
-}
-
-/* View selection - make tabs more distinct */
-.sx__view-selection {
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-lg);
-  padding: 2px;
-  gap: 2px;
-}
-
-.sx__view-selection__item {
-  border-radius: var(--radius-md) !important;
-}
-
-.sx__view-selection__item--active {
-  background: var(--bg-secondary) !important;
-  color: var(--sage-primary) !important;
-  box-shadow: var(--shadow-xs);
-}
-
-/* Calendar content area - moved height settings earlier */
-
-/* Month grid improvements */
-.sx__month-grid {
-  gap: 1px;
-  background: var(--border-subtle);
-}
-
-.sx__month-grid-day {
-  background: var(--bg-secondary);
-  min-height: 130px;
-  height: auto;  /* 이벤트 수에 따라 자동 확장 */
-}
-
-/* Responsive adjustments for mobile */
-@media (max-width: 640px) {
-  .sx__month-grid-day {
-    min-height: 80px;
-    height: auto;
-  }
-
-  .sx__month-grid-day__day-number {
-    font-size: 12px;
-  }
-
-  /* Hide some schedule-x controls on mobile */
-  .sx__calendar__header .sx__view-selection {
-    display: none;
-  }
 }

@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
     let query = supabase
       .from('legal_cases')
       .select(
-        'id, tenant_id, court_case_number, status, enc_cs_no, scourt_wmonid, scourt_next_progress_sync_at, scourt_sync_cooldown_until, case_result, case_result_date'
+        'id, tenant_id, court_case_number, status, scourt_enc_cs_no, scourt_wmonid, scourt_next_progress_sync_at, scourt_sync_cooldown_until, case_result, case_result_date'
       )
       .eq('scourt_sync_enabled', true)
       .not('court_case_number', 'is', null)
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (settings.activeCaseRule.requireLinked) {
-      query = query.not('enc_cs_no', 'is', null).not('scourt_wmonid', 'is', null)
+      query = query.not('scourt_enc_cs_no', 'is', null).not('scourt_wmonid', 'is', null)
     }
 
     const { data: candidates, error: candidateError } = await query

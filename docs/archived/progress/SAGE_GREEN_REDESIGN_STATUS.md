@@ -1,10 +1,10 @@
-# Sage Green Redesign Status - theyool-admin
+# Sage Green Redesign Status - luseed
 
 **Last Updated**: 2025-11-24
 **Progress**: 55% Complete
 
 ## Overview
-Systematic conversion of the theyool-admin system from generic gray/blue theme to professional Sage Green branding aligned with the main theyool website.
+Systematic conversion of the luseed system from generic gray/blue theme to professional Sage Green branding aligned with the main theyool website.
 
 ---
 
@@ -193,11 +193,11 @@ className="px-3 py-1.5 bg-sage-100 text-sage-700 rounded-lg border border-sage-2
 # apply-sage-theme.sh - Batch conversion helper
 
 FILES_TO_CONVERT=(
-  "/Users/hskim/theyool-admin/components/UnifiedScheduleModal.tsx"
-  "/Users/hskim/theyool-admin/components/CasePaymentsModal.tsx"
-  "/Users/hskim/theyool-admin/components/ClientPaymentsModal.tsx"
-  "/Users/hskim/theyool-admin/components/ConsultationPaymentsModal.tsx"
-  "/Users/hskim/theyool-admin/components/Dashboard.tsx"
+  "/Users/hskim/luseed/components/UnifiedScheduleModal.tsx"
+  "/Users/hskim/luseed/components/CasePaymentsModal.tsx"
+  "/Users/hskim/luseed/components/ClientPaymentsModal.tsx"
+  "/Users/hskim/luseed/components/ConsultationPaymentsModal.tsx"
+  "/Users/hskim/luseed/components/Dashboard.tsx"
 )
 
 for file in "${FILES_TO_CONVERT[@]}"; do
@@ -346,6 +346,6 @@ After conversion:
 
 ## Contact
 If conversion issues arise, refer to:
-- `/Users/hskim/theyool-admin/app/globals.css` for CSS variables
-- Completed components in `/Users/hskim/theyool-admin/components/` for patterns
+- `/Users/hskim/luseed/app/globals.css` for CSS variables
+- Completed components in `/Users/hskim/luseed/components/` for patterns
 - Main project `/Users/hskim/theyool/CLAUDE.md` for brand guidelines

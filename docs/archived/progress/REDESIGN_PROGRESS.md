@@ -208,7 +208,7 @@ To continue this redesign:
 
 ```bash
 # Check for blue colors that need changing
-cd /Users/hskim/theyool-admin
+cd /Users/hskim/luseed
 grep -r "bg-blue" components/ app/ | grep -v node_modules
 
 # Check for gray backgrounds

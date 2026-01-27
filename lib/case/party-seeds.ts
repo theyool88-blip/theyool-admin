@@ -18,8 +18,7 @@ export interface ManualPartySeed {
   party_name: string
   party_type: PartyType
   party_type_label: string
-  is_our_client: boolean
-  client_id?: string | null
+  is_primary: boolean  // NOTE: is_our_client → is_primary로 변경됨
 }
 
 export function buildManualPartySeeds({
@@ -71,8 +70,7 @@ export function buildManualPartySeeds({
       party_name: trimmedClientName,
       party_type: resolvedClientRole,
       party_type_label: clientLabel,
-      is_our_client: true,
-      client_id: clientId || null,
+      is_primary: true,  // 의뢰인 측 대표 당사자
     })
   }
 
@@ -81,7 +79,7 @@ export function buildManualPartySeeds({
       party_name: trimmedOpponentName,
       party_type: resolvedOpponentRole,
       party_type_label: opponentLabel,
-      is_our_client: false,
+      is_primary: false,  // 상대방 측 (대표 아님)
     })
   }
 

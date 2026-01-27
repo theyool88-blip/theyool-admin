@@ -6,6 +6,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { createClient as createAdminClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
+import { verifyToken, isTokenExpired } from './impersonation-token';
 import type {
   TenantContext,
   Tenant,
@@ -18,6 +19,9 @@ import type {
 
 /**
  * 슈퍼 어드민 대리 접속 토큰 확인
+ * - 서명된 토큰 검증
+ * - 현재 사용자가 실제 슈퍼어드민인지 확인
+ * - 토큰의 슈퍼어드민 ID와 현재 사용자 일치 확인
  */
 async function getImpersonationContext(): Promise<TenantContext | null> {
   try {
@@ -28,30 +32,65 @@ async function getImpersonationContext(): Promise<TenantContext | null> {
       return null;
     }
 
-    const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
-    const expiresAt = new Date(decoded.expiresAt);
-
-    if (expiresAt < new Date() || !decoded.tenantId) {
+    // 1. 서명된 토큰 검증
+    const payload = verifyToken(token);
+    if (!payload) {
+      console.warn('Impersonation token verification failed');
       return null;
     }
 
-    // Admin client로 테넌트 정보 조회
+    // 2. 토큰 만료 확인
+    if (isTokenExpired(payload)) {
+      console.warn('Impersonation token expired');
+      return null;
+    }
+
+    // 3. 현재 로그인한 사용자가 토큰의 슈퍼어드민인지 확인
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      console.warn('No authenticated user for impersonation');
+      return null;
+    }
+
+    // 4. 현재 사용자가 실제 슈퍼어드민인지 DB에서 확인
     const supabaseAdmin = createAdminClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data: tenant, error } = await supabaseAdmin
-      .from('tenants')
-      .select('*')
-      .eq('id', decoded.tenantId)
+    const { data: superAdmin, error: superAdminError } = await supabaseAdmin
+      .from('super_admins')
+      .select('id, user_id')
+      .eq('user_id', user.id)
       .single();
 
-    if (error || !tenant) {
+    if (superAdminError || !superAdmin) {
+      console.warn('User is not a super admin, ignoring impersonation token');
       return null;
     }
 
-    // 대리 접속 컨텍스트 반환 (슈퍼 어드민 + 테넌트 정보)
+    // 5. 토큰의 슈퍼어드민 ID와 현재 사용자 일치 확인
+    if (superAdmin.user_id !== payload.superAdminUserId) {
+      console.warn('Impersonation token was created by a different super admin');
+      return null;
+    }
+
+    // 6. 테넌트 정보 조회
+    const { data: tenant, error } = await supabaseAdmin
+      .from('tenants')
+      .select('*')
+      .eq('id', payload.tenantId)
+      .single();
+
+    if (error || !tenant) {
+      console.warn('Tenant not found for impersonation');
+      return null;
+    }
+
+    // 7. 대리 접속 컨텍스트 반환
+    // 주의: isSuperAdmin을 false로 설정하여 테넌트 격리 유지
     return {
       tenantId: tenant.id,
       tenantName: tenant.name,
@@ -63,10 +102,11 @@ async function getImpersonationContext(): Promise<TenantContext | null> {
       memberId: 'impersonation',
       memberRole: 'owner' as MemberRole,
       memberDisplayName: '슈퍼 어드민 (대리 접속)',
-      isSuperAdmin: true,
+      isSuperAdmin: false,  // 대리 접속 중에는 해당 테넌트로만 접근 제한
       isImpersonating: true,
     };
-  } catch {
+  } catch (error) {
+    console.error('Error in getImpersonationContext:', error);
     return null;
   }
 }

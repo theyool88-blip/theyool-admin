@@ -1,6 +1,6 @@
 /**
  * 홈페이지 Storage 마이그레이션 스크립트
- * theyool Supabase Storage → theyool-admin Supabase Storage
+ * theyool Supabase Storage → luseed Supabase Storage
  *
  * 마이그레이션 대상:
  * - testimonial-photos/* → homepage-testimonial-photos/{tenant_id}/*
@@ -28,7 +28,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const THEYOOL_URL = process.env.THEYOOL_SUPABASE_URL || '';
 const THEYOOL_SERVICE_KEY = process.env.THEYOOL_SUPABASE_SERVICE_KEY || '';
 
-// theyool-admin (대상)
+// luseed (대상)
 const ADMIN_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const ADMIN_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 

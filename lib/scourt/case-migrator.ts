@@ -17,7 +17,7 @@ interface CaseToMigrate {
   case_number: string;
   court_code: string;
   court_name: string;
-  enc_cs_no: string;
+  scourt_enc_cs_no: string;
   profile_id: string;
   legal_case_id?: string | null;
   tenant_id?: string | null;
@@ -130,7 +130,7 @@ export class CaseMigrator {
       const { error: updateError } = await this.supabase
         .from('scourt_profile_cases')
         .update({
-          enc_cs_no: result.encCsNo,
+          scourt_enc_cs_no: result.encCsNo,
           wmonid: newWmonid,
           migrated_at: new Date().toISOString(),
         })
@@ -197,7 +197,7 @@ export class CaseMigrator {
     // 기존 WMONID에 연결된 사건들 조회
     const { data: cases, error: queryError } = await this.supabase
       .from('scourt_profile_cases')
-      .select('id, case_number, court_code, court_name, enc_cs_no, profile_id, legal_case_id, tenant_id')
+      .select('id, case_number, court_code, court_name, scourt_enc_cs_no, profile_id, legal_case_id, tenant_id')
       .eq('user_wmonid_id', oldWmonidId);
 
     if (queryError) {
@@ -238,13 +238,13 @@ export class CaseMigrator {
       console.log(`\n[${i + 1}/${totalCases}] 처리 중...`);
 
       // 이미 마이그레이션된 사건 스킵
-      if (caseItem.enc_cs_no?.includes(newWmonid)) {
+      if (caseItem.scourt_enc_cs_no?.includes(newWmonid)) {
         console.log(`⏭️ 이미 마이그레이션됨: ${caseItem.case_number}`);
         skippedCount++;
         results.push({
           caseNumber: caseItem.case_number,
           success: true,
-          newEncCsNo: caseItem.enc_cs_no,
+          newEncCsNo: caseItem.scourt_enc_cs_no,
         });
         continue;
       }
@@ -330,18 +330,19 @@ export class CaseMigrator {
     }
 
     // 2. case_parties에서 당사자명 조회 (is_primary=true 우선)
+    // NOTE: is_our_client 컬럼이 스키마에서 제거됨 - is_primary 사용
     const { data: parties } = await this.supabase
       .from('case_parties')
-      .select('party_name, is_our_client, is_primary')
+      .select('party_name, is_primary')
       .eq('case_id', resolvedCaseId)
       .order('is_primary', { ascending: false })
       .order('party_order', { ascending: true });
 
     if (parties && parties.length > 0) {
-      // 의뢰인 측 당사자 우선, 없으면 상대방
-      const ourParty = parties.find(p => p.is_our_client);
-      const opponentParty = parties.find(p => !p.is_our_client);
-      return ourParty?.party_name || opponentParty?.party_name || null;
+      // is_primary=true인 당사자 우선, 없으면 첫 번째 당사자
+      const primaryParty = parties.find(p => p.is_primary);
+      const firstParty = parties[0];
+      return primaryParty?.party_name || firstParty?.party_name || null;
     }
 
     return null;

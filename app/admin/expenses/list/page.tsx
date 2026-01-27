@@ -93,37 +93,37 @@ export default function ExpenseListPage() {
   const hasActiveFilters = categoryFilter || startDate || endDate
 
   return (
-    <div className="min-h-screen bg-sage-50 pt-16">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-16">
       {/* Header */}
-      <div className="bg-white border-b border-sage-200 shadow-sm">
+      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-default)] shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div className="flex items-center gap-3">
               <Link
                 href="/admin/expenses"
-                className="w-11 h-11 flex items-center justify-center rounded-xl bg-sage-100 hover:bg-sage-200 active:bg-sage-300 transition-colors focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+                className="w-11 h-11 flex items-center justify-center rounded-xl bg-[var(--sage-muted)] hover:bg-[var(--bg-hover)] active:bg-[var(--bg-tertiary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)] focus:ring-offset-2"
                 aria-label="뒤로 가기"
               >
-                <ChevronLeft className="w-5 h-5 text-sage-700" />
+                <ChevronLeft className="w-5 h-5 text-[var(--text-secondary)]" />
               </Link>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-sage-800">지출 내역 관리</h1>
-                <p className="text-sm text-sage-600 mt-0.5">
-                  전체 <span className="font-semibold text-sage-700">{filteredExpenses.length}</span>건의 지출 내역
+                <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">지출 내역 관리</h1>
+                <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                  전체 <span className="font-semibold text-[var(--text-secondary)]">{filteredExpenses.length}</span>건의 지출 내역
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap gap-2 sm:gap-3">
               <button
                 onClick={handleExport}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-sage-700 bg-white border border-sage-300 rounded-xl hover:bg-sage-50 active:bg-sage-100 transition-colors min-h-[48px] shadow-sm focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+                className="btn btn-secondary flex items-center justify-center gap-2 px-4 py-2.5 text-sm min-h-[48px] shadow-sm"
               >
                 <Download className="w-5 h-5 flex-shrink-0" />
                 <span className="hidden sm:inline">Excel 다운로드</span>
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 text-sm text-white bg-sage-600 rounded-xl hover:bg-sage-700 active:bg-sage-800 transition-colors min-h-[48px] shadow-sm font-medium focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+                className="btn btn-primary flex items-center justify-center gap-2 px-4 py-2.5 text-sm min-h-[48px] shadow-sm font-medium"
               >
                 <Plus className="w-5 h-5 flex-shrink-0" />
                 <span>새 지출 등록</span>
@@ -134,32 +134,32 @@ export default function ExpenseListPage() {
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-white border-b border-sage-200">
+      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-default)]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
           {/* Search Bar */}
           <div className="flex gap-3 mb-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-sage-400" />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" />
               <input
                 type="text"
                 placeholder="공급업체명, 메모로 검색..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 text-base border border-sage-300 rounded-xl focus:ring-2 focus:ring-sage-500 focus:border-transparent min-h-[48px] text-sage-800 placeholder:text-sage-400"
+                className="form-input w-full pl-12 pr-4 py-3 text-base min-h-[48px]"
               />
             </div>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center justify-center gap-2 px-4 py-3 border rounded-xl transition-colors min-w-[48px] min-h-[48px] focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2 ${
+              className={`flex items-center justify-center gap-2 px-4 py-3 border rounded-xl transition-colors min-w-[48px] min-h-[48px] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)] focus:ring-offset-2 ${
                 hasActiveFilters
-                  ? 'bg-sage-100 border-sage-400 text-sage-700'
-                  : 'bg-white border-sage-300 text-sage-600 hover:bg-sage-50 active:bg-sage-100'
+                  ? 'bg-[var(--sage-muted)] border-[var(--sage-primary)] text-[var(--text-secondary)]'
+                  : 'bg-[var(--bg-secondary)] border-[var(--border-default)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
               }`}
             >
               <Filter className="w-5 h-5 flex-shrink-0" />
               <span className="hidden sm:inline font-medium">필터</span>
               {hasActiveFilters && (
-                <span className="w-5 h-5 bg-sage-600 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                <span className="w-5 h-5 bg-[var(--sage-primary)] text-white text-xs rounded-full flex items-center justify-center font-medium">
                   {[categoryFilter, startDate, endDate].filter(Boolean).length}
                 </span>
               )}
@@ -168,13 +168,13 @@ export default function ExpenseListPage() {
 
           {/* Filter Panel */}
           {showFilters && (
-            <div className="bg-sage-50 rounded-xl p-4 animate-slideDown border border-sage-200">
+            <div className="bg-[var(--bg-primary)] rounded-xl p-4 animate-slideDown border border-[var(--border-default)]">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-sage-700">상세 필터</span>
+                <span className="text-sm font-semibold text-[var(--text-secondary)]">상세 필터</span>
                 {hasActiveFilters && (
                   <button
                     onClick={clearFilters}
-                    className="flex items-center gap-1.5 text-sm text-sage-600 hover:text-sage-800 transition-colors px-2 py-1 rounded-lg hover:bg-sage-100"
+                    className="flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors px-2 py-1 rounded-lg hover:bg-[var(--bg-hover)]"
                   >
                     <X className="w-4 h-4" />
                     필터 초기화
@@ -184,11 +184,11 @@ export default function ExpenseListPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Category Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-sage-600 mb-1.5">카테고리</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">카테고리</label>
                   <select
                     value={categoryFilter}
                     onChange={(e) => setCategoryFilter(e.target.value)}
-                    className="w-full px-4 py-2.5 text-base border border-sage-300 rounded-xl focus:ring-2 focus:ring-sage-500 focus:border-transparent bg-white min-h-[44px] text-sage-800"
+                    className="form-input w-full px-4 py-2.5 text-base min-h-[44px]"
                   >
                     <option value="">전체 카테고리</option>
                     {categories.map(cat => (
@@ -199,23 +199,23 @@ export default function ExpenseListPage() {
 
                 {/* Start Date */}
                 <div>
-                  <label className="block text-sm font-medium text-sage-600 mb-1.5">시작일</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">시작일</label>
                   <input
                     type="date"
                     value={startDate}
                     onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-4 py-2.5 text-base border border-sage-300 rounded-xl focus:ring-2 focus:ring-sage-500 focus:border-transparent bg-white min-h-[44px] text-sage-800"
+                    className="form-input w-full px-4 py-2.5 text-base min-h-[44px]"
                   />
                 </div>
 
                 {/* End Date */}
                 <div>
-                  <label className="block text-sm font-medium text-sage-600 mb-1.5">종료일</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">종료일</label>
                   <input
                     type="date"
                     value={endDate}
                     onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-4 py-2.5 text-base border border-sage-300 rounded-xl focus:ring-2 focus:ring-sage-500 focus:border-transparent bg-white min-h-[44px] text-sage-800"
+                    className="form-input w-full px-4 py-2.5 text-base min-h-[44px]"
                   />
                 </div>
               </div>
@@ -227,22 +227,22 @@ export default function ExpenseListPage() {
       {/* Content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {loading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-sage-200 p-12 text-center">
+          <div className="card p-12 text-center">
             <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin rounded-full h-10 w-10 border-3 border-sage-200 border-t-sage-600"></div>
-              <p className="text-sm text-sage-600">지출 내역을 불러오는 중...</p>
+              <div className="animate-spin rounded-full h-10 w-10 border-3 border-[var(--border-default)] border-t-[var(--sage-primary)]"></div>
+              <p className="text-sm text-[var(--text-secondary)]">지출 내역을 불러오는 중...</p>
             </div>
           </div>
         ) : filteredExpenses.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-sage-200 p-12 text-center">
-            <div className="w-16 h-16 bg-sage-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-sage-400" />
+          <div className="card p-12 text-center">
+            <div className="w-16 h-16 bg-[var(--sage-muted)] rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-[var(--text-muted)]" />
             </div>
-            <p className="text-lg font-medium text-sage-700 mb-2">지출 내역이 없습니다</p>
-            <p className="text-sm text-sage-500 mb-6">새로운 지출 내역을 등록해보세요.</p>
+            <p className="text-lg font-medium text-[var(--text-secondary)] mb-2">지출 내역이 없습니다</p>
+            <p className="text-sm text-[var(--text-tertiary)] mb-6">새로운 지출 내역을 등록해보세요.</p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 text-white bg-sage-600 rounded-xl hover:bg-sage-700 active:bg-sage-800 transition-colors inline-flex items-center gap-2 font-medium min-h-[48px] shadow-sm focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+              className="btn btn-primary px-6 py-3 inline-flex items-center gap-2 font-medium min-h-[48px] shadow-sm"
             >
               <Plus className="w-5 h-5" />
               첫 지출 등록하기
@@ -255,12 +255,12 @@ export default function ExpenseListPage() {
               {filteredExpenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="bg-white rounded-xl border border-sage-200 p-4 shadow-sm"
+                  className="card p-4"
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-sage-100 text-sage-700">
+                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-[var(--sage-muted)] text-[var(--text-secondary)]">
                           {expense.expense_category}
                         </span>
                         {expense.is_recurring && (
@@ -269,19 +269,19 @@ export default function ExpenseListPage() {
                           </span>
                         )}
                       </div>
-                      <h3 className="text-base font-semibold text-sage-800 truncate">
+                      <h3 className="text-base font-semibold text-[var(--text-primary)] truncate">
                         {expense.vendor_name || '-'}
                       </h3>
                       {expense.memo && (
-                        <p className="text-sm text-sage-500 mt-1 line-clamp-2">{expense.memo}</p>
+                        <p className="text-sm text-[var(--text-tertiary)] mt-1 line-clamp-2">{expense.memo}</p>
                       )}
                     </div>
-                    <p className="text-lg font-bold text-sage-800 ml-3">
+                    <p className="text-lg font-bold text-[var(--text-primary)] ml-3">
                       {expense.amount.toLocaleString()}<span className="text-sm font-medium">원</span>
                     </p>
                   </div>
-                  <div className="flex items-center justify-between pt-3 border-t border-sage-100">
-                    <div className="flex items-center gap-3 text-sm text-sage-500">
+                  <div className="flex items-center justify-between pt-3 border-t border-[var(--border-subtle)]">
+                    <div className="flex items-center gap-3 text-sm text-[var(--text-tertiary)]">
                       <span>{(() => {
                         const d = new Date(expense.expense_date)
                         return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
@@ -290,14 +290,14 @@ export default function ExpenseListPage() {
                     <div className="flex gap-1">
                       <button
                         onClick={() => {/* TODO: Edit modal */}}
-                        className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-sage-100 active:bg-sage-200 transition-colors text-sage-600 focus:outline-none focus:ring-2 focus:ring-sage-500"
+                        className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]"
                         aria-label="수정"
                       >
                         <Edit className="w-5 h-5" />
                       </button>
                       <button
                         onClick={() => deleteExpense(expense.id)}
-                        className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-red-50 active:bg-red-100 transition-colors text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-[var(--color-danger-muted)] transition-colors text-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]"
                         aria-label="삭제"
                       >
                         <Trash2 className="w-5 h-5" />
@@ -309,36 +309,36 @@ export default function ExpenseListPage() {
             </div>
 
             {/* Desktop Table View */}
-            <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-sage-200 overflow-hidden">
+            <div className="hidden lg:block card overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-sage-50 border-b border-sage-200">
+                  <thead className="bg-[var(--bg-primary)] border-b border-[var(--border-default)]">
                     <tr>
-                      <th className="px-5 py-4 text-left text-sm font-semibold text-sage-700">
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[var(--text-secondary)]">
                         지출일
                       </th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold text-sage-700">
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[var(--text-secondary)]">
                         카테고리
                       </th>
-                      <th className="px-5 py-4 text-left text-sm font-semibold text-sage-700">
+                      <th className="px-5 py-4 text-left text-sm font-semibold text-[var(--text-secondary)]">
                         공급업체 / 메모
                       </th>
-                      <th className="px-5 py-4 text-right text-sm font-semibold text-sage-700">
+                      <th className="px-5 py-4 text-right text-sm font-semibold text-[var(--text-secondary)]">
                         금액
                       </th>
-                      <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
+                      <th className="px-5 py-4 text-center text-sm font-semibold text-[var(--text-secondary)]">
                         유형
                       </th>
-                      <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
+                      <th className="px-5 py-4 text-center text-sm font-semibold text-[var(--text-secondary)]">
                         작업
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-sage-100">
+                  <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-subtle)]">
                     {filteredExpenses.map((expense) => (
-                      <tr key={expense.id} className="hover:bg-sage-50 transition-colors">
+                      <tr key={expense.id} className="hover:bg-[var(--bg-hover)] transition-colors">
                         <td className="px-5 py-4 whitespace-nowrap">
-                          <span className="text-base text-sage-800">
+                          <span className="text-base text-[var(--text-primary)]">
                             {(() => {
                               const d = new Date(expense.expense_date)
                               return `${String(d.getFullYear()).slice(2)}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
@@ -346,23 +346,23 @@ export default function ExpenseListPage() {
                           </span>
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap">
-                          <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-sage-100 text-sage-700">
+                          <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-[var(--sage-muted)] text-[var(--text-secondary)]">
                             {expense.expense_category}
                           </span>
                         </td>
                         <td className="px-5 py-4">
-                          <p className="text-base font-medium text-sage-800">
+                          <p className="text-base font-medium text-[var(--text-primary)]">
                             {expense.vendor_name || '-'}
                           </p>
                           {expense.memo && (
-                            <p className="text-sm text-sage-500 mt-0.5 max-w-xs truncate">{expense.memo}</p>
+                            <p className="text-sm text-[var(--text-tertiary)] mt-0.5 max-w-xs truncate">{expense.memo}</p>
                           )}
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap text-right">
-                          <span className="text-lg font-bold text-sage-800">
+                          <span className="text-lg font-bold text-[var(--text-primary)]">
                             {expense.amount.toLocaleString()}
                           </span>
-                          <span className="text-sm text-sage-500 ml-0.5">원</span>
+                          <span className="text-sm text-[var(--text-tertiary)] ml-0.5">원</span>
                         </td>
                         <td className="px-5 py-4 whitespace-nowrap text-center">
                           {expense.is_recurring ? (
@@ -370,7 +370,7 @@ export default function ExpenseListPage() {
                               고정
                             </span>
                           ) : (
-                            <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-gray-100 text-gray-600">
+                            <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
                               일반
                             </span>
                           )}
@@ -379,14 +379,14 @@ export default function ExpenseListPage() {
                           <div className="flex justify-center gap-1">
                             <button
                               onClick={() => {/* TODO: Edit modal */}}
-                              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-sage-100 active:bg-sage-200 transition-colors text-sage-600 focus:outline-none focus:ring-2 focus:ring-sage-500"
+                              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]"
                               aria-label="수정"
                             >
                               <Edit className="w-5 h-5" />
                             </button>
                             <button
                               onClick={() => deleteExpense(expense.id)}
-                              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                              className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--color-danger-muted)] transition-colors text-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]"
                               aria-label="삭제"
                             >
                               <Trash2 className="w-5 h-5" />
@@ -401,17 +401,17 @@ export default function ExpenseListPage() {
             </div>
 
             {/* Summary */}
-            <div className="mt-4 bg-white rounded-xl shadow-sm border border-sage-200 p-5">
+            <div className="mt-4 card p-5">
               <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                <span className="text-base text-sage-600">
-                  총 <span className="font-semibold text-sage-700">{filteredExpenses.length}</span>건
+                <span className="text-base text-[var(--text-secondary)]">
+                  총 <span className="font-semibold text-[var(--text-secondary)]">{filteredExpenses.length}</span>건
                 </span>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-sm text-sage-500">합계:</span>
-                  <span className="text-2xl font-bold text-sage-800">
+                  <span className="text-sm text-[var(--text-tertiary)]">합계:</span>
+                  <span className="text-2xl font-bold text-[var(--text-primary)]">
                     {filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0).toLocaleString()}
                   </span>
-                  <span className="text-base text-sage-600">원</span>
+                  <span className="text-base text-[var(--text-secondary)]">원</span>
                 </div>
               </div>
             </div>

@@ -2,7 +2,7 @@
 
 ## 개요
 
-이 시스템은 **theyool 홈페이지**에서 상담 신청 시 표시되는 예약 가능 시간을 **theyool-admin**에서 관리할 수 있도록 합니다.
+이 시스템은 **theyool 홈페이지**에서 상담 신청 시 표시되는 예약 가능 시간을 **luseed**에서 관리할 수 있도록 합니다.
 
 ## 주요 기능
 
@@ -28,8 +28,8 @@
 ### 1. 데이터베이스 마이그레이션 실행
 
 ```bash
-# theyool-admin 프로젝트 디렉토리에서
-cd /Users/hskim/theyool-admin
+# luseed 프로젝트 디렉토리에서
+cd /Users/hskim/luseed
 ```
 
 Supabase 대시보드에서 SQL Editor를 열고 다음 파일의 내용을 실행:
@@ -54,7 +54,7 @@ mv components/features/ConsultationBooking/steps/Step3DateTime.tsx \
    components/features/ConsultationBooking/steps/Step3DateTime.tsx.backup
 
 # 새 파일 복사
-cp /Users/hskim/theyool-admin/Step3DateTime-dynamic.tsx \
+cp /Users/hskim/luseed/Step3DateTime-dynamic.tsx \
    components/features/ConsultationBooking/steps/Step3DateTime.tsx
 ```
 

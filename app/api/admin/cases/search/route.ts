@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isAuthenticated } from '@/lib/auth/auth'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant } from '@/lib/api/with-tenant'
 
-export async function GET(request: NextRequest) {
-  const authCheck = await isAuthenticated()
-  if (!authCheck) {
-    return NextResponse.json({ error: '인증이 필요합니다.' }, { status: 401 })
-  }
-
+export const GET = withTenant(async (request: NextRequest, { tenant }) => {
   const { searchParams } = new URL(request.url)
   const q = (searchParams.get('q') || '').trim()
   const limit = Number(searchParams.get('limit') || 20)
@@ -21,7 +16,8 @@ export async function GET(request: NextRequest) {
 
   let clientIds: string[] = []
   if (q) {
-    const { data: clientMatches } = await supabase
+    // 클라이언트 검색도 테넌트 필터 적용
+    let clientQuery = supabase
       .from('clients')
       .select('id')
       .or([
@@ -29,13 +25,20 @@ export async function GET(request: NextRequest) {
         `phone.ilike.%${q}%`
       ].join(','))
 
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      clientQuery = clientQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: clientMatches } = await clientQuery
+
     clientIds = (clientMatches || []).map(c => c.id)
   }
   if (clientId) {
     clientIds = Array.from(new Set([...clientIds, clientId]))
   }
 
-  const { data, error, count } = await supabase
+  // 사건 검색에 테넌트 필터 적용
+  let caseQuery = supabase
     .from('legal_cases')
     .select('id, case_name, court_case_number, contract_number, office, client:clients(name)', { count: 'exact' })
     .or([
@@ -47,10 +50,17 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(limit)
 
+  // 테넌트 격리 필터
+  if (!tenant.isSuperAdmin && tenant.tenantId) {
+    caseQuery = caseQuery.eq('tenant_id', tenant.tenantId)
+  }
+
+  const { data, error, count } = await caseQuery
+
   if (error) {
     console.error('Case search error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
   return NextResponse.json({ data: data || [], count: count || 0 })
-}
+})

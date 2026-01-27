@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useMemo } from 'react'
 import {
   getPartyLabels as getPartyLabelsFromSchema,
   getCaseCategory,
@@ -118,6 +119,13 @@ interface CaseClientLink {
   } | null
 }
 
+// Next hearing info for metrics
+interface NextHearingInfo {
+  date: string
+  type: string
+  daysUntil: number
+}
+
 export interface CaseHeroSectionProps {
   caseData: CaseData
   casePartiesForDisplay: CaseParty[]
@@ -130,6 +138,8 @@ export interface CaseHeroSectionProps {
   onFinalize: () => void
   onDelete: () => void
   caseClients?: CaseClientLink[]
+  // Next hearing info for prominent D-day display
+  nextHearing?: NextHearingInfo | null
 }
 
 // Helper: Format progress date (YYYYMMDD -> YY.MM.DD)
@@ -163,6 +173,7 @@ export default function CaseHeroSection({
   onFinalize,
   onDelete,
   caseClients = [],
+  nextHearing,
 }: CaseHeroSectionProps) {
   const router = useRouter()
 
@@ -623,191 +634,283 @@ export default function CaseHeroSection({
     ))
   }
 
+  // Format D-day display
+  const formatDDay = (days: number) => {
+    if (days === 0) return 'D-Day'
+    if (days > 0) return `D-${days}`
+    return `D+${Math.abs(days)}`
+  }
+
+  // Get D-day styling based on urgency
+  const getDDayStyle = (days: number) => {
+    if (days < 0) return {
+      bg: 'bg-[var(--color-danger)]',
+      text: 'text-white',
+      ring: 'ring-[var(--color-danger)]/20'
+    }
+    if (days <= 3) return {
+      bg: 'bg-[var(--color-warning)]',
+      text: 'text-white',
+      ring: 'ring-[var(--color-warning)]/20'
+    }
+    if (days <= 7) return {
+      bg: 'bg-[var(--sage-primary)]',
+      text: 'text-white',
+      ring: 'ring-[var(--sage-primary)]/20'
+    }
+    return {
+      bg: 'bg-[var(--bg-tertiary)]',
+      text: 'text-[var(--text-primary)]',
+      ring: 'ring-[var(--border-default)]'
+    }
+  }
+
+  // Format hearing date
+  const formatHearingDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토']
+    const weekday = weekdays[date.getDay()]
+    return `${month}/${day} (${weekday})`
+  }
+
   return (
-    <div className="card p-8 mb-6">
-      {/* Status badges */}
-      <div className="flex items-center gap-2 mb-4">
-        {caseData.office && (
-          <span className="badge-status badge-info">
-            {caseData.office}
-          </span>
-        )}
-        {(() => {
-          const statusInfo = getCaseStatusInfo()
-          if (!statusInfo) return null
-          return (
-            <span className={`badge-status ${caseData.status === '진행중' ? 'badge-success' : 'badge-info'}`}>
-              {statusInfo.label}
+    <div className="card p-0 mb-6 overflow-hidden">
+      {/* Next Hearing Banner - Prominent D-day Display */}
+      {nextHearing && (
+        <div className="px-6 py-4 bg-[var(--bg-tertiary)] border-b border-[var(--border-subtle)]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {/* D-day Badge - Large and prominent */}
+              <div className={`
+                flex items-center justify-center min-w-[72px] h-[72px] rounded-2xl
+                ${getDDayStyle(nextHearing.daysUntil).bg} ${getDDayStyle(nextHearing.daysUntil).text}
+                ring-4 ${getDDayStyle(nextHearing.daysUntil).ring}
+                shadow-lg
+              `}>
+                <span className="text-2xl font-bold tracking-tight">
+                  {formatDDay(nextHearing.daysUntil)}
+                </span>
+              </div>
+
+              {/* Hearing Info */}
+              <div>
+                <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1">
+                  다음 기일
+                </p>
+                <p className="text-lg font-semibold text-[var(--text-primary)]">
+                  {formatHearingDate(nextHearing.date)}
+                </p>
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {nextHearing.type}
+                </p>
+              </div>
+            </div>
+
+            {/* Calendar icon */}
+            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)]">
+              <svg className="w-5 h-5 text-[var(--text-tertiary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      <div className="p-6 sm:p-8">
+        {/* Top row: Badges */}
+        <div className="flex items-center flex-wrap gap-2 mb-4">
+          {caseData.office && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
+              {caseData.office}
             </span>
-          )
-        })()}
-        {/* Case level badge */}
-        {(() => {
-          const category = getCaseCategory(caseData.court_case_number || '')
-          const isApplicationCase = ['신청', '집행', '가사신청'].includes(category)
-          if (isApplicationCase || !caseData.case_level || ['신청', '기타'].includes(caseData.case_level)) {
-            return null
-          }
-          return (
-            <span className="badge-status badge-info">
-              {caseData.case_level}
+          )}
+          {(() => {
+            const statusInfo = getCaseStatusInfo()
+            if (!statusInfo) return null
+            return (
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                caseData.status === '진행중'
+                  ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]'
+                  : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  caseData.status === '진행중' ? 'bg-[var(--sage-primary)]' : 'bg-[var(--text-tertiary)]'
+                }`} />
+                {statusInfo.label}
+              </span>
+            )
+          })()}
+          {/* Case level badge */}
+          {(() => {
+            const category = getCaseCategory(caseData.court_case_number || '')
+            const isApplicationCase = ['신청', '집행', '가사신청'].includes(category)
+            if (isApplicationCase || !caseData.case_level || ['신청', '기타'].includes(caseData.case_level)) {
+              return null
+            }
+            return (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-info-muted)] text-[var(--color-info)]">
+                {caseData.case_level}
+              </span>
+            )
+          })()}
+          {/* Merge division badge */}
+          {(() => {
+            const mrgrDvs = (scourtSnapshot?.basicInfo as Record<string, string> | undefined)?.['병합구분'] ||
+                            (scourtSnapshot?.basicInfo as Record<string, string> | undefined)?.mrgrDvs
+            return mrgrDvs && mrgrDvs !== '없음' && (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-info-muted)] text-[var(--color-info)]">
+                {mrgrDvs}
+              </span>
+            )
+          })()}
+          {/* Result badge */}
+          {(getBasicInfo('종국결과', 'endRslt') || caseData.case_result) && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--color-warning-muted)] text-[var(--color-warning)]">
+              {getBasicInfo('종국결과', 'endRslt') || caseData.case_result}
+              {getBasicInfo('종국일', 'endDt') && (
+                <span className="ml-1 opacity-75">({formatProgressDate(String(getBasicInfo('종국일', 'endDt')))})</span>
+              )}
             </span>
-          )
-        })()}
-        {/* Merge division badge */}
-        {(() => {
-          const mrgrDvs = (scourtSnapshot?.basicInfo as Record<string, string> | undefined)?.['병합구분'] ||
-                          (scourtSnapshot?.basicInfo as Record<string, string> | undefined)?.mrgrDvs
-          return mrgrDvs && mrgrDvs !== '없음' && (
-            <span className="badge-status badge-info">
-              {mrgrDvs}
+          )}
+          {getBasicInfo('확정일', 'cfrmDt') && (
+            <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--sage-muted)] text-[var(--sage-primary)]">
+              {formatProgressDate(String(getBasicInfo('확정일', 'cfrmDt')))} 확정
             </span>
-          )
-        })()}
-        {/* Result badge */}
-        {(getBasicInfo('종국결과', 'endRslt') || caseData.case_result) && (
-          <span className="badge-status badge-warning">
-            {getBasicInfo('종국결과', 'endRslt') || caseData.case_result}
-            {getBasicInfo('종국일', 'endDt') && (
-              <span className="ml-1 opacity-75">({formatProgressDate(String(getBasicInfo('종국일', 'endDt')))})</span>
-            )}
-          </span>
-        )}
-        {getBasicInfo('확정일', 'cfrmDt') && (
-          <span className="badge-status badge-info">
-            {formatProgressDate(String(getBasicInfo('확정일', 'cfrmDt')))} 확정
-          </span>
-        )}
-      </div>
+          )}
+        </div>
 
-      {/* Main title: Court case number */}
-      <h1 className="text-display text-[var(--text-primary)] mb-2">
-        {getCourtAbbrev(caseData.court_name)} {caseData.court_case_number}
-      </h1>
+        {/* Main title: Court case number */}
+        <h1 className="text-display text-[var(--text-primary)] mb-2">
+          {getCourtAbbrev(caseData.court_name)} {caseData.court_case_number}
+        </h1>
 
-      {/* Case name */}
-      <p className="text-subheading text-[var(--text-secondary)] mb-5">
-        {getBasicInfo('사건명', 'csNm') || caseData.scourt_case_name || caseData.case_name}
-      </p>
+        {/* Case name */}
+        <p className="text-subheading text-[var(--text-secondary)] mb-5">
+          {getBasicInfo('사건명', 'csNm') || caseData.scourt_case_name || caseData.case_name}
+        </p>
 
-      {/* Party info - simplified */}
-      <div className="flex flex-wrap gap-4 mb-6">
-        {renderPartyInfo()}
-      </div>
+        {/* Party info - simplified */}
+        <div className="flex flex-wrap gap-4 mb-6">
+          {renderPartyInfo()}
+        </div>
 
-      {/* Quick Actions Bar */}
-      <div className="flex items-center gap-3 pt-5 border-t border-[var(--border-default)]">
-        {/* Document folder */}
-        {caseData.onedrive_folder_url && (
-          <a
-            href={caseData.onedrive_folder_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="btn btn-secondary"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M7.71 3.5l1.6 1.5h5.36a1.5 1.5 0 0 1 1.5 1.5v1h2.33a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 17V5a1.5 1.5 0 0 1 1.5-1.5h2.21z"/>
-            </svg>
-            서류 폴더
-          </a>
-        )}
-
-        {/* SCOURT sync/link button */}
-        {isLinked ? (
-          <button
-            onClick={onScourtSync}
-            disabled={scourtSyncing}
-            className="btn btn-secondary disabled:opacity-50"
-          >
-            {scourtSyncing ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            )}
-            {scourtSyncing ? '갱신 중...' : '갱신'}
-          </button>
-        ) : (
-          <button
-            onClick={onScourtSync}
-            disabled={scourtSyncing}
-            className="btn btn-secondary disabled:opacity-50"
-          >
-            {scourtSyncing ? (
-              <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-            ) : (
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
-              </svg>
-            )}
-            {scourtSyncing ? '연동 중...' : '대법원 연동'}
-          </button>
-        )}
-
-        {/* Right button group */}
-        <div className="flex items-center gap-2 ml-auto">
-          {/* Finalize button (only when in progress) */}
-          {caseData.status === '진행중' && (
-            <button
-              onClick={onFinalize}
-              className="btn btn-ghost"
+        {/* Quick Actions Bar */}
+        <div className="flex items-center flex-wrap gap-3 pt-5 border-t border-[var(--border-default)]">
+          {/* Document folder */}
+          {caseData.onedrive_folder_url && (
+            <a
+              href={caseData.onedrive_folder_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M7.71 3.5l1.6 1.5h5.36a1.5 1.5 0 0 1 1.5 1.5v1h2.33a1.5 1.5 0 0 1 1.5 1.5v9a1.5 1.5 0 0 1-1.5 1.5H5.5A1.5 1.5 0 0 1 4 17V5a1.5 1.5 0 0 1 1.5-1.5h2.21z"/>
               </svg>
-              종결
+              서류 폴더
+            </a>
+          )}
+
+          {/* SCOURT sync/link button */}
+          {isLinked ? (
+            <button
+              onClick={onScourtSync}
+              disabled={scourtSyncing}
+              className="btn btn-secondary disabled:opacity-50"
+            >
+              {scourtSyncing ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              )}
+              {scourtSyncing ? '갱신 중...' : '갱신'}
+            </button>
+          ) : (
+            <button
+              onClick={onScourtSync}
+              disabled={scourtSyncing}
+              className="btn btn-secondary disabled:opacity-50"
+            >
+              {scourtSyncing ? (
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+              ) : (
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                </svg>
+              )}
+              {scourtSyncing ? '연동 중...' : '대법원 연동'}
             </button>
           )}
 
-          {/* Delete button */}
-          <button
-            onClick={onDelete}
-            className="btn btn-danger-ghost"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            삭제
-          </button>
+          {/* Right button group */}
+          <div className="flex items-center gap-2 ml-auto">
+            {/* Last sync time */}
+            {scourtSyncStatus?.lastSync && (
+              <span className="text-xs text-[var(--text-muted)] mr-2 hidden sm:inline">
+                {(() => {
+                  const d = new Date(scourtSyncStatus.lastSync)
+                  const now = new Date()
+                  const diffMs = now.getTime() - d.getTime()
+                  const diffMins = Math.floor(diffMs / 60000)
+                  const diffHours = Math.floor(diffMs / 3600000)
+                  const diffDays = Math.floor(diffMs / 86400000)
 
-          {/* Edit button */}
-          <button
-            onClick={() => router.push(`/cases/${caseData.id}/edit`)}
-            className="btn btn-ghost"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            수정
-          </button>
+                  if (diffMins < 1) return '방금 전 갱신'
+                  if (diffMins < 60) return `${diffMins}분 전 갱신`
+                  if (diffHours < 24) return `${diffHours}시간 전 갱신`
+                  if (diffDays < 7) return `${diffDays}일 전 갱신`
+                  return `${d.getMonth() + 1}/${d.getDate()} 갱신`
+                })()}
+              </span>
+            )}
+
+            {/* Finalize button (only when in progress) */}
+            {caseData.status === '진행중' && (
+              <button
+                onClick={onFinalize}
+                className="btn btn-ghost"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="hidden sm:inline">종결</span>
+              </button>
+            )}
+
+            {/* Delete button */}
+            <button
+              onClick={onDelete}
+              className="btn btn-danger-ghost"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              <span className="hidden sm:inline">삭제</span>
+            </button>
+
+            {/* Edit button */}
+            <button
+              onClick={() => router.push(`/cases/${caseData.id}/edit`)}
+              className="btn btn-ghost"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="hidden sm:inline">수정</span>
+            </button>
+          </div>
         </div>
-
-        {/* Last sync time */}
-        {scourtSyncStatus?.lastSync && (
-          <span className="text-xs text-[var(--text-muted)]">
-            {(() => {
-              const d = new Date(scourtSyncStatus.lastSync)
-              const now = new Date()
-              const diffMs = now.getTime() - d.getTime()
-              const diffMins = Math.floor(diffMs / 60000)
-              const diffHours = Math.floor(diffMs / 3600000)
-              const diffDays = Math.floor(diffMs / 86400000)
-
-              if (diffMins < 1) return '방금 전'
-              if (diffMins < 60) return `${diffMins}분 전`
-              if (diffHours < 24) return `${diffHours}시간 전`
-              if (diffDays < 7) return `${diffDays}일 전`
-              return `${d.getMonth() + 1}/${d.getDate()}`
-            })()}
-          </span>
-        )}
       </div>
     </div>
   )

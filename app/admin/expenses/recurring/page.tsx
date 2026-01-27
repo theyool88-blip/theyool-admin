@@ -107,31 +107,31 @@ export default function RecurringExpensesPage() {
   const inactiveTemplates = templates.filter(t => !t.is_active)
 
   return (
-    <div className="min-h-screen bg-sage-50 pt-16">
+    <div className="min-h-screen bg-[var(--bg-primary)] pt-16">
       {/* Header */}
-      <div className="bg-white border-b border-sage-200 shadow-sm">
+      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-default)] shadow-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div className="flex items-center gap-3">
               <Link
                 href="/admin/expenses"
-                className="w-11 h-11 flex items-center justify-center rounded-xl bg-sage-100 hover:bg-sage-200 active:bg-sage-300 transition-colors focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+                className="w-11 h-11 flex items-center justify-center rounded-xl bg-[var(--sage-muted)] hover:bg-[var(--bg-hover)] active:bg-[var(--bg-tertiary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)] focus:ring-offset-2"
                 aria-label="뒤로 가기"
               >
-                <ChevronLeft className="w-5 h-5 text-sage-700" />
+                <ChevronLeft className="w-5 h-5 text-[var(--text-secondary)]" />
               </Link>
               <div>
-                <h1 className="text-xl sm:text-2xl font-bold text-sage-800">고정 지출 템플릿</h1>
-                <p className="text-sm text-sage-600 mt-0.5">
-                  활성 <span className="font-semibold text-sage-700">{activeTemplates.length}</span>개
-                  <span className="mx-1.5 text-sage-400">|</span>
-                  비활성 <span className="font-semibold text-sage-500">{inactiveTemplates.length}</span>개
+                <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">고정 지출 템플릿</h1>
+                <p className="text-sm text-[var(--text-secondary)] mt-0.5">
+                  활성 <span className="font-semibold text-[var(--text-secondary)]">{activeTemplates.length}</span>개
+                  <span className="mx-1.5 text-[var(--text-muted)]">|</span>
+                  비활성 <span className="font-semibold text-[var(--text-tertiary)]">{inactiveTemplates.length}</span>개
                 </p>
               </div>
             </div>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center justify-center gap-2 px-5 py-3 text-white bg-sage-600 rounded-xl hover:bg-sage-700 active:bg-sage-800 transition-colors min-h-[48px] font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+              className="btn btn-primary flex items-center justify-center gap-2 px-5 py-3 min-h-[48px] font-medium shadow-sm"
             >
               <Plus className="w-5 h-5 flex-shrink-0" />
               새 템플릿 추가
@@ -141,16 +141,16 @@ export default function RecurringExpensesPage() {
       </div>
 
       {/* Generate Section */}
-      <div className="bg-white border-b border-sage-200">
+      <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-default)]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-sage-100 flex items-center justify-center flex-shrink-0">
-                <RefreshCw className="w-7 h-7 text-sage-600" />
+              <div className="w-14 h-14 rounded-xl bg-[var(--sage-muted)] flex items-center justify-center flex-shrink-0">
+                <RefreshCw className="w-7 h-7 text-[var(--sage-primary)]" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-sage-800">고정 지출 자동 생성</h3>
-                <p className="text-sm text-sage-500 mt-0.5">
+                <h3 className="text-lg font-semibold text-[var(--text-primary)]">고정 지출 자동 생성</h3>
+                <p className="text-sm text-[var(--text-tertiary)] mt-0.5">
                   선택한 월의 고정 지출을 활성화된 템플릿으로 자동 생성합니다.
                 </p>
               </div>
@@ -160,12 +160,12 @@ export default function RecurringExpensesPage() {
                 type="month"
                 value={selectedMonth}
                 onChange={(e) => setSelectedMonth(e.target.value)}
-                className="px-4 py-3 text-base border border-sage-300 rounded-xl focus:ring-2 focus:ring-sage-500 focus:border-transparent min-h-[48px] text-sage-800"
+                className="form-input px-4 py-3 text-base min-h-[48px]"
               />
               <button
                 onClick={generateExpenses}
                 disabled={generating || !selectedMonth}
-                className="px-6 py-3 text-white bg-sage-600 rounded-xl hover:bg-sage-700 active:bg-sage-800 transition-colors flex items-center justify-center gap-2 disabled:bg-sage-300 disabled:cursor-not-allowed font-medium min-h-[48px] whitespace-nowrap shadow-sm focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+                className="btn btn-primary px-6 py-3 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed font-medium min-h-[48px] whitespace-nowrap shadow-sm"
               >
                 {generating ? (
                   <>
@@ -187,22 +187,22 @@ export default function RecurringExpensesPage() {
       {/* Templates List */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
         {loading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-sage-200 p-12 text-center">
+          <div className="card p-12 text-center">
             <div className="flex flex-col items-center gap-3">
-              <div className="animate-spin rounded-full h-10 w-10 border-3 border-sage-200 border-t-sage-600"></div>
-              <p className="text-sm text-sage-600">템플릿을 불러오는 중...</p>
+              <div className="animate-spin rounded-full h-10 w-10 border-3 border-[var(--border-default)] border-t-[var(--sage-primary)]"></div>
+              <p className="text-sm text-[var(--text-secondary)]">템플릿을 불러오는 중...</p>
             </div>
           </div>
         ) : templates.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm border border-sage-200 p-12 text-center">
-            <div className="w-16 h-16 bg-sage-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Calendar className="w-8 h-8 text-sage-400" />
+          <div className="card p-12 text-center">
+            <div className="w-16 h-16 bg-[var(--sage-muted)] rounded-full flex items-center justify-center mx-auto mb-4">
+              <Calendar className="w-8 h-8 text-[var(--text-muted)]" />
             </div>
-            <p className="text-lg font-medium text-sage-700 mb-2">등록된 고정 지출 템플릿이 없습니다</p>
-            <p className="text-sm text-sage-500 mb-6">매월 반복되는 지출을 템플릿으로 등록해보세요.</p>
+            <p className="text-lg font-medium text-[var(--text-secondary)] mb-2">등록된 고정 지출 템플릿이 없습니다</p>
+            <p className="text-sm text-[var(--text-tertiary)] mb-6">매월 반복되는 지출을 템플릿으로 등록해보세요.</p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 text-white bg-sage-600 rounded-xl hover:bg-sage-700 active:bg-sage-800 transition-colors inline-flex items-center gap-2 font-medium min-h-[48px] shadow-sm focus:outline-none focus:ring-2 focus:ring-sage-500 focus:ring-offset-2"
+              className="btn btn-primary px-6 py-3 inline-flex items-center gap-2 font-medium min-h-[48px] shadow-sm"
             >
               <Plus className="w-5 h-5" />
               첫 템플릿 추가하기
@@ -213,8 +213,8 @@ export default function RecurringExpensesPage() {
             {/* Active Templates */}
             {activeTemplates.length > 0 && (
               <div>
-                <h2 className="text-base font-semibold text-sage-800 mb-3 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-sage-500 rounded-full"></span>
+                <h2 className="text-base font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 bg-[var(--sage-primary)] rounded-full"></span>
                   활성 템플릿 ({activeTemplates.length}개)
                 </h2>
 
@@ -223,42 +223,42 @@ export default function RecurringExpensesPage() {
                   {activeTemplates.map((template) => (
                     <div
                       key={template.id}
-                      className="bg-white rounded-xl border border-sage-200 p-4 shadow-sm"
+                      className="card p-4"
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-sage-100 text-sage-700">
+                            <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-[var(--sage-muted)] text-[var(--text-secondary)]">
                               {template.expense_category}
                             </span>
-                            <span className="text-sm text-sage-500">매월 {template.day_of_month}일</span>
+                            <span className="text-sm text-[var(--text-tertiary)]">매월 {template.day_of_month}일</span>
                           </div>
-                          <h3 className="text-base font-semibold text-sage-800">
+                          <h3 className="text-base font-semibold text-[var(--text-primary)]">
                             {template.name}
                           </h3>
                         </div>
-                        <p className="text-lg font-bold text-sage-800 ml-3">
+                        <p className="text-lg font-bold text-[var(--text-primary)] ml-3">
                           {template.amount.toLocaleString()}<span className="text-sm font-medium">원</span>
                         </p>
                       </div>
-                      <div className="flex items-center justify-end pt-3 border-t border-sage-100">
+                      <div className="flex items-center justify-end pt-3 border-t border-[var(--border-subtle)]">
                         <div className="flex gap-1">
                           <button
                             onClick={() => toggleActive(template.id, template.is_active)}
-                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-amber-50 active:bg-amber-100 transition-colors text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-[var(--color-warning-muted)] transition-colors text-[var(--color-warning)] focus:outline-none focus:ring-2 focus:ring-[var(--color-warning)]"
                             aria-label="비활성화"
                           >
                             <Pause className="w-5 h-5" />
                           </button>
                           <button
-                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-sage-100 active:bg-sage-200 transition-colors text-sage-600 focus:outline-none focus:ring-2 focus:ring-sage-500"
+                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]"
                             aria-label="수정"
                           >
                             <Edit className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => deleteTemplate(template.id)}
-                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-red-50 active:bg-red-100 transition-colors text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-[var(--color-danger-muted)] transition-colors text-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]"
                             aria-label="삭제"
                           >
                             <Trash2 className="w-5 h-5" />
@@ -270,48 +270,48 @@ export default function RecurringExpensesPage() {
                 </div>
 
                 {/* Desktop Table View */}
-                <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-sage-200 overflow-hidden">
+                <div className="hidden lg:block card overflow-hidden">
                   <table className="w-full">
-                    <thead className="bg-sage-50 border-b border-sage-200">
+                    <thead className="bg-[var(--bg-primary)] border-b border-[var(--border-default)]">
                       <tr>
-                        <th className="px-5 py-4 text-left text-sm font-semibold text-sage-700">
+                        <th className="px-5 py-4 text-left text-sm font-semibold text-[var(--text-secondary)]">
                           템플릿명
                         </th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold text-sage-700">
+                        <th className="px-5 py-4 text-left text-sm font-semibold text-[var(--text-secondary)]">
                           카테고리
                         </th>
-                        <th className="px-5 py-4 text-right text-sm font-semibold text-sage-700">
+                        <th className="px-5 py-4 text-right text-sm font-semibold text-[var(--text-secondary)]">
                           금액
                         </th>
-                        <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
+                        <th className="px-5 py-4 text-center text-sm font-semibold text-[var(--text-secondary)]">
                           발생일
                         </th>
-                        <th className="px-5 py-4 text-center text-sm font-semibold text-sage-700">
+                        <th className="px-5 py-4 text-center text-sm font-semibold text-[var(--text-secondary)]">
                           작업
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-sage-100">
+                    <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-subtle)]">
                       {activeTemplates.map((template) => (
-                        <tr key={template.id} className="hover:bg-sage-50 transition-colors">
+                        <tr key={template.id} className="hover:bg-[var(--bg-hover)] transition-colors">
                           <td className="px-5 py-4">
-                            <span className="text-base font-medium text-sage-800">
+                            <span className="text-base font-medium text-[var(--text-primary)]">
                               {template.name}
                             </span>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap">
-                            <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-sage-100 text-sage-700">
+                            <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-[var(--sage-muted)] text-[var(--text-secondary)]">
                               {template.expense_category}
                             </span>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap text-right">
-                            <span className="text-lg font-bold text-sage-800">
+                            <span className="text-lg font-bold text-[var(--text-primary)]">
                               {template.amount.toLocaleString()}
                             </span>
-                            <span className="text-sm text-sage-500 ml-0.5">원</span>
+                            <span className="text-sm text-[var(--text-tertiary)] ml-0.5">원</span>
                           </td>
                           <td className="px-5 py-4 text-center">
-                            <span className="text-base text-sage-600">
+                            <span className="text-base text-[var(--text-secondary)]">
                               매월 {template.day_of_month}일
                             </span>
                           </td>
@@ -319,20 +319,20 @@ export default function RecurringExpensesPage() {
                             <div className="flex justify-center gap-1">
                               <button
                                 onClick={() => toggleActive(template.id, template.is_active)}
-                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-amber-50 active:bg-amber-100 transition-colors text-amber-600 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--color-warning-muted)] transition-colors text-[var(--color-warning)] focus:outline-none focus:ring-2 focus:ring-[var(--color-warning)]"
                                 aria-label="비활성화"
                               >
                                 <Pause className="w-5 h-5" />
                               </button>
                               <button
-                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-sage-100 active:bg-sage-200 transition-colors text-sage-600 focus:outline-none focus:ring-2 focus:ring-sage-500"
+                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]"
                                 aria-label="수정"
                               >
                                 <Edit className="w-5 h-5" />
                               </button>
                               <button
                                 onClick={() => deleteTemplate(template.id)}
-                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--color-danger-muted)] transition-colors text-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]"
                                 aria-label="삭제"
                               >
                                 <Trash2 className="w-5 h-5" />
@@ -350,8 +350,8 @@ export default function RecurringExpensesPage() {
             {/* Inactive Templates */}
             {inactiveTemplates.length > 0 && (
               <div>
-                <h2 className="text-base font-semibold text-sage-600 mb-3 flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 bg-gray-400 rounded-full"></span>
+                <h2 className="text-base font-semibold text-[var(--text-secondary)] mb-3 flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 bg-[var(--text-muted)] rounded-full"></span>
                   비활성 템플릿 ({inactiveTemplates.length}개)
                 </h2>
 
@@ -360,35 +360,35 @@ export default function RecurringExpensesPage() {
                   {inactiveTemplates.map((template) => (
                     <div
                       key={template.id}
-                      className="bg-white rounded-xl border border-sage-200 p-4 shadow-sm opacity-70"
+                      className="card p-4 opacity-70"
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-500">
+                            <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
                               {template.expense_category}
                             </span>
                           </div>
-                          <h3 className="text-base font-medium text-sage-600">
+                          <h3 className="text-base font-medium text-[var(--text-secondary)]">
                             {template.name}
                           </h3>
                         </div>
-                        <p className="text-lg font-bold text-sage-600 ml-3">
+                        <p className="text-lg font-bold text-[var(--text-secondary)] ml-3">
                           {template.amount.toLocaleString()}<span className="text-sm font-medium">원</span>
                         </p>
                       </div>
-                      <div className="flex items-center justify-end pt-3 border-t border-sage-100">
+                      <div className="flex items-center justify-end pt-3 border-t border-[var(--border-subtle)]">
                         <div className="flex gap-1">
                           <button
                             onClick={() => toggleActive(template.id, template.is_active)}
-                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-sage-100 active:bg-sage-200 transition-colors text-sage-600 focus:outline-none focus:ring-2 focus:ring-sage-500"
+                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]"
                             aria-label="활성화"
                           >
                             <Play className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => deleteTemplate(template.id)}
-                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-red-50 active:bg-red-100 transition-colors text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                            className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-[var(--color-danger-muted)] transition-colors text-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]"
                             aria-label="삭제"
                           >
                             <Trash2 className="w-5 h-5" />
@@ -400,55 +400,55 @@ export default function RecurringExpensesPage() {
                 </div>
 
                 {/* Desktop Table View */}
-                <div className="hidden lg:block bg-white rounded-xl shadow-sm border border-sage-200 overflow-hidden opacity-80">
+                <div className="hidden lg:block card overflow-hidden opacity-80">
                   <table className="w-full">
-                    <thead className="bg-sage-50 border-b border-sage-200">
+                    <thead className="bg-[var(--bg-primary)] border-b border-[var(--border-default)]">
                       <tr>
-                        <th className="px-5 py-4 text-left text-sm font-semibold text-sage-600">
+                        <th className="px-5 py-4 text-left text-sm font-semibold text-[var(--text-secondary)]">
                           템플릿명
                         </th>
-                        <th className="px-5 py-4 text-left text-sm font-semibold text-sage-600">
+                        <th className="px-5 py-4 text-left text-sm font-semibold text-[var(--text-secondary)]">
                           카테고리
                         </th>
-                        <th className="px-5 py-4 text-right text-sm font-semibold text-sage-600">
+                        <th className="px-5 py-4 text-right text-sm font-semibold text-[var(--text-secondary)]">
                           금액
                         </th>
-                        <th className="px-5 py-4 text-center text-sm font-semibold text-sage-600">
+                        <th className="px-5 py-4 text-center text-sm font-semibold text-[var(--text-secondary)]">
                           작업
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-sage-100">
+                    <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-subtle)]">
                       {inactiveTemplates.map((template) => (
-                        <tr key={template.id} className="hover:bg-sage-50 transition-colors">
+                        <tr key={template.id} className="hover:bg-[var(--bg-hover)] transition-colors">
                           <td className="px-5 py-4">
-                            <span className="text-base text-sage-600">
+                            <span className="text-base text-[var(--text-secondary)]">
                               {template.name}
                             </span>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap">
-                            <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-gray-100 text-gray-500">
+                            <span className="px-3 py-1.5 text-sm font-medium rounded-full bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]">
                               {template.expense_category}
                             </span>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap text-right">
-                            <span className="text-lg font-semibold text-sage-600">
+                            <span className="text-lg font-semibold text-[var(--text-secondary)]">
                               {template.amount.toLocaleString()}
                             </span>
-                            <span className="text-sm text-sage-400 ml-0.5">원</span>
+                            <span className="text-sm text-[var(--text-muted)] ml-0.5">원</span>
                           </td>
                           <td className="px-5 py-4 whitespace-nowrap">
                             <div className="flex justify-center gap-1">
                               <button
                                 onClick={() => toggleActive(template.id, template.is_active)}
-                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-sage-100 active:bg-sage-200 transition-colors text-sage-600 focus:outline-none focus:ring-2 focus:ring-sage-500"
+                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--bg-hover)] transition-colors text-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]"
                                 aria-label="활성화"
                               >
                                 <Play className="w-5 h-5" />
                               </button>
                               <button
                                 onClick={() => deleteTemplate(template.id)}
-                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+                                className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[var(--color-danger-muted)] transition-colors text-[var(--color-danger)] focus:outline-none focus:ring-2 focus:ring-[var(--color-danger)]"
                                 aria-label="삭제"
                               >
                                 <Trash2 className="w-5 h-5" />
@@ -467,16 +467,16 @@ export default function RecurringExpensesPage() {
 
         {/* Summary */}
         {activeTemplates.length > 0 && (
-          <div className="mt-5 bg-white rounded-xl shadow-sm border border-sage-200 p-5">
+          <div className="mt-5 card p-5">
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-              <span className="text-base text-sage-600">
+              <span className="text-base text-[var(--text-secondary)]">
                 활성 템플릿 월별 예상 지출
               </span>
               <div className="flex items-baseline gap-1">
-                <span className="text-2xl font-bold text-sage-800">
+                <span className="text-2xl font-bold text-[var(--text-primary)]">
                   {activeTemplates.reduce((sum, t) => sum + t.amount, 0).toLocaleString()}
                 </span>
-                <span className="text-base text-sage-600">원</span>
+                <span className="text-base text-[var(--text-secondary)]">원</span>
               </div>
             </div>
           </div>

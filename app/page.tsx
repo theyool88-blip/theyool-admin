@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import Dashboard, { type Schedule } from '@/components/Dashboard'
-import AdminHeader from '@/components/AdminHeader'
 import { HEARING_TYPE_LABELS, DEADLINE_TYPE_LABELS, HearingType, DeadlineType } from '@/types/court-hearing'
 
 type UnifiedCalendarRow = {
@@ -28,10 +27,10 @@ export default async function Home() {
   // 프로필 생성 (impersonation이면 tenantContext에서 생성)
   const profile = {
     id: tenantContext.memberId || 'impersonation',
-    user_id: tenantContext.isImpersonating ? 'impersonation' : tenantContext.memberId,
+    name: tenantContext.memberDisplayName || tenantContext.tenantName,
+    email: '',
     role: tenantContext.memberRole,
-    display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
-    status: 'active'
+    is_active: true
   }
 
   // 이번 주 일정 가져오기 (통합 캘린더 사용)
@@ -91,8 +90,7 @@ export default async function Home() {
   })
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="대시보드" />
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <Dashboard profile={profile} initialSchedules={schedules} />
     </div>
   )

@@ -8,7 +8,7 @@ SeeD는 법률 사무소 운영을 위한 AI 지원 시스템입니다. Clio의 
 - **SeeD Work**: AI 리서치 (THE0에서 구현)
 - **SeeD Draft**: 문서 자동화 (THE0에서 구현)
 
-이 문서는 theyool-admin에 구현된 SeeD Manage 시스템을 다룹니다.
+이 문서는 luseed에 구현된 SeeD Manage 시스템을 다룹니다.
 
 ---
 

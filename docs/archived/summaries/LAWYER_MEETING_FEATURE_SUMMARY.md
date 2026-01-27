@@ -352,7 +352,7 @@ const getScheduleTypeDot = (type: ScheduleType, hearingType?: string) => {
 ## 파일 경로 요약
 
 ```
-/Users/hskim/theyool-admin/
+/Users/hskim/luseed/
 ├── supabase/migrations/
 │   └── 20251122_add_lawyer_meeting_type.sql  ← 마이그레이션 SQL
 ├── types/

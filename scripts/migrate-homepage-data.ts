@@ -1,6 +1,6 @@
 /**
  * 홈페이지 데이터 마이그레이션 스크립트
- * theyool Supabase → theyool-admin Supabase
+ * theyool Supabase → luseed Supabase
  *
  * 마이그레이션 대상:
  * 1. blog_posts → homepage_blog_posts
@@ -32,7 +32,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
 const THEYOOL_URL = process.env.THEYOOL_SUPABASE_URL || '';
 const THEYOOL_SERVICE_KEY = process.env.THEYOOL_SUPABASE_SERVICE_KEY || '';
 
-// theyool-admin (대상)
+// luseed (대상)
 const ADMIN_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const ADMIN_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 

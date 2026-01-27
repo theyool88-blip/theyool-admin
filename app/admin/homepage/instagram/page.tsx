@@ -1,0 +1,47 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import InstagramManagement from '@/components/homepage/InstagramManagement';
+import { useTenant } from '@/hooks/useTenant';
+
+export default function InstagramManagementPage() {
+  const router = useRouter();
+  const { hasHomepage, isLoading } = useTenant();
+
+  useEffect(() => {
+    if (!isLoading && !hasHomepage) {
+      router.replace('/admin');
+    }
+  }, [hasHomepage, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)]">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="animate-pulse space-y-4">
+            <div className="h-12 bg-[var(--bg-secondary)] rounded-lg w-1/3" />
+            <div className="grid grid-cols-4 gap-4">
+              <div className="aspect-square bg-[var(--bg-secondary)] rounded-xl" />
+              <div className="aspect-square bg-[var(--bg-secondary)] rounded-xl" />
+              <div className="aspect-square bg-[var(--bg-secondary)] rounded-xl" />
+              <div className="aspect-square bg-[var(--bg-secondary)] rounded-xl" />
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!hasHomepage) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-primary)]">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <InstagramManagement />
+      </main>
+    </div>
+  );
+}

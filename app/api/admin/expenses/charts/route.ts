@@ -1,9 +1,10 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant } from '@/lib/api/with-tenant'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export const GET = withTenant(async (request: NextRequest, { tenant }) => {
   try {
     const supabase = createAdminClient()
 
@@ -13,11 +14,17 @@ export async function GET() {
     const startMonth = sixMonthsAgo.toISOString().slice(0, 7)
 
     // 월별 정산 데이터 (매출/지출 추이)
-    const { data: settlements, error: settlementsError } = await supabase
+    let settlementsQuery = supabase
       .from('monthly_settlements')
       .select('*')
       .gte('settlement_month', startMonth)
       .order('settlement_month', { ascending: true })
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      settlementsQuery = settlementsQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: settlements, error: settlementsError } = await settlementsQuery
 
     if (settlementsError) {
       console.error('Settlements fetch error:', settlementsError)
@@ -28,7 +35,7 @@ export async function GET() {
     }
 
     // 월별 추이 데이터 가공
-    const monthlyTrend = settlements.map(s => ({
+    const monthlyTrend = (settlements || []).map(s => ({
       month: s.settlement_month,
       revenue: s.total_revenue,
       expenses: s.total_expenses,
@@ -36,10 +43,16 @@ export async function GET() {
     }))
 
     // 2. 카테고리별 지출 집계 (최근 6개월)
-    const { data: expenses, error: expensesError } = await supabase
+    let expensesQuery = supabase
       .from('expenses')
       .select('expense_category, amount')
       .gte('month_key', startMonth)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      expensesQuery = expensesQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: expenses, error: expensesError } = await expensesQuery
 
     if (expensesError) {
       console.error('Expenses fetch error:', expensesError)
@@ -68,11 +81,17 @@ export async function GET() {
       .sort((a, b) => b.value - a.value)
 
     // 3. 변호사별 인출 추이 (최근 6개월)
-    const { data: withdrawals, error: withdrawalsError } = await supabase
+    let withdrawalsQuery = supabase
       .from('partner_withdrawals')
       .select('partner_name, month_key, amount')
       .gte('month_key', startMonth)
       .order('month_key', { ascending: true })
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      withdrawalsQuery = withdrawalsQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: withdrawals, error: withdrawalsError } = await withdrawalsQuery
 
     if (withdrawalsError) {
       console.error('Withdrawals fetch error:', withdrawalsError)
@@ -110,4 +129,4 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+})

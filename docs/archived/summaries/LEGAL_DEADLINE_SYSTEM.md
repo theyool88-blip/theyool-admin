@@ -310,7 +310,7 @@ const response = await fetch('/api/admin/case-deadlines', {
 ### 자동 테스트 실행
 
 ```bash
-cd /Users/hskim/theyool-admin
+cd /Users/hskim/luseed
 npx tsx scripts/test-legal-deadline-calculation.ts
 ```
 

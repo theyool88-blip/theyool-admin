@@ -4,13 +4,13 @@ import { useState, useEffect, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import AdminHeader from './AdminHeader'
 import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
 import {
   getGroupedCaseTypes,
   getCaseTypeAuto,
   isCriminalCase
 } from '@/lib/constants/case-types'
+import { AssigneeMultiSelect } from './ui/AssigneeMultiSelect'
 
 interface Client {
   id: string
@@ -40,7 +40,7 @@ interface LegalCase {
   onedrive_folder_url: string | null
   client_role: 'plaintiff' | 'defendant' | null
   opponent_name: string | null
-  enc_cs_no: string | null
+  scourt_enc_cs_no: string | null
   scourt_case_name: string | null
   client?: Client
   assigned_member?: { id: string; display_name: string | null; role: string } | null
@@ -80,6 +80,12 @@ interface UploadedFile {
   publicUrl: string
 }
 
+interface Assignee {
+  member_id: string
+  assignee_role?: 'lawyer' | 'staff'
+  is_primary?: boolean
+}
+
 // 한글 성씨 추출 (첫 글자)
 function extractSurname(name: string): string {
   const trimmed = name.trim()
@@ -105,20 +111,20 @@ function SectionHeader({
 }) {
   return (
     <div className="flex items-start gap-3">
-      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-sage-100 flex items-center justify-center">
-        <span className="text-sm font-semibold text-sage-700">{number}</span>
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-[var(--sage-muted)] flex items-center justify-center">
+        <span className="text-sm font-semibold text-[var(--sage-primary)]">{number}</span>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h2 className="text-base font-semibold text-gray-900">{title}</h2>
+          <h2 className="text-body font-semibold text-[var(--text-primary)]">{title}</h2>
           {optional && (
-            <span className="px-2 py-0.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-full">
+            <span className="px-2 py-0.5 text-xs font-medium text-[var(--sage-primary)] bg-[var(--sage-muted)] rounded-full">
               선택
             </span>
           )}
         </div>
         {subtitle && (
-          <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
+          <p className="text-caption text-[var(--text-muted)] mt-0.5">{subtitle}</p>
         )}
       </div>
     </div>
@@ -138,14 +144,14 @@ function FormField({
   hint?: string
 }) {
   return (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+    <div className="form-group">
+      <label className="form-label">
         {label}
-        {required && <span className="text-coral-600 ml-0.5">*</span>}
+        {required && <span className="text-[var(--color-danger)] ml-0.5">*</span>}
       </label>
       {children}
       {hint && (
-        <p className="mt-1 text-xs text-gray-500">{hint}</p>
+        <p className="form-hint">{hint}</p>
       )}
     </div>
   )
@@ -190,7 +196,7 @@ export default function CaseEditForm({
     case_name: caseData.case_name || '',
     client_id: caseData.client_id || '',
     status: caseData.status || '진행중',
-    assigned_to: caseData.assigned_to || '',
+    assignees: [] as Assignee[], // 담당변호사 목록 (다중 지정)
     contract_date: caseData.contract_date || '',
     retainer_fee: caseData.retainer_fee || 0,
     total_received: caseData.total_received || 0,
@@ -205,7 +211,7 @@ export default function CaseEditForm({
     onedrive_folder_url: caseData.onedrive_folder_url || '',
     client_role: caseData.client_role || '' as 'plaintiff' | 'defendant' | '',
     opponent_name: caseData.opponent_name || '',
-    enc_cs_no: caseData.enc_cs_no || '',
+    scourt_enc_cs_no: caseData.scourt_enc_cs_no || '',
     scourt_case_name: caseData.scourt_case_name || ''
   })
 
@@ -236,7 +242,7 @@ export default function CaseEditForm({
     .items.slice(0, 15)
 
   // 대법원 검색 성공 여부
-  const [scourtSearchSuccess, setScourtSearchSuccess] = useState(!!caseData.enc_cs_no)
+  const [scourtSearchSuccess, setScourtSearchSuccess] = useState(!!caseData.scourt_enc_cs_no)
 
   // 그룹별 사건 유형 옵션 (메모이제이션)
   const _groupedCaseTypes = useMemo(() => getGroupedCaseTypes(), [])
@@ -302,6 +308,20 @@ export default function CaseEditForm({
       })
       .catch(err => console.error('담당자 목록 조회 실패:', err))
 
+    // 담당변호사 목록 불러오기 (case_assignees)
+    fetch(`/api/admin/cases/${caseData.id}/assignees`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.assignees) {
+          const assignees = data.assignees.map((a: { memberId: string; isPrimary: boolean }) => ({
+            member_id: a.memberId,
+            is_primary: a.isPrimary
+          }))
+          setFormData(prev => ({ ...prev, assignees }))
+        }
+      })
+      .catch(err => console.error('담당변호사 목록 조회 실패:', err))
+
     // 계약서 파일 목록 불러오기
     fetch(`/api/admin/cases/${caseData.id}/contracts`)
       .then(res => res.json())
@@ -359,7 +379,7 @@ export default function CaseEditForm({
           ...prev,
           court_name: getCourtAbbrev(result.caseInfo.courtName || prev.court_name),
           client_role: result.caseInfo.clientRole || prev.client_role,
-          enc_cs_no: result.caseInfo.encCsNo || prev.enc_cs_no,
+          scourt_enc_cs_no: result.caseInfo.encCsNo || prev.scourt_enc_cs_no,
         }))
 
         setScourtSearchError(null)
@@ -426,6 +446,11 @@ export default function CaseEditForm({
     setSaving(true)
 
     try {
+      // 다중 담당변호사 → 첫 번째 주담당을 assigned_to로도 설정 (하위호환)
+      const primaryAssignee = formData.assignees.find(a => a.is_primary)
+      const firstAssignee = formData.assignees[0]
+      const assignedTo = primaryAssignee?.member_id || firstAssignee?.member_id || null
+
       const response = await fetch(`/api/admin/cases/${caseData.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -434,7 +459,7 @@ export default function CaseEditForm({
           case_name: formData.case_name,
           client_id: formData.client_id,
           status: formData.status,
-          assigned_to: formData.assigned_to || null,
+          assigned_to: assignedTo,
           contract_date: formData.contract_date || null,
           retainer_fee: formData.retainer_fee,
           total_received: formData.total_received,
@@ -448,7 +473,7 @@ export default function CaseEditForm({
           onedrive_folder_url: formData.onedrive_folder_url || null,
           client_role: clientRoleOverride || formData.client_role || null,
           opponent_name: formData.opponent_name || null,
-          enc_cs_no: formData.enc_cs_no || null,
+          scourt_enc_cs_no: formData.scourt_enc_cs_no || null,
           scourt_case_name: formData.scourt_case_name || null
         })
       })
@@ -458,6 +483,14 @@ export default function CaseEditForm({
       if (!response.ok) {
         throw new Error(result.error || '저장에 실패했습니다')
       }
+
+      // 담당변호사 목록 업데이트 (PUT으로 전체 교체)
+      // 담당변호사가 없어도 PUT 호출하여 기존 담당자 삭제
+      await fetch(`/api/admin/cases/${caseData.id}/assignees`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assignees: formData.assignees })
+      })
 
       alert('저장되었습니다')
       router.push(`/cases/${caseData.id}`)
@@ -559,35 +592,34 @@ export default function CaseEditForm({
     }
   }
 
-  const inputClassName = "w-full h-11 px-4 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors"
-  const selectClassName = "w-full h-11 px-4 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors appearance-none cursor-pointer"
+  const inputClassName = "form-input h-11"
+  const selectClassName = "form-input h-11 appearance-none cursor-pointer"
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sage-50/50 to-white">
-      <AdminHeader title="사건 수정" />
-
-      <div className="max-w-2xl mx-auto pt-20 pb-12 px-4">
-        {/* 뒤로가기 */}
-        <div className="mb-6">
-          <Link
-            href={`/cases/${caseData.id}`}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white rounded-full shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            사건 상세
-          </Link>
+    <>
+    <div className="page-container max-w-2xl">
+        {/* Page Header */}
+        <div className="page-header">
+          <div>
+            <Link
+              href={`/cases/${caseData.id}`}
+              className="text-caption text-[var(--text-muted)] hover:text-[var(--text-secondary)] mb-2 inline-block"
+            >
+              ← 사건 상세
+            </Link>
+            <h1 className="page-title">사건 정보 수정</h1>
+            <p className="page-subtitle">{caseData.case_name}</p>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* ========== 섹션 1: 대법원 사건 연동 ========== */}
-          <div className={`rounded-2xl border overflow-hidden transition-all ${
+          <div className={`card overflow-hidden transition-all ${
             scourtSearchSuccess
-              ? 'bg-sage-50 border-sage-300'
-              : 'bg-white border-sage-200 shadow-sm'
+              ? 'bg-[var(--sage-muted)] border-[var(--sage-primary)]'
+              : ''
           }`}>
-            <div className="p-5 border-b border-sage-100">
+            <div className="p-5 border-b border-[var(--border-subtle)]">
               <SectionHeader
                 number={1}
                 title="대법원 사건 연동"
@@ -599,11 +631,11 @@ export default function CaseEditForm({
             <div className="p-5">
               {scourtSearchSuccess ? (
                 <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sage-700">
-                    <svg className="w-5 h-5 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="flex items-center gap-2 text-[var(--sage-primary)]">
+                    <svg className="w-5 h-5 text-[var(--color-success)]" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <span className="font-medium">
+                    <span className="font-medium text-[var(--text-primary)]">
                       {formData.court_case_number} / {getCourtAbbrev(formData.court_name)}
                       {formData.client_role && ` (${formData.client_role === 'plaintiff' ? '원고' : '피고'})`}
                     </span>
@@ -615,7 +647,7 @@ export default function CaseEditForm({
                       setScourtSearchSuccess(false)
                       setScourtSearchError(null)
                     }}
-                    className="text-sm text-sage-600 hover:text-sage-700 font-medium"
+                    className="text-sm text-[var(--sage-primary)] hover:text-[var(--sage-primary-hover)] font-medium"
                   >
                     다시 검색하기
                   </button>
@@ -654,11 +686,11 @@ export default function CaseEditForm({
                           className={inputClassName}
                         />
                         {showCourtDropdown && filteredCourts.length > 0 && (
-                          <div className="absolute z-50 w-full mt-1 bg-white border border-sage-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                          <div className="absolute z-50 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg shadow-lg max-h-48 overflow-y-auto">
                             {filteredCourts.map(c => (
                               <div
                                 key={c.code}
-                                className="px-4 py-3 text-sm cursor-pointer hover:bg-sage-50 text-gray-900 border-b border-sage-50 last:border-b-0"
+                                className="px-4 py-3 text-sm cursor-pointer hover:bg-[var(--bg-hover)] text-[var(--text-primary)] border-b border-[var(--border-subtle)] last:border-b-0"
                                 onMouseDown={() => {
                                   setFormData({ ...formData, court_name: getCourtAbbrev(c.name) })
                                   setShowCourtDropdown(false)
@@ -684,8 +716,8 @@ export default function CaseEditForm({
                   </div>
 
                   {scourtSearchError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-                      <p className="text-sm text-red-600">{scourtSearchError}</p>
+                    <div className="p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)]/20 rounded-lg">
+                      <p className="text-sm text-[var(--color-danger)]">{scourtSearchError}</p>
                     </div>
                   )}
 
@@ -693,7 +725,7 @@ export default function CaseEditForm({
                     type="button"
                     onClick={handleScourtSearch}
                     disabled={scourtSearching}
-                    className="w-full sm:w-auto px-6 py-2.5 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                    className="btn btn-primary w-full sm:w-auto"
                   >
                     {scourtSearching ? '검색 중...' : '대법원 연동하기'}
                   </button>
@@ -703,8 +735,8 @@ export default function CaseEditForm({
           </div>
 
           {/* ========== 섹션 2: 당사자 정보 ========== */}
-          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-sage-100">
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b border-[var(--border-subtle)]">
               <SectionHeader
                 number={2}
                 title="당사자 정보"
@@ -733,7 +765,7 @@ export default function CaseEditForm({
                       ))}
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -756,7 +788,7 @@ export default function CaseEditForm({
                       <option value="defendant">피고</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -780,8 +812,8 @@ export default function CaseEditForm({
           </div>
 
           {/* ========== 섹션 3: 계약 정보 ========== */}
-          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-sage-100">
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b border-[var(--border-subtle)]">
               <SectionHeader
                 number={3}
                 title="계약 정보"
@@ -812,27 +844,13 @@ export default function CaseEditForm({
                   />
                 </FormField>
 
-                <FormField label="담당 변호사">
-                  <div className="relative">
-                    <select
-                      value={formData.assigned_to}
-                      onChange={(e) => setFormData({ ...formData, assigned_to: e.target.value })}
-                      className={selectClassName}
-                    >
-                      <option value="">선택하세요</option>
-                      {lawyerMembers.map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.display_name || '이름 없음'}
-                          {member.role === 'owner' && ' (대표)'}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </div>
-                  </div>
+                <FormField label="담당 변호사" hint="다중 선택 가능, 첫 번째가 주담당">
+                  <AssigneeMultiSelect
+                    members={lawyerMembers}
+                    value={formData.assignees}
+                    onChange={(assignees) => setFormData({ ...formData, assignees })}
+                    placeholder="담당변호사 선택"
+                  />
                 </FormField>
               </div>
 
@@ -858,7 +876,7 @@ export default function CaseEditForm({
                       <option value="종결">종결</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                      <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
@@ -901,21 +919,21 @@ export default function CaseEditForm({
               </div>
 
               {/* 계약서 업로드 */}
-              <div className="pt-4 border-t border-sage-100">
+              <div className="pt-4 border-t border-[var(--border-subtle)]">
                 <FormField label="계약서" hint="PDF, 이미지, Word 파일 (최대 10MB)">
                   <div
-                    className="border-2 border-dashed border-sage-200 rounded-lg p-6 text-center hover:border-sage-400 transition-colors cursor-pointer"
+                    className="border-2 border-dashed border-[var(--border-default)] rounded-lg p-6 text-center hover:border-[var(--sage-primary)] hover:bg-[var(--bg-hover)] transition-colors cursor-pointer"
                     onClick={() => fileInputRef.current?.click()}
                     onDragOver={(e) => {
                       e.preventDefault()
-                      e.currentTarget.classList.add('border-sage-400', 'bg-sage-50')
+                      e.currentTarget.classList.add('border-[var(--sage-primary)]', 'bg-[var(--sage-muted)]')
                     }}
                     onDragLeave={(e) => {
-                      e.currentTarget.classList.remove('border-sage-400', 'bg-sage-50')
+                      e.currentTarget.classList.remove('border-[var(--sage-primary)]', 'bg-[var(--sage-muted)]')
                     }}
                     onDrop={(e) => {
                       e.preventDefault()
-                      e.currentTarget.classList.remove('border-sage-400', 'bg-sage-50')
+                      e.currentTarget.classList.remove('border-[var(--sage-primary)]', 'bg-[var(--sage-muted)]')
                       handleFileUpload(e.dataTransfer.files)
                     }}
                   >
@@ -928,7 +946,7 @@ export default function CaseEditForm({
                       onChange={(e) => handleFileUpload(e.target.files)}
                     />
                     {isUploading ? (
-                      <div className="flex items-center justify-center gap-2 text-sage-600">
+                      <div className="flex items-center justify-center gap-2 text-[var(--sage-primary)]">
                         <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -937,10 +955,10 @@ export default function CaseEditForm({
                       </div>
                     ) : (
                       <>
-                        <svg className="mx-auto w-10 h-10 text-sage-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="mx-auto w-10 h-10 text-[var(--text-muted)] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-[var(--text-secondary)]">
                           파일을 드래그하거나 클릭하여 업로드
                         </p>
                       </>
@@ -952,14 +970,14 @@ export default function CaseEditForm({
                 {contractFiles.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {contractFiles.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between p-3 bg-sage-50 rounded-lg">
+                      <div key={file.id} className="flex items-center justify-between p-3 bg-[var(--bg-tertiary)] rounded-lg">
                         <div className="flex items-center gap-2 min-w-0">
-                          <svg className="w-5 h-5 text-sage-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <svg className="w-5 h-5 text-[var(--sage-primary)] flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                           </svg>
-                          <span className="text-sm text-gray-700 truncate">{file.file_name}</span>
+                          <span className="text-sm text-[var(--text-primary)] truncate">{file.file_name}</span>
                           {file.file_size && (
-                            <span className="text-xs text-gray-500">({formatFileSize(file.file_size)})</span>
+                            <span className="text-xs text-[var(--text-muted)]">({formatFileSize(file.file_size)})</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2">
@@ -967,14 +985,14 @@ export default function CaseEditForm({
                             href={file.publicUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-2 py-1 text-xs font-medium text-sage-600 hover:text-sage-700"
+                            className="px-2 py-1 text-xs font-medium text-[var(--sage-primary)] hover:text-[var(--sage-primary-hover)]"
                           >
                             다운로드
                           </a>
                           <button
                             type="button"
                             onClick={() => handleFileDelete(file.id, file.file_path)}
-                            className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                            className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)] transition-colors"
                           >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -992,7 +1010,7 @@ export default function CaseEditForm({
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                   rows={2}
-                  className="w-full px-4 py-3 text-base border border-sage-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500/20 focus:border-sage-500 transition-colors resize-none"
+                  className="form-input resize-none"
                   placeholder="추가 메모 사항"
                 />
               </FormField>
@@ -1000,8 +1018,8 @@ export default function CaseEditForm({
           </div>
 
           {/* ========== 섹션 4: 관련 사건 ========== */}
-          <div className="bg-white rounded-2xl border border-sage-200 shadow-sm overflow-hidden">
-            <div className="p-5 border-b border-sage-100">
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b border-[var(--border-subtle)]">
               <div className="flex items-center justify-between">
                 <SectionHeader
                   number={4}
@@ -1011,7 +1029,7 @@ export default function CaseEditForm({
                 <button
                   type="button"
                   onClick={() => setShowAddRelation(!showAddRelation)}
-                  className="px-3 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-lg hover:bg-sage-100 transition-colors"
+                  className="btn btn-sm btn-ghost"
                 >
                   + 추가
                 </button>
@@ -1020,7 +1038,7 @@ export default function CaseEditForm({
 
             <div className="p-5">
               {showAddRelation && (
-                <div className="mb-4 p-4 border border-sage-100 rounded-xl bg-sage-50/50">
+                <div className="mb-4 p-4 border border-[var(--border-subtle)] rounded-xl bg-[var(--bg-tertiary)]">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <FormField label="사건 선택">
                       <select
@@ -1049,7 +1067,7 @@ export default function CaseEditForm({
                       <button
                         type="button"
                         onClick={handleAddRelation}
-                        className="w-full h-11 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors"
+                        className="btn btn-primary w-full h-11"
                       >
                         추가하기
                       </button>
@@ -1060,28 +1078,28 @@ export default function CaseEditForm({
 
               <div className="space-y-2">
                 {relations.map((relation) => (
-                  <div key={relation.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                  <div key={relation.id} className="flex items-center justify-between p-3 border border-[var(--border-default)] rounded-lg">
                     <div className="flex items-center gap-2">
                       {relation.relation_type && (
-                        <span className="px-2 py-0.5 text-xs font-medium bg-sage-100 text-sage-700 rounded">
+                        <span className="px-2 py-0.5 text-xs font-medium bg-[var(--sage-muted)] text-[var(--sage-primary)] rounded">
                           {relation.relation_type}
                         </span>
                       )}
-                      <span className="text-sm text-gray-900">
+                      <span className="text-sm text-[var(--text-primary)]">
                         {relation.related_case?.case_name || '사건명 없음'}
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => handleDeleteRelation(relation.id)}
-                      className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                      className="btn btn-sm btn-danger-ghost"
                     >
                       삭제
                     </button>
                   </div>
                 ))}
                 {relations.length === 0 && (
-                  <p className="text-center text-gray-400 text-sm py-6">관련 사건이 없습니다</p>
+                  <p className="text-center text-[var(--text-muted)] text-sm py-6">관련 사건이 없습니다</p>
                 )}
               </div>
             </div>
@@ -1091,14 +1109,14 @@ export default function CaseEditForm({
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-4">
             <Link
               href={`/cases/${caseData.id}`}
-              className="w-full sm:w-auto px-6 py-3 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors text-center"
+              className="btn btn-secondary w-full sm:w-auto justify-center"
             >
               취소
             </Link>
             <button
               type="submit"
               disabled={saving}
-              className="w-full sm:w-auto px-8 py-3 text-sm font-medium text-white bg-sage-600 rounded-xl hover:bg-sage-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-sm"
+              className="btn btn-primary w-full sm:w-auto justify-center"
             >
               {saving ? (
                 <span className="flex items-center justify-center gap-2">
@@ -1117,71 +1135,73 @@ export default function CaseEditForm({
       </div>
 
       {showRoleConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900">의뢰인 역할 확인</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              의뢰인({selectedClientName || '의뢰인'})과 상대방({formData.opponent_name || '상대방'})의 성씨가 동일합니다.
-              의뢰인의 소송상 지위를 선택해주세요.
-            </p>
+        <div className="modal-backdrop">
+          <div className="modal-content max-w-sm">
+            <div className="p-5">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)]">의뢰인 역할 확인</h3>
+              <p className="mt-2 text-sm text-[var(--text-secondary)]">
+                의뢰인({selectedClientName || '의뢰인'})과 상대방({formData.opponent_name || '상대방'})의 성씨가 동일합니다.
+                의뢰인의 소송상 지위를 선택해주세요.
+              </p>
 
-            <div className="mt-4 space-y-2">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="client_role_confirm"
-                  value="plaintiff"
-                  checked={pendingClientRole === 'plaintiff'}
-                  onChange={(e) => {
-                    setPendingClientRole(e.target.value as 'plaintiff' | 'defendant')
+              <div className="mt-4 space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="client_role_confirm"
+                    value="plaintiff"
+                    checked={pendingClientRole === 'plaintiff'}
+                    onChange={(e) => {
+                      setPendingClientRole(e.target.value as 'plaintiff' | 'defendant')
+                      setRoleConfirmError('')
+                    }}
+                    className="w-4 h-4 text-[var(--sage-primary)] border-[var(--border-default)] focus:ring-[var(--sage-primary)]"
+                  />
+                  <span className="text-sm font-medium text-[var(--text-secondary)]">원고 (채권자)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="client_role_confirm"
+                    value="defendant"
+                    checked={pendingClientRole === 'defendant'}
+                    onChange={(e) => {
+                      setPendingClientRole(e.target.value as 'plaintiff' | 'defendant')
+                      setRoleConfirmError('')
+                    }}
+                    className="w-4 h-4 text-[var(--sage-primary)] border-[var(--border-default)] focus:ring-[var(--sage-primary)]"
+                  />
+                  <span className="text-sm font-medium text-[var(--text-secondary)]">피고 (채무자)</span>
+                </label>
+              </div>
+
+              {roleConfirmError && (
+                <p className="mt-2 text-sm text-[var(--color-danger)]">{roleConfirmError}</p>
+              )}
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRoleConfirm(false)
                     setRoleConfirmError('')
                   }}
-                  className="w-4 h-4 text-sage-600 border-gray-300 focus:ring-sage-500"
-                />
-                <span className="text-sm font-medium text-gray-700">원고 (채권자)</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="client_role_confirm"
-                  value="defendant"
-                  checked={pendingClientRole === 'defendant'}
-                  onChange={(e) => {
-                    setPendingClientRole(e.target.value as 'plaintiff' | 'defendant')
-                    setRoleConfirmError('')
-                  }}
-                  className="w-4 h-4 text-sage-600 border-gray-300 focus:ring-sage-500"
-                />
-                <span className="text-sm font-medium text-gray-700">피고 (채무자)</span>
-              </label>
-            </div>
-
-            {roleConfirmError && (
-              <p className="mt-2 text-sm text-coral-600">{roleConfirmError}</p>
-            )}
-
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowRoleConfirm(false)
-                  setRoleConfirmError('')
-                }}
-                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800"
-              >
-                취소
-              </button>
-              <button
-                type="button"
-                onClick={handleRoleConfirm}
-                className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700"
-              >
-                확인
-              </button>
+                  className="btn btn-ghost"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRoleConfirm}
+                  className="btn btn-primary"
+                >
+                  확인
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

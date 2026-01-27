@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import AdminHeader from '@/components/AdminHeader'
 import { formatCurrency } from '@/types/payment'
 
 type ReceivableGrade = 'normal' | 'watch' | 'collection'
@@ -211,48 +210,46 @@ export default function ReceivablesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--border-default)] border-t-[var(--text-secondary)]"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="미수금 관리" />
-
-      <div className="max-w-5xl mx-auto pt-20 pb-8 px-4">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
+      <div className="max-w-5xl mx-auto pt-6 pb-8 px-4">
         {/* Summary */}
         {data && (
           <div className="flex items-center gap-6 mb-5 text-sm">
             <div>
-              <span className="text-gray-500">총 미수금</span>
-              <span className="ml-2 text-lg font-bold text-red-600">{formatCurrency(data.total_outstanding)}</span>
+              <span className="text-[var(--text-tertiary)]">총 미수금</span>
+              <span className="ml-2 text-lg font-medium text-[var(--text-primary)]">{formatCurrency(data.total_outstanding)}</span>
             </div>
-            <div className="text-gray-400">|</div>
-            <div className="text-gray-500">
+            <div className="text-[var(--text-muted)]">|</div>
+            <div className="text-[var(--text-tertiary)]">
               {data.client_count}명 · {data.case_count}건
             </div>
             {data.watch_count > 0 && (
-              <span className="px-2 py-0.5 text-xs bg-amber-100 text-amber-700 rounded">관리 {data.watch_count}</span>
+              <span className="px-2 py-0.5 text-xs bg-[var(--color-warning-muted)] text-[var(--color-warning)] rounded">관리 {data.watch_count}</span>
             )}
             {data.collection_count > 0 && (
-              <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">추심 {data.collection_count}</span>
+              <span className="px-2 py-0.5 text-xs bg-[var(--color-danger-muted)] text-[var(--color-danger)] rounded">추심 {data.collection_count}</span>
             )}
           </div>
         )}
 
         {/* Filters */}
         <div className="flex items-center gap-3 mb-4 text-sm">
-          <div className="flex bg-gray-100 rounded-lg p-0.5">
+          <div className="flex bg-[var(--bg-tertiary)] rounded-lg p-0.5">
             <button
               onClick={() => setActiveTab('active')}
-              className={`px-3 py-1 rounded-md ${activeTab === 'active' ? 'bg-white shadow-sm font-medium' : 'text-gray-500'}`}
+              className={`px-3 py-1 rounded-md ${activeTab === 'active' ? 'bg-[var(--bg-secondary)] shadow-sm font-medium' : 'text-[var(--text-tertiary)]'}`}
             >
               미수금
             </button>
             <button
               onClick={() => setActiveTab('writeoffs')}
-              className={`px-3 py-1 rounded-md ${activeTab === 'writeoffs' ? 'bg-white shadow-sm font-medium' : 'text-gray-500'}`}
+              className={`px-3 py-1 rounded-md ${activeTab === 'writeoffs' ? 'bg-[var(--bg-secondary)] shadow-sm font-medium' : 'text-[var(--text-tertiary)]'}`}
             >
               포기이력 {data?.writeoffs?.length ? `(${data.writeoffs.length})` : ''}
             </button>
@@ -263,7 +260,7 @@ export default function ReceivablesPage() {
               <select
                 value={gradeFilter}
                 onChange={(e) => setGradeFilter(e.target.value)}
-                className="px-2 py-1 border border-gray-200 rounded bg-white text-sm"
+                className="form-input px-2 py-1 text-sm"
               >
                 <option value="">전체등급</option>
                 <option value="normal">정상</option>
@@ -274,7 +271,7 @@ export default function ReceivablesPage() {
               <select
                 value={officeFilter}
                 onChange={(e) => setOfficeFilter(e.target.value)}
-                className="px-2 py-1 border border-gray-200 rounded bg-white text-sm"
+                className="form-input px-2 py-1 text-sm"
               >
                 <option value="">전체사무소</option>
                 <option value="평택">평택</option>
@@ -284,7 +281,7 @@ export default function ReceivablesPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-2 py-1 border border-gray-200 rounded bg-white text-sm"
+                className="form-input px-2 py-1 text-sm"
               >
                 <option value="outstanding">미수금순</option>
                 <option value="grade">등급순</option>
@@ -294,15 +291,15 @@ export default function ReceivablesPage() {
           )}
         </div>
 
-        {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
+        {error && <div className="text-sm text-[var(--color-danger)] mb-4">{error}</div>}
 
         {/* List */}
         {activeTab === 'active' && (
-          <div className="bg-white rounded-lg border border-gray-200">
+          <div className="card">
             {!data?.clients.length ? (
-              <div className="py-12 text-center text-gray-400">미수금 없음</div>
+              <div className="py-12 text-center text-[var(--text-muted)]">미수금 없음</div>
             ) : (
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {data.clients.map((client) => {
                   const isOpen = expandedClients.has(client.client_id)
                   const memos = client.memos || []
@@ -312,54 +309,54 @@ export default function ReceivablesPage() {
                       {/* Client Row */}
                       <div
                         onClick={() => toggleExpand(client.client_id)}
-                        className="flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer"
+                        className="flex items-center px-4 py-3 hover:bg-[var(--bg-hover)] cursor-pointer"
                       >
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium mr-3 ${
-                          client.highest_grade === 'collection' ? 'bg-red-100 text-red-700' :
-                          client.highest_grade === 'watch' ? 'bg-amber-100 text-amber-700' :
-                          'bg-gray-100 text-gray-600'
+                          client.highest_grade === 'collection' ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]' :
+                          client.highest_grade === 'watch' ? 'bg-[var(--color-warning-muted)] text-[var(--color-warning)]' :
+                          'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                         }`}>
                           {client.client_name.charAt(0)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900 text-sm">{client.client_name}</span>
-                            <span className="text-xs text-gray-400">{client.case_count}건</span>
+                            <span className="font-medium text-[var(--text-primary)] text-sm">{client.client_name}</span>
+                            <span className="text-xs text-[var(--text-muted)]">{client.case_count}건</span>
                           </div>
                           {memos.length > 0 && (
-                            <p className="text-[14px] text-gray-500 mt-0.5 truncate">
+                            <p className="text-[14px] text-[var(--text-tertiary)] mt-0.5 truncate">
                               {memos[0].content}
                             </p>
                           )}
                         </div>
-                        <span className="font-bold text-red-600 text-sm">{formatCurrency(client.outstanding)}</span>
-                        <svg className={`w-4 h-4 ml-2 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span className="font-medium text-[var(--text-primary)] text-sm">{formatCurrency(client.outstanding)}</span>
+                        <svg className={`w-4 h-4 ml-2 text-[var(--text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </div>
 
                       {/* Expanded */}
                       {isOpen && (
-                        <div className="bg-gray-50 border-t border-gray-100">
+                        <div className="bg-[var(--bg-primary)] border-t border-[var(--border-subtle)]">
                           {/* Cases */}
                           {client.cases.map((c) => (
-                            <div key={c.id} className="flex items-center px-4 py-2 pl-14 border-b border-gray-100 last:border-b-0 bg-white">
+                            <div key={c.id} className="flex items-center px-4 py-2 pl-14 border-b border-[var(--border-subtle)] last:border-b-0 bg-[var(--bg-secondary)]">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-sm text-gray-800">{c.case_name}</span>
+                                  <span className="text-sm text-[var(--text-primary)]">{c.case_name}</span>
                                   {c.grade !== 'normal' && (
-                                    <span className={`px-1.5 py-0.5 text-xs rounded ${c.grade === 'watch' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>
+                                    <span className={`px-1.5 py-0.5 text-xs rounded ${c.grade === 'watch' ? 'bg-[var(--color-warning-muted)] text-[var(--color-warning)]' : 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]'}`}>
                                       {gradeLabels[c.grade]}
                                     </span>
                                   )}
                                 </div>
                               </div>
-                              <span className="text-sm font-medium text-red-600 mr-3">{formatCurrency(c.outstanding)}</span>
+                              <span className="text-sm font-medium text-[var(--text-primary)] mr-3">{formatCurrency(c.outstanding)}</span>
                               <select
                                 value={c.grade}
                                 onChange={(e) => changeGrade(c.id, e.target.value as ReceivableGrade)}
                                 onClick={(e) => e.stopPropagation()}
-                                className="text-xs px-1.5 py-0.5 border border-gray-200 rounded mr-2"
+                                className="text-xs px-1.5 py-0.5 border border-[var(--border-default)] rounded mr-2 bg-[var(--bg-secondary)]"
                               >
                                 <option value="normal">정상</option>
                                 <option value="watch">관리</option>
@@ -367,7 +364,7 @@ export default function ReceivablesPage() {
                               </select>
                               <button
                                 onClick={(e) => { e.stopPropagation(); openWaiveModal(c.id, c.case_name, c.outstanding) }}
-                                className="text-xs text-red-500 hover:text-red-700"
+                                className="text-xs text-[var(--color-danger)] hover:opacity-80"
                               >
                                 포기
                               </button>
@@ -383,13 +380,13 @@ export default function ReceivablesPage() {
                                     type="checkbox"
                                     checked={m.is_completed}
                                     onChange={() => toggleMemo(m.id, m.is_completed)}
-                                    className="mt-0.5 w-3.5 h-3.5 rounded border-gray-300"
+                                    className="mt-0.5 w-3.5 h-3.5 rounded border-[var(--border-default)]"
                                   />
-                                  <span className={`text-[14px] flex-1 ${m.is_completed ? 'line-through text-gray-400' : 'text-gray-600'}`}>
+                                  <span className={`text-[14px] flex-1 ${m.is_completed ? 'line-through text-[var(--text-muted)]' : 'text-[var(--text-secondary)]'}`}>
                                     {m.content}
-                                    <span className="text-gray-400 ml-2 text-xs">{fmtDate(m.created_at)}</span>
+                                    <span className="text-[var(--text-muted)] ml-2 text-xs">{fmtDate(m.created_at)}</span>
                                   </span>
-                                  <button onClick={() => deleteMemo(m.id)} className="text-xs text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100">×</button>
+                                  <button onClick={() => deleteMemo(m.id)} className="text-xs text-[var(--text-muted)] hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100">×</button>
                                 </div>
                               ))}
                             </div>
@@ -403,12 +400,12 @@ export default function ReceivablesPage() {
                               onChange={(e) => setNewMemoContent(prev => ({ ...prev, [client.client_id]: e.target.value }))}
                               onKeyDown={(e) => e.key === 'Enter' && addMemo(client.client_id)}
                               placeholder="메모 추가"
-                              className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded"
+                              className="form-input flex-1 px-2 py-1 text-xs"
                             />
                             <button
                               onClick={() => addMemo(client.client_id)}
                               disabled={!newMemoContent[client.client_id]?.trim()}
-                              className="px-2 py-1 text-xs bg-gray-800 text-white rounded disabled:opacity-40"
+                              className="btn btn-primary px-2 py-1 text-xs disabled:opacity-40"
                             >
                               추가
                             </button>
@@ -425,12 +422,12 @@ export default function ReceivablesPage() {
 
         {/* Writeoffs */}
         {activeTab === 'writeoffs' && (
-          <div className="bg-white rounded-lg border border-gray-200">
+          <div className="card">
             {!data?.writeoffs?.length ? (
-              <div className="py-12 text-center text-gray-400">포기 이력 없음</div>
+              <div className="py-12 text-center text-[var(--text-muted)]">포기 이력 없음</div>
             ) : (
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-gray-500 text-xs">
+                <thead className="bg-[var(--bg-primary)] text-[var(--text-tertiary)] text-xs">
                   <tr>
                     <th className="px-4 py-2 text-left font-medium">사건</th>
                     <th className="px-4 py-2 text-left font-medium">의뢰인</th>
@@ -439,14 +436,14 @@ export default function ReceivablesPage() {
                     <th className="px-4 py-2 text-right font-medium">일자</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[var(--border-subtle)]">
                   {data.writeoffs.map((w) => (
                     <tr key={w.id}>
-                      <td className="px-4 py-2">{w.case_name}</td>
-                      <td className="px-4 py-2 text-gray-500">{w.client_name || '-'}</td>
-                      <td className="px-4 py-2 text-right text-gray-400 line-through">{formatCurrency(w.original_amount)}</td>
-                      <td className="px-4 py-2 text-gray-500 truncate max-w-[200px]">{w.reason || '-'}</td>
-                      <td className="px-4 py-2 text-right text-gray-400">{fmtDate(w.written_off_at)}</td>
+                      <td className="px-4 py-2 text-[var(--text-primary)]">{w.case_name}</td>
+                      <td className="px-4 py-2 text-[var(--text-tertiary)]">{w.client_name || '-'}</td>
+                      <td className="px-4 py-2 text-right text-[var(--text-muted)] line-through">{formatCurrency(w.original_amount)}</td>
+                      <td className="px-4 py-2 text-[var(--text-tertiary)] truncate max-w-[200px]">{w.reason || '-'}</td>
+                      <td className="px-4 py-2 text-right text-[var(--text-muted)]">{fmtDate(w.written_off_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -459,25 +456,25 @@ export default function ReceivablesPage() {
       {/* Modal */}
       {waiveModal.isOpen && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-sm p-5">
-            <h3 className="font-bold text-gray-900 mb-3">미수금 포기</h3>
-            <div className="bg-gray-50 rounded p-3 mb-3">
-              <p className="text-sm text-gray-700">{waiveModal.caseName}</p>
-              <p className="text-lg font-bold text-red-600">{formatCurrency(waiveModal.amount)}</p>
+          <div className="card w-full max-w-sm p-5">
+            <h3 className="font-bold text-[var(--text-primary)] mb-3">미수금 포기</h3>
+            <div className="bg-[var(--bg-primary)] rounded p-3 mb-3">
+              <p className="text-sm text-[var(--text-secondary)]">{waiveModal.caseName}</p>
+              <p className="text-lg font-medium text-[var(--text-primary)]">{formatCurrency(waiveModal.amount)}</p>
             </div>
             <textarea
               value={waiveReason}
               onChange={(e) => setWaiveReason(e.target.value)}
               placeholder="포기 사유"
               rows={2}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded mb-3"
+              className="form-input w-full px-3 py-2 text-sm mb-3"
             />
             <div className="flex gap-2">
-              <button onClick={closeWaiveModal} className="flex-1 py-2 text-sm bg-gray-100 rounded">취소</button>
+              <button onClick={closeWaiveModal} className="btn btn-secondary flex-1 py-2 text-sm">취소</button>
               <button
                 onClick={handleWaive}
                 disabled={waiving || !waiveReason.trim()}
-                className="flex-1 py-2 text-sm bg-red-600 text-white rounded disabled:opacity-50"
+                className="flex-1 py-2 text-sm bg-[var(--color-danger)] text-white rounded disabled:opacity-50"
               >
                 {waiving ? '처리중' : '포기'}
               </button>

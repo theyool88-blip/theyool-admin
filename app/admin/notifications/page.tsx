@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import AdminHeader from '@/components/AdminHeader';
 import type {
   NotificationTemplate,
   NotificationLog,
@@ -32,10 +31,10 @@ const statusLabels: Record<NotificationStatus, string> = {
 };
 
 const statusColors: Record<NotificationStatus, string> = {
-  pending: 'text-yellow-600 bg-yellow-50',
-  sent: 'text-blue-600 bg-blue-50',
-  delivered: 'text-green-600 bg-green-50',
-  failed: 'text-red-600 bg-red-50',
+  pending: 'text-[var(--color-warning)] bg-[var(--color-warning-muted)]',
+  sent: 'text-[var(--sage-primary)] bg-[var(--sage-muted)]',
+  delivered: 'text-[var(--color-success)] bg-[var(--color-success-muted)]',
+  failed: 'text-[var(--color-danger)] bg-[var(--color-danger-muted)]',
 };
 
 type TabType = 'templates' | 'logs' | 'send' | 'settings';
@@ -251,26 +250,24 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="알림 관리" />
-
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">알림 관리</h1>
-          <p className="text-gray-600 mt-1">SMS 및 카카오 알림톡 발송 관리</p>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)]">알림 관리</h1>
+          <p className="text-[var(--text-secondary)] mt-1">SMS 및 카카오 알림톡 발송 관리</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          <div className="mb-4 p-4 bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded-lg text-[var(--color-danger)]">
             {error}
-            <button onClick={() => setError(null)} className="ml-2 text-red-500">
+            <button onClick={() => setError(null)} className="ml-2 text-[var(--color-danger)]">
               ✕
             </button>
           </div>
         )}
 
         {/* 탭 네비게이션 */}
-        <div className="border-b border-gray-200 mb-6">
+        <div className="border-b border-[var(--border-default)] mb-6">
           <nav className="-mb-px flex space-x-8">
             {[
               { key: 'templates', label: '템플릿 관리' },
@@ -283,8 +280,8 @@ export default function NotificationsPage() {
                 onClick={() => setActiveTab(tab.key as TabType)}
                 className={`py-4 px-1 border-b-2 font-medium text-sm ${
                   activeTab === tab.key
-                    ? 'border-sage-600 text-sage-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-[var(--sage-primary)] text-[var(--sage-primary)]'
+                    : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] hover:border-[var(--border-default)]'
                 }`}
               >
                 {tab.label}
@@ -297,45 +294,45 @@ export default function NotificationsPage() {
         {activeTab === 'templates' && (
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-medium">메시지 템플릿</h2>
+              <h2 className="text-lg font-medium text-[var(--text-primary)]">메시지 템플릿</h2>
               <button
                 onClick={() => {
                   setEditingTemplate(null);
                   setShowTemplateModal(true);
                 }}
-                className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700"
+                className="btn btn-primary px-4 py-2"
               >
                 + 새 템플릿
               </button>
             </div>
 
-            <div className="bg-white shadow rounded-lg overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="card overflow-hidden">
+              <table className="min-w-full divide-y divide-[var(--border-default)]">
+                <thead className="bg-[var(--bg-primary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">이름</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">카테고리</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">채널</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">관리</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">이름</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">카테고리</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">채널</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">상태</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-[var(--text-tertiary)] uppercase">관리</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-subtle)]">
                   {templates.map((template) => (
-                    <tr key={template.id} className="hover:bg-gray-50">
+                    <tr key={template.id} className="hover:bg-[var(--bg-hover)]">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-medium text-gray-900">{template.name}</div>
+                        <div className="font-medium text-[var(--text-primary)]">{template.name}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-tertiary)]">
                         {categoryLabels[template.category]}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-tertiary)]">
                         {channelLabels[template.channel]}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`px-2 py-1 text-xs rounded-full ${
-                            template.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                            template.is_active ? 'bg-[var(--color-success-muted)] text-[var(--color-success)]' : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                           }`}
                         >
                           {template.is_active ? '활성' : '비활성'}
@@ -347,13 +344,13 @@ export default function NotificationsPage() {
                             setEditingTemplate(template);
                             setShowTemplateModal(true);
                           }}
-                          className="text-sage-600 hover:text-sage-800 mr-3"
+                          className="text-[var(--sage-primary)] hover:opacity-80 mr-3"
                         >
                           수정
                         </button>
                         <button
                           onClick={() => deleteTemplate(template.id)}
-                          className="text-red-600 hover:text-red-800"
+                          className="text-[var(--color-danger)] hover:opacity-80"
                         >
                           삭제
                         </button>
@@ -362,7 +359,7 @@ export default function NotificationsPage() {
                   ))}
                   {templates.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={5} className="px-6 py-8 text-center text-[var(--text-tertiary)]">
                         등록된 템플릿이 없습니다.
                       </td>
                     </tr>
@@ -376,30 +373,30 @@ export default function NotificationsPage() {
         {/* 발송 이력 탭 */}
         {activeTab === 'logs' && (
           <div>
-            <h2 className="text-lg font-medium mb-4">발송 이력</h2>
+            <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">발송 이력</h2>
 
-            <div className="bg-white shadow rounded-lg overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+            <div className="card overflow-hidden">
+              <table className="min-w-full divide-y divide-[var(--border-default)]">
+                <thead className="bg-[var(--bg-primary)]">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">일시</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">수신자</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">채널</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">상태</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">내용</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">일시</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">수신자</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">채널</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">상태</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase">내용</th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-subtle)]">
                   {logs.map((log) => (
-                    <tr key={log.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <tr key={log.id} className="hover:bg-[var(--bg-hover)]">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-tertiary)]">
                         {new Date(log.created_at).toLocaleString('ko-KR')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{log.recipient_name || '-'}</div>
-                        <div className="text-sm text-gray-500">{log.recipient_phone}</div>
+                        <div className="text-sm font-medium text-[var(--text-primary)]">{log.recipient_name || '-'}</div>
+                        <div className="text-sm text-[var(--text-tertiary)]">{log.recipient_phone}</div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-[var(--text-tertiary)]">
                         {channelLabels[log.channel]}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -407,14 +404,14 @@ export default function NotificationsPage() {
                           {statusLabels[log.status]}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                      <td className="px-6 py-4 text-sm text-[var(--text-tertiary)] max-w-xs truncate">
                         {log.content.substring(0, 50)}...
                       </td>
                     </tr>
                   ))}
                   {logs.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                      <td colSpan={5} className="px-6 py-8 text-center text-[var(--text-tertiary)]">
                         발송 이력이 없습니다.
                       </td>
                     </tr>
@@ -424,21 +421,21 @@ export default function NotificationsPage() {
 
               {/* 페이지네이션 */}
               {logTotal > 20 && (
-                <div className="px-6 py-4 border-t flex justify-center gap-2">
+                <div className="px-6 py-4 border-t border-[var(--border-default)] flex justify-center gap-2">
                   <button
                     onClick={() => setLogPage((p) => Math.max(1, p - 1))}
                     disabled={logPage === 1}
-                    className="px-3 py-1 border rounded disabled:opacity-50"
+                    className="btn btn-secondary px-3 py-1 disabled:opacity-50"
                   >
                     이전
                   </button>
-                  <span className="px-3 py-1">
+                  <span className="px-3 py-1 text-[var(--text-secondary)]">
                     {logPage} / {Math.ceil(logTotal / 20)}
                   </span>
                   <button
                     onClick={() => setLogPage((p) => p + 1)}
                     disabled={logPage >= Math.ceil(logTotal / 20)}
-                    className="px-3 py-1 border rounded disabled:opacity-50"
+                    className="btn btn-secondary px-3 py-1 disabled:opacity-50"
                   >
                     다음
                   </button>
@@ -451,16 +448,16 @@ export default function NotificationsPage() {
         {/* 수동 발송 탭 */}
         {activeTab === 'send' && (
           <div className="max-w-2xl">
-            <h2 className="text-lg font-medium mb-4">수동 발송</h2>
+            <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">수동 발송</h2>
 
-            <div className="bg-white shadow rounded-lg p-6 space-y-4">
+            <div className="card p-6 space-y-4">
               {/* 채널 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">발송 채널</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">발송 채널</label>
                 <select
                   value={sendForm.channel}
                   onChange={(e) => setSendForm({ ...sendForm, channel: e.target.value as NotificationChannel })}
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="form-input w-full"
                 >
                   <option value="sms">SMS</option>
                   <option value="kakao_alimtalk">카카오 알림톡</option>
@@ -469,7 +466,7 @@ export default function NotificationsPage() {
 
               {/* 템플릿 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">템플릿 (선택)</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">템플릿 (선택)</label>
                 <select
                   value={sendForm.templateId}
                   onChange={(e) => {
@@ -485,7 +482,7 @@ export default function NotificationsPage() {
                       }
                     }
                   }}
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="form-input w-full"
                 >
                   <option value="">직접 입력</option>
                   {templates
@@ -500,15 +497,15 @@ export default function NotificationsPage() {
 
               {/* 메시지 내용 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">메시지 내용</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">메시지 내용</label>
                 <textarea
                   value={sendForm.customContent}
                   onChange={(e) => setSendForm({ ...sendForm, customContent: e.target.value })}
                   rows={5}
-                  className="w-full border rounded-lg px-3 py-2"
+                  className="form-input w-full"
                   placeholder="메시지 내용을 입력하세요. 변수는 {{이름}} 형식으로 사용합니다."
                 />
-                <div className="text-sm text-gray-500 mt-1">
+                <div className="text-sm text-[var(--text-tertiary)] mt-1">
                   {sendForm.customContent.length}자 / {sendForm.customContent.length > 90 ? 'LMS' : 'SMS'}
                 </div>
               </div>
@@ -516,22 +513,22 @@ export default function NotificationsPage() {
               {/* 수신자 정보 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">수신자 이름</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">수신자 이름</label>
                   <input
                     type="text"
                     value={sendForm.recipientName}
                     onChange={(e) => setSendForm({ ...sendForm, recipientName: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="form-input w-full"
                     placeholder="홍길동"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">전화번호 *</label>
+                  <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">전화번호 *</label>
                   <input
                     type="tel"
                     value={sendForm.recipientPhone}
                     onChange={(e) => setSendForm({ ...sendForm, recipientPhone: e.target.value })}
-                    className="w-full border rounded-lg px-3 py-2"
+                    className="form-input w-full"
                     placeholder="01012345678"
                   />
                 </div>
@@ -541,7 +538,7 @@ export default function NotificationsPage() {
               <button
                 onClick={handleSend}
                 disabled={sending}
-                className="w-full py-3 bg-sage-600 text-white rounded-lg hover:bg-sage-700 disabled:opacity-50"
+                className="btn btn-primary w-full py-3 disabled:opacity-50"
               >
                 {sending ? '발송 중...' : '발송하기'}
               </button>
@@ -552,13 +549,13 @@ export default function NotificationsPage() {
         {/* 자동 발송 설정 탭 */}
         {activeTab === 'settings' && (
           <div className="max-w-2xl">
-            <h2 className="text-lg font-medium mb-4">자동 발송 설정</h2>
+            <h2 className="text-lg font-medium text-[var(--text-primary)] mb-4">자동 발송 설정</h2>
 
             <div className="space-y-4">
               {schedules.map((schedule) => (
-                <div key={schedule.id} className="bg-white shadow rounded-lg p-6">
+                <div key={schedule.id} className="card p-6">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">{categoryLabels[schedule.category as TemplateCategory]}</h3>
+                    <h3 className="font-medium text-[var(--text-primary)]">{categoryLabels[schedule.category as TemplateCategory]}</h3>
                     <label className="flex items-center">
                       <input
                         type="checkbox"
@@ -571,13 +568,13 @@ export default function NotificationsPage() {
                         }
                         className="mr-2"
                       />
-                      <span className="text-sm text-gray-600">활성화</span>
+                      <span className="text-sm text-[var(--text-secondary)]">활성화</span>
                     </label>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">템플릿</label>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">템플릿</label>
                       <select
                         value={schedule.template_id || ''}
                         onChange={(e) =>
@@ -586,7 +583,7 @@ export default function NotificationsPage() {
                             template_id: e.target.value || undefined,
                           })
                         }
-                        className="w-full border rounded-lg px-3 py-2"
+                        className="form-input w-full"
                       >
                         <option value="">선택 안함</option>
                         {templates
@@ -599,7 +596,7 @@ export default function NotificationsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">발송 시각</label>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">발송 시각</label>
                       <input
                         type="time"
                         value={schedule.time_of_day}
@@ -609,11 +606,11 @@ export default function NotificationsPage() {
                             time_of_day: e.target.value,
                           })
                         }
-                        className="w-full border rounded-lg px-3 py-2"
+                        className="form-input w-full"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">일정 전 발송</label>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">일정 전 발송</label>
                       <select
                         value={schedule.days_before}
                         onChange={(e) =>
@@ -622,7 +619,7 @@ export default function NotificationsPage() {
                             days_before: parseInt(e.target.value),
                           })
                         }
-                        className="w-full border rounded-lg px-3 py-2"
+                        className="form-input w-full"
                       >
                         <option value={0}>당일</option>
                         <option value={1}>1일 전</option>
@@ -632,7 +629,7 @@ export default function NotificationsPage() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">발송 채널</label>
+                      <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">발송 채널</label>
                       <select
                         value={schedule.channel}
                         onChange={(e) =>
@@ -641,7 +638,7 @@ export default function NotificationsPage() {
                             channel: e.target.value as NotificationChannel | 'both',
                           })
                         }
-                        className="w-full border rounded-lg px-3 py-2"
+                        className="form-input w-full"
                       >
                         <option value="sms">SMS</option>
                         <option value="kakao_alimtalk">카카오 알림톡</option>
@@ -653,7 +650,7 @@ export default function NotificationsPage() {
               ))}
 
               {schedules.length === 0 && (
-                <div className="bg-white shadow rounded-lg p-6 text-center text-gray-500">
+                <div className="card p-6 text-center text-[var(--text-tertiary)]">
                   자동 발송 설정이 없습니다.
                 </div>
               )}
@@ -707,41 +704,41 @@ function TemplateEditModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b">
-          <h2 className="text-lg font-medium">{template ? '템플릿 수정' : '새 템플릿'}</h2>
+      <div className="card max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-[var(--border-default)]">
+          <h2 className="text-lg font-medium text-[var(--text-primary)]">{template ? '템플릿 수정' : '새 템플릿'}</h2>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">템플릿 이름 *</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">템플릿 이름 *</label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="w-full border rounded-lg px-3 py-2"
+              className="form-input w-full"
               required
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">채널</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">채널</label>
               <select
                 value={form.channel}
                 onChange={(e) => setForm({ ...form, channel: e.target.value as NotificationChannel })}
-                className="w-full border rounded-lg px-3 py-2"
+                className="form-input w-full"
               >
                 <option value="sms">SMS</option>
                 <option value="kakao_alimtalk">카카오 알림톡</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">카테고리</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">카테고리</label>
               <select
                 value={form.category}
                 onChange={(e) => setForm({ ...form, category: e.target.value as TemplateCategory })}
-                className="w-full border rounded-lg px-3 py-2"
+                className="form-input w-full"
               >
                 <option value="hearing_reminder">재판기일 알림</option>
                 <option value="consultation_reminder">상담 리마인더</option>
@@ -753,26 +750,26 @@ function TemplateEditModal({
 
           {form.channel === 'kakao_alimtalk' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">제목 (알림톡)</label>
+              <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">제목 (알림톡)</label>
               <input
                 type="text"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full border rounded-lg px-3 py-2"
+                className="form-input w-full"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">메시지 내용 *</label>
+            <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">메시지 내용 *</label>
             <textarea
               value={form.content}
               onChange={(e) => setForm({ ...form, content: e.target.value })}
               rows={8}
-              className="w-full border rounded-lg px-3 py-2 font-mono text-sm"
+              className="form-input w-full font-mono text-sm"
               required
             />
-            <div className="text-sm text-gray-500 mt-1">
+            <div className="text-sm text-[var(--text-tertiary)] mt-1">
               사용 가능 변수: {'{{이름}}'}, {'{{날짜}}'}, {'{{시간}}'}, {'{{장소}}'}, {'{{사건번호}}'} 등
             </div>
           </div>
@@ -785,16 +782,16 @@ function TemplateEditModal({
               onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
               className="mr-2"
             />
-            <label htmlFor="is_active" className="text-sm text-gray-700">
+            <label htmlFor="is_active" className="text-sm text-[var(--text-secondary)]">
               활성화
             </label>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t">
-            <button type="button" onClick={onClose} className="px-4 py-2 border rounded-lg hover:bg-gray-50">
+          <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border-default)]">
+            <button type="button" onClick={onClose} className="btn btn-secondary px-4 py-2">
               취소
             </button>
-            <button type="submit" className="px-4 py-2 bg-sage-600 text-white rounded-lg hover:bg-sage-700">
+            <button type="submit" className="btn btn-primary px-4 py-2">
               저장
             </button>
           </div>

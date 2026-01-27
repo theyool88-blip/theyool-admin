@@ -1,13 +1,13 @@
 # 상담 관리 시스템 설정 가이드
 
 **작성일**: 2025-11-23
-**프로젝트**: theyool-admin (법무법인 더율 관리자 시스템)
+**프로젝트**: luseed (법무법인 더율 관리자 시스템)
 
 ---
 
 ## 1. 개요
 
-더율(theyool) 프로젝트의 통합 상담 관리 시스템을 theyool-admin으로 성공적으로 이식했습니다.
+더율(theyool) 프로젝트의 통합 상담 관리 시스템을 luseed으로 성공적으로 이식했습니다.
 
 ### 시스템 특징
 - ✅ 4가지 상담 유형 지원 (콜백, 방문, 화상, 정보문의)
@@ -23,7 +23,7 @@
 ## 2. 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── types/
 │   └── consultation.ts               # 타입 정의 (407 lines)
 │
@@ -331,7 +331,7 @@ pending → contacted → confirmed → in_progress → completed
 ## 9. 설정 방법
 
 ### Step 1: Supabase 확인
-theyool-admin과 theyool이 **같은 Supabase 프로젝트**를 사용하므로 추가 마이그레이션은 불필요합니다.
+luseed과 theyool이 **같은 Supabase 프로젝트**를 사용하므로 추가 마이그레이션은 불필요합니다.
 
 확인 사항:
 ```bash
@@ -343,7 +343,7 @@ SUPABASE_SERVICE_ROLE_KEY=***
 
 ### Step 2: 의존성 확인
 ```bash
-cd /Users/hskim/theyool-admin
+cd /Users/hskim/luseed
 
 # 타입스크립트 에러 확인
 npm run type-check

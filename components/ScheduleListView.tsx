@@ -49,13 +49,13 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
   const getTypeColor = (type: string) => {
     switch (type) {
       case 'COURT_HEARING':
-        return 'bg-sage-100 text-sage-800 border-sage-200'
+        return 'bg-[var(--sage-muted)] text-[var(--text-primary)] border-[var(--border-default)]'
       case 'DEADLINE':
-        return 'bg-orange-100 text-orange-700 border-orange-200'
+        return 'bg-[var(--color-warning-muted)] text-[var(--color-warning)] border-[var(--border-default)]'
       case 'CONSULTATION':
-        return 'bg-sage-50 text-sage-700 border-sage-200'
+        return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-[var(--border-default)]'
       default:
-        return 'bg-gray-100 text-gray-700 border-gray-200'
+        return 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] border-[var(--border-default)]'
     }
   }
 
@@ -64,19 +64,19 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
       case 'SCHEDULED':
       case 'pending':
       case 'PENDING':
-        return 'bg-sage-50 text-sage-700 border-sage-200'
+        return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-[var(--border-default)]'
       case 'COMPLETED':
       case 'confirmed':
-        return 'bg-green-50 text-green-700 border-green-200'
+        return 'bg-[var(--color-success-muted)] text-[var(--color-success)] border-[var(--border-default)]'
       case 'CANCELLED':
       case 'cancelled':
-        return 'bg-gray-50 text-gray-700 border-gray-200'
+        return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)]'
       case 'POSTPONED':
-        return 'bg-yellow-50 text-yellow-700 border-yellow-200'
+        return 'bg-[var(--color-warning-muted)] text-[var(--color-warning)] border-[var(--border-default)]'
       case 'OVERDUE':
-        return 'bg-red-50 text-red-700 border-red-200'
+        return 'bg-[var(--color-danger-muted)] text-[var(--color-danger)] border-[var(--border-default)]'
       default:
-        return 'bg-gray-50 text-gray-700 border-gray-200'
+        return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border-default)]'
     }
   }
 
@@ -128,9 +128,9 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
   return (
     <div className="space-y-4">
       {/* 필터 및 정렬 */}
-      <div className="flex flex-wrap items-center gap-3 bg-white p-4 rounded-lg border border-sage-200">
+      <div className="flex flex-wrap items-center gap-3 bg-[var(--bg-secondary)] p-4 rounded-lg border border-[var(--border-default)]">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-sage-800">필터:</span>
+          <span className="text-sm font-medium text-[var(--text-primary)]">필터:</span>
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
@@ -144,7 +144,7 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-sage-800">정렬:</span>
+          <span className="text-sm font-medium text-[var(--text-primary)]">정렬:</span>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value as 'date' | 'type')}
@@ -155,61 +155,61 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
           </select>
         </div>
 
-        <div className="ml-auto text-sm text-sage-700">
-          총 <span className="font-semibold text-sage-900">{sortedSchedules.length}</span>개
+        <div className="ml-auto text-sm text-[var(--sage-primary)]">
+          총 <span className="font-semibold text-[var(--text-primary)]">{sortedSchedules.length}</span>개
         </div>
       </div>
 
       {/* 목록 */}
       {sortedSchedules.length === 0 ? (
-        <div className="bg-white rounded-lg border border-sage-200 p-12 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-sage-100 rounded-full mb-4">
-            
+        <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] p-12 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-[var(--sage-muted)] rounded-full mb-4">
+
           </div>
-          <p className="text-gray-600 font-medium">일정이 없습니다.</p>
-          <p className="text-sm text-sage-600 mt-1">새로운 일정을 추가해보세요.</p>
+          <p className="text-[var(--text-secondary)] font-medium">일정이 없습니다.</p>
+          <p className="text-sm text-[var(--sage-primary)] mt-1">새로운 일정을 추가해보세요.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-lg border border-sage-200 overflow-hidden">
+        <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-sage-50 border-b border-sage-200">
+              <thead className="bg-[var(--sage-muted)] border-b border-[var(--border-default)]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-sage-800 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                     날짜/시간
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-sage-800 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                     종류
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-sage-800 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                     제목
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-sage-800 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                     참조
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-sage-800 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                     장소
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-sage-800 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                     상태
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-sage-800 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--text-primary)] uppercase tracking-wider">
                     액션
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-sage-100">
+              <tbody className="divide-y divide-[var(--border-subtle)]">
                 {sortedSchedules.map((schedule) => (
                   <tr
                     key={schedule.id}
-                    className="hover:bg-sage-50 cursor-pointer transition-colors"
+                    className="hover:bg-[var(--bg-hover)] cursor-pointer transition-colors"
                     onClick={() => onEdit(schedule)}
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-[var(--text-primary)]">
                         {formatDate(schedule.event_date)}
                       </div>
-                      <div className="text-sm text-sage-600">
+                      <div className="text-sm text-[var(--sage-primary)]">
                         {formatTime(schedule.event_time)}
                       </div>
                     </td>
@@ -219,22 +219,22 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
                       </span>
                     </td>
                     <td className="px-4 py-4">
-                      <div className="text-sm font-medium text-gray-900 max-w-md truncate">
+                      <div className="text-sm font-medium text-[var(--text-primary)] max-w-md truncate">
                         {schedule.title}
                       </div>
                       {schedule.description && (
-                        <div className="text-sm text-sage-600 max-w-md truncate">
+                        <div className="text-sm text-[var(--sage-primary)] max-w-md truncate">
                           {schedule.description}
                         </div>
                       )}
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-[var(--text-primary)]">
                         {schedule.reference_id}
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-sage-600">
+                      <div className="text-sm text-[var(--sage-primary)]">
                         {shortenCourtLocation(schedule.location)}
                       </div>
                     </td>
@@ -249,7 +249,7 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
                           e.stopPropagation()
                           onEdit(schedule)
                         }}
-                        className="text-sage-700 hover:text-sage-900 font-medium mr-3"
+                        className="text-[var(--sage-primary)] hover:text-[var(--text-primary)] font-medium mr-3"
                       >
                         수정
                       </button>
@@ -259,7 +259,7 @@ export default function ScheduleListView({ schedules, onEdit, onDelete }: Schedu
                             e.stopPropagation()
                             onDelete(schedule)
                           }}
-                          className="text-red-600 hover:text-red-900 font-medium"
+                          className="text-[var(--color-danger)] hover:text-[var(--color-danger)] font-medium"
                         >
                           삭제
                         </button>

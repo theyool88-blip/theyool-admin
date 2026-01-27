@@ -184,20 +184,20 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="card p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
-            <Key className="w-5 h-5 text-amber-600" />
+          <div className="w-10 h-10 rounded-lg bg-[var(--sage-muted)] flex items-center justify-center">
+            <Key className="w-5 h-5 text-[var(--sage-primary)]" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">API 키 관리</h2>
-            <p className="text-xs text-gray-500">홈페이지 연동용 API 키</p>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">API 키 관리</h2>
+            <p className="text-xs text-[var(--text-tertiary)]">홈페이지 연동용 API 키</p>
           </div>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="h-9 px-4 text-sm font-medium text-white bg-amber-600 rounded hover:bg-amber-700 flex items-center gap-2"
+          className="btn btn-primary flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
           새 API 키
@@ -206,38 +206,38 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
 
       {/* Alerts */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mb-4 p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded-lg flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 text-[var(--color-danger)] flex-shrink-0" />
+          <p className="text-sm text-[var(--color-danger)]">{error}</p>
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2">
-          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-          <p className="text-sm text-green-600">{success}</p>
+        <div className="mb-4 p-3 bg-[var(--color-success-muted)] border border-[var(--color-success)] rounded-lg flex items-center gap-2">
+          <CheckCircle className="w-4 h-4 text-[var(--color-success)] flex-shrink-0" />
+          <p className="text-sm text-[var(--color-success)]">{success}</p>
         </div>
       )}
 
       {/* 새로 생성된 키 표시 */}
       {newApiKey && (
-        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+        <div className="mb-4 p-4 bg-[var(--sage-muted)] border border-[var(--sage-primary)] rounded-lg">
           <div className="flex items-center gap-2 mb-2">
-            <AlertCircle className="w-4 h-4 text-amber-600" />
-            <p className="text-sm font-medium text-amber-800">
+            <AlertCircle className="w-4 h-4 text-[var(--sage-primary)]" />
+            <p className="text-sm font-medium text-[var(--text-primary)]">
               API 키가 생성되었습니다
             </p>
           </div>
-          <p className="text-xs text-amber-700 mb-3">
+          <p className="text-xs text-[var(--text-secondary)] mb-3">
             이 키는 다시 확인할 수 없습니다. 안전하게 보관하세요.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 p-2 bg-white border border-amber-200 rounded text-sm font-mono text-gray-900 overflow-x-auto">
+            <code className="flex-1 p-2 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded text-sm font-mono text-[var(--text-primary)] overflow-x-auto">
               {newApiKey}
             </code>
             <button
               onClick={() => copyToClipboard(newApiKey)}
-              className="h-9 px-3 text-sm font-medium text-amber-700 bg-amber-100 rounded hover:bg-amber-200 flex items-center gap-1"
+              className="btn btn-secondary h-9 px-3 flex items-center gap-1"
             >
               {copied ? (
                 <>
@@ -254,7 +254,7 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
           </div>
           <button
             onClick={() => setNewApiKey(null)}
-            className="mt-3 text-xs text-amber-600 hover:underline"
+            className="mt-3 text-xs text-[var(--sage-primary)] hover:underline"
           >
             닫기
           </button>
@@ -263,15 +263,15 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
 
       {/* 키 목록 */}
       {loading ? (
-        <div className="flex items-center gap-2 text-gray-500">
+        <div className="flex items-center gap-2 text-[var(--text-tertiary)]">
           <RefreshCw className="w-4 h-4 animate-spin" />
           <span className="text-sm">로딩 중...</span>
         </div>
       ) : keys.length === 0 ? (
         <div className="text-center py-8">
-          <Key className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">API 키가 없습니다</p>
-          <p className="text-xs text-gray-400 mt-1">
+          <Key className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3" />
+          <p className="text-sm text-[var(--text-tertiary)]">API 키가 없습니다</p>
+          <p className="text-caption mt-1">
             홈페이지와 연동하려면 API 키를 생성하세요
           </p>
         </div>
@@ -282,30 +282,30 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
               key={key.id}
               className={`p-4 rounded-lg border ${
                 key.is_active
-                  ? 'bg-white border-gray-200'
-                  : 'bg-gray-50 border-gray-100'
+                  ? 'bg-[var(--bg-secondary)] border-[var(--border-default)]'
+                  : 'bg-[var(--bg-primary)] border-[var(--border-subtle)]'
               }`}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-[var(--text-primary)]">
                       {key.name || '이름 없음'}
                     </p>
                     <span
                       className={`text-xs px-1.5 py-0.5 rounded ${
                         key.is_active
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-200 text-gray-600'
+                          ? 'bg-[var(--color-success-muted)] text-[var(--color-success)]'
+                          : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
                       }`}
                     >
                       {key.is_active ? '활성' : '비활성'}
                     </span>
                   </div>
-                  <p className="text-xs font-mono text-gray-500 mb-2">
+                  <p className="text-xs font-mono text-[var(--text-tertiary)] mb-2">
                     {key.key_prefix}...
                   </p>
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-4 text-xs text-[var(--text-tertiary)]">
                     <span>생성: {formatDate(key.created_at)}</span>
                     <span>마지막 사용: {formatDate(key.last_used_at)}</span>
                     <span>호출: {key.usage_count || 0}회</span>
@@ -317,8 +317,8 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
                     onClick={() => handleToggleActive(key.id, key.is_active)}
                     className={`p-2 rounded ${
                       key.is_active
-                        ? 'text-green-600 hover:bg-green-50'
-                        : 'text-gray-400 hover:bg-gray-100'
+                        ? 'text-[var(--color-success)] hover:bg-[var(--color-success-muted)]'
+                        : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]'
                     }`}
                     title={key.is_active ? '비활성화' : '활성화'}
                   >
@@ -330,7 +330,7 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
                   </button>
                   <button
                     onClick={() => handleDeleteKey(key.id)}
-                    className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                    className="p-2 text-[var(--text-muted)] hover:text-[var(--color-danger)] hover:bg-[var(--color-danger-muted)] rounded"
                     title="삭제"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -345,15 +345,15 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
       {/* 생성 모달 */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+          <div className="bg-[var(--bg-secondary)] rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
                 새 API 키 생성
               </h3>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label className="form-label">
                     키 이름
                   </label>
                   <input
@@ -361,31 +361,31 @@ export default function ApiKeyManager({ hasHomepage }: ApiKeyManagerProps) {
                     value={newKeyName}
                     onChange={(e) => setNewKeyName(e.target.value)}
                     placeholder="예: 홈페이지 연동용"
-                    className="w-full h-10 px-3 text-sm border border-gray-200 rounded focus:outline-none focus:border-sage-500"
+                    className="form-input w-full"
                   />
                 </div>
 
-                <p className="text-xs text-gray-500">
+                <p className="text-caption">
                   API 키는 생성 후 다시 확인할 수 없습니다.
                   생성되면 바로 안전한 곳에 저장하세요.
                 </p>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 px-6 py-4 bg-gray-50 rounded-b-lg">
+            <div className="flex justify-end gap-2 px-6 py-4 bg-[var(--bg-primary)] rounded-b-lg">
               <button
                 onClick={() => {
                   setShowCreateModal(false);
                   setNewKeyName('홈페이지 연동용');
                 }}
-                className="h-9 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded hover:bg-gray-50"
+                className="btn btn-secondary"
               >
                 취소
               </button>
               <button
                 onClick={handleCreateKey}
                 disabled={creating || !newKeyName.trim()}
-                className="h-9 px-4 text-sm font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50 flex items-center gap-2"
+                className="btn btn-primary flex items-center gap-2"
               >
                 {creating ? (
                   <>

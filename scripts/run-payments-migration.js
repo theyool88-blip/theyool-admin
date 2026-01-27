@@ -17,7 +17,7 @@ async function runMigration() {
     console.log('🚀 payments 테이블 마이그레이션 시작\n')
 
     const sql = fs.readFileSync(
-      '/Users/hskim/theyool-admin/supabase/migrations/20251124_create_payments_table.sql',
+      '/Users/hskim/luseed/supabase/migrations/20251124_create_payments_table.sql',
       'utf-8'
     )
 

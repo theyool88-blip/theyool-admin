@@ -24,10 +24,31 @@ export const POST = withRole('admin')(async (request, { tenant }) => {
     const body = await request.json().catch(() => ({}));
     const { caseId, hearingId } = body;
 
-    // 동기화 대상 조회
+    // court_hearings는 tenant_id 컬럼이 없음 - 테넌트의 사건 ID 목록을 먼저 조회
+    const { data: tenantCases, error: casesError } = await supabase
+      .from('legal_cases')
+      .select('id')
+      .eq('tenant_id', tenantId);
+
+    if (casesError) {
+      return NextResponse.json({ error: casesError.message }, { status: 500 });
+    }
+
+    const tenantCaseIds = tenantCases?.map(c => c.id) || [];
+
+    if (tenantCaseIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        message: '동기화할 기일이 없습니다 (사건 없음)',
+        synced: 0,
+      });
+    }
+
+    // 동기화 대상 조회 (테넌트 격리 적용)
     let query = supabase
       .from('court_hearings')
       .select('id, case_id, case_number, hearing_type, hearing_date, location, google_event_id')
+      .in('case_id', tenantCaseIds)
       .is('google_event_id', null)
       .gte('hearing_date', new Date().toISOString())
       .eq('status', 'SCHEDULED');
@@ -36,7 +57,10 @@ export const POST = withRole('admin')(async (request, { tenant }) => {
       // 특정 기일만
       query = query.eq('id', hearingId);
     } else if (caseId) {
-      // 특정 사건의 기일들
+      // 특정 사건의 기일들 (테넌트 소속 확인)
+      if (!tenantCaseIds.includes(caseId)) {
+        return NextResponse.json({ error: 'Case not found in your tenant' }, { status: 403 });
+      }
       query = query.eq('case_id', caseId);
     }
 

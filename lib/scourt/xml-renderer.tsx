@@ -95,10 +95,10 @@ export function BasicInfoTable({ layout, data, className }: BasicInfoTableProps)
   return (
     <div className={className}>
       <h3 className="text-base md:text-lg font-semibold mb-3 flex items-center gap-2">
-        <span className="w-1 h-5 bg-sage-600 rounded"></span>
+        <span className="w-1 h-5 bg-[var(--sage-primary)] rounded"></span>
         {layout.title}
         {typeof data.cortNm === 'string' && data.cortNm && (
-          <span className="text-xs md:text-sm font-normal text-gray-500">
+          <span className="text-xs md:text-sm font-normal text-[var(--text-tertiary)]">
             ({data.cortNm})
           </span>
         )}
@@ -142,7 +142,7 @@ function BasicInfoRowComponent({ row, data }: BasicInfoRowProps) {
   }
 
   return (
-    <tr className="border-b border-gray-200">
+    <tr className="border-b border-[var(--border-default)]">
       {row.cells.map((cell, cellIndex) => (
         <BasicInfoCellComponent
           key={cellIndex}
@@ -185,8 +185,8 @@ function BasicInfoCellComponent({ cell, data }: BasicInfoCellProps) {
   }
 
   const baseClasses = isHeader
-    ? 'px-2 md:px-3 py-1.5 md:py-2 bg-gray-50 text-xs md:text-sm font-medium text-gray-700 text-left'
-    : 'px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900';
+    ? 'px-2 md:px-3 py-1.5 md:py-2 bg-[var(--bg-primary)] text-xs md:text-sm font-medium text-[var(--text-secondary)] text-left'
+    : 'px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-[var(--text-primary)]';
 
   const Tag = isHeader ? 'th' : 'td';
 
@@ -269,30 +269,30 @@ export function GridTable({ layout, data, className, caseLinkMap, rowActionHeade
   return (
     <div className={className}>
       <h3 className="text-base md:text-lg font-semibold mb-3 flex items-center gap-2">
-        <span className="w-1 h-5 bg-sage-600 rounded"></span>
+        <span className="w-1 h-5 bg-[var(--sage-primary)] rounded"></span>
         {layout.title}
       </h3>
 
       {!hasData ? (
-        <p className="text-xs md:text-sm text-gray-500 py-4 text-center bg-gray-50 rounded">
+        <p className="text-xs md:text-sm text-[var(--text-tertiary)] py-4 text-center bg-[var(--bg-primary)] rounded">
           {layout.noResultMessage || '조회된 내용이 없습니다.'}
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full border-collapse min-w-full">
             <thead>
-              <tr className="bg-gray-50 border-y border-gray-200">
+              <tr className="bg-[var(--bg-primary)] border-y border-[var(--border-default)]">
                 {visibleColumns.map((col, i) => (
                   <th
                     key={i}
-                    className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 text-center"
+                    className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-[var(--text-secondary)] text-center"
                     style={{ width: col.width ? `${col.width}%` : 'auto' }}
                   >
                     {col.header}
                   </th>
                 ))}
                 {renderRowAction && (
-                  <th className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-gray-700 text-center w-16">
+                  <th className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm font-medium text-[var(--text-secondary)] text-center w-16">
                     {rowActionHeader || '수정'}
                   </th>
                 )}
@@ -300,7 +300,7 @@ export function GridTable({ layout, data, className, caseLinkMap, rowActionHeade
             </thead>
             <tbody>
               {data.map((row, rowIndex) => (
-                <tr key={rowIndex} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={rowIndex} className="border-b border-[var(--border-subtle)] hover:bg-[var(--bg-hover)]">
                   {visibleColumns.map((col, colIndex) => {
                     // expression 컬럼: 여러 필드를 조합
                     let displayValue: string;
@@ -334,11 +334,11 @@ export function GridTable({ layout, data, className, caseLinkMap, rowActionHeade
                     return (
                       <td
                         key={colIndex}
-                        className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-gray-900"
+                        className="px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-sm text-[var(--text-primary)]"
                         style={{ textAlign: (col.textAlign as React.CSSProperties['textAlign']) || 'center' }}
                       >
                         {caseLink ? (
-                          <a href={caseLink} className="text-sage-700 hover:underline">
+                          <a href={caseLink} className="text-[var(--sage-primary)] hover:underline">
                             {displayValue}
                           </a>
                         ) : (
@@ -422,7 +422,7 @@ export function ScourtGeneralInfoRenderer({
       <BasicInfoTable
         layout={basicInfoLayout}
         data={processedBasicInfo}
-        className="bg-white rounded-lg border border-gray-200 p-4"
+        className="card p-4"
       />
 
       {/* 당사자내용 */}
@@ -430,7 +430,7 @@ export function ScourtGeneralInfoRenderer({
         <GridTable
           layout={gridLayouts.dlt_btprtCttLst}
           data={apiData.dlt_btprtCttLst || []}
-          className="bg-white rounded-lg border border-gray-200 p-4"
+          className="card p-4"
         />
       )}
 
@@ -439,7 +439,7 @@ export function ScourtGeneralInfoRenderer({
         <GridTable
           layout={gridLayouts.dlt_agntCttLst}
           data={apiData.dlt_agntCttLst || []}
-          className="bg-white rounded-lg border border-gray-200 p-4"
+          className="card p-4"
         />
       )}
 
@@ -448,7 +448,7 @@ export function ScourtGeneralInfoRenderer({
         <GridTable
           layout={gridLayouts.dlt_rcntDxdyLst}
           data={apiData.dlt_rcntDxdyLst || []}
-          className="bg-white rounded-lg border border-gray-200 p-4"
+          className="card p-4"
         />
       )}
 
@@ -457,7 +457,7 @@ export function ScourtGeneralInfoRenderer({
         <GridTable
           layout={gridLayouts.dlt_rcntSbmsnDocmtLst}
           data={apiData.dlt_rcntSbmsnDocmtLst || []}
-          className="bg-white rounded-lg border border-gray-200 p-4"
+          className="card p-4"
         />
       )}
 
@@ -466,7 +466,7 @@ export function ScourtGeneralInfoRenderer({
         <GridTable
           layout={gridLayouts.dlt_reltCsLst}
           data={apiData.dlt_reltCsLst || []}
-          className="bg-white rounded-lg border border-gray-200 p-4"
+          className="card p-4"
         />
       )}
 
@@ -475,7 +475,7 @@ export function ScourtGeneralInfoRenderer({
         <GridTable
           layout={gridLayouts.dlt_inscrtDtsLst}
           data={apiData.dlt_inscrtDtsLst || []}
-          className="bg-white rounded-lg border border-gray-200 p-4"
+          className="card p-4"
         />
       )}
     </div>

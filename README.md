@@ -1,4 +1,4 @@
-# 법무법인 더율 관리자 시스템 (theyool-admin)
+# 법무법인 더율 관리자 시스템 (luseed)
 
 **법무법인 더율**의 사건, 의뢰인, 상담, 재정을 통합 관리하는 관리자 시스템입니다.
 
@@ -78,7 +78,7 @@ npm run dev
 ## 프로젝트 구조
 
 ```
-theyool-admin/
+luseed/
 ├── app/              # Next.js App Router
 │   ├── admin/        # 관리자 페이지
 │   ├── api/          # API 라우트

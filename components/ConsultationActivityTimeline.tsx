@@ -70,14 +70,14 @@ export default function ConsultationActivityTimeline({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--sage-primary)]"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-600 text-sm">
+      <div className="bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded-lg p-4 text-[var(--color-danger)] text-sm">
         {error}
       </div>
     );
@@ -85,7 +85,7 @@ export default function ConsultationActivityTimeline({
 
   if (activities.length === 0) {
     return (
-      <div className="text-center py-8 text-gray-500">
+      <div className="text-center py-8 text-[var(--text-tertiary)]">
         <p>활동 기록이 없습니다.</p>
       </div>
     );
@@ -103,21 +103,21 @@ export default function ConsultationActivityTimeline({
       {/* Summary Statistics */}
       {showSummary && summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-sage-50 rounded-lg p-4">
-            <p className="text-xs text-gray-600 mb-1">전체 활동</p>
-            <p className="text-2xl font-bold text-gray-900">{summary.total_activities}</p>
+          <div className="bg-[var(--sage-muted)] rounded-lg p-4">
+            <p className="text-xs text-[var(--text-secondary)] mb-1">전체 활동</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{summary.total_activities}</p>
           </div>
-          <div className="bg-purple-50 rounded-lg p-4">
-            <p className="text-xs text-gray-600 mb-1">상태 변경</p>
-            <p className="text-2xl font-bold text-purple-900">{summary.status_changes}</p>
+          <div className="bg-[var(--bg-tertiary)] rounded-lg p-4">
+            <p className="text-xs text-[var(--text-secondary)] mb-1">상태 변경</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{summary.status_changes}</p>
           </div>
-          <div className="bg-orange-50 rounded-lg p-4">
-            <p className="text-xs text-gray-600 mb-1">일정 변경</p>
-            <p className="text-2xl font-bold text-orange-900">{summary.schedule_changes}</p>
+          <div className="bg-[var(--bg-tertiary)] rounded-lg p-4">
+            <p className="text-xs text-[var(--text-secondary)] mb-1">일정 변경</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{summary.schedule_changes}</p>
           </div>
-          <div className="bg-cyan-50 rounded-lg p-4">
-            <p className="text-xs text-gray-600 mb-1">메모 추가</p>
-            <p className="text-2xl font-bold text-cyan-900">{summary.notes_added}</p>
+          <div className="bg-[var(--bg-tertiary)] rounded-lg p-4">
+            <p className="text-xs text-[var(--text-secondary)] mb-1">메모 추가</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{summary.notes_added}</p>
           </div>
         </div>
       )}
@@ -129,11 +129,11 @@ export default function ConsultationActivityTimeline({
             {/* Date Header */}
             <div className="flex items-center gap-3 mb-4">
               <div className="flex-shrink-0">
-                <div className="bg-sage-100 text-sage-800 px-3 py-1 rounded-full text-xs font-semibold">
+                <div className="bg-[var(--sage-muted)] text-[var(--sage-primary)] px-3 py-1 rounded-full text-xs font-semibold">
                   {formatActivityDate(group.date)}
                 </div>
               </div>
-              <div className="flex-1 h-px bg-sage-200"></div>
+              <div className="flex-1 h-px bg-[var(--border-subtle)]"></div>
             </div>
 
             {/* Activities for this date */}
@@ -147,7 +147,7 @@ export default function ConsultationActivityTimeline({
                 >
                   {/* Timeline line */}
                   {index !== group.activities.length - 1 && (
-                    <div className="absolute left-[19px] top-10 bottom-0 w-px bg-sage-200"></div>
+                    <div className="absolute left-[19px] top-10 bottom-0 w-px bg-[var(--border-subtle)]"></div>
                   )}
 
                   {/* Icon */}
@@ -164,7 +164,7 @@ export default function ConsultationActivityTimeline({
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <div
-                      className={`bg-white border border-sage-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-shadow ${
+                      className={`card p-4 hover:shadow-md transition-shadow ${
                         compact ? 'text-sm' : ''
                       }`}
                     >
@@ -179,35 +179,35 @@ export default function ConsultationActivityTimeline({
                             {ACTIVITY_TYPE_LABELS[activity.activity_type]}
                           </span>
                           {!activity.is_system_generated && (
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-[var(--text-tertiary)]">
                               {activity.actor_name || ACTOR_TYPE_LABELS[activity.actor_type]}
                             </span>
                           )}
                         </div>
-                        <span className="text-xs text-gray-500 flex-shrink-0">
+                        <span className="text-xs text-[var(--text-tertiary)] flex-shrink-0">
                           {formatActivityTime(activity.created_at)}
                         </span>
                       </div>
 
                       {/* Description */}
-                      <p className="text-gray-900 mb-2">{activity.description}</p>
+                      <p className="text-[var(--text-primary)] mb-2">{activity.description}</p>
 
                       {/* Change Details (if available) */}
                       {(activity.old_value || activity.new_value) && (
-                        <div className="mt-3 pt-3 border-t border-sage-100 text-sm">
+                        <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] text-sm">
                           <div className="grid grid-cols-2 gap-3">
                             {activity.old_value && (
                               <div>
-                                <p className="text-xs text-gray-500 mb-1">이전</p>
-                                <p className="text-gray-700 bg-gray-50 px-2 py-1 rounded">
+                                <p className="text-xs text-[var(--text-tertiary)] mb-1">이전</p>
+                                <p className="text-[var(--text-secondary)] bg-[var(--bg-primary)] px-2 py-1 rounded">
                                   {activity.old_value}
                                 </p>
                               </div>
                             )}
                             {activity.new_value && (
                               <div>
-                                <p className="text-xs text-gray-500 mb-1">이후</p>
-                                <p className="text-gray-900 bg-coral-50 px-2 py-1 rounded font-medium">
+                                <p className="text-xs text-[var(--text-tertiary)] mb-1">이후</p>
+                                <p className="text-[var(--text-primary)] bg-coral-50 px-2 py-1 rounded font-medium">
                                   {activity.new_value}
                                 </p>
                               </div>
@@ -218,12 +218,12 @@ export default function ConsultationActivityTimeline({
 
                       {/* Metadata (if available) */}
                       {activity.metadata && Object.keys(activity.metadata).length > 0 && (
-                        <div className="mt-2 text-xs text-gray-500">
+                        <div className="mt-2 text-xs text-[var(--text-tertiary)]">
                           <details>
-                            <summary className="cursor-pointer hover:text-gray-700">
+                            <summary className="cursor-pointer hover:text-[var(--text-secondary)]">
                               세부 정보
                             </summary>
-                            <pre className="mt-2 p-2 bg-gray-50 rounded overflow-x-auto">
+                            <pre className="mt-2 p-2 bg-[var(--bg-primary)] rounded overflow-x-auto">
                               {JSON.stringify(activity.metadata, null, 2)}
                             </pre>
                           </details>
@@ -243,7 +243,7 @@ export default function ConsultationActivityTimeline({
         <div className="text-center pt-4">
           <button
             onClick={() => setShowAll(!showAll)}
-            className="text-sage-600 hover:text-sage-800 font-medium text-sm"
+            className="text-[var(--sage-primary)] hover:text-[var(--sage-dark)] font-medium text-sm"
           >
             {showAll ? '접기' : `${activities.length - maxItems}개 더 보기`}
           </button>

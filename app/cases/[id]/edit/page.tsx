@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import CaseEditForm from '@/components/CaseEditForm'
+import AdminLayoutClient from '@/components/AdminLayoutClient'
 
 type RelatedCaseRecord = {
   id: string
@@ -87,5 +88,9 @@ export default async function CaseEditPage({ params }: { params: Promise<{ id: s
     display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
   }
 
-  return <CaseEditForm profile={profile as any} caseData={caseData} allCases={allCases || []} relatedCases={relatedCases} />
+  return (
+    <AdminLayoutClient>
+      <CaseEditForm profile={profile as any} caseData={caseData} allCases={allCases || []} relatedCases={relatedCases} />
+    </AdminLayoutClient>
+  )
 }

@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import NewClientForm from '@/components/NewClientForm'
+import AdminLayoutClient from '@/components/AdminLayoutClient'
 
 export default async function NewClientPage() {
   // 테넌트 컨텍스트 조회 (impersonation 포함)
@@ -9,5 +10,9 @@ export default async function NewClientPage() {
     redirect('/login')
   }
 
-  return <NewClientForm />
+  return (
+    <AdminLayoutClient>
+      <NewClientForm />
+    </AdminLayoutClient>
+  )
 }

@@ -74,7 +74,7 @@ async function main() {
 
   for (const assignment of assignmentStats || []) {
     const memberId = assignment.member_id;
-    const member = assignment.member as { display_name: string; role: string } | null;
+    const member = assignment.member as unknown as { display_name: string; role: string } | null;
 
     if (!memberStats.has(memberId)) {
       memberStats.set(memberId, {

@@ -75,10 +75,10 @@ export default function SourceStatsWidget() {
 
   if (loading) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-semibold mb-4 text-gray-900">유입 경로 분석</h3>
-        <div className="flex items-center justify-center py-8 text-gray-500">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sage-600"></div>
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">유입 경로 분석</h3>
+        <div className="flex items-center justify-center py-8 text-[var(--text-tertiary)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--sage-primary)]"></div>
         </div>
       </div>
     );
@@ -86,9 +86,9 @@ export default function SourceStatsWidget() {
 
   if (error) {
     return (
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-semibold mb-4 text-gray-900">유입 경로 분석</h3>
-        <div className="text-center py-8 text-red-600">
+      <div className="card p-6">
+        <h3 className="text-lg font-semibold mb-4 text-[var(--text-primary)]">유입 경로 분석</h3>
+        <div className="text-center py-8 text-[var(--color-danger)]">
           <p>{error}</p>
         </div>
       </div>
@@ -96,12 +96,12 @@ export default function SourceStatsWidget() {
   }
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
+    <div className="card p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">유입 경로 분석</h3>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">유입 경로 분석</h3>
         <Link
           href="/admin/settings/sources"
-          className="text-xs text-sage-600 hover:text-sage-800 font-medium"
+          className="text-xs text-[var(--sage-primary)] hover:text-[var(--sage-dark)] font-medium"
         >
           관리 →
         </Link>
@@ -109,7 +109,7 @@ export default function SourceStatsWidget() {
 
       <div className="space-y-3">
         {stats.length === 0 ? (
-          <p className="text-center text-gray-500 py-8">
+          <p className="text-center text-[var(--text-tertiary)] py-8">
             데이터가 없습니다.
           </p>
         ) : (
@@ -125,8 +125,8 @@ export default function SourceStatsWidget() {
                 </span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-gray-600 text-sm">{count}건</span>
-                <span className="text-sm font-medium text-gray-900 w-12 text-right">
+                <span className="text-[var(--text-secondary)] text-sm">{count}건</span>
+                <span className="text-sm font-medium text-[var(--text-primary)] w-12 text-right">
                   {percentage.toFixed(1)}%
                 </span>
               </div>
@@ -141,10 +141,10 @@ export default function SourceStatsWidget() {
           {stats.slice(0, 5).map(({ source, percentage }) => (
             <div key={`bar-${source.id}`} className="space-y-1">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600">{source.name}</span>
-                <span className="font-medium text-gray-900">{percentage.toFixed(1)}%</span>
+                <span className="text-[var(--text-secondary)]">{source.name}</span>
+                <span className="font-medium text-[var(--text-primary)]">{percentage.toFixed(1)}%</span>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
                 <div
                   className={`h-full ${getSourceColorClass(source.color).split(' ')[0]} transition-all duration-500`}
                   style={{ width: `${Math.max(percentage, 2)}%` }}
@@ -156,7 +156,7 @@ export default function SourceStatsWidget() {
       )}
 
       {stats.length > 5 && (
-        <p className="mt-4 text-xs text-center text-gray-500">
+        <p className="mt-4 text-xs text-center text-[var(--text-tertiary)]">
           상위 5개 유입 경로만 표시됩니다
         </p>
       )}

@@ -1,7 +1,8 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant } from '@/lib/api/with-tenant'
 
-export async function GET() {
+export const GET = withTenant(async (request: NextRequest, { tenant }) => {
   try {
     const supabase = createAdminClient()
 
@@ -12,30 +13,54 @@ export async function GET() {
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
 
     // Fetch total expenses (all time)
-    const { count: totalExpensesCount } = await supabase
+    let totalCountQuery = supabase
       .from('expenses')
       .select('*', { count: 'exact', head: true })
 
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      totalCountQuery = totalCountQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { count: totalExpensesCount } = await totalCountQuery
+
     // Fetch monthly expenses (current month)
-    const { data: monthlyExpensesData } = await supabase
+    let monthlyQuery = supabase
       .from('expenses')
       .select('amount')
       .gte('expense_date', firstDayOfMonth)
       .lte('expense_date', lastDayOfMonth)
 
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      monthlyQuery = monthlyQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: monthlyExpensesData } = await monthlyQuery
+
     const monthlyExpenses = monthlyExpensesData?.reduce((sum, exp) => sum + (exp.amount || 0), 0) || 0
 
     // Fetch recurring templates count (active only)
-    const { count: recurringCount } = await supabase
+    let recurringQuery = supabase
       .from('recurring_templates')
       .select('*', { count: 'exact', head: true })
       .eq('is_active', true)
 
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      recurringQuery = recurringQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { count: recurringCount } = await recurringQuery
+
     // Fetch pending settlements count (not settled)
-    const { count: pendingSettlements } = await supabase
+    let settlementsQuery = supabase
       .from('monthly_settlements')
       .select('*', { count: 'exact', head: true })
       .eq('is_settled', false)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      settlementsQuery = settlementsQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { count: pendingSettlements } = await settlementsQuery
 
     return NextResponse.json({
       total_expenses: totalExpensesCount || 0,
@@ -50,4 +75,4 @@ export async function GET() {
       { status: 500 }
     )
   }
-}
+})

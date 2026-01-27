@@ -1,23 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isAuthenticated } from '@/lib/auth/auth'
+import { withTenant } from '@/lib/api/with-tenant'
 
 /**
  * GET /api/admin/cases/[id]/client-role
- * 현재 의뢰인 역할 조회 (case_clients + case_parties에서 추론)
+ * 현재 의뢰인 역할 조회 (테넌트 격리 적용)
  */
-export async function GET(
+export const GET = withTenant(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { tenant, params }
+) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const id = params?.id
+    if (!id) {
+      return NextResponse.json({ error: 'Case ID is required' }, { status: 400 })
     }
 
-    const { id } = await params
     const adminClient = createAdminClient()
+
+    // 먼저 해당 사건이 현재 테넌트 소속인지 확인
+    let caseQuery = adminClient
+      .from('legal_cases')
+      .select('id, tenant_id')
+      .eq('id', id)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      caseQuery = caseQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: caseData, error: caseError } = await caseQuery.single()
+
+    if (caseError || !caseData) {
+      return NextResponse.json(
+        { error: 'Case not found in your tenant' },
+        { status: 404 }
+      )
+    }
 
     // case_clients에서 primary 의뢰인의 linked_party_id 조회
     const { data: caseClient, error: clientError } = await adminClient
@@ -65,7 +83,6 @@ export async function GET(
     return NextResponse.json({
       success: true,
       client_role: clientRole,
-      // client_role_status는 더 이상 사용하지 않음 (항상 confirmed로 간주)
       client_role_status: 'confirmed',
     })
   } catch (error) {
@@ -73,23 +90,22 @@ export async function GET(
     const message = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
-}
+})
 
 /**
  * PATCH /api/admin/cases/[id]/client-role
- * 의뢰인 역할 변경 (case_parties.party_type 업데이트)
+ * 의뢰인 역할 변경 (테넌트 격리 적용)
  */
-export async function PATCH(
+export const PATCH = withTenant(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { tenant, params }
+) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const id = params?.id
+    if (!id) {
+      return NextResponse.json({ error: 'Case ID is required' }, { status: 400 })
     }
 
-    const { id } = await params
     const body = await request.json()
     const { client_role } = body
 
@@ -103,6 +119,25 @@ export async function PATCH(
 
     const adminClient = createAdminClient()
 
+    // 먼저 해당 사건이 현재 테넌트 소속인지 확인
+    let caseQuery = adminClient
+      .from('legal_cases')
+      .select('id, tenant_id')
+      .eq('id', id)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      caseQuery = caseQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: caseData, error: caseError } = await caseQuery.single()
+
+    if (caseError || !caseData) {
+      return NextResponse.json(
+        { error: 'Case not found in your tenant' },
+        { status: 404 }
+      )
+    }
+
     // 1. case_clients에서 primary 의뢰인의 linked_party_id 조회
     const { data: caseClient } = await adminClient
       .from('case_clients')
@@ -115,14 +150,13 @@ export async function PATCH(
     const clientPartyType = client_role === 'plaintiff' ? 'plaintiff' : 'defendant'
     const opponentPartyType = client_role === 'plaintiff' ? 'defendant' : 'plaintiff'
 
-    // 의뢰인 당사자 업데이트 (linked_party_id 또는 is_primary=true)
+    // 의뢰인 당사자 업데이트
     if (caseClient?.linked_party_id) {
       await adminClient
         .from('case_parties')
         .update({ party_type: clientPartyType, updated_at: new Date().toISOString() })
         .eq('id', caseClient.linked_party_id)
     } else {
-      // linked_party_id가 없으면 is_primary=true인 당사자 업데이트
       await adminClient
         .from('case_parties')
         .update({ party_type: clientPartyType, updated_at: new Date().toISOString() })
@@ -130,7 +164,7 @@ export async function PATCH(
         .eq('is_primary', true)
     }
 
-    // 상대방 당사자 업데이트 (is_primary=false, manual_override=false인 경우만)
+    // 상대방 당사자 업데이트
     await adminClient
       .from('case_parties')
       .update({ party_type: opponentPartyType, updated_at: new Date().toISOString() })
@@ -153,4 +187,4 @@ export async function PATCH(
     const message = error instanceof Error ? error.message : 'Internal server error'
     return NextResponse.json({ error: message }, { status: 500 })
   }
-}
+})

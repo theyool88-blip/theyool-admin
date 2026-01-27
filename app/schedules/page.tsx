@@ -1,7 +1,12 @@
 import { redirect } from 'next/navigation'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
-import MonthlyCalendar from '@/components/MonthlyCalendar'
-import AdminHeader from '@/components/AdminHeader'
+import BigCalendar from '@/components/calendar/BigCalendar'
+import AdminLayoutClient from '@/components/AdminLayoutClient'
+
+export const metadata = {
+  title: '일정 관리 | Luseed',
+  description: '법무법인 일정 캘린더',
+}
 
 export default async function SchedulesPage() {
   // 테넌트 컨텍스트 조회 (impersonation 포함)
@@ -10,7 +15,7 @@ export default async function SchedulesPage() {
     redirect('/login')
   }
 
-  // MonthlyCalendar에 전달할 profile 형식으로 변환
+  // BigCalendar에 전달할 profile 형식으로 변환
   const profile = {
     id: tenantContext.memberId,
     tenant_id: tenantContext.tenantId,
@@ -19,9 +24,8 @@ export default async function SchedulesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="일정 관리" />
-      <MonthlyCalendar profile={profile as any} />
-    </div>
+    <AdminLayoutClient fullHeight>
+      <BigCalendar profile={profile as any} />
+    </AdminLayoutClient>
   )
 }

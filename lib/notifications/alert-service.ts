@@ -170,7 +170,7 @@ export async function sendEmailAlert(
         'Authorization': `Bearer ${resendApiKey}`,
       },
       body: JSON.stringify({
-        from: 'theyool-admin@notifications.theyool.kr',
+        from: 'luseed@notifications.theyool.kr',
         to: recipients,
         subject: `[${typeLabel[payload.type]}] ${payload.title}`,
         html: htmlContent,

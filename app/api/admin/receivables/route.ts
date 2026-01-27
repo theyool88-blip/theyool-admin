@@ -132,13 +132,21 @@ export const PATCH = withTenant(async (request, { tenant }) => {
     }
 
     // 의뢰인 정보 및 수임료 조회
-    const { data: partyInfo } = await supabase
-      .from('case_parties')
-      .select('party_name, fee_allocation_amount, client_id')
+    // NOTE: is_our_client, fee_allocation_amount, client_id 컬럼이 case_parties에서 제거됨
+    // case_clients 테이블을 사용하도록 리팩토링 필요
+    const { data: caseClientInfo } = await supabase
+      .from('case_clients')
+      .select('client_id, retainer_fee, clients(name)')
       .eq('case_id', case_id)
-      .eq('is_our_client', true)
+      .eq('is_primary_client', true)
       .limit(1)
       .maybeSingle()
+
+    const partyInfo = caseClientInfo ? {
+      party_name: (caseClientInfo.clients as { name?: string } | null)?.name || null,
+      fee_allocation_amount: caseClientInfo.retainer_fee || 0,
+      client_id: caseClientInfo.client_id
+    } : null
 
     // 입금 합계 조회
     const { data: payments } = await supabase
@@ -167,13 +175,14 @@ export const PATCH = withTenant(async (request, { tenant }) => {
       // 테이블이 없어도 계속 진행
     }
 
-    // 수임료 배분 금액을 입금액과 동일하게 설정하여 미수금 0 처리
-    if (partyInfo) {
+    // 수임료를 입금액과 동일하게 설정하여 미수금 0 처리
+    // NOTE: case_parties.fee_allocation_amount → case_clients.retainer_fee로 이관됨
+    if (caseClientInfo) {
       await supabase
-        .from('case_parties')
-        .update({ fee_allocation_amount: totalReceived })
+        .from('case_clients')
+        .update({ retainer_fee: totalReceived })
         .eq('case_id', case_id)
-        .eq('is_our_client', true)
+        .eq('is_primary_client', true)
     }
 
     return NextResponse.json({
@@ -244,23 +253,32 @@ export const GET = withTenant(async (request, { tenant }) => {
 
     const caseIds = cases.map(c => c.id)
 
-    // case_parties에서 의뢰인(is_our_client=true) + 수임료 배분 정보 조회
-    let partiesQuery = supabase
-      .from('case_parties')
+    // case_clients에서 의뢰인 + 수임료 정보 조회
+    // NOTE: is_our_client, fee_allocation_amount, client_id 컬럼이 case_parties에서 제거됨
+    let clientsQuery = supabase
+      .from('case_clients')
       .select(`
         case_id,
-        party_name,
-        fee_allocation_amount,
-        client_id
+        client_id,
+        retainer_fee,
+        clients(name)
       `)
       .in('case_id', caseIds)
-      .eq('is_our_client', true)
+      .eq('is_primary_client', true)
 
     if (!tenant.isSuperAdmin && tenant.tenantId) {
-      partiesQuery = partiesQuery.eq('tenant_id', tenant.tenantId)
+      clientsQuery = clientsQuery.eq('tenant_id', tenant.tenantId)
     }
 
-    const { data: parties } = await partiesQuery
+    const { data: caseClients } = await clientsQuery
+
+    // case_clients 데이터를 parties 형식으로 변환 (호환성 유지)
+    const parties = caseClients?.map(cc => ({
+      case_id: cc.case_id,
+      party_name: (cc.clients as { name?: string } | null)?.name || null,
+      fee_allocation_amount: cc.retainer_fee || 0,
+      client_id: cc.client_id
+    }))
 
     // payments에서 사건별 입금 합계 조회
     let paymentsQuery = supabase
@@ -283,7 +301,7 @@ export const GET = withTenant(async (request, { tenant }) => {
     })
 
     // 사건별 의뢰인 정보 매핑
-    const partyByCase = new Map<string, { party_name: string; fee_allocation_amount: number; client_id: string | null }>()
+    const partyByCase = new Map<string, { party_name: string | null; fee_allocation_amount: number; client_id: string | null }>()
     parties?.forEach(p => {
       if (!partyByCase.has(p.case_id)) {
         partyByCase.set(p.case_id, {

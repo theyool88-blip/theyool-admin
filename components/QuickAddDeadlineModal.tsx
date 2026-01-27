@@ -315,13 +315,13 @@ export default function QuickAddDeadlineModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-[var(--bg-secondary)] rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="sticky top-0 bg-white border-b border-sage-200 px-6 py-4 flex items-center justify-between rounded-t-xl">
-          <h2 className="text-lg font-semibold text-sage-800">데드라인 추가</h2>
+        <div className="sticky top-0 bg-[var(--bg-secondary)] border-b border-[var(--border-subtle)] px-6 py-4 flex items-center justify-between rounded-t-xl">
+          <h2 className="text-lg font-semibold text-[var(--text-primary)]">데드라인 추가</h2>
           <button
             onClick={handleClose}
-            className="p-2 text-sage-400 hover:text-sage-600 hover:bg-sage-50 rounded-lg transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
             aria-label="닫기"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,9 +332,9 @@ export default function QuickAddDeadlineModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           {/* 사건번호 자동완성 */}
-          <div className="relative">
-            <label className="block text-sm font-medium text-sage-700 mb-2">
-              사건번호 <span className="text-coral-600">*</span>
+          <div className="relative form-group">
+            <label className="form-label">
+              사건번호 <span className="text-[var(--color-danger)]">*</span>
             </label>
             <input
               type="text"
@@ -347,14 +347,10 @@ export default function QuickAddDeadlineModal({
                 if (caseOptions.length > 0) setShowDropdown(true)
               }}
               placeholder="사건번호 또는 사건명 검색"
-              className={`w-full px-3 py-2 text-sm border rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0 ${
-                errors.case_number
-                  ? 'border-coral-500 focus:border-coral-500 focus:ring-coral-200'
-                  : 'border-sage-200 focus:border-sage-500 focus:ring-sage-500'
-              }`}
+              className={`form-input ${errors.case_number ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]/20' : ''}`}
             />
             {errors.case_number && (
-              <p className="mt-1.5 text-sm text-coral-600 flex items-center gap-1">
+              <p className="mt-1.5 text-sm text-[var(--color-danger)] flex items-center gap-1">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -364,25 +360,25 @@ export default function QuickAddDeadlineModal({
 
             {/* 드롭다운 */}
             {showDropdown && caseOptions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1.5 bg-white border border-sage-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1.5 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg shadow-lg max-h-60 overflow-y-auto">
                 {caseOptions.map((option) => (
                   <button
                     key={option.id}
                     type="button"
                     onClick={() => handleSelectCase(option)}
-                    className="w-full text-left px-4 py-3 hover:bg-sage-50 transition-colors border-b border-sage-100 last:border-b-0 first:rounded-t-lg last:rounded-b-lg min-h-[44px]"
+                    className="w-full text-left px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors border-b border-[var(--border-subtle)] last:border-b-0 first:rounded-t-lg last:rounded-b-lg min-h-[44px]"
                   >
-                    <p className="font-medium text-sage-800">{option.case_number}</p>
-                    <p className="text-sm text-sage-600 mt-0.5">{option.case_name}</p>
+                    <p className="font-medium text-[var(--text-primary)]">{option.case_number}</p>
+                    <p className="text-sm text-[var(--text-muted)] mt-0.5">{option.case_name}</p>
                   </button>
                 ))}
               </div>
             )}
 
             {formData.case_name && (
-              <div className="mt-2.5 p-3 bg-sage-50 border border-sage-200 rounded-lg">
-                <p className="text-sm text-sage-700 font-medium flex items-center gap-2">
-                  <svg className="w-4 h-4 text-sage-600" fill="currentColor" viewBox="0 0 20 20">
+              <div className="mt-2.5 p-3 bg-[var(--sage-muted)] border border-[var(--border-subtle)] rounded-lg">
+                <p className="text-sm text-[var(--text-secondary)] font-medium flex items-center gap-2">
+                  <svg className="w-4 h-4 text-[var(--sage-primary)]" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                   선택된 사건: {formData.case_name}
@@ -392,18 +388,14 @@ export default function QuickAddDeadlineModal({
           </div>
 
           {/* 데드라인 유형 */}
-          <div>
-            <label className="block text-sm font-medium text-sage-700 mb-2">
-              데드라인 유형 <span className="text-coral-600">*</span>
+          <div className="form-group">
+            <label className="form-label">
+              데드라인 유형 <span className="text-[var(--color-danger)]">*</span>
             </label>
             <select
               value={formData.deadline_type}
               onChange={(e) => setFormData(prev => ({ ...prev, deadline_type: e.target.value as DeadlineType }))}
-              className={`w-full px-3 py-2 text-sm border rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0 ${
-                errors.deadline_type
-                  ? 'border-coral-500 focus:border-coral-500 focus:ring-coral-200'
-                  : 'border-sage-200 focus:border-sage-500 focus:ring-sage-500'
-              }`}
+              className={`form-input ${errors.deadline_type ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]/20' : ''}`}
             >
               <option value="">선택하세요</option>
               {deadlineTypes.map((type) => (
@@ -413,7 +405,7 @@ export default function QuickAddDeadlineModal({
               ))}
             </select>
             {errors.deadline_type && (
-              <p className="mt-1.5 text-sm text-coral-600 flex items-center gap-1">
+              <p className="mt-1.5 text-sm text-[var(--color-danger)] flex items-center gap-1">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
@@ -424,14 +416,14 @@ export default function QuickAddDeadlineModal({
 
           {/* 당사자 선택 (선택 사항) */}
           {caseParties.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-sage-700 mb-2">
-                당사자 지정 <span className="text-sage-500">(선택)</span>
+            <div className="form-group">
+              <label className="form-label">
+                당사자 지정 <span className="text-[var(--text-muted)]">(선택)</span>
               </label>
               <select
                 value={formData.party_id}
                 onChange={(e) => handleSelectParty(e.target.value)}
-                className="w-full px-3 py-2 text-sm border border-sage-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-sage-500 focus:ring-sage-500"
+                className="form-input"
               >
                 <option value="">전체 사건 (당사자 무관)</option>
                 {caseParties.map((party) => (
@@ -440,11 +432,11 @@ export default function QuickAddDeadlineModal({
                   </option>
                 ))}
               </select>
-              <p className="mt-2 text-sm text-sage-600">
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
                 특정 당사자의 송달일 기준으로 기한을 관리하려면 선택하세요.
               </p>
               {formData.party_side && (
-                <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-sage-100 text-sage-700 text-xs font-medium rounded-full">
+                <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 bg-[var(--sage-muted)] text-[var(--sage-primary)] text-xs font-medium rounded-full">
                   <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                   </svg>
@@ -455,36 +447,32 @@ export default function QuickAddDeadlineModal({
           )}
 
           {/* 기산일 (트리거 날짜) */}
-          <div>
-            <label className="block text-sm font-medium text-sage-700 mb-2">
-              기산일 <span className="text-coral-600">*</span>
+          <div className="form-group">
+            <label className="form-label">
+              기산일 <span className="text-[var(--color-danger)]">*</span>
             </label>
             <input
               type="date"
               value={formData.trigger_date}
               onChange={(e) => setFormData(prev => ({ ...prev, trigger_date: e.target.value }))}
-              className={`w-full px-3 py-2 text-sm border rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0 ${
-                errors.trigger_date
-                  ? 'border-coral-500 focus:border-coral-500 focus:ring-coral-200'
-                  : 'border-sage-200 focus:border-sage-500 focus:ring-sage-500'
-              }`}
+              className={`form-input ${errors.trigger_date ? 'border-[var(--color-danger)] focus:border-[var(--color-danger)] focus:ring-[var(--color-danger)]/20' : ''}`}
               style={{ colorScheme: 'light' }}
             />
             {errors.trigger_date && (
-              <p className="mt-1.5 text-sm text-coral-600 flex items-center gap-1">
+              <p className="mt-1.5 text-sm text-[var(--color-danger)] flex items-center gap-1">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
                 {errors.trigger_date}
               </p>
             )}
-            <p className="mt-2 text-sm text-sage-600">
+            <p className="mt-2 text-sm text-[var(--text-muted)]">
               불변기간 계산의 시작일입니다 (예: 판결선고일, 송달일 등)
             </p>
           </div>
 
           {/* 전자송달 여부 */}
-          <div className="flex items-start gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start gap-3 p-3 bg-[var(--color-warning-muted)] border border-[var(--color-warning)]/20 rounded-lg">
             <input
               type="checkbox"
               id="is_electronic_service"
@@ -493,13 +481,13 @@ export default function QuickAddDeadlineModal({
                 ...prev,
                 is_electronic_service: e.target.checked
               }))}
-              className="mt-0.5 w-4 h-4 text-amber-600 border-amber-300 rounded focus:ring-amber-500"
+              className="mt-0.5 w-4 h-4 text-[var(--color-warning)] border-[var(--color-warning)]/30 rounded focus:ring-[var(--color-warning)]"
             />
             <div>
-              <label htmlFor="is_electronic_service" className="text-sm font-medium text-amber-800 cursor-pointer">
+              <label htmlFor="is_electronic_service" className="text-sm font-medium text-[var(--color-warning)] cursor-pointer">
                 전자송달 (0시 의제)
               </label>
-              <p className="text-xs text-amber-700 mt-1">
+              <p className="text-xs text-[var(--text-secondary)] mt-1">
                 전자소송에서 미열람 7일 후 자정(0시)에 송달 의제된 경우 체크하세요.
                 민법 제157조 단서에 따라 초일산입 적용되어 기한이 1일 단축됩니다.
               </p>
@@ -508,35 +496,35 @@ export default function QuickAddDeadlineModal({
 
           {/* 자동 계산 미리보기 */}
           {preview.deadline_date && (
-            <div className="p-4 bg-sage-50 border border-sage-200 rounded-lg">
-              <h3 className="text-sm font-medium text-sage-800 mb-3">자동 계산 결과</h3>
+            <div className="p-4 bg-[var(--sage-muted)] border border-[var(--border-subtle)] rounded-lg">
+              <h3 className="text-sm font-medium text-[var(--text-primary)] mb-3">자동 계산 결과</h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-sage-600 font-medium">기간</p>
-                  <p className="text-sage-800 font-semibold">{preview.days}일</p>
+                  <p className="text-[var(--text-muted)] font-medium">기간</p>
+                  <p className="text-[var(--text-primary)] font-semibold">{preview.days}일</p>
                 </div>
                 <div>
-                  <p className="text-sage-600 font-medium">만료일</p>
-                  <p className="text-sage-800 font-semibold">{formatDateKR(preview.deadline_date)}</p>
+                  <p className="text-[var(--text-muted)] font-medium">만료일</p>
+                  <p className="text-[var(--text-primary)] font-semibold">{formatDateKR(preview.deadline_date)}</p>
                   {preview.wasExtended && (
-                    <p className="text-xs text-amber-600 mt-0.5">* 토/공휴일로 연장됨</p>
+                    <p className="text-xs text-[var(--color-warning)] mt-0.5">* 토/공휴일로 연장됨</p>
                   )}
                 </div>
                 <div className="col-span-2">
-                  <p className="text-sage-600 font-medium">만료 일시</p>
-                  <p className="text-sage-800 font-semibold">{formatDateKR(preview.deadline_date)} 23:59</p>
+                  <p className="text-[var(--text-muted)] font-medium">만료 일시</p>
+                  <p className="text-[var(--text-primary)] font-semibold">{formatDateKR(preview.deadline_date)} 23:59</p>
                 </div>
               </div>
               <div className="mt-3 space-y-1">
                 {formData.is_electronic_service && (
-                  <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <p className="text-xs text-[var(--color-warning)] flex items-center gap-1">
                     <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                     </svg>
                     전자송달(0시 의제) 적용: 초일산입으로 1일 단축됨
                   </p>
                 )}
-                <p className="text-xs text-sage-500">
+                <p className="text-xs text-[var(--text-muted)]">
                   민법 제161조에 따라 말일이 토요일 또는 공휴일이면 익일로 연장됩니다.
                 </p>
               </div>
@@ -544,8 +532,8 @@ export default function QuickAddDeadlineModal({
           )}
 
           {/* 메모 */}
-          <div>
-            <label className="block text-sm font-medium text-sage-700 mb-2">
+          <div className="form-group">
+            <label className="form-label">
               메모
             </label>
             <textarea
@@ -553,23 +541,23 @@ export default function QuickAddDeadlineModal({
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
               rows={3}
               placeholder="추가 메모"
-              className="w-full px-3 py-2 text-sm border border-sage-200 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-0 focus:border-sage-500 focus:ring-sage-500 resize-none"
+              className="form-input resize-none"
             />
           </div>
 
           {/* 버튼 */}
-          <div className="flex gap-3 pt-4 border-t border-sage-200">
+          <div className="flex gap-3 pt-4 border-t border-[var(--border-subtle)]">
             <button
               type="button"
               onClick={handleClose}
-              className="flex-1 min-h-[44px] px-4 text-sm font-medium text-sage-700 bg-white border border-sage-300 rounded-lg hover:bg-sage-50 transition-colors"
+              className="btn btn-secondary flex-1"
             >
               취소
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 min-h-[44px] px-4 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 disabled:bg-sage-300 disabled:cursor-not-allowed transition-colors"
+              className="btn btn-primary flex-1"
             >
               {loading ? '추가 중...' : '데드라인 추가'}
             </button>

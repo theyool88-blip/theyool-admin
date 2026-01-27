@@ -19,7 +19,7 @@
 ## Modified Files
 
 ### 1. WeeklyCalendar.tsx
-**위치**: `/Users/hskim/theyool-admin/components/WeeklyCalendar.tsx`
+**위치**: `/Users/hskim/luseed/components/WeeklyCalendar.tsx`
 
 **핵심 변경**:
 - 오늘 날짜: 파란 원형 배지 (●)
@@ -28,7 +28,7 @@
 - 타입 · 시간: 한 줄에 inline 표시
 
 ### 2. MonthlyCalendar.tsx
-**위치**: `/Users/hskim/theyool-admin/components/MonthlyCalendar.tsx`
+**위치**: `/Users/hskim/luseed/components/MonthlyCalendar.tsx`
 
 **핵심 변경**:
 - 도트 인디케이터: 일정 있는 날 상단에 컬러 도트 (●●●)
@@ -65,7 +65,7 @@
 
 ### 1. 개발 서버 실행
 ```bash
-cd /Users/hskim/theyool-admin
+cd /Users/hskim/luseed
 npm run dev
 ```
 

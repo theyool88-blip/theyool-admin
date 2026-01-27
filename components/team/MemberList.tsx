@@ -352,7 +352,7 @@ export default function MemberList({
               <Users className="w-5 h-5 text-[var(--sage-primary)]" />
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-[var(--text-primary)]">멤버 목록</h2>
+              <h2 className="text-sm font-semibold text-[var(--text-primary)]">권한 설정</h2>
               <p className="text-xs text-[var(--text-tertiary)]">
                 {members.length}명 / {memberLimit === -1 ? '무제한' : `${memberLimit}명`}
               </p>

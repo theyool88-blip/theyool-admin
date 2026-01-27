@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withRole } from '@/lib/api/with-tenant';
 import type { MemberRole } from '@/types/tenant';
+import { sendInviteEmail } from '@/lib/email/invite-email';
 
 // 플랜별 멤버 제한
 const PLAN_MEMBER_LIMITS: Record<string, number> = {
@@ -88,7 +89,7 @@ export const GET = withRole('admin')(async (request, { tenant }) => {
 export const POST = withRole('admin')(async (request, { tenant }) => {
   try {
     const body = await request.json();
-    const { email, role } = body;
+    const { email, role, sendEmail = false } = body;
 
     // 유효성 검사
     if (!email || !role) {
@@ -241,11 +242,45 @@ export const POST = withRole('admin')(async (request, { tenant }) => {
     // 초대 링크 생성
     const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/invite/${invitation.token}`;
 
+    // 이메일 발송 옵션이 켜져 있으면 발송
+    let emailSent = false;
+    let emailError: string | undefined;
+
+    if (sendEmail) {
+      // 테넌트 이름 조회
+      const { data: tenantInfo } = await supabase
+        .from('tenants')
+        .select('name')
+        .eq('id', tenant.tenantId)
+        .single();
+
+      // 초대자 이름 조회
+      const { data: inviterInfo } = await supabase
+        .from('tenant_members')
+        .select('display_name')
+        .eq('id', tenant.memberId)
+        .single();
+
+      const result = await sendInviteEmail({
+        to: email.toLowerCase(),
+        inviteUrl,
+        role,
+        tenantName: tenantInfo?.name || '법률사무소',
+        inviterName: inviterInfo?.display_name || undefined,
+        expiresAt: new Date(invitation.expires_at),
+      });
+
+      emailSent = result.success;
+      emailError = result.error;
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         invitation,
         inviteUrl,
+        emailSent,
+        emailError,
       },
     });
   } catch (error) {

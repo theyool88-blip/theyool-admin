@@ -4,7 +4,7 @@
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import * as fs from "fs";
-dotenv.config({ path: "/Users/hskim/theyool-admin/.env.local" });
+dotenv.config({ path: "/Users/hskim/luseed/.env.local" });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -45,7 +45,7 @@ async function run() {
     // case_parties 테이블 생성 (Supabase Dashboard에서 직접 실행 필요)
     console.log("\n[안내] 아래 SQL을 Supabase Dashboard > SQL Editor에서 실행해주세요:\n");
     const migrationSQL = fs.readFileSync(
-      "/Users/hskim/theyool-admin/supabase/migrations/20260107_case_parties.sql",
+      "/Users/hskim/luseed/supabase/migrations/20260107_case_parties.sql",
       "utf-8"
     );
     console.log(migrationSQL);

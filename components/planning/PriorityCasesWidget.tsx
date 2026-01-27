@@ -66,10 +66,10 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
   }
 
   const gradeColors: Record<string, string> = {
-    A: 'bg-red-100 text-red-700 border-red-200',
-    B: 'bg-orange-100 text-orange-700 border-orange-200',
-    C: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-    D: 'bg-green-100 text-green-700 border-green-200',
+    A: 'bg-[var(--color-danger-muted)] text-[var(--color-danger)] border-[var(--color-danger)]',
+    B: 'bg-[var(--color-warning-muted)] text-[var(--color-warning)] border-[var(--color-warning)]',
+    C: 'bg-[var(--color-warning-muted)] text-[var(--color-warning)] border-[var(--color-warning)]',
+    D: 'bg-[var(--color-success-muted)] text-[var(--color-success)] border-[var(--color-success)]',
   };
 
   const gradeLabels: Record<string, string> = {
@@ -81,12 +81,12 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900">사건 우선순위</p>
+      <div className="card">
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <p className="text-sm font-medium text-[var(--text-primary)]">사건 우선순위</p>
         </div>
         <div className="p-4 flex justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-sage-600"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-[var(--border-default)] border-t-[var(--sage-primary)]"></div>
         </div>
       </div>
     );
@@ -94,34 +94,34 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900">사건 우선순위</p>
+      <div className="card">
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <p className="text-sm font-medium text-[var(--text-primary)]">사건 우선순위</p>
         </div>
-        <div className="p-4 text-center text-sm text-gray-500">{error}</div>
+        <div className="p-4 text-center text-sm text-[var(--text-tertiary)]">{error}</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-900">사건 우선순위</p>
-        <span className="text-xs text-gray-500">
+    <div className="card">
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <p className="text-sm font-medium text-[var(--text-primary)]">사건 우선순위</p>
+        <span className="text-xs text-[var(--text-tertiary)]">
           {priorities.filter((p) => p.grade === 'A').length}건 긴급
         </span>
       </div>
 
       {priorities.length === 0 ? (
-        <div className="p-4 text-center text-sm text-gray-500">
+        <div className="p-4 text-center text-sm text-[var(--text-tertiary)]">
           긴급한 사건이 없습니다
         </div>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-[var(--border-subtle)]">
           {priorities.map((priority) => (
             <div
               key={priority.caseId}
-              className="px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="px-4 py-3 hover:bg-[var(--bg-hover)] transition-colors"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-2 min-w-0">
@@ -136,12 +136,12 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
                   <div className="min-w-0">
                     <Link
                       href={`/admin/cases?id=${priority.caseId}`}
-                      className="text-sm font-medium text-gray-900 hover:text-sage-600 block truncate"
+                      className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--sage-primary)] block truncate"
                     >
                       {priority.caseNumber}
                     </Link>
                     {priority.clientName && (
-                      <p className="text-xs text-gray-500 truncate">
+                      <p className="text-xs text-[var(--text-tertiary)] truncate">
                         {priority.clientName}
                       </p>
                     )}
@@ -155,10 +155,10 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
                       <span
                         className={`text-xs font-medium ${
                           priority.nextDeadline.daysRemaining <= 3
-                            ? 'text-red-600'
+                            ? 'text-[var(--color-danger)]'
                             : priority.nextDeadline.daysRemaining <= 7
-                              ? 'text-orange-600'
-                              : 'text-gray-600'
+                              ? 'text-[var(--color-warning)]'
+                              : 'text-[var(--text-secondary)]'
                         }`}
                       >
                         {priority.nextDeadline.daysRemaining === 0
@@ -167,7 +167,7 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
                             ? `D+${Math.abs(priority.nextDeadline.daysRemaining)}`
                             : `D-${priority.nextDeadline.daysRemaining}`}
                       </span>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[var(--text-tertiary)]">
                         {priority.nextDeadline.typeName}
                       </p>
                     </div>
@@ -176,13 +176,13 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
                       <span
                         className={`text-xs font-medium ${
                           priority.nextHearing.daysRemaining <= 3
-                            ? 'text-red-600'
-                            : 'text-gray-600'
+                            ? 'text-[var(--color-danger)]'
+                            : 'text-[var(--text-secondary)]'
                         }`}
                       >
                         D-{priority.nextHearing.daysRemaining}
                       </span>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-[var(--text-tertiary)]">
                         {priority.nextHearing.typeName}
                       </p>
                     </div>
@@ -198,10 +198,10 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
                       key={flag.id}
                       className={`text-xs px-1.5 py-0.5 rounded ${
                         flag.severity === 'critical'
-                          ? 'bg-red-50 text-red-600'
+                          ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]'
                           : flag.severity === 'high'
-                            ? 'bg-orange-50 text-orange-600'
-                            : 'bg-yellow-50 text-yellow-600'
+                            ? 'bg-[var(--color-warning-muted)] text-[var(--color-warning)]'
+                            : 'bg-[var(--color-warning-muted)] text-[var(--color-warning)]'
                       }`}
                     >
                       {flag.title}
@@ -213,7 +213,7 @@ export default function PriorityCasesWidget({ limit = 5 }: Props) {
               {/* 추천 작업 */}
               {priority.recommendedActions.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-[var(--text-tertiary)]">
                     다음 작업: {priority.recommendedActions[0].title}
                   </p>
                 </div>

@@ -52,7 +52,7 @@ END
 - `gs.schedule_type`는 TEXT 타입이므로 수정 불필요
 
 ## 마이그레이션 파일
-- **경로**: `/Users/hskim/theyool-admin/supabase/migrations/20251124_fix_unified_calendar_consultations.sql`
+- **경로**: `/Users/hskim/luseed/supabase/migrations/20251124_fix_unified_calendar_consultations.sql`
 - **상태**: 수정 완료, 실행 준비 완료
 
 ## 실행 방법

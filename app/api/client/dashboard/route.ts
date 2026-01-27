@@ -54,14 +54,15 @@ export async function GET(_request: NextRequest) {
 
     const caseIds = (casesRaw || []).map((c) => c.id);
 
-    // case_parties에서 상대방(is_our_client=false) 이름 조회
+    // case_parties에서 상대방(is_primary=false) 이름 조회
+    // NOTE: is_our_client 컬럼이 스키마에서 제거됨
     let opponentMap = new Map<string, string>();
     if (caseIds.length > 0) {
       const { data: opponents } = await supabase
         .from('case_parties')
         .select('case_id, party_name')
         .in('case_id', caseIds)
-        .eq('is_our_client', false)
+        .eq('is_primary', false)
         .order('party_order', { ascending: true });
 
       if (opponents) {

@@ -36,17 +36,17 @@ function Toast({ toast, onClose }: ToastProps) {
   }
 
   const icons = {
-    success: <CheckCircle className="w-5 h-5 text-green-500" />,
-    error: <XCircle className="w-5 h-5 text-red-500" />,
-    warning: <AlertCircle className="w-5 h-5 text-amber-500" />,
-    info: <Info className="w-5 h-5 text-blue-500" />
+    success: <CheckCircle className="w-5 h-5 text-[var(--color-success)]" />,
+    error: <XCircle className="w-5 h-5 text-[var(--color-danger)]" />,
+    warning: <AlertCircle className="w-5 h-5 text-[var(--color-warning)]" />,
+    info: <Info className="w-5 h-5 text-[var(--color-info)]" />
   }
 
   const colors = {
-    success: 'bg-white border-green-200',
-    error: 'bg-white border-red-200',
-    warning: 'bg-white border-amber-200',
-    info: 'bg-white border-blue-200'
+    success: 'bg-[var(--bg-secondary)] border-[var(--color-success)]',
+    error: 'bg-[var(--bg-secondary)] border-[var(--color-danger)]',
+    warning: 'bg-[var(--bg-secondary)] border-[var(--color-warning)]',
+    info: 'bg-[var(--bg-secondary)] border-[var(--color-info)]'
   }
 
   return (
@@ -58,10 +58,10 @@ function Toast({ toast, onClose }: ToastProps) {
       `}
     >
       {icons[toast.type]}
-      <p className="flex-1 text-sm font-medium text-gray-900">{toast.message}</p>
+      <p className="flex-1 text-sm font-medium text-[var(--text-primary)]">{toast.message}</p>
       <button
         onClick={handleClose}
-        className="text-gray-400 hover:text-gray-600 transition-colors"
+        className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
       >
         <X className="w-4 h-4" />
       </button>

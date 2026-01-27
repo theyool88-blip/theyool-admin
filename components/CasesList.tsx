@@ -2,9 +2,23 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminHeader from './AdminHeader'
+import {
+  Search,
+  Plus,
+  LayoutGrid,
+  LayoutList,
+  Calendar,
+  CreditCard,
+  ChevronDown,
+  Cloud,
+  Layers,
+  CornerDownRight,
+} from 'lucide-react'
 import UnifiedScheduleModal from './UnifiedScheduleModal'
 import CasePaymentsModal from './CasePaymentsModal'
+import DataTable, { Pagination, TableToolbar, Column } from './ui/DataTable'
+import { CaseStatusBadge } from './ui/StatusBadge'
+import { EmptySearchResults, EmptyCases } from './ui/EmptyState'
 
 interface Client {
   id: string
@@ -35,13 +49,26 @@ interface LegalCase {
   assignees?: CaseAssignee[]
   contract_date: string
   court_case_number: string | null
+  court_name: string | null
+  case_level: string | null
+  main_case_id: string | null
   onedrive_folder_url: string | null
   client?: Client
   payment_info?: {
     total_amount: number
     payment_count: number
   }
+  parties?: {
+    ourClient: string | null
+    ourClientLabel: string | null
+    opponent: string | null
+    opponentLabel: string | null
+  }
+  _isSubCase?: boolean
 }
+
+type ViewMode = 'table' | 'card'
+type SortDirection = 'asc' | 'desc' | null
 
 export default function CasesList({ initialCases }: { initialCases: LegalCase[] }) {
   const cases = initialCases
@@ -54,9 +81,13 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
   const [selectedCaseNumber, setSelectedCaseNumber] = useState<string | undefined>(undefined)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [selectedCaseForPayment, setSelectedCaseForPayment] = useState<LegalCase | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [sortColumn, setSortColumn] = useState<string>('contract_date')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
+  const [groupByMainCase, setGroupByMainCase] = useState(false)
   const router = useRouter()
 
-  const filteredCases = useMemo(() => {
+  const processedCases = useMemo(() => {
     let filtered = [...cases]
 
     if (statusFilter !== 'all') {
@@ -68,23 +99,102 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
       filtered = filtered.filter(c =>
         c.contract_number?.toLowerCase().includes(term) ||
         c.case_name?.toLowerCase().includes(term) ||
-        c.client?.name?.toLowerCase().includes(term)
+        c.client?.name?.toLowerCase().includes(term) ||
+        c.court_case_number?.toLowerCase().includes(term) ||
+        c.court_name?.toLowerCase().includes(term) ||
+        c.parties?.ourClient?.toLowerCase().includes(term) ||
+        c.parties?.opponent?.toLowerCase().includes(term)
       )
     }
 
-    return filtered
-  }, [cases, searchTerm, statusFilter])
+    // 그룹화 모드가 아니면 기존 정렬만
+    if (!groupByMainCase) {
+      if (sortColumn && sortDirection) {
+        filtered.sort((a, b) => {
+          let aVal: string | number = ''
+          let bVal: string | number = ''
+
+          switch (sortColumn) {
+            case 'contract_date':
+              aVal = a.contract_date || ''
+              bVal = b.contract_date || ''
+              break
+            case 'case_name':
+              aVal = a.case_name || ''
+              bVal = b.case_name || ''
+              break
+            case 'client':
+              aVal = a.client?.name || ''
+              bVal = b.client?.name || ''
+              break
+            case 'status':
+              aVal = a.status
+              bVal = b.status
+              break
+          }
+
+          if (sortDirection === 'asc') {
+            return aVal < bVal ? -1 : aVal > bVal ? 1 : 0
+          } else {
+            return aVal > bVal ? -1 : aVal < bVal ? 1 : 0
+          }
+        })
+      }
+      return filtered
+    }
+
+    // 그룹화 모드: 주사건-서브사건 그룹핑
+    const mainCases = filtered.filter(c => !c.main_case_id)
+    const subCases = filtered.filter(c => c.main_case_id)
+
+    // 서브사건을 main_case_id로 그룹화
+    const subCaseMap = new Map<string, typeof filtered>()
+    for (const sub of subCases) {
+      const mainId = sub.main_case_id!
+      if (!subCaseMap.has(mainId)) {
+        subCaseMap.set(mainId, [])
+      }
+      subCaseMap.get(mainId)!.push(sub)
+    }
+
+    // 주사건 정렬 (최신순)
+    const sortedMains = [...mainCases].sort((a, b) => {
+      const aDate = a.contract_date || ''
+      const bDate = b.contract_date || ''
+      return bDate.localeCompare(aDate)
+    })
+
+    // 주사건 아래에 서브사건 삽입
+    const result: (LegalCase & { _isSubCase?: boolean })[] = []
+    for (const main of sortedMains) {
+      result.push(main)
+      const subs = subCaseMap.get(main.id) || []
+      // 서브사건 심급 순서로 정렬
+      const levelOrder: Record<string, number> = {
+        '1심': 1,
+        '2심(항소심)': 2,
+        '3심(상고심)': 3,
+      }
+      const sortedSubs = subs.sort((a, b) =>
+        (levelOrder[a.case_level || ''] || 0) - (levelOrder[b.case_level || ''] || 0)
+      )
+      for (const sub of sortedSubs) {
+        result.push({ ...sub, _isSubCase: true })
+      }
+    }
+
+    // 주사건 없이 떠도는 서브사건 추가
+    const includedMainIds = new Set(sortedMains.map(m => m.id))
+    const orphanSubs = subCases.filter(s => !includedMainIds.has(s.main_case_id!))
+    result.push(...orphanSubs)
+
+    return result
+  }, [cases, searchTerm, statusFilter, groupByMainCase, sortColumn, sortDirection])
 
   const indexOfLastCase = currentPage * casesPerPage
   const indexOfFirstCase = indexOfLastCase - casesPerPage
-  const currentCases = filteredCases.slice(indexOfFirstCase, indexOfLastCase)
-  const totalPages = Math.ceil(filteredCases.length / casesPerPage)
-
-  const getStatusStyle = (status: string) => {
-    return status === '진행중'
-      ? 'bg-sage-100 text-sage-700'
-      : 'bg-gray-100 text-gray-600'
-  }
+  const currentCases = processedCases.slice(indexOfFirstCase, indexOfLastCase)
+  const totalPages = Math.ceil(processedCases.length / casesPerPage)
 
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-'
@@ -93,6 +203,11 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}.${month}.${day}`
+  }
+
+  const handleSort = (column: string, direction: SortDirection) => {
+    setSortColumn(column)
+    setSortDirection(direction)
   }
 
   const handleAddSchedule = (e: React.MouseEvent, caseId: string, caseNumber: string | null) => {
@@ -113,245 +228,250 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     setSelectedCaseForPayment(null)
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="사건 관리" />
-
-      <div className="max-w-6xl mx-auto pt-20 pb-8 px-4">
-        {/* Summary */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-gray-500">총 {filteredCases.length}건</span>
-          </div>
-          <button
-            onClick={() => router.push('/cases/new')}
-            className="px-4 py-2 text-sm font-medium text-white bg-sage-600 rounded-lg hover:bg-sage-700 transition-colors"
-          >
-            + 사건 추가
-          </button>
+  // Table columns definition
+  const columns: Column<LegalCase>[] = [
+    {
+      key: 'contract_date',
+      header: '계약일',
+      width: '100px',
+      sortable: true,
+      render: (item) => (
+        <span className="text-caption">{formatDate(item.contract_date)}</span>
+      ),
+    },
+    {
+      key: 'court_case_number',
+      header: '사건번호',
+      width: '140px',
+      render: (item) => (
+        <span className="text-body font-mono text-sm">
+          {item.court_case_number || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'court_name',
+      header: '법원',
+      width: '90px',
+      render: (item) => (
+        <span className="text-caption truncate" title={item.court_name || ''}>
+          {shortenCourtName(item.court_name) || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'case_level',
+      header: '심급',
+      width: '70px',
+      render: (item) => item.case_level
+        ? <CaseLevelBadge level={item.case_level} />
+        : <span className="text-[var(--text-muted)]">-</span>,
+    },
+    {
+      key: 'case_name',
+      header: '사건명',
+      sortable: !groupByMainCase,
+      render: (item) => (
+        <div className={`flex items-center gap-1.5 ${
+          item._isSubCase ? 'pl-5' : ''
+        }`}>
+          {item._isSubCase && (
+            <CornerDownRight className="w-3.5 h-3.5 text-[var(--text-muted)] flex-shrink-0" />
+          )}
+          <span className="text-body truncate max-w-[200px]">{item.case_name}</span>
+          {item.onedrive_folder_url && (
+            <span title="OneDrive 연결됨">
+              <Cloud className="w-4 h-4 text-[var(--color-info)] flex-shrink-0" />
+            </span>
+          )}
         </div>
+      ),
+    },
+    {
+      key: 'parties',
+      header: '당사자',
+      width: '180px',
+      render: (item) => <PartiesCell parties={item.parties} clientName={item.client?.name} />,
+    },
+    {
+      key: 'assignee',
+      header: '담당자',
+      width: '140px',
+      align: 'center',
+      render: (item) => <AssigneeCell assignees={item.assignees} assignedMember={item.assigned_member} />,
+    },
+    {
+      key: 'status',
+      header: '상태',
+      width: '80px',
+      align: 'center',
+      sortable: true,
+      render: (item) => <CaseStatusBadge status={item.status} />,
+    },
+  ]
 
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
+  return (
+    <div className="page-container">
+      {/* Page Header */}
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">사건 목록</h1>
+          <p className="page-subtitle">총 {processedCases.length}건</p>
+        </div>
+        <button
+          onClick={() => router.push('/cases/new')}
+          className="btn btn-primary"
+        >
+          <Plus className="w-4 h-4" />
+          사건 추가
+        </button>
+      </div>
+
+      {/* Toolbar */}
+      <TableToolbar className="mb-4">
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
           <input
             type="text"
-            placeholder="계약번호, 사건명, 의뢰인..."
+            placeholder="계약번호, 사건명, 의뢰인, 사건번호, 법원, 당사자 검색..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value)
               setCurrentPage(1)
             }}
-            className="px-3 py-1.5 border border-gray-200 rounded bg-white text-sm w-64 focus:outline-none focus:ring-1 focus:ring-sage-500"
+            className="form-input pl-9 w-full"
           />
+        </div>
 
+        {/* Status Filter */}
+        <div className="relative">
           <select
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value as 'all' | '진행중' | '종결')
               setCurrentPage(1)
             }}
-            className="px-2 py-1.5 border border-gray-200 rounded bg-white text-sm"
+            className="form-input pr-8 appearance-none"
           >
             <option value="all">전체 상태</option>
             <option value="진행중">진행중</option>
             <option value="종결">종결</option>
           </select>
-
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
         </div>
 
-        {/* Cases Table */}
-        <div className="bg-white rounded-lg border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs">
-                <tr>
-                  <th className="px-4 py-2.5 text-left font-medium">계약일</th>
-                  <th className="px-4 py-2.5 text-left font-medium">유형</th>
-                  <th className="px-4 py-2.5 text-left font-medium">의뢰인</th>
-                  <th className="px-4 py-2.5 text-left font-medium">사건명</th>
-                  <th className="px-4 py-2.5 text-center font-medium">담당자</th>
-                  <th className="px-4 py-2.5 text-center font-medium">상태</th>
-                  <th className="px-4 py-2.5 text-center font-medium">액션</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {currentCases.map((legalCase) => (
-                  <tr
-                    key={legalCase.id}
-                    onClick={() => router.push(`/cases/${legalCase.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
-                  >
-                    <td className="px-4 py-3 text-gray-600">
-                      {formatDate(legalCase.contract_date)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {legalCase.case_type || '-'}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {legalCase.client?.name || '-'}
-                    </td>
-                    <td className="px-4 py-3 text-gray-900 max-w-[300px]">
-                      <div className="flex items-center gap-1.5">
-                        <span className="truncate">{legalCase.case_name}</span>
-                        {legalCase.onedrive_folder_url && (
-                          <span className="flex-shrink-0 text-sky-500" title="OneDrive 연결됨">
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12.5 3C9.85 3 7.45 4.35 6.15 6.5C3.25 6.7 1 9.1 1 12c0 3 2.5 5.5 5.5 5.5h12c2.5 0 4.5-2 4.5-4.5 0-2.4-1.85-4.35-4.2-4.5C17.85 5.95 15.35 3 12.5 3z"/>
-                            </svg>
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center gap-1 flex-wrap justify-center">
-                        {(() => {
-                          // 다중 담당자 표시: assignees가 있으면 사용, 없으면 레거시 assigned_member 사용
-                          const assignees = legalCase.assignees || []
-                          const primary = assignees.find(a => a.isPrimary)
-                          const others = assignees.filter(a => !a.isPrimary)
+        {/* Group Toggle */}
+        <button
+          onClick={() => setGroupByMainCase(!groupByMainCase)}
+          className={`p-1.5 rounded transition-colors ${
+            groupByMainCase
+              ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+          }`}
+          title="주사건 그룹화"
+        >
+          <Layers className="w-4 h-4" />
+        </button>
 
-                          if (assignees.length > 0) {
-                            return (
-                              <>
-                                {primary && (
-                                  <span
-                                    className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded bg-sage-100 text-sage-700"
-                                    title={`주담당: ${primary.displayName}`}
-                                  >
-                                    {primary.displayName} ★
-                                  </span>
-                                )}
-                                {others.length > 0 && (
-                                  <span
-                                    className="inline-flex px-1.5 py-0.5 text-xs font-medium rounded bg-gray-100 text-gray-600 cursor-help"
-                                    title={others.map(a => a.displayName).join(', ')}
-                                  >
-                                    +{others.length}
-                                  </span>
-                                )}
-                              </>
-                            )
-                          }
-
-                          // 레거시 fallback
-                          return legalCase.assigned_member?.display_name ? (
-                            <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded bg-indigo-50 text-indigo-700">
-                              {legalCase.assigned_member.display_name}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )
-                        })()}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${getStatusStyle(legalCase.status)}`}>
-                        {legalCase.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={(e) => handleOpenPaymentModal(e, legalCase)}
-                          className="px-2 py-1 text-xs font-medium rounded bg-sage-600 text-white hover:bg-sage-700 transition-colors"
-                        >
-                          입금
-                        </button>
-                        <button
-                          onClick={(e) => handleAddSchedule(e, legalCase.id, legalCase.court_case_number)}
-                          className="px-2 py-1 text-xs font-medium rounded transition-colors bg-sage-600 text-white hover:bg-sage-700"
-                        >
-                          기일
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Empty State */}
-          {currentCases.length === 0 && (
-            <div className="py-12 text-center text-gray-400">
-              검색 결과가 없습니다
-            </div>
-          )}
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="px-4 py-3 border-t border-gray-100">
-              <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-500">
-                  {indexOfFirstCase + 1}-{Math.min(indexOfLastCase, filteredCases.length)} / {filteredCases.length}건
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    이전
-                  </button>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum
-                    if (totalPages <= 5) {
-                      pageNum = i + 1
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i
-                    } else {
-                      pageNum = currentPage - 2 + i
-                    }
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1 text-xs font-medium rounded transition-colors ${
-                          currentPage === pageNum
-                            ? 'bg-sage-600 text-white'
-                            : 'text-gray-600 bg-white border border-gray-200 hover:bg-gray-50'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    )
-                  })}
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    disabled={currentPage === totalPages}
-                    className="px-3 py-1 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    다음
-                  </button>
-                </div>
-              </div>
-
-              {/* Per Page */}
-              <div className="flex items-center justify-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                <span className="text-xs text-gray-500">페이지당:</span>
-                {[50, 100].map((num) => (
-                  <button
-                    key={num}
-                    onClick={() => {
-                      setCasesPerPage(num)
-                      setCurrentPage(1)
-                    }}
-                    className={`px-2 py-1 text-xs font-medium rounded transition-colors ${
-                      casesPerPage === num
-                        ? 'bg-sage-600 text-white'
-                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    {num}건
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+        {/* View Mode Toggle */}
+        <div className="flex items-center gap-1 p-1 bg-[var(--bg-tertiary)] rounded-lg">
+          <button
+            onClick={() => setViewMode('table')}
+            className={`p-1.5 rounded transition-colors ${
+              viewMode === 'table'
+                ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+            title="테이블 뷰"
+          >
+            <LayoutList className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('card')}
+            className={`p-1.5 rounded transition-colors ${
+              viewMode === 'card'
+                ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+            }`}
+            title="카드 뷰"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
         </div>
-      </div>
+      </TableToolbar>
+
+      {/* Content */}
+      {currentCases.length === 0 ? (
+        searchTerm ? (
+          <EmptySearchResults
+            searchTerm={searchTerm}
+            onClear={() => setSearchTerm('')}
+          />
+        ) : (
+          <EmptyCases onAddCase={() => router.push('/cases/new')} />
+        )
+      ) : viewMode === 'table' ? (
+        /* Table View */
+        <DataTable
+          data={currentCases}
+          columns={columns}
+          keyExtractor={(item) => item.id}
+          onRowClick={(item) => router.push(`/cases/${item.id}`)}
+          sortColumn={sortColumn}
+          sortDirection={sortDirection}
+          onSort={handleSort}
+          rowActions={(item) => (
+            <>
+              <button
+                onClick={(e) => handleOpenPaymentModal(e, item)}
+                className="p-1.5 rounded text-[var(--color-success)] hover:bg-[var(--color-success)]/10 transition-colors"
+                title="입금 등록"
+              >
+                <CreditCard className="w-4 h-4" />
+              </button>
+              <button
+                onClick={(e) => handleAddSchedule(e, item.id, item.court_case_number)}
+                className="p-1.5 rounded text-[var(--sage-primary)] hover:bg-[var(--sage-muted)] transition-colors"
+                title="기일 등록"
+              >
+                <Calendar className="w-4 h-4" />
+              </button>
+            </>
+          )}
+        />
+      ) : (
+        /* Card View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {currentCases.map((legalCase) => (
+            <CaseCard
+              key={legalCase.id}
+              legalCase={legalCase}
+              formatDate={formatDate}
+              onClick={() => router.push(`/cases/${legalCase.id}`)}
+              onPayment={(e) => handleOpenPaymentModal(e, legalCase)}
+              onSchedule={(e) => handleAddSchedule(e, legalCase.id, legalCase.court_case_number)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={processedCases.length}
+          itemsPerPage={casesPerPage}
+          onPageChange={setCurrentPage}
+          onItemsPerPageChange={(n) => {
+            setCasesPerPage(n)
+            setCurrentPage(1)
+          }}
+          itemsPerPageOptions={[25, 50, 100]}
+          className="mt-4"
+        />
+      )}
 
       {/* Unified Schedule Modal */}
       <UnifiedScheduleModal
@@ -383,6 +503,196 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
           clientName={selectedCaseForPayment.client?.name}
           onPaymentAdded={handlePaymentAdded}
         />
+      )}
+    </div>
+  )
+}
+
+// Sub-components
+interface AssigneeCellProps {
+  assignees?: CaseAssignee[]
+  assignedMember?: {
+    id: string
+    display_name: string
+    role: string
+  }
+}
+
+function AssigneeCell({ assignees, assignedMember }: AssigneeCellProps) {
+  const primary = assignees?.find(a => a.isPrimary)
+  const others = assignees?.filter(a => !a.isPrimary) || []
+
+  if (assignees && assignees.length > 0) {
+    return (
+      <div className="flex items-center gap-1 flex-wrap justify-center">
+        {primary && (
+          <span
+            className="inline-flex items-center px-2 py-0.5 text-caption font-medium rounded bg-[var(--sage-muted)] text-[var(--sage-primary)]"
+            title={`주담당: ${primary.displayName}`}
+          >
+            {primary.displayName} ★
+          </span>
+        )}
+        {others.length > 0 && (
+          <span
+            className="inline-flex px-1.5 py-0.5 text-caption font-medium rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-help"
+            title={others.map(a => a.displayName).join(', ')}
+          >
+            +{others.length}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  // Legacy fallback
+  if (assignedMember?.display_name) {
+    return (
+      <span className="inline-flex px-2 py-0.5 text-caption font-medium rounded bg-[var(--color-info)]/10 text-[var(--color-info)]">
+        {assignedMember.display_name}
+      </span>
+    )
+  }
+
+  return <span className="text-[var(--text-muted)]">-</span>
+}
+
+interface CaseCardProps {
+  legalCase: LegalCase
+  formatDate: (date: string | null) => string
+  onClick: () => void
+  onPayment: (e: React.MouseEvent) => void
+  onSchedule: (e: React.MouseEvent) => void
+}
+
+function CaseCard({ legalCase, formatDate, onClick, onPayment, onSchedule }: CaseCardProps) {
+  const primary = legalCase.assignees?.find(a => a.isPrimary)
+
+  return (
+    <div
+      onClick={onClick}
+      className="card p-4 cursor-pointer hover:border-[var(--sage-primary)] transition-all"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            {/* 심급 뱃지 */}
+            {legalCase.case_level && legalCase.case_level !== '1심' && (
+              <CaseLevelBadge level={legalCase.case_level} />
+            )}
+            <h3 className="text-body font-semibold truncate">{legalCase.case_name}</h3>
+          </div>
+          {/* 당사자 표시 */}
+          <p className="text-caption mt-0.5">
+            {legalCase.parties?.ourClient || legalCase.client?.name || '-'}
+            {legalCase.parties?.opponent && (
+              <span className="text-[var(--text-muted)]"> v {legalCase.parties.opponent}</span>
+            )}
+          </p>
+        </div>
+        <CaseStatusBadge status={legalCase.status} />
+      </div>
+
+      {/* Meta */}
+      <div className="space-y-2 mb-4">
+        {/* 사건번호 */}
+        {legalCase.court_case_number && (
+          <div className="flex items-center justify-between text-caption">
+            <span className="text-[var(--text-muted)]">사건번호</span>
+            <span className="font-mono text-sm">{legalCase.court_case_number}</span>
+          </div>
+        )}
+        {/* 법원 */}
+        {legalCase.court_name && (
+          <div className="flex items-center justify-between text-caption">
+            <span className="text-[var(--text-muted)]">법원</span>
+            <span>{shortenCourtName(legalCase.court_name)}</span>
+          </div>
+        )}
+        {/* 계약일 */}
+        <div className="flex items-center justify-between text-caption">
+          <span className="text-[var(--text-muted)]">계약일</span>
+          <span>{formatDate(legalCase.contract_date)}</span>
+        </div>
+        {/* 담당자 */}
+        <div className="flex items-center justify-between text-caption">
+          <span className="text-[var(--text-muted)]">담당자</span>
+          <span>{primary?.displayName || legalCase.assigned_member?.display_name || '-'}</span>
+        </div>
+      </div>
+
+      {/* Cloud indicator */}
+      {legalCase.onedrive_folder_url && (
+        <div className="flex items-center gap-1.5 text-caption text-[var(--color-info)] mb-3">
+          <Cloud className="w-3.5 h-3.5" />
+          <span>OneDrive 연결됨</span>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 pt-3 border-t border-[var(--border-default)]">
+        <button
+          onClick={onPayment}
+          className="flex-1 btn btn-ghost btn-sm justify-center text-[var(--color-success)]"
+        >
+          <CreditCard className="w-4 h-4" />
+          입금
+        </button>
+        <button
+          onClick={onSchedule}
+          className="flex-1 btn btn-ghost btn-sm justify-center text-[var(--sage-primary)]"
+        >
+          <Calendar className="w-4 h-4" />
+          기일
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Helper functions for new columns
+function shortenCourtName(name: string | null): string | null {
+  if (!name) return null
+  return name
+    .replace('지방법원', '지법')
+    .replace('고등법원', '고법')
+    .replace('대법원', '대법')
+    .replace('가정법원', '가법')
+    .replace('행정법원', '행법')
+}
+
+function CaseLevelBadge({ level }: { level: string }) {
+  const colorMap: Record<string, string> = {
+    '1심': 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
+    '2심(항소심)': 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
+    '3심(상고심)': 'bg-[var(--color-error)]/10 text-[var(--color-error)]',
+  }
+  const shortLabel = level
+    .replace('2심(항소심)', '항소심')
+    .replace('3심(상고심)', '상고심')
+  return (
+    <span className={`px-1.5 py-0.5 text-xs rounded ${colorMap[level] || ''}`}>
+      {shortLabel}
+    </span>
+  )
+}
+
+function PartiesCell({ parties, clientName }: {
+  parties?: LegalCase['parties']
+  clientName?: string
+}) {
+  const ourClient = parties?.ourClient || clientName
+  if (!ourClient) return <span className="text-[var(--text-muted)]">-</span>
+
+  return (
+    <div className="text-body text-sm truncate">
+      <span className="font-medium">{ourClient}</span>
+      {parties?.opponent && (
+        <>
+          <span className="text-[var(--text-muted)] mx-1">v</span>
+          <span>{parties.opponent}</span>
+        </>
       )}
     </div>
   )

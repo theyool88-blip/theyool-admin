@@ -49,6 +49,12 @@ function resolveTriggerSource(value: unknown, forceRefresh: boolean): string {
   return forceRefresh ? 'manual' : 'auto'
 }
 
+// UUID 형식 검증 헬퍼
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function isValidUUID(value: unknown): boolean {
+  return typeof value === 'string' && UUID_REGEX.test(value);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -64,16 +70,54 @@ export async function POST(request: NextRequest) {
     const resolvedSyncType = normalizeSyncType(syncType);
     const resolvedTriggerSource = resolveTriggerSource(triggerSource, forceRefresh);
 
-    if (!legalCaseId || !caseNumber) {
+    // 입력값 로깅
+    console.log('[SCOURT SYNC] 요청 수신:', {
+      legalCaseId,
+      caseNumber,
+      courtName,
+      partyName: partyName ? '***' : undefined,
+      forceRefresh,
+      syncType: resolvedSyncType,
+    });
+
+    // 필수 파라미터 검증
+    if (!legalCaseId) {
+      console.error('[SCOURT SYNC] legalCaseId 누락');
       return NextResponse.json(
-        { error: '필수 파라미터 누락: legalCaseId, caseNumber' },
+        { error: '사건 ID가 누락되었습니다', code: 'MISSING_CASE_ID' },
         { status: 400 }
       );
     }
 
-    const supabase = createAdminClient();
+    if (!isValidUUID(legalCaseId)) {
+      console.error('[SCOURT SYNC] legalCaseId UUID 형식 오류:', legalCaseId);
+      return NextResponse.json(
+        { error: '잘못된 사건 ID 형식입니다', code: 'INVALID_CASE_ID_FORMAT' },
+        { status: 400 }
+      );
+    }
 
-    // 1. 사건 정보 조회 (enc_cs_no, scourt_wmonid 확인)
+    if (!caseNumber) {
+      console.error('[SCOURT SYNC] caseNumber 누락');
+      return NextResponse.json(
+        { error: '사건번호가 누락되었습니다', code: 'MISSING_CASE_NUMBER' },
+        { status: 400 }
+      );
+    }
+
+    // Admin 클라이언트 생성 (환경 변수 오류 처리)
+    let supabase;
+    try {
+      supabase = createAdminClient();
+    } catch (envError) {
+      console.error('[SCOURT SYNC] Admin 클라이언트 생성 실패:', envError);
+      return NextResponse.json(
+        { error: '서버 구성 오류가 발생했습니다', code: 'SERVER_CONFIG_ERROR' },
+        { status: 500 }
+      );
+    }
+
+    // 1. 사건 정보 조회 (scourt_enc_cs_no, scourt_wmonid 확인)
     const { data: legalCase, error: caseError } = await supabase
       .from('legal_cases')
       .select('*, scourt_last_sync, scourt_last_progress_sync_at, scourt_last_general_sync_at, scourt_progress_hash, scourt_general_hash, scourt_sync_enabled, scourt_sync_cooldown_until, scourt_next_progress_sync_at, scourt_next_general_sync_at, scourt_enc_cs_no, scourt_wmonid, court_name')
@@ -81,10 +125,52 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (caseError || !legalCase) {
-      console.error('[SCOURT SYNC] 사건 조회 실패:', { legalCaseId, caseError });
+      console.error('[SCOURT SYNC] 사건 조회 실패:', {
+        legalCaseId,
+        errorCode: caseError?.code,
+        errorMessage: caseError?.message,
+        errorDetails: caseError?.details,
+      });
+
+      // 에러 코드별 분기 처리
+      if (caseError?.code === 'PGRST116') {
+        // No rows returned
+        return NextResponse.json(
+          { error: '해당 ID의 사건을 찾을 수 없습니다', code: 'CASE_NOT_FOUND', detail: legalCaseId },
+          { status: 404 }
+        );
+      }
+      if (caseError?.code === '22P02') {
+        // Invalid UUID format (PostgreSQL)
+        return NextResponse.json(
+          { error: '잘못된 사건 ID 형식입니다', code: 'INVALID_UUID', detail: legalCaseId },
+          { status: 400 }
+        );
+      }
+
+      // 인증/권한 오류 감지
+      const errorMessage = caseError?.message?.toLowerCase() || '';
+      const isAuthError =
+        caseError?.code === 'PGRST301' || // JWT 오류
+        caseError?.code === '42501' || // 권한 부족
+        errorMessage.includes('jwt') ||
+        errorMessage.includes('api key') ||
+        errorMessage.includes('invalid') ||
+        errorMessage.includes('unauthorized') ||
+        errorMessage.includes('authentication');
+
+      if (isAuthError) {
+        console.error('[SCOURT SYNC] 인증 오류 감지 - API 키를 확인해주세요');
+        return NextResponse.json(
+          { error: 'API 인증 오류가 발생했습니다. 관리자에게 문의해주세요.', code: 'AUTH_ERROR', detail: caseError?.message },
+          { status: 401 }
+        );
+      }
+
+      // 기타 DB 오류
       return NextResponse.json(
-        { error: '사건을 찾을 수 없습니다', detail: caseError?.message },
-        { status: 404 }
+        { error: '사건 조회 중 데이터베이스 오류가 발생했습니다', code: 'DB_ERROR', detail: caseError?.message },
+        { status: 500 }
       );
     }
 

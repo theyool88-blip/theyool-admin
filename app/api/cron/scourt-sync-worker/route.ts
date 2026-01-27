@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
       const { data: legalCase, error: caseError } = await supabase
         .from('legal_cases')
         .select(
-          'id, tenant_id, court_case_number, court_name, enc_cs_no, scourt_wmonid, scourt_sync_enabled, scourt_sync_cooldown_until, scourt_last_general_sync_at'
+          'id, tenant_id, court_case_number, court_name, scourt_enc_cs_no, scourt_wmonid, scourt_sync_enabled, scourt_sync_cooldown_until, scourt_last_general_sync_at'
         )
         .eq('id', job.legal_case_id)
         .single()
@@ -273,7 +273,7 @@ export async function GET(request: NextRequest) {
       }
 
       let effectiveSyncType: ScourtSyncType = syncType
-      const hasLink = Boolean(legalCase.enc_cs_no && legalCase.scourt_wmonid)
+      const hasLink = Boolean(legalCase.scourt_enc_cs_no && legalCase.scourt_wmonid)
       if (effectiveSyncType !== 'full' && !hasLink) {
         if (job.payload?.allowFullFallback) {
           effectiveSyncType = 'full'

@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-The theyool-admin system has been successfully converted from a generic blue/gray theme to a professional Sage Green branding system that aligns with the main theyool website. All 30+ files have been systematically redesigned for visual consistency, trust-building, and professional aesthetics.
+The luseed system has been successfully converted from a generic blue/gray theme to a professional Sage Green branding system that aligns with the main theyool website. All 30+ files have been systematically redesigned for visual consistency, trust-building, and professional aesthetics.
 
 ### Key Achievements
 - Converted 4 major modals (~1800 lines)
@@ -321,9 +321,9 @@ The admin system now shares the same design language:
 
 ### Resources
 - Main project CLAUDE.md: `/Users/hskim/theyool/CLAUDE.md`
-- Admin globals.css: `/Users/hskim/theyool-admin/app/globals.css`
-- Redesign status: `/Users/hskim/theyool-admin/SAGE_GREEN_REDESIGN_STATUS.md`
-- Conversion script: `/Users/hskim/theyool-admin/apply-sage-theme.sh`
+- Admin globals.css: `/Users/hskim/luseed/app/globals.css`
+- Redesign status: `/Users/hskim/luseed/SAGE_GREEN_REDESIGN_STATUS.md`
+- Conversion script: `/Users/hskim/luseed/apply-sage-theme.sh`
 
 ### Questions?
 Refer to completed components for examples:

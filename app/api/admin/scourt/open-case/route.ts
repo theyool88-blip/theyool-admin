@@ -18,8 +18,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { openCaseInBrowser } from '@/lib/scourt/case-opener';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { withTenant } from '@/lib/api/with-tenant';
 
-export async function POST(request: NextRequest) {
+export const POST = withTenant(async (
+  request: NextRequest,
+  { tenant }
+) => {
   try {
     const body = await request.json();
     const { caseId, caseNumber } = body;
@@ -33,16 +37,29 @@ export async function POST(request: NextRequest) {
 
     console.log(`📍 SCOURT 사건 열기: ${caseNumber} (${caseId})`);
 
-    // DB에서 wmonid, encCsNo 조회
     const supabase = createAdminClient();
-    const { data: legalCase } = await supabase
+
+    // DB에서 wmonid, encCsNo 조회 (테넌트 격리)
+    let caseQuery = supabase
       .from('legal_cases')
-      .select('scourt_wmonid, enc_cs_no')
-      .eq('id', caseId)
-      .single();
+      .select('scourt_wmonid, scourt_enc_cs_no')
+      .eq('id', caseId);
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      caseQuery = caseQuery.eq('tenant_id', tenant.tenantId);
+    }
+
+    const { data: legalCase, error: caseError } = await caseQuery.single();
+
+    if (caseError || !legalCase) {
+      return NextResponse.json(
+        { success: false, error: '사건을 찾을 수 없습니다.' },
+        { status: 404 }
+      );
+    }
 
     const wmonid = legalCase?.scourt_wmonid;
-    const encCsNo = legalCase?.enc_cs_no;
+    const encCsNo = legalCase?.scourt_enc_cs_no;
 
     if (!encCsNo) {
       return NextResponse.json(
@@ -75,4 +92,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
+});

@@ -93,17 +93,17 @@ export default function CasePaymentsModal({
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+      <div className="bg-[var(--bg-secondary)] rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-6 py-5 border-b border-sage-100">
+        <div className="px-6 py-5 border-b border-[var(--border-subtle)]">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-sage-800">{caseName}</h2>
-              <p className="text-sm text-sage-500 mt-0.5">입금 관리</p>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)]">{caseName}</h2>
+              <p className="text-sm text-[var(--text-muted)] mt-0.5">입금 관리</p>
             </div>
             <button
               onClick={onClose}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-sage-400 hover:text-sage-600 hover:bg-sage-50 rounded-lg transition-colors"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] rounded-lg transition-colors"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -112,12 +112,12 @@ export default function CasePaymentsModal({
           </div>
           {/* Summary */}
           <div className="flex items-center gap-4 mt-4 text-sm">
-            <div className="bg-sage-50 px-4 py-2 rounded-lg">
-              <span className="text-sage-600">총 입금액</span>
-              <span className="ml-2 font-semibold text-sage-800">{formatCurrency(totalAmount)}</span>
+            <div className="bg-[var(--sage-muted)] px-4 py-2 rounded-lg">
+              <span className="text-[var(--text-secondary)]">총 입금액</span>
+              <span className="ml-2 font-medium text-[var(--text-primary)]">{formatCurrency(totalAmount)}</span>
             </div>
-            <div className="text-sage-300">|</div>
-            <span className="text-sage-600">{payments.length}건</span>
+            <div className="text-[var(--border-default)]">|</div>
+            <span className="text-[var(--text-secondary)]">{payments.length}건</span>
           </div>
         </div>
 
@@ -136,7 +136,7 @@ export default function CasePaymentsModal({
               {/* Add Button */}
               <button
                 onClick={() => setShowAddForm(true)}
-                className="mb-5 px-4 py-2.5 min-h-[44px] text-sm font-medium bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+                className="btn btn-primary mb-5"
               >
                 + 입금 추가
               </button>
@@ -144,42 +144,42 @@ export default function CasePaymentsModal({
               {/* Payments List */}
               {loading ? (
                 <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-sage-200 border-t-sage-600 mx-auto"></div>
-                  <p className="mt-3 text-sm text-sage-500">불러오는 중...</p>
+                  <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--border-subtle)] border-t-[var(--sage-primary)] mx-auto"></div>
+                  <p className="mt-3 text-sm text-[var(--text-muted)]">불러오는 중...</p>
                 </div>
               ) : payments.length === 0 ? (
-                <div className="text-center py-12 text-sage-400 text-sm">
+                <div className="text-center py-12 text-[var(--text-muted)] text-sm">
                   입금 내역이 없습니다
                 </div>
               ) : (
-                <div className="border border-sage-200 rounded-lg overflow-hidden">
+                <div className="border border-[var(--border-subtle)] rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
-                    <thead className="bg-sage-50">
+                    <thead className="bg-[var(--bg-tertiary)]">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">일자</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">입금자</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-sage-500 uppercase tracking-wider">금액</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-sage-500 uppercase tracking-wider">명목</th>
-                        <th className="px-4 py-3 text-center text-xs font-medium text-sage-500 uppercase tracking-wider">삭제</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">일자</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">입금자</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">금액</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">명목</th>
+                        <th className="px-4 py-3 text-center text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">삭제</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-sage-100 bg-white">
+                    <tbody className="divide-y divide-[var(--border-subtle)] bg-[var(--bg-secondary)]">
                       {payments.map((payment) => (
-                        <tr key={payment.id} className="hover:bg-sage-50 transition-colors">
-                          <td className="px-4 py-3 text-sm text-sage-600">
+                        <tr key={payment.id} className="hover:bg-[var(--bg-hover)] transition-colors">
+                          <td className="px-4 py-3 text-sm text-[var(--text-secondary)]">
                             {formatDate(payment.payment_date)}
                           </td>
-                          <td className="px-4 py-3 text-sm font-medium text-sage-800">
+                          <td className="px-4 py-3 text-sm font-medium text-[var(--text-primary)]">
                             {payment.depositor_name}
                           </td>
-                          <td className={`px-4 py-3 text-sm text-right font-medium ${payment.amount < 0 ? 'text-coral-600' : 'text-sage-800'}`}>
+                          <td className="px-4 py-3 text-sm text-right font-medium text-[var(--text-primary)]">
                             {formatCurrency(payment.amount)}
                           </td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-md ${
                               payment.payment_category === '환불'
-                                ? 'bg-coral-50 text-coral-700'
-                                : 'bg-sage-100 text-sage-700'
+                                ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]'
+                                : 'bg-[var(--sage-muted)] text-[var(--sage-primary)]'
                             }`}>
                               {payment.payment_category}
                             </span>
@@ -187,7 +187,7 @@ export default function CasePaymentsModal({
                           <td className="px-4 py-3 text-center">
                             <button
                               onClick={() => handleDelete(payment.id)}
-                              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center text-xs text-coral-500 hover:text-coral-700 hover:bg-coral-50 rounded-lg transition-colors"
+                              className="btn btn-sm btn-danger-ghost"
                             >
                               삭제
                             </button>
@@ -203,10 +203,10 @@ export default function CasePaymentsModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-sage-100 bg-sage-50">
+        <div className="px-6 py-4 border-t border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 min-h-[44px] text-sm font-medium bg-white border border-sage-300 text-sage-700 rounded-lg hover:bg-sage-50 transition-colors"
+            className="btn btn-secondary"
           >
             닫기
           </button>
@@ -297,59 +297,60 @@ function AddPaymentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-sage-50 rounded-xl p-5 border border-sage-200">
-      <h3 className="text-lg font-semibold text-sage-800 mb-5">입금 추가</h3>
+    <form onSubmit={handleSubmit} className="bg-[var(--sage-muted)] rounded-xl p-5 border border-[var(--border-subtle)]">
+      <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-5">입금 추가</h3>
 
       <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">
-            입금일 <span className="text-coral-500">*</span>
+        <div className="form-group">
+          <label className="form-label">
+            입금일 <span className="text-[var(--color-danger)]">*</span>
           </label>
           <input
             type="date"
             value={formData.payment_date}
             onChange={(e) => setFormData({ ...formData, payment_date: e.target.value })}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
+            className="form-input"
+            style={{ colorScheme: 'light' }}
             required
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">
-            입금자명 <span className="text-coral-500">*</span>
+        <div className="form-group">
+          <label className="form-label">
+            입금자명 <span className="text-[var(--color-danger)]">*</span>
           </label>
           <input
             type="text"
             value={formData.depositor_name}
             onChange={(e) => setFormData({ ...formData, depositor_name: e.target.value })}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
+            className="form-input"
             placeholder="홍길동"
             required
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">
-            금액 <span className="text-coral-500">*</span>
+        <div className="form-group">
+          <label className="form-label">
+            금액 <span className="text-[var(--color-danger)]">*</span>
           </label>
           <input
             type="text"
             value={formData.amount}
             onChange={(e) => handleAmountChange(e.target.value)}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
+            className="form-input"
             placeholder="1,000,000"
             required
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">
-            명목 <span className="text-coral-500">*</span>
+        <div className="form-group">
+          <label className="form-label">
+            명목 <span className="text-[var(--color-danger)]">*</span>
           </label>
           <select
             value={formData.payment_category}
             onChange={(e) => setFormData({ ...formData, payment_category: e.target.value as PaymentCategory })}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
+            className="form-input"
             required
           >
             <option value="">선택</option>
@@ -361,14 +362,12 @@ function AddPaymentForm({
           </select>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">
-            입금방법
-          </label>
+        <div className="form-group">
+          <label className="form-label">입금방법</label>
           <select
             value={formData.receipt_type}
             onChange={(e) => setFormData({ ...formData, receipt_type: e.target.value as ReceiptType | '' })}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
+            className="form-input"
           >
             <option value="">선택</option>
             {Object.values(RECEIPT_TYPES).map((type) => (
@@ -379,15 +378,13 @@ function AddPaymentForm({
           </select>
         </div>
 
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-sage-700 mb-1.5">
-            메모
-          </label>
+        <div className="form-group col-span-2">
+          <label className="form-label">메모</label>
           <input
             type="text"
             value={formData.memo}
             onChange={(e) => setFormData({ ...formData, memo: e.target.value })}
-            className="w-full px-3 py-2.5 text-sm border border-sage-200 rounded-lg bg-white focus:outline-none focus:border-sage-500 focus:ring-2 focus:ring-sage-500/20 transition-colors"
+            className="form-input"
             placeholder="메모 (선택)"
           />
         </div>
@@ -397,14 +394,14 @@ function AddPaymentForm({
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2.5 min-h-[44px] text-sm font-medium bg-white border border-sage-300 text-sage-700 rounded-lg hover:bg-sage-50 transition-colors"
+          className="btn btn-secondary flex-1"
         >
           취소
         </button>
         <button
           type="submit"
           disabled={submitting}
-          className="flex-1 py-2.5 min-h-[44px] text-sm font-medium bg-sage-600 text-white rounded-lg hover:bg-sage-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="btn btn-primary flex-1"
         >
           {submitting ? '처리중...' : '추가'}
         </button>

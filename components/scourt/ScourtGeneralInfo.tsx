@@ -123,7 +123,7 @@ export function ScourtGeneralInfo({
   }
 
   return (
-    <div className="text-gray-500 text-sm p-4">
+    <div className="text-[var(--text-tertiary)] text-sm p-4">
       SCOURT 연동 데이터가 없습니다.
     </div>
   );
@@ -147,11 +147,11 @@ export function BasicInfoSection({ data }: BasicInfoSectionProps) {
   const groups = groupFields(fields);
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-        <h3 className="text-sm font-medium text-gray-700">기본정보</h3>
+    <div className="card overflow-hidden">
+      <div className="bg-[var(--bg-primary)] px-4 py-2 border-b border-[var(--border-default)]">
+        <h3 className="text-sm font-medium text-[var(--text-secondary)]">기본정보</h3>
       </div>
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-[var(--border-subtle)]">
         {groups.map((group, idx) => (
           <div key={idx} className="px-4 py-3">
             <dl className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2">
@@ -173,8 +173,8 @@ function FieldItem({ field }: { field: VisibleField }) {
   const displayValue = field.value != null ? String(field.value) : '';
   return (
     <div className="flex flex-col">
-      <dt className="text-xs text-gray-500">{field.label}</dt>
-      <dd className="text-sm text-gray-900 font-medium truncate" title={displayValue}>
+      <dt className="text-xs text-[var(--text-tertiary)]">{field.label}</dt>
+      <dd className="text-sm text-[var(--text-primary)] font-medium truncate" title={displayValue}>
         {displayValue}
       </dd>
     </div>
@@ -202,32 +202,32 @@ export function TableSection({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-        <h3 className="text-sm font-medium text-gray-700">{title}</h3>
+    <div className="card overflow-hidden">
+      <div className="bg-[var(--bg-primary)] px-4 py-2 border-b border-[var(--border-default)]">
+        <h3 className="text-sm font-medium text-[var(--text-secondary)]">{title}</h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-[var(--border-default)]">
+          <thead className="bg-[var(--bg-primary)]">
             <tr>
               {columnLabels.map((label, idx) => (
                 <th
                   key={idx}
                   scope="col"
-                  className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider"
                 >
                   {label}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-default)]">
             {rows.map((row, rowIdx) => (
-              <tr key={rowIdx} className="hover:bg-gray-50">
+              <tr key={rowIdx} className="hover:bg-[var(--bg-hover)]">
                 {columns.map((col, colIdx) => (
                   <td
                     key={colIdx}
-                    className="px-4 py-2 text-sm text-gray-900 whitespace-nowrap"
+                    className="px-4 py-2 text-sm text-[var(--text-primary)] whitespace-nowrap"
                   >
                     {row[col] != null ? String(row[col]) : "-"}
                   </td>
@@ -276,20 +276,20 @@ export function PartyTable({ rawData }: PartyTableProps) {
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-        <h3 className="text-sm font-medium text-gray-700">당사자</h3>
+    <div className="card overflow-hidden">
+      <div className="bg-[var(--bg-primary)] px-4 py-2 border-b border-[var(--border-default)]">
+        <h3 className="text-sm font-medium text-[var(--text-secondary)]">당사자</h3>
       </div>
       <div className="p-4 space-y-4">
         {Object.entries(grouped).map(([type, partyList]) => (
           <div key={type}>
-            <h4 className="text-xs font-medium text-gray-500 mb-2">{type}</h4>
+            <h4 className="text-xs font-medium text-[var(--text-tertiary)] mb-2">{type}</h4>
             <ul className="space-y-1">
               {partyList.map((party, idx) => (
-                <li key={idx} className="text-sm text-gray-900">
+                <li key={idx} className="text-sm text-[var(--text-primary)]">
                   {party.btprtNm}
                   {party.csUltmtDvsNm && (
-                    <span className="ml-2 text-xs text-gray-500">
+                    <span className="ml-2 text-xs text-[var(--text-tertiary)]">
                       ({party.csUltmtDvsNm})
                     </span>
                   )}
@@ -412,9 +412,9 @@ function groupFields(fields: VisibleField[]): VisibleField[][] {
  */
 function LegacyBasicInfoSection({ fields }: { fields: VisibleField[] }) {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-        <h3 className="text-sm font-medium text-gray-700">기본정보</h3>
+    <div className="card overflow-hidden">
+      <div className="bg-[var(--bg-primary)] px-4 py-2 border-b border-[var(--border-default)]">
+        <h3 className="text-sm font-medium text-[var(--text-secondary)]">기본정보</h3>
       </div>
       <div className="px-4 py-3">
         <dl className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2">
@@ -422,8 +422,8 @@ function LegacyBasicInfoSection({ fields }: { fields: VisibleField[] }) {
             const displayValue = field.value != null ? String(field.value) : '';
             return (
               <div key={field.key} className="flex flex-col">
-                <dt className="text-xs text-gray-500">{field.label}</dt>
-                <dd className="text-sm text-gray-900 font-medium truncate" title={displayValue}>
+                <dt className="text-xs text-[var(--text-tertiary)]">{field.label}</dt>
+                <dd className="text-sm text-[var(--text-primary)] font-medium truncate" title={displayValue}>
                   {displayValue}
                 </dd>
               </div>
@@ -442,33 +442,33 @@ function LegacyPartyTable({ title, parties }: { title: string; parties: LegacyPa
   if (!parties || parties.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-        <h3 className="text-sm font-medium text-gray-700">{title}</h3>
+    <div className="card overflow-hidden">
+      <div className="bg-[var(--bg-primary)] px-4 py-2 border-b border-[var(--border-default)]">
+        <h3 className="text-sm font-medium text-[var(--text-secondary)]">{title}</h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-[var(--border-default)]">
+          <thead className="bg-[var(--bg-primary)]">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">구분</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">이름</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">종국결과</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">종국일</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]">구분</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]">이름</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]">종국결과</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]">종국일</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-[var(--border-default)]">
             {parties.map((party, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="px-4 py-2 text-sm text-gray-900">
+              <tr key={idx} className="hover:bg-[var(--bg-hover)]">
+                <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                   {party.btprtStndngNm || party.partyType || '-'}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-900">
+                <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                   {party.btprtNm || party.name || '-'}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-900">
+                <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                   {party.csUltmtDvsNm || party.result || '-'}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-900">
+                <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                   {party.csUltmtYmd || party.resultDate || '-'}
                 </td>
               </tr>
@@ -487,29 +487,29 @@ function LegacyRepresentativeTable({ title, representatives }: { title: string; 
   if (!representatives || representatives.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
-        <h3 className="text-sm font-medium text-gray-700">{title}</h3>
+    <div className="card overflow-hidden">
+      <div className="bg-[var(--bg-primary)] px-4 py-2 border-b border-[var(--border-default)]">
+        <h3 className="text-sm font-medium text-[var(--text-secondary)]">{title}</h3>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-[var(--border-default)]">
+          <thead className="bg-[var(--bg-primary)]">
             <tr>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">관계</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">대리인</th>
-              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">법무법인</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]">관계</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]">대리인</th>
+              <th className="px-4 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]">법무법인</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-[var(--border-default)]">
             {representatives.map((rep, idx) => (
-              <tr key={idx} className="hover:bg-gray-50">
-                <td className="px-4 py-2 text-sm text-gray-900">
+              <tr key={idx} className="hover:bg-[var(--bg-hover)]">
+                <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                   {rep.btprtRltnCtt || rep.relation || '-'}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-900">
+                <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                   {rep.agntNm || rep.name || '-'}
                 </td>
-                <td className="px-4 py-2 text-sm text-gray-900">
+                <td className="px-4 py-2 text-sm text-[var(--text-primary)]">
                   {rep.jdafrCorpNm || rep.lawFirm || '-'}
                 </td>
               </tr>

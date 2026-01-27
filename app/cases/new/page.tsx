@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import NewCaseForm from '@/components/NewCaseForm'
+import AdminLayoutClient from '@/components/AdminLayoutClient'
 
 interface PageProps {
   searchParams: Promise<{
@@ -61,11 +62,12 @@ export default async function NewCasePage({ searchParams }: PageProps) {
       }
     } else {
       // linked_party_id가 없으면 is_primary=true인 당사자의 party_type 사용
+      // NOTE: is_our_client 컬럼이 스키마에서 제거됨
       const { data: primaryParty } = await adminClient
         .from('case_parties')
         .select('party_type')
         .eq('case_id', params.sourceCaseId)
-        .eq('is_our_client', true)
+        .eq('is_primary', true)
         .maybeSingle()
 
       if (primaryParty) {
@@ -78,7 +80,7 @@ export default async function NewCasePage({ searchParams }: PageProps) {
       .from('case_parties')
       .select('party_name')
       .eq('case_id', params.sourceCaseId)
-      .eq('is_our_client', false)
+      .eq('is_primary', false)
       .order('party_order', { ascending: true })
       .limit(1)
       .maybeSingle()
@@ -90,17 +92,19 @@ export default async function NewCasePage({ searchParams }: PageProps) {
   }
 
   return (
-    <NewCaseForm
-      clients={clients || []}
-      initialCaseNumber={params.caseNumber}
-      initialCourtName={params.courtName}
-      initialClientId={params.clientId}
-      initialPartyName={params.partyName}
-      sourceCaseId={params.sourceCaseId}
-      initialClientRole={sourceCase?.client_role || null}
-      initialOpponentName={sourceCase?.opponent_name || null}
-      sourceRelationType={params.relationType}
-      sourceRelationEncCsNo={params.relationEncCsNo}
-    />
+    <AdminLayoutClient>
+      <NewCaseForm
+        clients={clients || []}
+        initialCaseNumber={params.caseNumber}
+        initialCourtName={params.courtName}
+        initialClientId={params.clientId}
+        initialPartyName={params.partyName}
+        sourceCaseId={params.sourceCaseId}
+        initialClientRole={sourceCase?.client_role || null}
+        initialOpponentName={sourceCase?.opponent_name || null}
+        sourceRelationType={params.relationType}
+        sourceRelationEncCsNo={params.relationEncCsNo}
+      />
+    </AdminLayoutClient>
   )
 }

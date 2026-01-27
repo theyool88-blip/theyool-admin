@@ -186,6 +186,74 @@ export async function confirmPayment(
 }
 
 /**
+ * 입금 확인 처리 (테넌트 격리 적용)
+ *
+ * @param paymentId - 확인할 입금 ID
+ * @param confirmedBy - 확인자 (관리자 이메일 또는 이름)
+ * @param tenantId - 테넌트 ID (undefined면 모든 테넌트 접근 가능)
+ * @param notes - 확인 메모 (선택사항)
+ * @returns 업데이트된 입금 정보
+ */
+export async function confirmPaymentWithTenant(
+  paymentId: string,
+  confirmedBy: string,
+  tenantId?: string,
+  _notes?: string
+) {
+  const supabase = createAdminClient()
+  void _notes
+
+  try {
+    // 1. 먼저 해당 결제가 테넌트 소속인지 확인
+    let checkQuery = supabase
+      .from('payments')
+      .select('id, tenant_id')
+      .eq('id', paymentId)
+
+    if (tenantId) {
+      checkQuery = checkQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data: existingPayment, error: checkError } = await checkQuery.single()
+
+    if (checkError || !existingPayment) {
+      return { success: false, error: 'Payment not found in your tenant' }
+    }
+
+    // 2. 입금 확인 처리
+    let updateQuery = supabase
+      .from('payments')
+      .update({
+        is_confirmed: true,
+        confirmed_at: new Date().toISOString(),
+        confirmed_by: confirmedBy,
+      })
+      .eq('id', paymentId)
+
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data: payment, error: updateError } = await updateQuery.select().single()
+
+    if (updateError) {
+      return { success: false, error: updateError.message }
+    }
+
+    // 3. 해당 월 정산 자동 업데이트 (있다면)
+    if (payment && payment.month_key) {
+      await syncMonthlySettlement(payment.month_key)
+    }
+
+    return { success: true, data: payment }
+  } catch (error) {
+    console.error('Error confirming payment:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { success: false, error: message }
+  }
+}
+
+/**
  * 입금 일괄 확인 처리
  *
  * @param paymentIds - 확인할 입금 ID 배열
@@ -214,6 +282,84 @@ export async function confirmPaymentsBatch(
     }
 
     // 영향받은 월의 정산 업데이트
+    const uniqueMonths = [...new Set(data.map(p => p.month_key).filter(Boolean))]
+    for (const month of uniqueMonths) {
+      await syncMonthlySettlement(month as string)
+    }
+
+    return { success: true, data, count: data.length }
+  } catch (error) {
+    console.error('Error confirming payments batch:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return { success: false, error: message }
+  }
+}
+
+/**
+ * 입금 일괄 확인 처리 (테넌트 격리 적용)
+ *
+ * @param paymentIds - 확인할 입금 ID 배열
+ * @param confirmedBy - 확인자
+ * @param tenantId - 테넌트 ID (undefined면 모든 테넌트 접근 가능)
+ * @returns 처리 결과
+ */
+export async function confirmPaymentsBatchWithTenant(
+  paymentIds: string[],
+  confirmedBy: string,
+  tenantId?: string
+) {
+  const supabase = createAdminClient()
+
+  try {
+    // 1. 먼저 해당 결제들이 테넌트 소속인지 확인
+    let checkQuery = supabase
+      .from('payments')
+      .select('id, tenant_id')
+      .in('id', paymentIds)
+
+    if (tenantId) {
+      checkQuery = checkQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data: existingPayments, error: checkError } = await checkQuery
+
+    if (checkError) {
+      return { success: false, error: checkError.message }
+    }
+
+    // 테넌트 필터 적용 시, 요청된 ID 중 해당 테넌트에 없는 것이 있으면 거부
+    if (tenantId && existingPayments) {
+      const foundIds = new Set(existingPayments.map(p => p.id))
+      const notFoundIds = paymentIds.filter(id => !foundIds.has(id))
+      if (notFoundIds.length > 0) {
+        return {
+          success: false,
+          error: `Some payments not found in your tenant: ${notFoundIds.join(', ')}`
+        }
+      }
+    }
+
+    // 2. 일괄 확인 처리
+    let updateQuery = supabase
+      .from('payments')
+      .update({
+        is_confirmed: true,
+        confirmed_at: new Date().toISOString(),
+        confirmed_by: confirmedBy,
+      })
+      .in('id', paymentIds)
+
+    if (tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenantId)
+    }
+
+    const { data, error } = await updateQuery.select()
+
+    if (error) {
+      return { success: false, error: error.message }
+    }
+
+    // 3. 영향받은 월의 정산 업데이트
     const uniqueMonths = [...new Set(data.map(p => p.month_key).filter(Boolean))]
     for (const month of uniqueMonths) {
       await syncMonthlySettlement(month as string)

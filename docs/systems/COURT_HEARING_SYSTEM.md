@@ -348,7 +348,7 @@ MonthlyCalendar에서 3개 테이블 통합:
 ## 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── components/
 │   ├── QuickAddHearingModal.tsx
 │   ├── QuickAddDeadlineModal.tsx

@@ -378,7 +378,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
 
     // 일방 화상기일이지만 참여자 정보가 없는 경우 (판단 불가)
     if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
-      return { show: true, label: '화상', color: 'bg-gray-100 text-gray-600' }
+      return { show: true, label: '화상', color: 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]' }
     }
 
     return null
@@ -486,7 +486,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
   const getScheduleTypeColor = (type: ScheduleType, hearingType?: string, eventSubtype?: string, scourt_result_raw?: string) => {
     // 연기된 기일: 흐린 회색 (기일변경, 연기, 취하, 취소 등 - 비활성 느낌)
     if (type === 'court_hearing' && isPostponedHearing(scourt_result_raw)) {
-      return 'bg-gray-100 text-gray-400 border-l-gray-300'
+      return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-l-[var(--border-default)]'
     }
 
     // 변호사미팅은 청록색(teal)으로 구분
@@ -496,42 +496,42 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
 
     // 참석하지 않는 법원기일은 회색으로 표시 (선고, 양육상담, 면접조사)
     if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING' || hearingType === 'HEARING_INVESTIGATION')) {
-      return 'bg-gray-50 text-gray-600 border-l-gray-400'
+      return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
     }
 
     // 미확정 상담은 점선 테두리
     if (type === 'consultation' && eventSubtype?.startsWith('pending_')) {
-      return 'bg-blue-50 text-blue-700 border-l-blue-400 border-dashed'
+      return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)] border-dashed'
     }
 
     switch (type) {
-      case 'trial': return 'bg-sage-50 text-sage-700 border-l-sage-500'
-      case 'consultation': return 'bg-blue-50 text-blue-700 border-l-blue-500'
-      case 'meeting': return 'bg-gray-50 text-gray-600 border-l-gray-400'
-      case 'court_hearing': return 'bg-sage-50 text-sage-700 border-l-sage-500'
-      case 'deadline': return 'bg-orange-50 text-orange-700 border-l-orange-500'
-      default: return 'bg-gray-50 text-gray-600 border-l-gray-400'
+      case 'trial': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
+      case 'consultation': return 'bg-[var(--color-info-muted)] text-[var(--color-info)] border-l-[var(--color-info)]'
+      case 'meeting': return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
+      case 'court_hearing': return 'bg-[var(--sage-muted)] text-[var(--sage-primary)] border-l-[var(--sage-primary)]'
+      case 'deadline': return 'bg-[var(--color-warning-muted)] text-[var(--color-warning)] border-l-[var(--color-warning)]'
+      default: return 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-l-[var(--border-default)]'
     }
   }
 
   const getScheduleTypeDot = (type: ScheduleType, hearingType?: string) => {
-    // 변호사미팅은 청록색(teal) 점으로 구분
+    // 변호사미팅은 더 진한 sage 점으로 구분
     if (type === 'court_hearing' && hearingType === 'HEARING_LAWYER_MEETING') {
-      return 'bg-teal-500'
+      return 'bg-[var(--sage-primary-active)]'
     }
 
     // 참석하지 않는 법원기일은 회색 점 (선고, 양육상담, 면접조사)
     if (type === 'court_hearing' && (hearingType === 'HEARING_JUDGMENT' || hearingType === 'HEARING_PARENTING' || hearingType === 'HEARING_INVESTIGATION')) {
-      return 'bg-gray-400'
+      return 'bg-[var(--text-muted)]'
     }
 
     switch (type) {
-      case 'trial': return 'bg-sage-500'
-      case 'consultation': return 'bg-blue-500'
-      case 'meeting': return 'bg-gray-400'
-      case 'court_hearing': return 'bg-sage-500'
-      case 'deadline': return 'bg-orange-500'
-      default: return 'bg-gray-400'
+      case 'trial': return 'bg-[var(--sage-primary)]'
+      case 'consultation': return 'bg-[var(--color-info)]'
+      case 'meeting': return 'bg-[var(--text-muted)]'
+      case 'court_hearing': return 'bg-[var(--sage-primary)]'
+      case 'deadline': return 'bg-[var(--color-warning)]'
+      default: return 'bg-[var(--text-muted)]'
     }
   }
 
@@ -566,24 +566,24 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
   return (
     <div className="w-full max-w-5xl mx-auto pt-16 sm:pt-20 pb-6 sm:pb-8 px-3 sm:px-6 lg:px-8">
       {/* 간소화된 헤더 (iOS 스타일) */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-3 relative">
+      <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] mb-3 relative">
         <div className="flex items-center justify-between px-3 py-2">
           {/* 좌측: 이전/다음 달 + 년월 */}
           <div className="flex items-center gap-1">
             <button
               onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h2 className="text-sm sm:text-base font-semibold text-gray-900 min-w-[100px] text-center">
+            <h2 className="text-sm sm:text-base font-semibold text-[var(--text-primary)] min-w-[100px] text-center">
               {format(currentDate, 'yyyy년 M월', { locale: ko })}
             </h2>
             <button
               onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-              className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -597,7 +597,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             {viewMode === 'calendar' ? (
               <button
                 onClick={() => setViewMode('week')}
-                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                 title="7일 보기로 전환"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -607,7 +607,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             ) : viewMode === 'week' ? (
               <button
                 onClick={() => setViewMode('calendar')}
-                className="p-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
                 title="월간 보기로 전환"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -618,7 +618,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             <button
               onClick={() => setShowMenu(!showMenu)}
               className={`p-2 rounded-lg transition-colors ${
-                showMenu ? 'bg-gray-100 text-gray-900' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                showMenu ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]'
               }`}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -630,11 +630,11 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
 
         {/* 드롭다운 메뉴 */}
         {showMenu && (
-          <div className="absolute right-3 top-14 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50 min-w-[200px]">
+          <div className="absolute right-3 top-14 bg-[var(--bg-secondary)] rounded-lg shadow-lg border border-[var(--border-default)] p-4 z-50 min-w-[200px]">
             {/* 필터 활성 표시 */}
             {(filterType !== 'all' || lawyerFilter !== 'all') && (
-              <div className="mb-3 pb-3 border-b border-gray-100">
-                <div className="flex items-center gap-2 text-xs text-sage-600">
+              <div className="mb-3 pb-3 border-b border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2 text-xs text-[var(--sage-primary)]">
                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M3 3a1 1 0 011-1h12a1 1 0 011 1v3a1 1 0 01-.293.707L12 11.414V15a1 1 0 01-.293.707l-2 2A1 1 0 018 17v-5.586L3.293 6.707A1 1 0 013 6V3z" clipRule="evenodd" />
                   </svg>
@@ -645,14 +645,14 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
 
             {/* 일정 타입 필터 */}
             <div className="mb-4">
-              <p className="text-xs text-gray-500 mb-2 font-medium">일정 필터</p>
+              <p className="text-xs text-[var(--text-tertiary)] mb-2 font-medium">일정 필터</p>
               <div className="flex gap-2">
                 <button
                   onClick={() => setFilterType('all')}
                   className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                     filterType === 'all'
-                      ? 'bg-sage-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-[var(--sage-primary)] text-white'
+                      : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                   }`}
                 >
                   전체
@@ -661,8 +661,8 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   onClick={() => setFilterType('court')}
                   className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                     filterType === 'court'
-                      ? 'bg-sage-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-[var(--sage-primary)] text-white'
+                      : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                   }`}
                 >
                   재판만
@@ -673,11 +673,11 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
             {/* 변호사 필터 */}
             {tenantMembers.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs text-gray-500 mb-2 font-medium">변호사</p>
+                <p className="text-xs text-[var(--text-tertiary)] mb-2 font-medium">변호사</p>
                 <select
                   value={lawyerFilter}
                   onChange={(e) => setLawyerFilter(e.target.value)}
-                  className="w-full px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-sage-500"
+                  className="w-full px-3 py-1.5 text-xs font-medium rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]"
                 >
                   <option value="all">모든 변호사</option>
                   {tenantMembers.map((member) => (
@@ -689,13 +689,13 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
               </div>
             )}
 
-            <hr className="my-3 border-gray-100" />
+            <hr className="my-3 border-[var(--border-subtle)]" />
 
             {/* 목록 보기 */}
             <button
               onClick={() => { setViewMode('list'); setShowMenu(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-colors mb-1 ${
-                viewMode === 'list' ? 'bg-sage-100 text-sage-700' : 'text-gray-600 hover:bg-gray-50'
+                viewMode === 'list' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
               }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -711,22 +711,36 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                 setSelectedDate(new Date())
                 setShowMenu(false)
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               오늘로 이동
             </button>
+
+            {/* Schedule-X 새 캘린더 링크 */}
+            <div className="border-t border-[var(--border-subtle)] my-2 pt-2">
+              <a
+                href="/schedules/new"
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[var(--color-info)] hover:bg-[var(--color-info-muted)] rounded-lg transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+                새 캘린더 체험하기
+                <span className="ml-auto px-1.5 py-0.5 text-[10px] font-bold bg-[var(--color-info)] text-white rounded">BETA</span>
+              </a>
+            </div>
           </div>
         )}
       </div>
 
       {/* 월간 캘린더 */}
-      <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-4">
+      <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] p-3 sm:p-4">
         {loading ? (
           <div className="flex justify-center items-center h-96">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-gray-600"></div>
+            <div className="animate-spin rounded-full h-6 w-6 border-2 border-[var(--border-default)] border-t-[var(--text-secondary)]"></div>
           </div>
         ) : viewMode === 'list' ? (
           <ScheduleListView
@@ -755,11 +769,11 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
           /* 7일 보기 (iOS 스타일 - 2열 4행 8칸 그리드) */
           <div className="grid grid-cols-2 rounded-lg overflow-hidden">
             {/* 첫 번째 칸: 미니 캘린더 */}
-            <div className="bg-white p-3" style={{ minHeight: 'max(120px, calc((100vh - 240px) / 4))' }}>
+            <div className="bg-[var(--bg-secondary)] p-3" style={{ minHeight: 'max(120px, calc((100vh - 240px) / 4))' }}>
               <div className="grid grid-cols-7 text-center mb-1">
                 {['월', '화', '수', '목', '금', '토', '일'].map((d, i) => (
                   <div key={d} className={`text-[10px] font-medium py-0.5 ${
-                    i === 5 ? 'text-blue-600' : i === 6 ? 'text-red-500' : 'text-gray-500'
+                    i === 5 ? 'text-[var(--color-info)]' : i === 6 ? 'text-[var(--color-danger)]' : 'text-[var(--text-tertiary)]'
                   }`}>
                     {d}
                   </div>
@@ -792,21 +806,21 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         onClick={() => setSelectedDate(d)}
                         className={`text-[10px] min-h-[22px] min-w-[22px] py-0.5 rounded transition-all font-medium focus:outline-none ${
                           isSelectedDay
-                            ? 'bg-sage-600 text-white'
+                            ? 'bg-[var(--sage-primary)] text-white'
                             : isTodayDay
-                            ? 'bg-sage-100 text-sage-700 font-bold'
+                            ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)] font-bold'
                             : isInCurrentMonth
                             ? isSunday
-                              ? 'text-red-500 hover:bg-red-50'
+                              ? 'text-[var(--color-danger)] hover:bg-[var(--color-danger-muted)]'
                               : isSaturday
-                              ? 'text-blue-600 hover:bg-blue-50'
-                              : 'text-gray-600 hover:bg-gray-100'
-                            : 'text-gray-300'
+                              ? 'text-[var(--color-info)] hover:bg-[var(--color-info-muted)]'
+                              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                            : 'text-[var(--border-default)]'
                         }`}
                       >
                         <span>{format(d, 'd')}</span>
                         {hasSchedule && !isSelectedDay && (
-                          <div className="w-1 h-1 bg-sage-500 rounded-full mx-auto mt-0.5" />
+                          <div className="w-1 h-1 bg-[var(--sage-primary)] rounded-full mx-auto mt-0.5" />
                         )}
                       </button>
                     )
@@ -828,10 +842,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                 <div
                   key={i}
                   onClick={() => setSelectedDate(d)}
-                  className={`bg-white p-2 sm:p-3 cursor-pointer relative ${
+                  className={`bg-[var(--bg-secondary)] p-2 sm:p-3 cursor-pointer relative ${
                     isSelectedDay
-                      ? 'bg-sage-50 ring-1 ring-sage-400 ring-inset transition-all duration-150'
-                      : 'hover:bg-gray-50 active:scale-[0.99] transition-all duration-150'
+                      ? 'bg-[var(--sage-muted)] ring-1 ring-[var(--sage-primary)] ring-inset transition-all duration-150'
+                      : 'hover:bg-[var(--bg-hover)] active:scale-[0.99] transition-all duration-150'
                   }`}
                   style={{ minHeight: 'max(120px, calc((100vh - 240px) / 4))' }}
                 >
@@ -839,21 +853,21 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   <div className="flex items-center gap-1 mb-2">
                     <span className={`text-sm font-bold transition-all duration-150 flex-shrink-0 ${
                       isSelectedDay
-                        ? 'w-6 h-6 flex items-center justify-center rounded-full text-xs text-white bg-sage-500'
-                        : holidayName || isSunday ? 'text-red-500' : isWeekend ? 'text-blue-600' : 'text-gray-800'
+                        ? 'w-6 h-6 flex items-center justify-center rounded-full text-xs text-white bg-[var(--sage-primary)]'
+                        : holidayName || isSunday ? 'text-[var(--color-danger)]' : isWeekend ? 'text-[var(--color-info)]' : 'text-[var(--text-primary)]'
                     }`}>
                       {format(d, 'd')}
                     </span>
                     <span className={`text-xs font-medium flex-shrink-0 ${
-                      holidayName || isSunday ? 'text-red-400' : isWeekend ? 'text-blue-500' : 'text-gray-400'
+                      holidayName || isSunday ? 'text-[var(--color-danger)]' : isWeekend ? 'text-[var(--color-info)]' : 'text-[var(--text-muted)]'
                     }`}>
                       {format(d, 'EEE', { locale: ko })}
                     </span>
                     {isTodayDay && !holidayName && (
-                      <span className="text-[10px] text-sage-700 font-medium bg-sage-100 px-1.5 py-0.5 rounded">TODAY</span>
+                      <span className="text-[10px] text-[var(--sage-primary)] font-medium bg-[var(--sage-muted)] px-1.5 py-0.5 rounded">TODAY</span>
                     )}
                     {holidayName && (
-                      <span className="text-[10px] text-red-500 font-medium truncate">
+                      <span className="text-[10px] text-[var(--color-danger)] font-medium truncate">
                         {holidayName}{isTodayDay && ' (TODAY)'}
                       </span>
                     )}
@@ -882,19 +896,19 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                             ) : null
                           })()}
                           {schedule.location && (
-                            <span className="ml-0.5 text-gray-500 font-normal">{getShortCourt(schedule.location)}</span>
+                            <span className="ml-0.5 text-[var(--text-tertiary)] font-normal">{getShortCourt(schedule.location)}</span>
                           )}
                           {schedule.type === 'deadline' && schedule.daysUntil !== undefined && (
-                            <span className="ml-0.5 text-orange-600 font-medium">{formatDaysUntil(schedule.daysUntil)}</span>
+                            <span className="ml-0.5 text-[var(--color-warning)] font-medium">{formatDaysUntil(schedule.daysUntil)}</span>
                           )}
                         </div>
-                        <div className="truncate text-gray-600">
+                        <div className="truncate text-[var(--text-secondary)]">
                           {getShortTitle(schedule.title)}
                         </div>
                       </div>
                     ))}
                     {daySchedules.length > 4 && (
-                      <div className="text-[9px] text-gray-500 font-medium px-1">
+                      <div className="text-[9px] text-[var(--text-tertiary)] font-medium px-1">
                         +{daySchedules.length - 4}건
                       </div>
                     )}
@@ -911,7 +925,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                 <div
                   key={day}
                   className={`text-center font-medium text-xs py-1 ${
-                    index === 0 ? 'text-red-500' : index === 6 ? 'text-blue-600' : 'text-gray-500'
+                    index === 0 ? 'text-[var(--color-danger)]' : index === 6 ? 'text-[var(--color-info)]' : 'text-[var(--text-tertiary)]'
                   }`}
                 >
                   {day}
@@ -943,27 +957,27 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                     onClick={() => setSelectedDate(day)}
                     className={`p-1 sm:p-2 cursor-pointer overflow-hidden relative ${
                       isSelected
-                        ? 'bg-sage-50 ring-1 ring-sage-400 ring-inset z-10 transition-all duration-150'
-                        : 'hover:bg-gray-50 active:scale-[0.98] transition-all duration-150'
+                        ? 'bg-[var(--sage-muted)] ring-1 ring-[var(--sage-primary)] ring-inset z-10 transition-all duration-150'
+                        : 'hover:bg-[var(--bg-hover)] active:scale-[0.98] transition-all duration-150'
                     } ${!isCurrentMonth ? 'opacity-40' : ''}`}
                   >
                     <div className="flex items-center gap-1 mb-1">
                       <div className={`text-xs font-medium transition-all duration-150 flex-shrink-0 ${
                         isSelected
-                          ? 'w-5 h-5 flex items-center justify-center rounded-full text-[10px] text-white bg-sage-500'
+                          ? 'w-5 h-5 flex items-center justify-center rounded-full text-[10px] text-white bg-[var(--sage-primary)]'
                           : isHoliday || isSunday
-                          ? 'text-red-500'
+                          ? 'text-[var(--color-danger)]'
                           : isSaturday
-                          ? 'text-blue-600'
-                          : 'text-gray-700'
+                          ? 'text-[var(--color-info)]'
+                          : 'text-[var(--text-secondary)]'
                       }`}>
                         {format(day, 'd')}
                       </div>
                       {isCurrentDay && !holidayName && (
-                        <span className="text-[9px] text-sage-700 font-medium bg-sage-100 px-1.5 py-0.5 rounded">TODAY</span>
+                        <span className="text-[9px] text-[var(--sage-primary)] font-medium bg-[var(--sage-muted)] px-1.5 py-0.5 rounded">TODAY</span>
                       )}
                       {holidayName && (
-                        <span className="text-[9px] text-red-500 font-medium truncate" title={holidayName}>
+                        <span className="text-[9px] text-[var(--color-danger)] font-medium truncate" title={holidayName}>
                           {holidayName}{isCurrentDay && ' (TODAY)'}
                         </span>
                       )}
@@ -989,19 +1003,19 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                           <div className="font-medium truncate">
                             {schedule.time?.slice(0, 5)}
                             {schedule.location && (
-                              <span className="ml-0.5 text-gray-500 font-normal">{getShortCourt(schedule.location)}</span>
+                              <span className="ml-0.5 text-[var(--text-tertiary)] font-normal">{getShortCourt(schedule.location)}</span>
                             )}
                             {schedule.type === 'deadline' && schedule.daysUntil !== undefined && (
-                              <span className="ml-0.5 text-orange-600 font-medium">{formatDaysUntil(schedule.daysUntil)}</span>
+                              <span className="ml-0.5 text-[var(--color-warning)] font-medium">{formatDaysUntil(schedule.daysUntil)}</span>
                             )}
                           </div>
-                          <div className="truncate text-gray-600">
+                          <div className="truncate text-[var(--text-secondary)]">
                             {getShortTitle(schedule.title)}
                           </div>
                         </div>
                       ))}
                       {daySchedules.length > 2 && (
-                        <div className="text-[9px] text-gray-500 font-medium px-1">
+                        <div className="text-[9px] text-[var(--text-tertiary)] font-medium px-1">
                           +{daySchedules.length - 2}건
                         </div>
                       )}
@@ -1016,19 +1030,19 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
 
       {/* 선택된 날짜의 상세 일정 */}
       {selectedDate && (
-        <div className="bg-white rounded-lg border border-gray-200 p-3 mt-3 shadow-sm">
+        <div className="bg-[var(--bg-secondary)] rounded-lg border border-[var(--border-default)] p-3 mt-3 shadow-sm">
           <div className="flex justify-between items-center mb-3">
             <div>
-              <h3 className="text-xs font-bold text-gray-900">
+              <h3 className="text-xs font-bold text-[var(--text-primary)]">
                 {format(selectedDate, 'M월 d일 (E)', { locale: ko })} 일정
               </h3>
-              <p className="text-[10px] text-gray-500 mt-0.5">
+              <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">
                 {format(selectedDate, 'yyyy년', { locale: ko })}
               </p>
             </div>
             <button
               onClick={() => setSelectedDate(null)}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-gray-300"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--border-default)]"
               aria-label="닫기"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1039,10 +1053,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
 
           {selectedDaySchedules.length === 0 ? (
             <div className="text-center py-6">
-              <svg className="w-8 h-8 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-8 h-8 mx-auto text-[var(--border-default)] mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <p className="text-[10px] text-gray-500">이 날짜에 등록된 일정이 없습니다.</p>
+              <p className="text-[10px] text-[var(--text-tertiary)]">이 날짜에 등록된 일정이 없습니다.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -1050,7 +1064,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                 return (
                   <div
                     key={schedule.id}
-                    className={`p-2.5 rounded-lg border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} hover:shadow-md transition-all cursor-pointer border border-gray-100 focus:outline-none focus:ring-2 focus:ring-sage-400`}
+                    className={`p-2.5 rounded-lg border-l-4 ${getScheduleTypeColor(schedule.type, schedule.hearing_type, schedule.event_subtype, schedule.scourt_result_raw)} hover:shadow-md transition-all cursor-pointer border border-[var(--border-subtle)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)]`}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -1198,23 +1212,23 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                         ) : null
                       })()}
                       {schedule.time && (
-                        <span className="text-[10px] font-semibold text-gray-700">
+                        <span className="text-[10px] font-semibold text-[var(--text-secondary)]">
                           {schedule.time.slice(0, 5)}
                         </span>
                       )}
                       {schedule.type === 'deadline' && schedule.daysUntil !== undefined && (
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          schedule.daysUntil <= 1 ? 'bg-red-100 text-red-700' :
-                          schedule.daysUntil <= 3 ? 'bg-orange-100 text-orange-700' :
-                          'bg-amber-100 text-amber-700'
+                          schedule.daysUntil <= 1 ? 'bg-[var(--color-danger-muted)] text-[var(--color-danger)]' :
+                          schedule.daysUntil <= 3 ? 'bg-[var(--color-warning-muted)] text-[var(--text-primary)]' :
+                          'bg-[var(--color-warning-muted)] text-[var(--color-warning)]'
                         }`}>
                           {formatDaysUntil(schedule.daysUntil)}
                         </span>
                       )}
                     </div>
-                    <h4 className="text-xs font-semibold text-gray-900 mb-1">{schedule.title}</h4>
+                    <h4 className="text-xs font-semibold text-[var(--text-primary)] mb-1">{schedule.title}</h4>
                     {schedule.case_number && (
-                      <p className="text-[10px] text-gray-600 flex items-center gap-1 mb-0.5">
+                      <p className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1 mb-0.5">
                         <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
@@ -1222,7 +1236,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                       </p>
                     )}
                     {schedule.location && (
-                      <p className="text-[10px] text-gray-600 flex items-center gap-1">
+                      <p className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1">
                         <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1232,7 +1246,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                     )}
                     {/* SCOURT 기일 결과 표시 (예: "다음기일지정(2025.02.15)", "변론종결") */}
                     {schedule.type === 'court_hearing' && schedule.scourt_result_raw && (
-                      <p className="text-[10px] text-sage-600 flex items-center gap-1 mt-0.5">
+                      <p className="text-[10px] text-[var(--sage-primary)] flex items-center gap-1 mt-0.5">
                         <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
@@ -1244,10 +1258,10 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                      tenantMembers.length > 0 &&
                      !isNoLawyerAttendanceRequired(schedule) && (
                       <div
-                        className="mt-2 pt-2 border-t border-gray-200 flex items-center gap-2"
+                        className="mt-2 pt-2 border-t border-[var(--border-default)] flex items-center gap-2"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <span className="text-[10px] text-gray-600 flex items-center gap-1">
+                        <span className="text-[10px] text-[var(--text-secondary)] flex items-center gap-1">
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                           </svg>
@@ -1257,7 +1271,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                           value={schedule.attending_lawyer_id || ''}
                           onChange={(e) => updateAttendingLawyer(schedule.id, e.target.value || null)}
                           disabled={updatingLawyer === schedule.id}
-                          className={`text-[10px] px-2 py-1 rounded border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-sage-500 ${
+                          className={`text-[10px] px-2 py-1 rounded border border-[var(--border-default)] bg-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)] focus:border-[var(--sage-primary)] ${
                             updatingLawyer === schedule.id ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                           }`}
                         >
@@ -1269,7 +1283,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                           ))}
                         </select>
                         {updatingLawyer === schedule.id && (
-                          <div className="animate-spin w-3 h-3 border-2 border-gray-300 border-t-sage-600 rounded-full" />
+                          <div className="animate-spin w-3 h-3 border-2 border-[var(--border-default)] border-t-[var(--sage-primary)] rounded-full" />
                         )}
                       </div>
                     )}
@@ -1280,9 +1294,9 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
           )}
 
           {/* 일정 추가 버튼 */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
+          <div className="mt-3 pt-3 border-t border-[var(--border-default)]">
             <button
-              className="w-full px-3 py-2 text-[10px] font-semibold text-sage-700 bg-sage-50 border border-sage-200 rounded-lg hover:bg-sage-100 hover:border-sage-300 transition-all focus:outline-none focus:ring-2 focus:ring-sage-400 focus:ring-offset-1 flex items-center justify-center gap-1.5"
+              className="w-full px-3 py-2 text-[10px] font-semibold text-[var(--sage-primary)] bg-[var(--sage-muted)] border border-[var(--sage-primary)]/20 rounded-lg hover:bg-[var(--sage-primary)]/10 hover:border-[var(--sage-primary)]/30 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--sage-primary)] focus:ring-offset-1 flex items-center justify-center gap-1.5"
               onClick={() => {
                 if (selectedDate) {
                   setPrefilledDate(format(selectedDate, 'yyyy-MM-dd'))

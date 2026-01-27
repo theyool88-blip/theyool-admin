@@ -1,0 +1,323 @@
+'use client'
+
+import { CalendarEvent } from '@schedule-x/calendar'
+import { Temporal } from '@js-temporal/polyfill'
+import { formatDaysUntil } from '@/types/court-hearing'
+
+// Helper function to extract time string from event start (handles both string and Temporal)
+function getTimeFromStart(start: string | Temporal.PlainDate | Temporal.ZonedDateTime | unknown): string | null {
+  if (typeof start === 'string') {
+    const parts = start.split(' ')
+    return parts.length > 1 ? parts[1]?.slice(0, 5) : null
+  }
+
+  // Handle Temporal.ZonedDateTime
+  if (start && typeof start === 'object' && 'hour' in start) {
+    const zdt = start as Temporal.ZonedDateTime
+    const hour = String(zdt.hour).padStart(2, '0')
+    const minute = String(zdt.minute).padStart(2, '0')
+    if (hour === '00' && minute === '00') return null
+    return `${hour}:${minute}`
+  }
+
+  // Temporal.PlainDate has no time
+  return null
+}
+
+// Event type labels in Korean
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  COURT_HEARING: '법원기일',
+  DEADLINE: '마감일',
+  CONSULTATION: '상담',
+  MEETING: '회의',
+}
+
+// Event subtype labels for court hearings
+const HEARING_TYPE_LABELS: Record<string, string> = {
+  HEARING_TRIAL: '변론',
+  HEARING_PREPARATION: '준비',
+  HEARING_MEDIATION: '조정',
+  HEARING_JUDGMENT: '선고',
+  HEARING_LAWYER_MEETING: '미팅',
+  HEARING_PARENTING: '양육',
+  HEARING_INVESTIGATION: '조사',
+  HEARING_OTHER: '기타',
+}
+
+// Types that don't require lawyer attendance
+const NO_LAWYER_ATTENDANCE_TYPES = [
+  'HEARING_JUDGMENT',
+  'HEARING_INVESTIGATION',
+  'HEARING_PARENTING',
+]
+
+// Check if hearing is postponed
+const isPostponedHearing = (result?: string): boolean => {
+  if (!result) return false
+  const keywords = ['기일변경', '연기', '취하', '취소', '변경지정']
+  return keywords.some(kw => result.includes(kw))
+}
+
+// Get video badge info
+const getVideoBadgeInfo = (scourtTypeRaw?: string, videoParticipantSide?: string, ourClientSide?: string): { label: string; color: string } | null => {
+  if (scourtTypeRaw?.includes('쌍방 화상장치') || scourtTypeRaw?.includes('쌍방화상장치') || videoParticipantSide === 'both') {
+    return { label: '화상', color: 'bg-purple-100 text-purple-700' }
+  }
+  if (videoParticipantSide && ourClientSide) {
+    if (videoParticipantSide === ourClientSide) {
+      return { label: '화상', color: 'bg-purple-100 text-purple-700' }
+    }
+    return null
+  }
+  if (scourtTypeRaw?.includes('일방 화상장치') || scourtTypeRaw?.includes('일방화상장치')) {
+    return { label: '화상', color: 'bg-gray-100 text-gray-600' }
+  }
+  return null
+}
+
+// Shorten court location
+const getShortCourt = (location?: string) => {
+  if (!location) return ''
+  const jiwonMatch = location.match(/([가-힣]{2,4})지원/)
+  if (jiwonMatch) return jiwonMatch[1]
+  const courtNames = ['서울', '수원', '평택', '천안', '대전', '대구', '부산', '광주', '인천', '울산', '창원', '청주', '전주', '춘천', '제주', '의정부', '고양', '성남', '안산', '안양', '용인', '화성', '서산', '아산', '세종']
+  for (const name of courtNames) {
+    if (location.includes(name)) return name
+  }
+  return location.slice(0, 2)
+}
+
+// Short title for calendar cell
+const getShortTitle = (title: string) => {
+  return title
+    .replace(/\s*\[(일방|쌍방)\s*화상장치\]\s*/g, ' ')
+    .replace('변론기일', '변론')
+    .replace('조정기일', '조정')
+    .replace('선고기일', '선고')
+    .replace('판결선고', '판결')
+    .replace('심문기일', '심문')
+    .replace('양육상담', '양육')
+    .replace('중간심문', '중간')
+    .replace('변호사 미팅', '미팅')
+    .replace('상소기간', '상소')
+    .replace('조정이의기간', '조정이의')
+    .replace('즉시항고', '즉항')
+    .replace('항소이유서', '항소이유')
+    .replace('지급명령이의', '지명이의')
+    .trim()
+}
+
+interface ScheduleXEventCardProps {
+  calendarEvent: CalendarEvent
+}
+
+export default function ScheduleXEventCard({ calendarEvent }: ScheduleXEventCardProps) {
+  const eventType = (calendarEvent as any).eventType as string | undefined
+  const eventSubtype = (calendarEvent as any).eventSubtype as string | undefined
+  const caseNumber = (calendarEvent as any).caseNumber as string | undefined
+  const location = calendarEvent.location
+  const scourtTypeRaw = (calendarEvent as any).scourtTypeRaw as string | undefined
+  const scourtResultRaw = (calendarEvent as any).scourtResultRaw as string | undefined
+  const videoParticipantSide = (calendarEvent as any).videoParticipantSide as string | undefined
+  const ourClientSide = (calendarEvent as any).ourClientSide as string | undefined
+  const daysUntil = (calendarEvent as any).daysUntil as number | undefined
+
+  // Get type label
+  const subtypeLabel = eventSubtype ? HEARING_TYPE_LABELS[eventSubtype] || eventSubtype : ''
+  const isPostponed = isPostponedHearing(scourtResultRaw)
+  const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
+  const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
+
+  // Get time from start (handles both string and Temporal formats)
+  const timeStr = getTimeFromStart(calendarEvent.start)
+
+  // Video badge
+  const videoBadge = getVideoBadgeInfo(scourtTypeRaw, videoParticipantSide, ourClientSide)
+
+  // Determine styling based on event type and status
+  const getEventStyle = () => {
+    if (eventType === 'HOLIDAY') {
+      return 'border-l-red-500 bg-red-50 text-red-700'
+    }
+    if (eventType === 'COURT_HEARING') {
+      if (isPostponed) {
+        return 'border-l-[var(--border-default)] bg-[var(--bg-tertiary)] opacity-60'
+      }
+      if (isLawyerMeeting) {
+        return 'border-l-teal-500 bg-teal-50'
+      }
+      if (isNoAttendanceRequired) {
+        return 'border-l-[var(--border-default)] bg-[var(--bg-primary)]'
+      }
+      return 'border-l-[var(--sage-primary)] bg-[var(--sage-muted)]'
+    }
+    switch (eventType) {
+      case 'CONSULTATION':
+        return 'border-l-[var(--color-info)] bg-[var(--color-info-muted)]'
+      case 'DEADLINE':
+        return 'border-l-[#F59E0B] bg-[rgba(245,158,11,0.15)]'
+      default:
+        return 'border-l-[var(--text-muted)] bg-[var(--bg-tertiary)]'
+    }
+  }
+
+  return (
+    <div
+      className={`
+        w-full h-full px-1.5 py-1 rounded-md border-l-[3px] overflow-hidden
+        cursor-pointer transition-all hover:shadow-sm
+        ${getEventStyle()}
+      `}
+    >
+      {/* Title */}
+      <div className={`font-medium text-[11px] truncate leading-tight ${isPostponed ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-primary)]'}`}>
+        {getShortTitle(calendarEvent.title || '')}
+      </div>
+
+      {/* Time & Type Badge */}
+      <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+        {timeStr && (
+          <span className="text-[10px] text-[var(--text-secondary)] font-medium">
+            {timeStr}
+          </span>
+        )}
+        {eventType === 'COURT_HEARING' && subtypeLabel && (
+          <span className={`text-[9px] px-1 py-0.5 rounded ${
+            isPostponed ? 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]' :
+            isLawyerMeeting ? 'bg-teal-100 text-teal-700' :
+            'bg-[var(--sage-muted)] text-[var(--sage-primary)]'
+          }`}>
+            {isPostponed ? '연기' : subtypeLabel}
+          </span>
+        )}
+        {videoBadge && !isPostponed && (
+          <span className={`text-[9px] px-1 py-0.5 rounded font-bold ${videoBadge.color}`}>
+            {videoBadge.label}
+          </span>
+        )}
+        {eventType === 'DEADLINE' && daysUntil !== undefined && (
+          <span className={`text-[9px] px-1 py-0.5 rounded font-bold ${
+            daysUntil <= 1 ? 'bg-red-100 text-red-700' :
+            daysUntil <= 3 ? 'bg-orange-100 text-orange-700' :
+            'bg-yellow-100 text-yellow-700'
+          }`}>
+            {formatDaysUntil(daysUntil)}
+          </span>
+        )}
+      </div>
+
+      {/* Location (shortened) */}
+      {location && (
+        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-[var(--text-tertiary)] truncate">
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          </svg>
+          <span className="truncate">{getShortCourt(location)}</span>
+        </div>
+      )}
+
+      {/* Case Number */}
+      {caseNumber && (
+        <div className="flex items-center gap-1 mt-0.5 text-[10px] text-[var(--text-tertiary)] truncate">
+          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span className="truncate">{caseNumber}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Get purpose/type label for chip
+const getChipPurposeLabel = (eventType?: string, eventSubtype?: string): string => {
+  if (eventType === 'CONSULTATION') return '상담'
+  if (eventType === 'DEADLINE') return '마감'
+  if (eventType === 'MEETING') return '회의'
+  if (eventType === 'COURT_HEARING' && eventSubtype) {
+    return HEARING_TYPE_LABELS[eventSubtype] || '기일'
+  }
+  return ''
+}
+
+// Extract client name from title (usually format: "김철수 vs 이영희 이혼소송" -> "김철수")
+const extractClientName = (title: string): string => {
+  // Try to get first party name before "vs" or other separators
+  const vsMatch = title.match(/^([가-힣]+)\s*(vs|VS|v\.|대)/);
+  if (vsMatch) return vsMatch[1]
+  // For consultations, title might be client name directly
+  const nameMatch = title.match(/^([가-힣]{2,4})/)
+  if (nameMatch) return nameMatch[1]
+  return title.slice(0, 3)
+}
+
+// Month Grid version (smaller, for month view)
+export function ScheduleXEventChip({ calendarEvent }: ScheduleXEventCardProps) {
+  const eventType = (calendarEvent as any).eventType as string | undefined
+  const eventSubtype = (calendarEvent as any).eventSubtype as string | undefined
+  const scourtResultRaw = (calendarEvent as any).scourtResultRaw as string | undefined
+  const scourtTypeRaw = (calendarEvent as any).scourtTypeRaw as string | undefined
+  const videoParticipantSide = (calendarEvent as any).videoParticipantSide as string | undefined
+  const ourClientSide = (calendarEvent as any).ourClientSide as string | undefined
+  const daysUntil = (calendarEvent as any).daysUntil as number | undefined
+  const location = calendarEvent.location
+
+  const isPostponed = isPostponedHearing(scourtResultRaw)
+  const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
+  const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
+  const videoBadge = getVideoBadgeInfo(scourtTypeRaw, videoParticipantSide, ourClientSide)
+
+  // Get time from start (handles both string and Temporal formats)
+  const timeStr = getTimeFromStart(calendarEvent.start) || ''
+
+  const getDotColor = () => {
+    if (eventType === 'HOLIDAY') {
+      return 'bg-red-500'
+    }
+    if (eventType === 'COURT_HEARING') {
+      if (isPostponed) return 'bg-gray-300'
+      if (isLawyerMeeting) return 'bg-teal-500'
+      if (isNoAttendanceRequired) return 'bg-gray-400'
+      return 'bg-[var(--sage-primary)]'
+    }
+    switch (eventType) {
+      case 'CONSULTATION':
+        return 'bg-[var(--color-info)]'
+      case 'DEADLINE':
+        return 'bg-[#F59E0B]'
+      default:
+        return 'bg-[var(--text-muted)]'
+    }
+  }
+
+  const isHoliday = eventType === 'HOLIDAY'
+  const purposeLabel = getChipPurposeLabel(eventType, eventSubtype)
+  const shortCourt = getShortCourt(location)
+  const clientName = extractClientName(calendarEvent.title || '')
+
+  // Format: "(목적)14:00 법원 의뢰인" or for holidays just the title
+  const displayText = isHoliday
+    ? calendarEvent.title
+    : isPostponed
+      ? `(연기)${clientName}`
+      : `${purposeLabel ? `(${purposeLabel})` : ''}${timeStr ? timeStr + ' ' : ''}${shortCourt ? shortCourt + ' ' : ''}${clientName}`
+
+  return (
+    <div className={`flex items-center gap-1 px-1 py-0.5 rounded text-[10px] truncate ${isPostponed ? 'opacity-50' : ''}`}>
+      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getDotColor()}`} />
+      <span className={`truncate ${isPostponed ? 'text-[var(--text-muted)] line-through' : isHoliday ? 'text-red-600 font-medium' : 'text-[var(--text-secondary)]'}`}>
+        {displayText}
+      </span>
+      {videoBadge && !isPostponed && (
+        <span className="text-[8px] px-0.5 rounded bg-purple-100 text-purple-600">화</span>
+      )}
+      {eventType === 'DEADLINE' && daysUntil !== undefined && daysUntil <= 3 && (
+        <span className={`text-[8px] px-0.5 rounded font-bold ${
+          daysUntil <= 1 ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+        }`}>
+          D{daysUntil <= 0 ? '' : '-'}{Math.abs(daysUntil)}
+        </span>
+      )}
+    </div>
+  )
+}

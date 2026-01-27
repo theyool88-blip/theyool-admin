@@ -22,29 +22,29 @@ function LoginContent() {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-sage-500 border-t-transparent"></div>
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--sage-primary)] border-t-transparent"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--bg-primary)] px-4">
       {/* 로고 */}
       <div className="mb-8 text-center">
-        <h1 className="text-2xl font-bold text-gray-900">법무법인 더율</h1>
-        <p className="text-sm text-gray-500 mt-1">의뢰인 전용 페이지</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">법무법인 더율</h1>
+        <p className="text-sm text-[var(--text-tertiary)] mt-1">의뢰인 전용 페이지</p>
       </div>
 
       {/* 로그인 카드 */}
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-lg p-8">
-        <h2 className="text-lg font-semibold text-gray-900 text-center mb-6">
+      <div className="w-full max-w-sm card rounded-xl shadow-lg p-8">
+        <h2 className="text-lg font-semibold text-[var(--text-primary)] text-center mb-6">
           로그인
         </h2>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600 text-center">
+          <div className="mb-4 p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)]/20 rounded-lg">
+            <p className="text-sm text-[var(--color-danger)] text-center">
               {error === 'AccessDenied'
                 ? '등록된 의뢰인이 아닙니다. 수임 계약 시 등록된 전화번호로 로그인해주세요.'
                 : '로그인 중 오류가 발생했습니다.'}
@@ -52,7 +52,7 @@ function LoginContent() {
           </div>
         )}
 
-        <p className="text-sm text-gray-600 text-center mb-6">
+        <p className="text-sm text-[var(--text-secondary)] text-center mb-6">
           수임 계약 시 등록된 전화번호가 연결된
           <br />
           카카오 계정으로 로그인해주세요.
@@ -75,14 +75,14 @@ function LoginContent() {
           카카오 로그인
         </button>
 
-        <p className="text-xs text-gray-400 text-center mt-4">
+        <p className="text-xs text-[var(--text-muted)] text-center mt-4">
           로그인 시 전화번호 제공에 동의해주세요.
         </p>
       </div>
 
       {/* 안내 */}
       <div className="mt-8 text-center">
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-[var(--text-muted)]">
           문의사항이 있으시면 1661-7633으로 연락주세요.
         </p>
       </div>
@@ -94,8 +94,8 @@ export default function ClientLoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-sage-500 border-t-transparent"></div>
+        <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--sage-primary)] border-t-transparent"></div>
         </div>
       }
     >

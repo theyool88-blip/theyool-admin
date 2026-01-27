@@ -72,7 +72,7 @@ export default function FileUploader({
         className={`
           border-2 border-dashed rounded-lg p-8 text-center cursor-pointer
           transition-colors duration-200
-          ${isDragging ? 'border-sage-500 bg-sage-50' : 'border-gray-300 hover:border-sage-400'}
+          ${isDragging ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)]' : 'border-[var(--border-default)] hover:border-[var(--sage-primary)]'}
           ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
         `}
       >
@@ -86,7 +86,7 @@ export default function FileUploader({
         />
 
         <svg
-          className={`mx-auto h-12 w-12 ${isDragging ? 'text-sage-500' : 'text-gray-400'}`}
+          className={`mx-auto h-12 w-12 ${isDragging ? 'text-[var(--sage-primary)]' : 'text-[var(--text-muted)]'}`}
           stroke="currentColor"
           fill="none"
           viewBox="0 0 48 48"
@@ -101,20 +101,20 @@ export default function FileUploader({
         </svg>
 
         <div className="mt-4">
-          <p className="text-sm text-gray-600">
-            <span className="font-medium text-sage-600 hover:text-sage-500">
+          <p className="text-body text-[var(--text-secondary)]">
+            <span className="font-medium text-[var(--sage-primary)] hover:opacity-80">
               파일을 선택
             </span>
             하거나 여기에 드래그하세요
           </p>
-          <p className="text-xs text-gray-500 mt-1">
+          <p className="text-caption text-[var(--text-tertiary)] mt-1">
             CSV, Excel (.xlsx, .xls) 파일 지원
           </p>
         </div>
       </div>
 
       {/* 지원 형식 안내 */}
-      <div className="text-xs text-gray-500 space-y-1">
+      <div className="text-caption text-[var(--text-tertiary)] space-y-1">
         <p>* <strong>표준파일</strong>: 사건번호, 법원명, 의뢰인명 컬럼 필수</p>
         <p>* <strong>기타 형식</strong>: AI가 컬럼을 분석하여 자동 매핑</p>
       </div>

@@ -8,59 +8,59 @@
 ## Components (7 files)
 
 ### Navigation & Layout
-1. `/Users/hskim/theyool-admin/components/AdminHeader.tsx` - Sage Green header
-2. `/Users/hskim/theyool-admin/components/Dashboard.tsx` - Main dashboard (401 lines)
+1. `/Users/hskim/luseed/components/AdminHeader.tsx` - Sage Green header
+2. `/Users/hskim/luseed/components/Dashboard.tsx` - Main dashboard (401 lines)
 
 ### Calendar Components
-3. `/Users/hskim/theyool-admin/components/WeeklyCalendar.tsx` - Weekly calendar view
-4. `/Users/hskim/theyool-admin/components/MonthlyCalendar.tsx` - Monthly calendar view
+3. `/Users/hskim/luseed/components/WeeklyCalendar.tsx` - Weekly calendar view
+4. `/Users/hskim/luseed/components/MonthlyCalendar.tsx` - Monthly calendar view
 
 ### List Components
-5. `/Users/hskim/theyool-admin/components/CasesList.tsx` - Case management table
-6. `/Users/hskim/theyool-admin/components/ClientsList.tsx` - Client management table
-7. `/Users/hskim/theyool-admin/components/ScheduleListView.tsx` - Schedule list view
+5. `/Users/hskim/luseed/components/CasesList.tsx` - Case management table
+6. `/Users/hskim/luseed/components/ClientsList.tsx` - Client management table
+7. `/Users/hskim/luseed/components/ScheduleListView.tsx` - Schedule list view
 
 ---
 
 ## Modals (7 files, ~2500 lines)
 
 ### Court Hearing Modals
-1. `/Users/hskim/theyool-admin/components/QuickAddHearingModal.tsx` (450 lines)
+1. `/Users/hskim/luseed/components/QuickAddHearingModal.tsx` (450 lines)
    - Court hearing creation form
    - form-input-standard applied
    - Sage Green button colors
    - Coral error states
 
-2. `/Users/hskim/theyool-admin/components/HearingDetailModal.tsx` (502 lines)
+2. `/Users/hskim/luseed/components/HearingDetailModal.tsx` (502 lines)
    - View/edit hearing details
    - form-input-standard applied
    - Dual mode (view/edit)
    - Sage badge colors
 
-3. `/Users/hskim/theyool-admin/components/QuickAddDeadlineModal.tsx` (350 lines)
+3. `/Users/hskim/luseed/components/QuickAddDeadlineModal.tsx` (350 lines)
    - Deadline creation
    - form-input-standard applied
    - Sage color scheme
 
 ### Unified Schedule Modal
-4. `/Users/hskim/theyool-admin/components/UnifiedScheduleModal.tsx` (731 lines)
+4. `/Users/hskim/luseed/components/UnifiedScheduleModal.tsx` (731 lines)
    - Multi-category scheduling
    - Handles: hearings, deadlines, schedules, consultations
    - Complex form with conditional fields
    - Automated conversion applied
 
 ### Payment Modals
-5. `/Users/hskim/theyool-admin/components/CasePaymentsModal.tsx` (443 lines)
+5. `/Users/hskim/luseed/components/CasePaymentsModal.tsx` (443 lines)
    - Case payment tracking
    - Payment status badges
    - form-input-standard applied
 
-6. `/Users/hskim/theyool-admin/components/ClientPaymentsModal.tsx` (190 lines)
+6. `/Users/hskim/luseed/components/ClientPaymentsModal.tsx` (190 lines)
    - Client payment history
    - Simpler payment interface
    - Sage table styling
 
-7. `/Users/hskim/theyool-admin/components/ConsultationPaymentsModal.tsx` (437 lines)
+7. `/Users/hskim/luseed/components/ConsultationPaymentsModal.tsx` (437 lines)
    - Consultation payment management
    - Similar to CasePaymentsModal
    - Automated conversion applied
@@ -70,84 +70,84 @@
 ## Pages (18 files, ~4000 lines)
 
 ### Authentication
-1. `/Users/hskim/theyool-admin/app/login/page.tsx`
+1. `/Users/hskim/luseed/app/login/page.tsx`
    - Beautiful Sage Green login card
    - Gradient background
    - form-input-standard inputs
    - Loading spinner with Sage colors
 
 ### Dashboard
-2. `/Users/hskim/theyool-admin/app/page.tsx`
+2. `/Users/hskim/luseed/app/page.tsx`
    - Main dashboard wrapper
    - Automated conversion
 
-3. `/Users/hskim/theyool-admin/app/admin/page.tsx`
+3. `/Users/hskim/luseed/app/admin/page.tsx`
    - Admin-specific dashboard
    - Automated conversion
 
 ### Schedule Management
-4. `/Users/hskim/theyool-admin/app/schedules/page.tsx`
+4. `/Users/hskim/luseed/app/schedules/page.tsx`
    - Schedule list and management
    - Automated conversion
 
 ### Case Management
-5. `/Users/hskim/theyool-admin/app/cases/page.tsx`
+5. `/Users/hskim/luseed/app/cases/page.tsx`
    - Case list/search
    - Automated conversion
 
-6. `/Users/hskim/theyool-admin/app/cases/[id]/page.tsx`
+6. `/Users/hskim/luseed/app/cases/[id]/page.tsx`
    - Individual case details
    - Automated conversion
 
-7. `/Users/hskim/theyool-admin/app/cases/[id]/edit/page.tsx`
+7. `/Users/hskim/luseed/app/cases/[id]/edit/page.tsx`
    - Case editing form
    - Automated conversion
 
-8. `/Users/hskim/theyool-admin/app/admin/cases/page.tsx`
+8. `/Users/hskim/luseed/app/admin/cases/page.tsx`
    - Cases admin panel
    - Automated conversion
 
-9. `/Users/hskim/theyool-admin/app/admin/cases/stats/page.tsx`
+9. `/Users/hskim/luseed/app/admin/cases/stats/page.tsx`
    - Case statistics dashboard
    - Automated conversion
 
 ### Client Management
-10. `/Users/hskim/theyool-admin/app/clients/page.tsx`
+10. `/Users/hskim/luseed/app/clients/page.tsx`
     - Client list/search
     - Automated conversion
 
-11. `/Users/hskim/theyool-admin/app/clients/[id]/page.tsx`
+11. `/Users/hskim/luseed/app/clients/[id]/page.tsx`
     - Client detail view
     - Automated conversion
 
-12. `/Users/hskim/theyool-admin/app/clients/[id]/edit/page.tsx`
+12. `/Users/hskim/luseed/app/clients/[id]/edit/page.tsx`
     - Client editing form
     - Automated conversion
 
-13. `/Users/hskim/theyool-admin/app/admin/clients/page.tsx`
+13. `/Users/hskim/luseed/app/admin/clients/page.tsx`
     - Client admin panel
     - Automated conversion
 
 ### Consultation Management
-14. `/Users/hskim/theyool-admin/app/admin/consultations/page.tsx`
+14. `/Users/hskim/luseed/app/admin/consultations/page.tsx`
     - Consultation management
     - Automated conversion
 
-15. `/Users/hskim/theyool-admin/app/admin/consultations/stats/page.tsx`
+15. `/Users/hskim/luseed/app/admin/consultations/stats/page.tsx`
     - Consultation statistics
     - Automated conversion
 
 ### Payment Management
-16. `/Users/hskim/theyool-admin/app/admin/payments/page.tsx`
+16. `/Users/hskim/luseed/app/admin/payments/page.tsx`
     - Payment administration
     - Automated conversion
 
-17. `/Users/hskim/theyool-admin/app/admin/payments/stats/page.tsx`
+17. `/Users/hskim/luseed/app/admin/payments/stats/page.tsx`
     - Payment statistics dashboard
     - Automated conversion
 
 ### System Settings
-18. `/Users/hskim/theyool-admin/app/admin/settings/page.tsx`
+18. `/Users/hskim/luseed/app/admin/settings/page.tsx`
     - System configuration
     - Automated conversion
 

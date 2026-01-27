@@ -32,9 +32,11 @@ export default function InviteMemberModal({
 }: InviteMemberModalProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<MemberRole>('staff');
+  const [sendEmailOption, setSendEmailOption] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // owner만 admin 역할 부여 가능
@@ -45,13 +47,14 @@ export default function InviteMemberModal({
     e.preventDefault();
     setError('');
     setInviteUrl(null);
+    setEmailSent(false);
     setLoading(true);
 
     try {
       const response = await fetch('/api/admin/tenant/members', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, role, sendEmail: sendEmailOption }),
       });
 
       const result = await response.json();
@@ -62,6 +65,7 @@ export default function InviteMemberModal({
       }
 
       setInviteUrl(result.data.inviteUrl);
+      setEmailSent(result.data.emailSent || false);
     } catch (err) {
       console.error('Invite error:', err);
       setError('서버 오류가 발생했습니다.');
@@ -85,8 +89,10 @@ export default function InviteMemberModal({
   const handleClose = () => {
     setEmail('');
     setRole('staff');
+    setSendEmailOption(true);
     setError('');
     setInviteUrl(null);
+    setEmailSent(false);
     setCopied(false);
     if (inviteUrl) {
       onSuccess(); // 초대가 생성된 경우에만 새로고침
@@ -160,11 +166,13 @@ export default function InviteMemberModal({
                 <div className="flex items-center gap-2 mb-2">
                   <CheckCircle className="w-4 h-4 text-[var(--color-success)]" />
                   <p className="text-sm font-medium text-[var(--color-success)]">
-                    초대가 생성되었습니다
+                    {emailSent ? '초대 이메일이 발송되었습니다' : '초대가 생성되었습니다'}
                   </p>
                 </div>
                 <p className="text-xs text-[var(--text-secondary)]">
-                  아래 링크를 복사하여 {email}에게 전달해주세요.
+                  {emailSent
+                    ? `${email}로 초대 이메일이 발송되었습니다.`
+                    : `아래 링크를 복사하여 ${email}에게 전달해주세요.`}
                 </p>
               </div>
 
@@ -245,6 +253,22 @@ export default function InviteMemberModal({
                   {role === 'admin' && '관리자는 모든 기능에 접근할 수 있습니다.'}
                   {role === 'lawyer' && '변호사는 사건 관리가 가능하지만 회계 기능은 제한됩니다.'}
                   {role === 'staff' && '직원은 기본 사건 조회만 가능하며 회계 기능은 제한됩니다.'}
+                </p>
+              </div>
+
+              <div className="form-group">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={sendEmailOption}
+                    onChange={(e) => setSendEmailOption(e.target.checked)}
+                    disabled={!canInvite || loading}
+                    className="w-4 h-4 rounded border-[var(--border-default)] text-[var(--sage-primary)] focus:ring-[var(--sage-primary)]"
+                  />
+                  <span className="text-sm text-[var(--text-primary)]">초대 이메일 발송</span>
+                </label>
+                <p className="mt-1.5 text-xs text-[var(--text-tertiary)] ml-6">
+                  체크하면 입력한 이메일로 초대 링크가 자동으로 발송됩니다.
                 </p>
               </div>
 

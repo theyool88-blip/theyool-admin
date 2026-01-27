@@ -30,7 +30,7 @@ export async function saveEncCsNoToCase(params: SaveEncCsNoParams): Promise<void
   const supabase = createAdminClient();
 
   const updateData: Record<string, unknown> = {
-    enc_cs_no: encCsNo,
+    scourt_enc_cs_no: encCsNo,
     scourt_wmonid: wmonid,
     scourt_last_sync: new Date().toISOString(),
     scourt_sync_status: 'synced',
@@ -67,16 +67,16 @@ export async function getStoredEncCsNo(legalCaseId: string): Promise<StoredEncCs
 
   const { data, error } = await supabase
     .from('legal_cases')
-    .select('enc_cs_no, scourt_wmonid, court_case_number, scourt_last_sync')
+    .select('scourt_enc_cs_no, scourt_wmonid, court_case_number, scourt_last_sync')
     .eq('id', legalCaseId)
     .single();
 
-  if (error || !data?.enc_cs_no) {
+  if (error || !data?.scourt_enc_cs_no) {
     return null;
   }
 
   return {
-    encCsNo: data.enc_cs_no,
+    encCsNo: data.scourt_enc_cs_no,
     wmonid: data.scourt_wmonid,
     caseNumber: data.court_case_number,
     lastSync: data.scourt_last_sync,

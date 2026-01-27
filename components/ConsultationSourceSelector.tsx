@@ -60,8 +60,8 @@ export default function ConsultationSourceSelector({
   return (
     <div className={className}>
       {showLabel && (
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          유입 경로 {required && <span className="text-red-500">*</span>}
+        <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">
+          유입 경로 {required && <span className="text-[var(--color-danger)]">*</span>}
         </label>
       )}
 
@@ -72,7 +72,7 @@ export default function ConsultationSourceSelector({
           onChange={(e) => onChange(e.target.value)}
           disabled={disabled || loading}
           required={required}
-          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-sage-500 focus:border-sage-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+          className="form-input w-full"
         >
           <option value="">선택하세요</option>
           {sources.map((source) => (
@@ -86,7 +86,7 @@ export default function ConsultationSourceSelector({
         {/* Selected Source Badge */}
         {selectedSource && (
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-500">선택됨:</span>
+            <span className="text-sm text-[var(--text-tertiary)]">선택됨:</span>
             <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getSourceColorClass(selectedSource.color)}`}>
               {selectedSource.name}
             </span>
@@ -95,12 +95,12 @@ export default function ConsultationSourceSelector({
 
         {/* Loading State */}
         {loading && (
-          <p className="text-sm text-gray-500">유입 경로를 불러오는 중...</p>
+          <p className="text-sm text-[var(--text-tertiary)]">유입 경로를 불러오는 중...</p>
         )}
 
         {/* Empty State */}
         {!loading && sources.length === 0 && (
-          <p className="text-sm text-red-500">
+          <p className="text-sm text-[var(--color-danger)]">
             사용 가능한 유입 경로가 없습니다. 설정에서 추가해주세요.
           </p>
         )}

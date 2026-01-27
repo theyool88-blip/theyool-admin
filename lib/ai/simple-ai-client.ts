@@ -1,5 +1,5 @@
 /**
- * Simple AI Client for theyool-admin
+ * Simple AI Client for luseed
  *
  * Gemini API를 사용한 간단한 AI 클라이언트
  * Planning, Communication 모듈에서 사용

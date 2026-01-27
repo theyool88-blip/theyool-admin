@@ -1,24 +1,22 @@
-import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { withTenant } from '@/lib/api/with-tenant'
 
 // GET: Get payment statistics
-export async function GET() {
+export const GET = withTenant(async (request: NextRequest, { tenant }) => {
   try {
-    const supabase = await createClient()
+    const adminSupabase = createAdminClient()
 
-    // Check authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Use admin client for data queries (bypasses RLS)
-    const adminSupabase = await createAdminClient()
-
-    // Get all payments for total calculations
-    const { data: allPayments, error: paymentsError } = await adminSupabase
+    // Get all payments for total calculations (with tenant filter)
+    let paymentsQuery = adminSupabase
       .from('payments')
       .select('amount, office_location, payment_date')
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      paymentsQuery = paymentsQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: allPayments, error: paymentsError } = await paymentsQuery
 
     if (paymentsError) {
       throw paymentsError
@@ -46,31 +44,49 @@ export async function GET() {
       ? Math.round(((thisMonthAmount - lastMonthAmount) / lastMonthAmount) * 100)
       : thisMonthAmount > 0 ? 100 : 0
 
-    // Get statistics from views
-    const { data: byCategory, error: categoryError } = await adminSupabase
+    // Get statistics from views (with tenant filter)
+    let categoryQuery = adminSupabase
       .from('payment_stats_by_category')
       .select('*')
       .order('total_amount', { ascending: false })
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      categoryQuery = categoryQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: byCategory, error: categoryError } = await categoryQuery
 
     if (categoryError) {
       throw categoryError
     }
 
-    const { data: byOffice, error: officeError } = await adminSupabase
+    let officeQuery = adminSupabase
       .from('payment_stats_by_office')
       .select('*')
       .order('office_location')
       .order('payment_category')
 
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      officeQuery = officeQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: byOffice, error: officeError } = await officeQuery
+
     if (officeError) {
       throw officeError
     }
 
-    const { data: byMonth, error: monthError } = await adminSupabase
+    let monthQuery = adminSupabase
       .from('payment_stats_by_month')
       .select('*')
       .order('month', { ascending: false })
       .limit(12)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      monthQuery = monthQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: byMonth, error: monthError } = await monthQuery
 
     if (monthError) {
       throw monthError
@@ -96,4 +112,4 @@ export async function GET() {
     console.error('Failed to fetch payment statistics:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
-}
+})

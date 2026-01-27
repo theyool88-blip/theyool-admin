@@ -1,54 +1,41 @@
-import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
+import * as dotenv from 'dotenv';
 
-config({ path: '.env.local' });
+dotenv.config({ path: '.env.local' });
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const CASE_ID = 'e7affc63-ad4e-48e8-bd10-3ae1f5c9752e';
-
-async function main() {
-  // 1. 사건 기본 정보
-  const { data: lc } = await supabase
-    .from('legal_cases')
-    .select('id, court_case_number, case_name')
-    .eq('id', CASE_ID)
-    .single();
-  console.log('=== 사건 정보 ===');
-  console.log(lc);
-
-  // 2. case_parties 테이블
-  const { data: parties } = await supabase
+async function checkParties() {
+  const { data: parties, error } = await supabase
     .from('case_parties')
     .select('*')
-    .eq('case_id', CASE_ID);
-  console.log('\n=== case_parties 테이블 ===');
-  console.log(JSON.stringify(parties, null, 2));
+    .order('created_at', { ascending: false });
 
-  // 3. scourt_case_snapshots에서 raw_data 확인
-  const { data: snapshot } = await supabase
-    .from('scourt_case_snapshots')
-    .select('raw_data')
-    .eq('legal_case_id', CASE_ID)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-
-  if (snapshot?.raw_data) {
-    console.log('\n=== SCOURT raw_data 당사자 (dlt_btprtCttLst) ===');
-    const rawData = snapshot.raw_data as Record<string, unknown>;
-    if (rawData.dlt_btprtCttLst) {
-      console.log(JSON.stringify(rawData.dlt_btprtCttLst, null, 2));
-    } else {
-      console.log('dlt_btprtCttLst 없음');
-      console.log('Available dlt_ keys:', Object.keys(rawData).filter(k => k.startsWith('dlt_')));
-    }
-  } else {
-    console.log('\n스냅샷 없음');
+  if (error) {
+    console.log('Error:', error.message);
+    return;
   }
+
+  console.log('case_parties 전체 데이터 (' + (parties?.length || 0) + '개):');
+  console.log('');
+  
+  if (parties && parties.length > 0) {
+    console.log('컬럼 목록:', Object.keys(parties[0]).join(', '));
+    console.log('');
+  }
+
+  (parties || []).forEach((p, i) => {
+    console.log('[' + i + ']');
+    console.log('    party_name="' + p.party_name + '"');
+    console.log('    party_type="' + p.party_type + '"');
+    console.log('    party_type_label="' + p.party_type_label + '"');
+    console.log('    scourt_party_index=' + p.scourt_party_index);
+    console.log('    manual_override=' + p.manual_override);
+    console.log('');
+  });
 }
 
-main().catch(console.error);
+checkParties();

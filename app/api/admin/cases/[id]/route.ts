@@ -1,40 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isAuthenticated } from '@/lib/auth/auth'
+import { withTenant } from '@/lib/api/with-tenant'
 import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils'
 
 /**
  * PATCH /api/admin/cases/[id]
- * Update a legal case with case_parties sync
+ * Update a legal case with case_parties sync (테넌트 격리 적용)
  */
-export async function PATCH(
+export const PATCH = withTenant(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { tenant, params }
+) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const id = params?.id
+    if (!id) {
+      return NextResponse.json({ error: 'Case ID is required' }, { status: 400 })
     }
 
-    const { id } = await params
     const body = await request.json()
-
     const adminClient = createAdminClient()
 
     // 1. 기존 사건 정보 조회 (변경 감지용, tenant_id 포함)
-    const { data: existingCase, error: fetchError } = await adminClient
+    let existingQuery = adminClient
       .from('legal_cases')
       .select('id, tenant_id, primary_client_id')
       .eq('id', id)
-      .single()
 
-    if (fetchError) {
-      console.error('Error fetching existing case:', fetchError)
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      existingQuery = existingQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: existingCase, error: fetchError } = await existingQuery.single()
+
+    if (fetchError || !existingCase) {
       return NextResponse.json(
-        { error: `Case not found: ${fetchError.message}` },
-        { status: fetchError.code === 'PGRST116' ? 404 : 500 }
+        { error: 'Case not found in your tenant' },
+        { status: 404 }
       )
     }
 
@@ -48,8 +51,8 @@ export async function PATCH(
         )
       : null
 
-    // 2. legal_cases 업데이트 (client_id, retainer_fee, client_role은 case_clients로 관리)
-    const { data, error } = await adminClient
+    // 2. legal_cases 업데이트
+    let updateQuery = adminClient
       .from('legal_cases')
       .update({
         contract_number: body.contract_number || null,
@@ -57,9 +60,6 @@ export async function PATCH(
         status: body.status,
         assigned_to: body.assigned_to || null,
         contract_date: body.contract_date || null,
-        total_received: body.total_received,
-        success_fee_agreement: body.success_fee_agreement || null,
-        calculated_success_fee: body.calculated_success_fee,
         court_case_number: body.court_case_number || null,
         court_name: resolvedCourtName,
         case_type: body.case_type || null,
@@ -67,12 +67,15 @@ export async function PATCH(
         judge_name: body.judge_name || null,
         notes: body.notes || null,
         onedrive_folder_url: body.onedrive_folder_url || null,
-        enc_cs_no: body.enc_cs_no || null,
-        scourt_case_name: body.scourt_case_name || null
+        scourt_enc_cs_no: body.scourt_enc_cs_no || null,
       })
       .eq('id', id)
-      .select()
-      .single()
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      updateQuery = updateQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data, error } = await updateQuery.select().single()
 
     if (error) {
       console.error('Error updating case:', error)
@@ -133,7 +136,7 @@ export async function PATCH(
             .maybeSingle()
 
           // 새 case_clients 레코드 생성 (tenant_id 필수)
-          const { data: newCaseClient } = await adminClient
+          await adminClient
             .from('case_clients')
             .insert({
               tenant_id: existingCase.tenant_id,
@@ -151,7 +154,7 @@ export async function PATCH(
             await adminClient
               .from('case_parties')
               .update({
-                is_our_client: true,
+                is_primary: true,
                 updated_at: new Date().toISOString()
               })
               .eq('id', matchingParty.id)
@@ -165,12 +168,12 @@ export async function PATCH(
       const opponentName = (body.opponent_name || '').trim()
 
       if (opponentName) {
-        // 4a. 상대방측 당사자 찾기 (is_primary=false)
+        // 4a. 상대방측 당사자 찾기
         const { data: opponentParty } = await adminClient
           .from('case_parties')
           .select('id, party_name')
           .eq('case_id', id)
-          .eq('is_our_client', false)
+          .eq('is_primary', false)
           .order('party_order', { ascending: true })
           .limit(1)
           .maybeSingle()
@@ -191,15 +194,14 @@ export async function PATCH(
             .eq('id', opponentParty.id)
         } else {
           // 상대방 당사자가 없으면 새로 생성
-          // 의뢰인 당사자의 party_type으로 상대방 타입 결정
-          const { data: clientParty } = await adminClient
-            .from('case_parties')
-            .select('party_type')
+          const { data: linkedParty } = await adminClient
+            .from('case_clients')
+            .select('linked_party_id, case_parties!linked_party_id(party_type)')
             .eq('case_id', id)
-            .eq('is_our_client', true)
+            .eq('is_primary_client', true)
             .maybeSingle()
 
-          const clientRole = clientParty?.party_type || 'plaintiff'
+          const clientRole = (linkedParty?.case_parties as { party_type?: string } | null)?.party_type || 'plaintiff'
           const opponentRole = clientRole === 'plaintiff' ? 'defendant' : 'plaintiff'
 
           await adminClient
@@ -211,9 +213,6 @@ export async function PATCH(
               party_type: opponentRole,
               is_primary: false,
               party_order: 2,
-              manual_override: false,
-              scourt_synced: false,
-              representatives: []
             })
         }
       }
@@ -231,27 +230,26 @@ export async function PATCH(
       { status: 500 }
     )
   }
-}
+})
 
 /**
  * GET /api/admin/cases/[id]
- * Get a single case by ID with deadlines and hearings
+ * Get a single case by ID with deadlines and hearings (테넌트 격리 적용)
  */
-export async function GET(
+export const GET = withTenant(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { tenant, params }
+) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const id = params?.id
+    if (!id) {
+      return NextResponse.json({ error: 'Case ID is required' }, { status: 400 })
     }
 
-    const { id } = await params
     const adminClient = createAdminClient()
 
     // 사건 기본 정보 조회 (primary_client_id FK 사용)
-    const { data, error } = await adminClient
+    let caseQuery = adminClient
       .from('legal_cases')
       .select(`
         *,
@@ -278,10 +276,22 @@ export async function GET(
         )
       `)
       .eq('id', id)
-      .single()
+
+    // 테넌트 격리 필터
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      caseQuery = caseQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data, error } = await caseQuery.single()
 
     if (error) {
       console.error('Error fetching case:', error)
+      if (error.code === 'PGRST116') {
+        return NextResponse.json(
+          { error: 'Case not found in your tenant' },
+          { status: 404 }
+        )
+      }
       return NextResponse.json(
         { error: `Failed to fetch case: ${error.message}` },
         { status: 500 }
@@ -302,18 +312,37 @@ export async function GET(
       .eq('case_id', id)
       .order('hearing_date', { ascending: true })
 
-    // 기일 충돌 감지를 위해 모든 사건의 기일 조회 (향후 30일)
+    // 기일 충돌 감지를 위해 테넌트 내 모든 사건의 기일 조회 (향후 30일)
+    // court_hearings는 tenant_id 컬럼이 없음 - case_id FK를 통해 legal_cases join 필요
     const today = new Date()
     const thirtyDaysLater = new Date(today)
     thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30)
 
-    const { data: allHearings } = await adminClient
-      .from('court_hearings')
-      .select('*')
-      .gte('hearing_date', today.toISOString())
-      .lte('hearing_date', thirtyDaysLater.toISOString())
-      .eq('status', 'SCHEDULED')
-      .order('hearing_date', { ascending: true })
+    // 먼저 테넌트의 모든 case_id를 조회
+    let tenantCasesQuery = adminClient
+      .from('legal_cases')
+      .select('id')
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      tenantCasesQuery = tenantCasesQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: tenantCases } = await tenantCasesQuery
+    const tenantCaseIds = tenantCases?.map(c => c.id) || []
+
+    let allHearings: typeof data[] = []
+    if (tenantCaseIds.length > 0) {
+      const { data: hearingsData } = await adminClient
+        .from('court_hearings')
+        .select('*')
+        .in('case_id', tenantCaseIds)
+        .gte('hearing_date', today.toISOString())
+        .lte('hearing_date', thirtyDaysLater.toISOString())
+        .eq('status', 'SCHEDULED')
+        .order('hearing_date', { ascending: true })
+
+      allHearings = hearingsData || []
+    }
 
     // Transform case_assignees to a more usable format
     const assignees = (data.case_assignees as Array<{
@@ -336,7 +365,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: caseData,
-      assignees,  // Transformed assignees list
+      assignees,
       deadlines: deadlines || [],
       hearings: hearings || [],
       allHearings: allHearings || [],
@@ -349,35 +378,39 @@ export async function GET(
       { status: 500 }
     )
   }
-}
+})
 
 /**
  * DELETE /api/admin/cases/[id]
- * Delete a legal case and all related data
+ * Delete a legal case and all related data (테넌트 격리 적용)
  */
-export async function DELETE(
+export const DELETE = withTenant(async (
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+  { tenant, params }
+) => {
   try {
-    const authenticated = await isAuthenticated()
-    if (!authenticated) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const id = params?.id
+    if (!id) {
+      return NextResponse.json({ error: 'Case ID is required' }, { status: 400 })
     }
 
-    const { id } = await params
     const adminClient = createAdminClient()
 
-    // 1. 사건 존재 여부 확인
-    const { data: existingCase, error: fetchError } = await adminClient
+    // 1. 사건 존재 여부 확인 (테넌트 필터 포함)
+    let checkQuery = adminClient
       .from('legal_cases')
-      .select('id, case_name')
+      .select('id, case_name, tenant_id')
       .eq('id', id)
-      .single()
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      checkQuery = checkQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { data: existingCase, error: fetchError } = await checkQuery.single()
 
     if (fetchError || !existingCase) {
       return NextResponse.json(
-        { error: '사건을 찾을 수 없습니다' },
+        { error: 'Case not found in your tenant' },
         { status: 404 }
       )
     }
@@ -414,11 +447,17 @@ export async function DELETE(
     // 2i. case_notices 삭제
     await adminClient.from('case_notices').delete().eq('case_id', id)
 
-    // 3. 사건 삭제
-    const { error: deleteError } = await adminClient
+    // 3. 사건 삭제 (테넌트 필터 포함)
+    let deleteQuery = adminClient
       .from('legal_cases')
       .delete()
       .eq('id', id)
+
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      deleteQuery = deleteQuery.eq('tenant_id', tenant.tenantId)
+    }
+
+    const { error: deleteError } = await deleteQuery
 
     if (deleteError) {
       console.error('Error deleting case:', deleteError)
@@ -442,4 +481,4 @@ export async function DELETE(
       { status: 500 }
     )
   }
-}
+})

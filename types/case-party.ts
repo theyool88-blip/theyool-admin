@@ -558,6 +558,14 @@ export function normalizePartyNameForMatch(name: string): string {
  * 예: preservePrefix("1. 이OO", "이명규") → "1. 이명규"
  */
 export function preservePrefix(originalValue: string, newName: string): string {
+  // 방어: newName이 비어있거나 유효하지 않으면 원본 그대로 반환
+  if (!newName || !newName.trim()) {
+    return originalValue || '';
+  }
+  // 방어: newName이 마스킹된 이름이면 원본 유지
+  if (isMaskedPartyName(newName)) {
+    return originalValue || newName;
+  }
   if (!originalValue) return newName;
   const prefixMatch = originalValue.match(PARTY_NAME_PREFIX_REGEX);
   const suffixMatch = originalValue.match(PARTY_NAME_SUFFIX_REGEX);
@@ -565,7 +573,7 @@ export function preservePrefix(originalValue: string, newName: string): string {
   const suffix = suffixMatch ? suffixMatch[0] : '';
   const cleanedName = newName.replace(PARTY_NAME_SUFFIX_REGEX, '').trim();
   const combined = `${prefix}${cleanedName}${suffix}`;
-  return combined.trim() || cleanedName;
+  return combined.trim() || cleanedName || originalValue;
 }
 
 /**

@@ -2513,14 +2513,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             displayName;
         }
 
-        // 최종 방어: displayName이 "1. 피고 2." 같은 깨진 형태인지 확인
-        const isBrokenFormat = /^\d+\.\s*[가-힣]+\s+\d+\.?$/.test(displayName);
-        if (isBrokenFormat || !displayName || displayName === '-') {
-          displayName = preferredParty?.party_name
-            ? removeNumberPrefix(preferredParty.party_name)
-            : '-';
-        }
-
         const hasOtherSuffix = PARTY_NAME_SUFFIX_REGEX.test(displayName);
 
         return {

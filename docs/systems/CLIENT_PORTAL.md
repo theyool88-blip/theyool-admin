@@ -151,7 +151,7 @@
 ## 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── app/
 │   ├── admin/
 │   │   └── client-preview/
@@ -333,7 +333,7 @@ drive_file_classifications 테이블 업데이트
   - client_visible: boolean (공개 여부)
   - client_doc_type: enum (문서 유형)
         ↓
-theyool-admin 클라이언트 포털에서 조회
+luseed 클라이언트 포털에서 조회
 ```
 
 ### API 엔드포인트

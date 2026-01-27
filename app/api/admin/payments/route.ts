@@ -161,21 +161,8 @@ export const POST = withTenant(async (request, { tenant }) => {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    // Update case total_received if case_id exists
-    if (data.case_id) {
-      const { data: sums, error: sumError } = await supabase
-        .from('payments')
-        .select('amount')
-        .eq('case_id', data.case_id)
-
-      if (!sumError && sums) {
-        const total = sums.reduce((sum, p) => sum + p.amount, 0)
-        await supabase
-          .from('legal_cases')
-          .update({ total_received: total })
-          .eq('id', data.case_id)
-      }
-    }
+    // NOTE: total_received 컬럼이 스키마에서 제거됨
+    // 입금 합계는 payments 테이블을 조회하여 실시간 계산
 
     // Update consultation status to 'payment_confirmed' if consultation_id exists
     if (data.consultation_id) {

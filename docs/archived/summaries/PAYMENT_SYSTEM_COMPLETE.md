@@ -146,7 +146,7 @@
 ## 🗂️ 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── supabase/migrations/
 │   └── 20251124_create_payments_table.sql    # DB 마이그레이션
 │

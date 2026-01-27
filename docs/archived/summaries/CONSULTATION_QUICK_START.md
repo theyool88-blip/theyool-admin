@@ -7,8 +7,8 @@
 ## 1. 로컬 테스트 (1분)
 
 ```bash
-# theyool-admin 디렉토리로 이동
-cd /Users/hskim/theyool-admin
+# luseed 디렉토리로 이동
+cd /Users/hskim/luseed
 
 # 개발 서버 시작
 npm run dev
@@ -54,7 +54,7 @@ open http://localhost:3000/admin/consultations
 ## 4. 주요 파일 위치
 
 ```
-/Users/hskim/theyool-admin/
+/Users/hskim/luseed/
 ├── app/admin/consultations/page.tsx     # 관리자 UI
 ├── app/api/admin/consultations/         # API 라우트
 ├── lib/supabase/consultations.ts        # 데이터 액세스

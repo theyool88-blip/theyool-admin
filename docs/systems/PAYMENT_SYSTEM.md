@@ -268,7 +268,7 @@ node scripts/import-expense-data.js
 ## 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── app/
 │   ├── admin/
 │   │   ├── payments/

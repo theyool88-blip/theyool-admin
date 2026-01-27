@@ -122,24 +122,24 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
   const getSeverityColor = (severity: AnomalyAlert['severity']) => {
     switch (severity) {
       case 'high':
-        return 'bg-red-50 border-red-200 text-red-700';
+        return 'bg-[var(--color-danger-muted)] border-[var(--color-danger)] text-[var(--color-danger)]';
       case 'medium':
-        return 'bg-amber-50 border-amber-200 text-amber-700';
+        return 'bg-[var(--color-warning-muted)] border-[var(--color-warning)] text-[var(--color-warning)]';
       case 'low':
-        return 'bg-blue-50 border-blue-200 text-blue-700';
+        return 'bg-[var(--color-info-muted)] border-[var(--color-info)] text-[var(--color-info)]';
     }
   };
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
+    <div className="card p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-            <BarChart3 className="w-5 h-5 text-indigo-600" />
+          <div className="w-10 h-10 rounded-lg bg-[var(--color-info-muted)] flex items-center justify-center">
+            <BarChart3 className="w-5 h-5 text-[var(--color-info)]" />
           </div>
           <div>
-            <h2 className="text-sm font-semibold text-gray-900">홈페이지 분석</h2>
-            <p className="text-xs text-gray-500">방문자 및 상담 통계</p>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">홈페이지 분석</h2>
+            <p className="text-caption">방문자 및 상담 통계</p>
           </div>
         </div>
 
@@ -147,7 +147,7 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value as '7d' | '30d' | '90d')}
-            className="h-8 px-2 text-xs border border-gray-200 rounded focus:outline-none focus:border-sage-500"
+            className="form-input h-8 px-2 text-xs"
           >
             <option value="7d">최근 7일</option>
             <option value="30d">최근 30일</option>
@@ -156,7 +156,7 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
           <button
             onClick={fetchStats}
             disabled={loading}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+            className="p-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -164,14 +164,14 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
       </div>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-600">{error}</p>
+        <div className="mb-4 p-3 bg-[var(--color-danger-muted)] border border-[var(--color-danger)] rounded-lg">
+          <p className="text-sm text-[var(--color-danger)]">{error}</p>
         </div>
       )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
-          <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+          <RefreshCw className="w-6 h-6 animate-spin text-[var(--text-muted)]" />
         </div>
       ) : data ? (
         <div className="space-y-6">
@@ -199,56 +199,56 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
 
           {/* 요약 카드 */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-gray-500 mb-1">
+            <div className="p-4 bg-[var(--bg-primary)] rounded-lg">
+              <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-1">
                 <Users className="w-4 h-4" />
                 <span className="text-xs">방문자</span>
               </div>
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-[var(--text-primary)]">
                 {data.summary.totalVisitors.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-caption mt-1">
                 일 평균 {data.summary.avgDailyVisitors}
               </p>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-gray-500 mb-1">
+            <div className="p-4 bg-[var(--bg-primary)] rounded-lg">
+              <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-1">
                 <Eye className="w-4 h-4" />
                 <span className="text-xs">페이지뷰</span>
               </div>
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-[var(--text-primary)]">
                 {data.summary.totalPageViews.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-caption mt-1">
                 방문당 {data.summary.totalVisitors > 0
                   ? (data.summary.totalPageViews / data.summary.totalVisitors).toFixed(1)
                   : '0'}페이지
               </p>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-gray-500 mb-1">
+            <div className="p-4 bg-[var(--bg-primary)] rounded-lg">
+              <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-1">
                 <MessageSquare className="w-4 h-4" />
                 <span className="text-xs">상담 신청</span>
               </div>
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-[var(--text-primary)]">
                 {data.summary.totalConsultations.toLocaleString()}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-caption mt-1">
                 일 평균 {data.summary.avgDailyConsultations}
               </p>
             </div>
 
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center gap-2 text-gray-500 mb-1">
+            <div className="p-4 bg-[var(--bg-primary)] rounded-lg">
+              <div className="flex items-center gap-2 text-[var(--text-tertiary)] mb-1">
                 <TrendingUp className="w-4 h-4" />
                 <span className="text-xs">전환율</span>
               </div>
-              <p className="text-xl font-bold text-sage-600">
+              <p className="text-xl font-bold text-[var(--sage-primary)]">
                 {data.summary.conversionRate}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-caption mt-1">
                 예약 {data.summary.totalBookings}건 포함
               </p>
             </div>
@@ -256,8 +256,8 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
 
           {/* 일별 추이 차트 (간단한 바 차트) */}
           <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-gray-400" />
+            <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-3 flex items-center gap-2">
+              <Activity className="w-4 h-4 text-[var(--text-muted)]" />
               일별 추이
             </h3>
             <div className="h-32 flex items-end gap-1">
@@ -275,15 +275,15 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
                   >
                     <div className="w-full flex gap-0.5 items-end h-24">
                       <div
-                        className="flex-1 bg-blue-200 rounded-t transition-all hover:bg-blue-300"
+                        className="flex-1 bg-[var(--color-info-muted)] rounded-t transition-all hover:bg-[var(--color-info)]"
                         style={{ height: `${visitorHeight}%`, minHeight: stat.visitors > 0 ? '4px' : '0' }}
                       />
                       <div
-                        className="flex-1 bg-sage-400 rounded-t transition-all hover:bg-sage-500"
+                        className="flex-1 bg-[var(--sage-primary)] rounded-t transition-all hover:opacity-80"
                         style={{ height: `${consultationHeight}%`, minHeight: stat.consultations > 0 ? '4px' : '0' }}
                       />
                     </div>
-                    <span className="text-[10px] text-gray-400">
+                    <span className="text-[10px] text-[var(--text-muted)]">
                       {formatDate(stat.date)}
                     </span>
                   </div>
@@ -292,12 +292,12 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
             </div>
             <div className="flex items-center justify-center gap-4 mt-2">
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-blue-200 rounded" />
-                <span className="text-xs text-gray-500">방문자</span>
+                <div className="w-3 h-3 bg-[var(--color-info-muted)] rounded" />
+                <span className="text-caption">방문자</span>
               </div>
               <div className="flex items-center gap-1">
-                <div className="w-3 h-3 bg-sage-400 rounded" />
-                <span className="text-xs text-gray-500">상담</span>
+                <div className="w-3 h-3 bg-[var(--sage-primary)] rounded" />
+                <span className="text-caption">상담</span>
               </div>
             </div>
           </div>
@@ -305,32 +305,32 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
           {/* API 키 사용량 */}
           {data.apiKeyStats.length > 0 && (
             <div>
-              <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                <Key className="w-4 h-4 text-gray-400" />
+              <h3 className="text-sm font-medium text-[var(--text-secondary)] mb-3 flex items-center gap-2">
+                <Key className="w-4 h-4 text-[var(--text-muted)]" />
                 API 키 사용량
               </h3>
               <div className="space-y-2">
                 {data.apiKeyStats.map((key) => (
                   <div
                     key={key.keyId}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-3 bg-[var(--bg-primary)] rounded-lg"
                   >
                     <div className="flex items-center gap-3">
                       <span
                         className={`w-2 h-2 rounded-full ${
-                          key.isActive ? 'bg-green-500' : 'bg-gray-300'
+                          key.isActive ? 'bg-[var(--color-success)]' : 'bg-[var(--text-muted)]'
                         }`}
                       />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{key.name}</p>
-                        <p className="text-xs text-gray-500 font-mono">{key.keyPrefix}...</p>
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{key.name}</p>
+                        <p className="text-caption font-mono">{key.keyPrefix}...</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-medium text-gray-900">
+                      <p className="text-sm font-medium text-[var(--text-primary)]">
                         {key.usageCount.toLocaleString()}회
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-caption">
                         {key.lastUsedAt ? `최근: ${formatDateTime(key.lastUsedAt)}` : '미사용'}
                       </p>
                     </div>
@@ -342,8 +342,8 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
         </div>
       ) : (
         <div className="text-center py-8">
-          <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">통계 데이터가 없습니다</p>
+          <BarChart3 className="w-12 h-12 text-[var(--text-muted)] mx-auto mb-3" />
+          <p className="text-body">통계 데이터가 없습니다</p>
         </div>
       )}
     </div>

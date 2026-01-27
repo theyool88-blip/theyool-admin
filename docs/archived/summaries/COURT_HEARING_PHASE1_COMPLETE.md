@@ -105,7 +105,7 @@
 ## 🗂️ 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── app/
 │   ├── api/admin/
 │   │   ├── court-hearings/

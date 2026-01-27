@@ -3,7 +3,7 @@
 ## 📋 구현 내용
 
 ### 1. 입금 내역 모달 (`CasePaymentsModal`)
-**위치**: `/Users/hskim/theyool-admin/components/CasePaymentsModal.tsx`
+**위치**: `/Users/hskim/luseed/components/CasePaymentsModal.tsx`
 
 **주요 기능**:
 - ✅ 사건별 입금 내역 목록 표시
@@ -38,7 +38,7 @@
 ---
 
 ### 2. 사건 목록 페이지 개선 (`CasesList`)
-**위치**: `/Users/hskim/theyool-admin/components/CasesList.tsx`
+**위치**: `/Users/hskim/luseed/components/CasesList.tsx`
 
 **추가된 기능**:
 
@@ -250,5 +250,5 @@ function MyComponent() {
 - **작업자**: Claude Code
 - **소요 시간**: 약 30분
 - **관련 파일**:
-  - `/Users/hskim/theyool-admin/components/CasePaymentsModal.tsx` (신규)
-  - `/Users/hskim/theyool-admin/components/CasesList.tsx` (수정)
+  - `/Users/hskim/luseed/components/CasePaymentsModal.tsx` (신규)
+  - `/Users/hskim/luseed/components/CasesList.tsx` (수정)

@@ -159,7 +159,7 @@
 ## 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── components/
 │   ├── MonthlyCalendar.tsx         # 통합 캘린더 (3개 테이블)
 │   ├── CaseDetail.tsx               # 사건 상세 (탭 구조)

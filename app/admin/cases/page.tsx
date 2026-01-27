@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import AdminHeader from '@/components/AdminHeader'
 import UnifiedScheduleModal from '@/components/UnifiedScheduleModal'
 import CasePaymentsModal from '@/components/CasePaymentsModal'
 import { formatCurrency } from '@/types/payment'
@@ -147,37 +146,35 @@ export default function CasesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-sage-600"></div>
+      <div className="flex items-center justify-center min-h-screen bg-[var(--bg-primary)]">
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--border-default)] border-t-[var(--sage-primary)]"></div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <AdminHeader title="사건 관리" />
-
-      <div className="max-w-6xl mx-auto pt-20 pb-8 px-4">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
+      <div className="max-w-6xl mx-auto pt-6 pb-8 px-4">
         {/* Summary */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-6 text-sm">
             <div>
-              <span className="text-gray-500">전체</span>
-              <span className="ml-2 text-lg font-bold text-gray-900">{summary.total_count}건</span>
+              <span className="text-[var(--text-tertiary)]">전체</span>
+              <span className="ml-2 text-lg font-bold text-[var(--text-primary)]">{summary.total_count}건</span>
             </div>
-            <div className="text-gray-300">|</div>
+            <div className="text-[var(--border-default)]">|</div>
             <div className="flex items-center gap-3">
-              <span className="px-2 py-0.5 text-xs bg-sage-100 text-sage-700 rounded">
+              <span className="px-2 py-0.5 text-xs bg-[var(--sage-muted)] text-[var(--sage-primary)] rounded">
                 진행 {summary.active_count}
               </span>
-              <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded">
+              <span className="px-2 py-0.5 text-xs bg-[var(--bg-tertiary)] text-[var(--text-secondary)] rounded">
                 종결 {summary.closed_count}
               </span>
             </div>
           </div>
           <button
             onClick={() => router.push('/cases/new')}
-            className="px-4 py-2 text-sm font-medium bg-sage-600 text-white rounded-lg hover:bg-sage-700 transition-colors"
+            className="btn btn-primary px-4 py-2 text-sm font-medium"
           >
             + 사건 추가
           </button>
@@ -195,7 +192,7 @@ export default function CasesPage() {
                 setSearchTerm(e.target.value)
                 setCurrentPage(1)
               }}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent"
+              className="form-input w-full px-3 py-2 text-sm"
             />
           </div>
 
@@ -206,7 +203,7 @@ export default function CasesPage() {
               setStatusFilter(e.target.value as 'all' | '진행중' | '종결')
               setCurrentPage(1)
             }}
-            className="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-sage-500"
+            className="form-input px-3 py-2 text-sm"
           >
             <option value="all">전체 상태</option>
             <option value="진행중">진행중</option>
@@ -215,18 +212,18 @@ export default function CasesPage() {
 
         </div>
 
-        {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
+        {error && <div className="text-sm text-[var(--color-danger)] mb-4">{error}</div>}
 
         {/* Cases List */}
-        <div className="bg-white rounded-lg border border-gray-200">
+        <div className="card">
           {!filteredCases.length ? (
-            <div className="py-12 text-center text-gray-400 text-sm">
+            <div className="py-12 text-center text-[var(--text-muted)] text-sm">
               {searchTerm ? '검색 결과가 없습니다' : '등록된 사건이 없습니다'}
             </div>
           ) : (
             <>
               {/* Table Header */}
-              <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 border-b border-gray-200 text-xs text-gray-500 font-medium">
+              <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2 bg-[var(--bg-primary)] border-b border-[var(--border-default)] text-xs text-[var(--text-tertiary)] font-medium">
                 <div className="col-span-1 text-center">계약일</div>
                 <div className="col-span-1 text-center">담당자</div>
                 <div className="col-span-1 text-center">의뢰인</div>
@@ -238,12 +235,12 @@ export default function CasesPage() {
               </div>
 
               {/* Table Body */}
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-[var(--border-subtle)]">
                 {currentCases.map((legalCase) => (
                   <div
                     key={legalCase.id}
                     onClick={() => router.push(`/cases/${legalCase.id}`)}
-                    className="grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-3 hover:bg-gray-50 cursor-pointer transition-colors items-center"
+                    className="grid grid-cols-1 md:grid-cols-12 gap-2 px-4 py-3 hover:bg-[var(--bg-hover)] cursor-pointer transition-colors items-center"
                   >
                     {/* Mobile Layout */}
                     <div className="md:hidden space-y-2">
@@ -252,29 +249,29 @@ export default function CasesPage() {
                           <span className="px-1.5 py-0.5 text-xs rounded bg-indigo-50 text-indigo-700">
                             {legalCase.assigned_member?.display_name || '-'}
                           </span>
-                          <span className="text-xs text-gray-500">{formatDate(legalCase.contract_date)}</span>
+                          <span className="text-xs text-[var(--text-tertiary)]">{formatDate(legalCase.contract_date)}</span>
                         </div>
                         <span className={`px-1.5 py-0.5 text-xs rounded ${
-                          legalCase.status === '진행중' ? 'bg-sage-100 text-sage-700' : 'bg-gray-100 text-gray-500'
+                          legalCase.status === '진행중' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
                         }`}>
                           {legalCase.status}
                         </span>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{legalCase.case_name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-sm font-medium text-[var(--text-primary)]">{legalCase.case_name}</p>
+                        <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
                           {legalCase.client?.name || '-'}
                           {legalCase.court_case_number && ` | ${legalCase.court_case_number}`}
                         </p>
                       </div>
                       <div className="flex items-center justify-between pt-1">
-                        <span className="text-xs text-gray-600">
+                        <span className="text-xs text-[var(--text-secondary)]">
                           입금: {formatCurrency(legalCase.payment_info?.total_amount || 0)}
                         </span>
                         <div className="flex gap-2">
                           <button
                             onClick={(e) => handleOpenPaymentModal(e, legalCase)}
-                            className="px-2 py-1 text-xs bg-sage-600 text-white rounded hover:bg-sage-700"
+                            className="btn btn-primary px-2 py-1 text-xs"
                           >
                             입금
                           </button>
@@ -283,8 +280,8 @@ export default function CasesPage() {
                             disabled={!legalCase.court_case_number}
                             className={`px-2 py-1 text-xs rounded ${
                               legalCase.court_case_number
-                                ? 'bg-sage-600 text-white hover:bg-sage-700'
-                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                ? 'btn btn-primary'
+                                : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
                             }`}
                           >
                             기일
@@ -294,7 +291,7 @@ export default function CasesPage() {
                     </div>
 
                     {/* Desktop Layout */}
-                    <div className="hidden md:block col-span-1 text-center text-xs text-gray-600">
+                    <div className="hidden md:block col-span-1 text-center text-xs text-[var(--text-secondary)]">
                       {formatDate(legalCase.contract_date)}
                     </div>
                     <div className="hidden md:block col-span-1 text-center">
@@ -302,29 +299,29 @@ export default function CasesPage() {
                         {legalCase.assigned_member?.display_name || '-'}
                       </span>
                     </div>
-                    <div className="hidden md:block col-span-1 text-center text-sm font-medium text-gray-900 truncate">
+                    <div className="hidden md:block col-span-1 text-center text-sm font-medium text-[var(--text-primary)] truncate">
                       {legalCase.client?.name || '-'}
                     </div>
-                    <div className="hidden md:block col-span-3 text-sm text-gray-900 truncate">
+                    <div className="hidden md:block col-span-3 text-sm text-[var(--text-primary)] truncate">
                       {legalCase.case_name}
                     </div>
-                    <div className="hidden md:block col-span-2 text-xs text-gray-500 truncate">
+                    <div className="hidden md:block col-span-2 text-xs text-[var(--text-tertiary)] truncate">
                       {legalCase.court_case_number || '-'}
                     </div>
                     <div className="hidden md:block col-span-1 text-center">
                       <span className={`px-1.5 py-0.5 text-xs rounded ${
-                        legalCase.status === '진행중' ? 'bg-sage-100 text-sage-700' : 'bg-gray-100 text-gray-500'
+                        legalCase.status === '진행중' ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)]' : 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]'
                       }`}>
                         {legalCase.status}
                       </span>
                     </div>
-                    <div className="hidden md:block col-span-1 text-right text-xs font-medium text-gray-700">
+                    <div className="hidden md:block col-span-1 text-right text-xs font-medium text-[var(--text-secondary)]">
                       {formatCurrency(legalCase.payment_info?.total_amount || 0)}
                     </div>
                     <div className="hidden md:flex col-span-2 justify-center gap-2">
                       <button
                         onClick={(e) => handleOpenPaymentModal(e, legalCase)}
-                        className="px-2 py-1 text-xs bg-sage-600 text-white rounded hover:bg-sage-700 transition-colors"
+                        className="btn btn-primary px-2 py-1 text-xs"
                       >
                         입금
                       </button>
@@ -333,8 +330,8 @@ export default function CasesPage() {
                         disabled={!legalCase.court_case_number}
                         className={`px-2 py-1 text-xs rounded transition-colors ${
                           legalCase.court_case_number
-                            ? 'bg-sage-600 text-white hover:bg-sage-700'
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                            ? 'btn btn-primary'
+                            : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
                         }`}
                       >
                         기일
@@ -346,15 +343,15 @@ export default function CasesPage() {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between">
-                  <span className="text-xs text-gray-500">
+                <div className="px-4 py-3 border-t border-[var(--border-subtle)] flex items-center justify-between">
+                  <span className="text-xs text-[var(--text-tertiary)]">
                     {indexOfFirstCase + 1}-{Math.min(indexOfLastCase, filteredCases.length)} / {filteredCases.length}건
                   </span>
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
-                      className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       이전
                     </button>
@@ -375,8 +372,8 @@ export default function CasesPage() {
                           onClick={() => setCurrentPage(pageNum)}
                           className={`px-2 py-1 text-xs rounded ${
                             currentPage === pageNum
-                              ? 'bg-sage-600 text-white'
-                              : 'text-gray-600 hover:bg-gray-100'
+                              ? 'bg-[var(--sage-primary)] text-white'
+                              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
                           }`}
                         >
                           {pageNum}
@@ -386,7 +383,7 @@ export default function CasesPage() {
                     <button
                       onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                       disabled={currentPage === totalPages}
-                      className="px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] rounded disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       다음
                     </button>

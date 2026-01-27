@@ -10,8 +10,9 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   getCachedXml,
-  downloadXmlFromScourt,
-  saveCachedXml,
+  downloadXmlWithProtection,
+  RateLimitExceededError,
+  DownloadTimeoutError,
 } from "@/lib/scourt/xml-fetcher";
 
 /**
@@ -84,21 +85,31 @@ export async function GET(request: NextRequest) {
  * - forceRefresh?: boolean - 강제 갱신 여부
  */
 export async function POST(request: NextRequest) {
+  // request body 한 번만 파싱
+  let body: { xmlPath?: string; caseType?: string; forceRefresh?: boolean };
   try {
-    const body = await request.json();
-    const { xmlPath, caseType, forceRefresh = false } = body;
+    body = await request.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid JSON body" },
+      { status: 400 }
+    );
+  }
 
-    if (!xmlPath) {
-      return NextResponse.json(
-        { error: "Missing required field: xmlPath" },
-        { status: 400 }
-      );
-    }
+  const { xmlPath, caseType, forceRefresh = false } = body;
 
+  if (!xmlPath) {
+    return NextResponse.json(
+      { error: "Missing required field: xmlPath" },
+      { status: 400 }
+    );
+  }
+
+  try {
     // 강제 갱신이 아니면 캐시 확인
     if (!forceRefresh) {
       const cached = await getCachedXml(xmlPath);
-      if (cached) {
+      if (cached && cached.xml_content !== '__DOWNLOADING__') {
         return NextResponse.json({
           message: "XML already cached",
           xml_path: cached.xml_path,
@@ -108,26 +119,64 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // SCOURT에서 다운로드
-    const xmlContent = await downloadXmlFromScourt(xmlPath);
-
-    // 캐시에 저장
-    const saved = await saveCachedXml(xmlPath, xmlContent, caseType);
-
-    if (!saved) {
-      return NextResponse.json(
-        { error: "Failed to save XML to cache" },
-        { status: 500 }
-      );
-    }
+    // 통합 함수로 다운로드 (분산 락 + rate limit)
+    const xmlContent = await downloadXmlWithProtection(xmlPath, caseType);
 
     return NextResponse.json({
       message: "XML downloaded and cached",
-      xml_path: saved.xml_path,
-      cached_at: saved.created_at,
+      xml_path: xmlPath,
+      xml_content: xmlContent,
       from_cache: false,
     });
+
   } catch (error) {
+    // Graceful Degradation: Rate limit 또는 타임아웃 시
+    if (error instanceof RateLimitExceededError || error instanceof DownloadTimeoutError) {
+      console.warn(`[XML] Graceful degradation for ${error.xmlPath}: ${error.name}`);
+
+      // 1. 정적 파일 시도
+      try {
+        const publicPath = path.join(process.cwd(), "public", "scourt-xml", xmlPath);
+        const xmlContent = await fs.readFile(publicPath, "utf8");
+        return NextResponse.json({
+          xml_path: xmlPath,
+          xml_content: xmlContent,
+          from_static: true,
+          degraded: true,
+          reason: error.name,
+        });
+      } catch {
+        // 정적 파일 없음
+      }
+
+      // 2. 기존 캐시 반환 (stale이라도, __DOWNLOADING__ 제외)
+      try {
+        const cached = await getCachedXml(xmlPath);
+        if (cached && cached.xml_content && cached.xml_content !== '__DOWNLOADING__') {
+          return NextResponse.json({
+            xml_path: cached.xml_path,
+            xml_content: cached.xml_content,
+            from_cache: true,
+            degraded: true,
+            reason: error.name,
+          });
+        }
+      } catch {
+        // 캐시 조회 실패
+      }
+
+      // 3. 정적 파일/캐시 모두 없으면 503 Service Unavailable
+      return NextResponse.json(
+        {
+          error: "Service temporarily unavailable",
+          reason: error.name,
+          retry_after: 5,
+        },
+        { status: 503 }
+      );
+    }
+
+    // 기타 에러 처리
     console.error("Error caching XML:", error);
     return NextResponse.json(
       {

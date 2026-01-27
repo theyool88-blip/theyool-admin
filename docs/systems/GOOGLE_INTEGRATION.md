@@ -216,7 +216,7 @@ GOOGLE_CALENDAR_CLIENT_ID=xxx.apps.googleusercontent.com
 GOOGLE_CALENDAR_CLIENT_SECRET=xxx
 
 # 앱 URL (OAuth 콜백용)
-NEXT_PUBLIC_APP_URL=https://theyool-admin.vercel.app
+NEXT_PUBLIC_APP_URL=https://luseed.vercel.app
 ```
 
 ---
@@ -234,7 +234,7 @@ NEXT_PUBLIC_APP_URL=https://theyool-admin.vercel.app
 - **유형**: 웹 애플리케이션
 - **승인된 리디렉션 URI**:
   - `http://localhost:3000/api/auth/callback/google` (개발)
-  - `https://theyool-admin.vercel.app/api/auth/callback/google` (프로덕션)
+  - `https://luseed.vercel.app/api/auth/callback/google` (프로덕션)
 
 ### 3. API 활성화
 

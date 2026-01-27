@@ -68,7 +68,7 @@ FROM bookings;
 
   console.log('Supabase Dashboard에서 다음 단계를 따라주세요:\n')
   console.log('1. https://supabase.com/dashboard 접속')
-  console.log('2. theyool-admin 프로젝트 선택')
+  console.log('2. luseed 프로젝트 선택')
   console.log('3. 왼쪽 메뉴에서 "SQL Editor" 클릭')
   console.log('4. "New query" 클릭')
   console.log('5. 아래 SQL을 복사해서 붙여넣기\n')

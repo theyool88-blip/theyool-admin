@@ -226,7 +226,7 @@ GET /api/admin/consultations?
 ## 파일 구조
 
 ```
-theyool-admin/
+luseed/
 ├── app/
 │   ├── admin/
 │   │   ├── consultations/

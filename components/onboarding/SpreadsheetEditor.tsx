@@ -244,31 +244,31 @@ export default function SpreadsheetEditor({
   return (
     <div className="space-y-4">
       {/* 테이블 */}
-      <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="card border border-[var(--border-default)] rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-[var(--border-default)]">
+            <thead className="bg-[var(--bg-primary)]">
               <tr>
-                <th className="w-10 px-2 py-2 text-center text-xs font-medium text-gray-500">
+                <th className="w-10 px-2 py-2 text-center text-xs font-medium text-[var(--text-tertiary)]">
                   #
                 </th>
                 {DISPLAY_COLUMNS.map(col => (
                   <th
                     key={col.key}
                     style={{ width: col.width }}
-                    className="px-2 py-2 text-left text-xs font-medium text-gray-500"
+                    className="px-2 py-2 text-left text-xs font-medium text-[var(--text-tertiary)]"
                   >
                     {col.label}
-                    {col.required && <span className="text-red-500 ml-0.5">*</span>}
+                    {col.required && <span className="text-[var(--color-danger)] ml-0.5">*</span>}
                   </th>
                 ))}
                 <th className="w-10 px-2 py-2"></th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-[var(--bg-secondary)] divide-y divide-[var(--border-default)]">
               {rows.map((row, rowIndex) => (
-                <tr key={rowIndex} className="hover:bg-gray-50">
-                  <td className="px-2 py-1 text-center text-xs text-gray-400">
+                <tr key={rowIndex} className="hover:bg-[var(--bg-hover)]">
+                  <td className="px-2 py-1 text-center text-xs text-[var(--text-muted)]">
                     {rowIndex + 1}
                   </td>
                   {DISPLAY_COLUMNS.map(col => {
@@ -278,7 +278,7 @@ export default function SpreadsheetEditor({
                     return (
                       <td
                         key={col.key}
-                        className={`px-1 py-1 ${isSelected ? 'bg-sage-50' : ''}`}
+                        className={`px-1 py-1 ${isSelected ? 'bg-[var(--sage-muted)]' : ''}`}
                         onClick={() => handleCellClick(rowIndex, col.key)}
                       >
                         {isSelected ? (
@@ -290,15 +290,14 @@ export default function SpreadsheetEditor({
                             onKeyDown={handleKeyDown}
                             onBlur={commitEdit}
                             onPaste={handlePaste}
-                            className="w-full px-1 py-0.5 text-sm border border-sage-400 rounded
-                                       focus:outline-none focus:ring-1 focus:ring-sage-500"
+                            className="form-input w-full px-1 py-0.5 text-sm"
                             disabled={disabled}
                           />
                         ) : (
                           <div
                             className={`px-1 py-0.5 text-sm truncate cursor-pointer
-                                       ${value ? 'text-gray-900' : 'text-gray-300'}
-                                       ${col.required && !value ? 'bg-red-50' : ''}`}
+                                       ${value ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}
+                                       ${col.required && !value ? 'bg-[var(--color-danger-muted)]' : ''}`}
                           >
                             {value || (col.required ? '필수' : '-')}
                           </div>
@@ -311,7 +310,7 @@ export default function SpreadsheetEditor({
                       type="button"
                       onClick={() => removeRow(rowIndex)}
                       disabled={disabled || rows.length <= 1}
-                      className="p-1 text-gray-400 hover:text-red-500 disabled:opacity-30"
+                      className="p-1 text-[var(--text-muted)] hover:text-[var(--color-danger)] disabled:opacity-30"
                       title="행 삭제"
                     >
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -332,8 +331,8 @@ export default function SpreadsheetEditor({
           type="button"
           onClick={addRow}
           disabled={disabled || rows.length >= maxRows}
-          className="flex items-center gap-1 px-3 py-1.5 text-sm text-sage-600
-                     hover:bg-sage-50 rounded-lg disabled:opacity-50"
+          className="btn btn-secondary flex items-center gap-1 px-3 py-1.5 text-sm text-[var(--sage-primary)]
+                     hover:bg-[var(--sage-muted)] rounded-lg disabled:opacity-50"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -341,7 +340,7 @@ export default function SpreadsheetEditor({
           행 추가
         </button>
 
-        <div className="text-xs text-gray-500">
+        <div className="text-caption text-[var(--text-tertiary)]">
           {rows.length} / {maxRows}행 | Tab: 다음 셀, Enter: 다음 행, Ctrl+V: 붙여넣기
         </div>
       </div>

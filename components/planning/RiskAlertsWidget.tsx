@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { AlertCircle, AlertTriangle, FileText, CheckCircle, type LucideIcon } from 'lucide-react';
 
 interface RiskAlert {
   id: string;
@@ -70,21 +71,21 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
     }
   }
 
-  const severityStyles: Record<string, { bg: string; text: string; icon: string }> = {
+  const severityStyles: Record<string, { bg: string; text: string; icon: LucideIcon }> = {
     critical: {
-      bg: 'bg-red-50',
-      text: 'text-red-700',
-      icon: '🚨',
+      bg: 'bg-[var(--color-danger-muted)]',
+      text: 'text-[var(--color-danger)]',
+      icon: AlertCircle,
     },
     high: {
-      bg: 'bg-orange-50',
-      text: 'text-orange-700',
-      icon: '⚠️',
+      bg: 'bg-[var(--color-warning-muted)]',
+      text: 'text-[var(--color-warning)]',
+      icon: AlertTriangle,
     },
     medium: {
-      bg: 'bg-yellow-50',
-      text: 'text-yellow-700',
-      icon: '📋',
+      bg: 'bg-[var(--bg-tertiary)]',
+      text: 'text-[var(--text-secondary)]',
+      icon: FileText,
     },
   };
 
@@ -96,12 +97,12 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900">리스크 알림</p>
+      <div className="card">
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <p className="text-sm font-medium text-[var(--text-primary)]">리스크 알림</p>
         </div>
         <div className="p-4 flex justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-2 border-gray-300 border-t-sage-600"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-[var(--border-default)] border-t-[var(--sage-primary)]"></div>
         </div>
       </div>
     );
@@ -109,11 +110,11 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-sm font-medium text-gray-900">리스크 알림</p>
+      <div className="card">
+        <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+          <p className="text-sm font-medium text-[var(--text-primary)]">리스크 알림</p>
         </div>
-        <div className="p-4 text-center text-sm text-gray-500">{error}</div>
+        <div className="p-4 text-center text-sm text-[var(--text-tertiary)]">{error}</div>
       </div>
     );
   }
@@ -121,11 +122,11 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
   const criticalCount = alerts.filter((a) => a.severity === 'critical').length;
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-        <p className="text-sm font-medium text-gray-900">리스크 알림</p>
+    <div className="card">
+      <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
+        <p className="text-sm font-medium text-[var(--text-primary)]">리스크 알림</p>
         {criticalCount > 0 && (
-          <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded">
+          <span className="px-2 py-0.5 bg-[var(--color-danger-muted)] text-[var(--color-danger)] text-xs font-medium rounded">
             긴급 {criticalCount}건
           </span>
         )}
@@ -133,11 +134,11 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
 
       {alerts.length === 0 ? (
         <div className="p-4 text-center">
-          <span className="text-2xl">✅</span>
-          <p className="text-sm text-gray-500 mt-2">확인이 필요한 리스크가 없습니다</p>
+          <CheckCircle className="w-8 h-8 mx-auto text-[var(--sage-primary)]" />
+          <p className="text-sm text-[var(--text-tertiary)] mt-2">확인이 필요한 리스크가 없습니다</p>
         </div>
       ) : (
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-[var(--border-subtle)]">
           {alerts.map((alert, index) => {
             const style = severityStyles[alert.severity];
             return (
@@ -147,7 +148,7 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
               >
                 <div className="flex items-start gap-3">
                   {/* 아이콘 */}
-                  <span className="flex-shrink-0 text-lg">{style.icon}</span>
+                  <style.icon className={`w-5 h-5 flex-shrink-0 ${style.text}`} />
 
                   {/* 내용 */}
                   <div className="flex-1 min-w-0">
@@ -163,13 +164,13 @@ export default function RiskAlertsWidget({ limit = 5 }: Props) {
                     </div>
                     <Link
                       href={`/admin/cases?id=${alert.caseId}`}
-                      className="text-xs text-gray-600 hover:text-sage-600 block truncate mt-1"
+                      className="text-xs text-[var(--text-secondary)] hover:text-[var(--sage-primary)] block truncate mt-1"
                     >
                       {alert.caseNumber}
                       {alert.clientName && ` · ${alert.clientName}`}
                     </Link>
                     {alert.description && (
-                      <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                      <p className="text-xs text-[var(--text-tertiary)] mt-1 line-clamp-2">
                         {alert.description}
                       </p>
                     )}

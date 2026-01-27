@@ -742,6 +742,7 @@ export default function NewCaseForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (loading) return  // 더블클릭 방지
     await submitCase()
   }
 

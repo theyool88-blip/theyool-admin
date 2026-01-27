@@ -64,53 +64,76 @@ export const GET = withTenant(async (request, { tenant }) => {
       )
     }
 
-    // Fetch payment info for each case
-    const casesWithPayments = await Promise.all(
-      (cases || []).map(async (legalCase: Record<string, unknown>) => {
-        const { data: payments } = await adminClient
-          .from('payments')
-          .select('amount')
-          .eq('case_id', legalCase.id)
+    const casesList = cases || []
 
-        const totalAmount = payments?.reduce((sum, p) => sum + p.amount, 0) || 0
-        const paymentCount = payments?.length || 0
+    // 케이스가 없으면 빈 배열 반환
+    if (casesList.length === 0) {
+      return NextResponse.json({ cases: [] })
+    }
 
-        // Use cache fields for client info (no join needed)
-        const clientData = legalCase.primary_client_id
-          ? { id: legalCase.primary_client_id, name: legalCase.primary_client_name }
-          : null
+    const caseIds = casesList.map(c => c.id)
 
-        // Extract case_assignees
-        const caseAssignees = legalCase.case_assignees as Array<{
-          id: string
-          member_id: string
-          is_primary: boolean
-          assignee_role: string
-          member: { id: string; display_name: string; role: string } | null
-        }> | undefined
+    // 단일 쿼리로 모든 케이스의 payments 조회 (N+1 최적화)
+    let paymentsQuery = adminClient
+      .from('payments')
+      .select('case_id, amount')
+      .in('case_id', caseIds)
 
-        // Remove case_assignees from response
-        const { case_assignees: _, ...caseWithoutAssignees } = legalCase
+    if (!tenant.isSuperAdmin && tenant.tenantId) {
+      paymentsQuery = paymentsQuery.eq('tenant_id', tenant.tenantId)
+    }
 
-        return {
-          ...caseWithoutAssignees,
-          client: clientData,
-          // Include assignees list (담당변호사/담당직원 목록)
-          assignees: caseAssignees?.map(a => ({
-            id: a.id,
-            memberId: a.member_id,
-            isPrimary: a.is_primary,
-            assigneeRole: a.assignee_role,
-            displayName: a.member?.display_name,
-            role: a.member?.role
-          })) || [],
-          payment_info: {
-            total_amount: totalAmount,
-            payment_count: paymentCount
-          }
+    const { data: allPayments } = await paymentsQuery
+
+    // 케이스별 결제 정보 집계
+    const paymentMap = new Map<string, { total: number; count: number }>()
+    for (const payment of (allPayments || [])) {
+      if (!payment.case_id) continue
+      const existing = paymentMap.get(payment.case_id) || { total: 0, count: 0 }
+      existing.total += payment.amount || 0
+      existing.count += 1
+      paymentMap.set(payment.case_id, existing)
+    }
+
+    // 메모리에서 케이스별 정보 조합
+    const casesWithPayments = casesList.map((legalCase: Record<string, unknown>) => {
+      const paymentInfo = paymentMap.get(legalCase.id as string) || { total: 0, count: 0 }
+
+      // Use cache fields for client info (no join needed)
+      const clientData = legalCase.primary_client_id
+        ? { id: legalCase.primary_client_id, name: legalCase.primary_client_name }
+        : null
+
+      // Extract case_assignees
+      const caseAssignees = legalCase.case_assignees as Array<{
+        id: string
+        member_id: string
+        is_primary: boolean
+        assignee_role: string
+        member: { id: string; display_name: string; role: string } | null
+      }> | undefined
+
+      // Remove case_assignees from response
+      const { case_assignees: _, ...caseWithoutAssignees } = legalCase
+
+      return {
+        ...caseWithoutAssignees,
+        client: clientData,
+        // Include assignees list (담당변호사/담당직원 목록)
+        assignees: caseAssignees?.map(a => ({
+          id: a.id,
+          memberId: a.member_id,
+          isPrimary: a.is_primary,
+          assigneeRole: a.assignee_role,
+          displayName: a.member?.display_name,
+          role: a.member?.role
+        })) || [],
+        payment_info: {
+          total_amount: paymentInfo.total,
+          payment_count: paymentInfo.count
         }
-      })
-    )
+      }
+    })
 
     return NextResponse.json({ cases: casesWithPayments })
   } catch (error) {
@@ -352,15 +375,22 @@ export const POST = withTenant(async (request, { tenant }) => {
         )
       : null
 
-    // 중복 사건 검사 (정제된 사건번호 + 정규화된 법원명으로 검색)
-    if (cleanedCaseNumber && resolvedCourtName) {
-      const { data: existingCase } = await adminClient
+    // 중복 사건 검사 (사건번호가 있으면 중복 체크)
+    if (cleanedCaseNumber) {
+      let query = adminClient
         .from('legal_cases')
         .select('id, case_name')
         .eq('tenant_id', tenant.tenantId)
         .eq('court_case_number', cleanedCaseNumber)
-        .eq('court_name', resolvedCourtName)
-        .maybeSingle()
+
+      // court_name이 있으면 eq, 없으면 is null로 비교
+      if (resolvedCourtName) {
+        query = query.eq('court_name', resolvedCourtName)
+      } else {
+        query = query.is('court_name', null)
+      }
+
+      const { data: existingCase } = await query.maybeSingle()
 
       if (existingCase) {
         return NextResponse.json({
@@ -402,6 +432,13 @@ export const POST = withTenant(async (request, { tenant }) => {
 
     if (error) {
       console.error('Error creating case:', error)
+      // PostgreSQL UNIQUE violation 에러 (code: 23505)
+      if (error.code === '23505') {
+        return NextResponse.json({
+          error: '동일한 사건번호가 이미 등록되어 있습니다.',
+          details: '같은 법원, 같은 사건번호의 사건이 이미 존재합니다.'
+        }, { status: 409 })
+      }
       return NextResponse.json(
         { error: `Failed to create case: ${error.message}` },
         { status: 500 }
@@ -514,7 +551,7 @@ export const POST = withTenant(async (request, { tenant }) => {
             party_name: seed.party_name,
             party_type: seed.party_type,
             party_type_label: seed.party_type_label,
-            is_primary: seed.is_our_client,  // seed의 is_our_client를 is_primary로 매핑
+            is_primary: seed.is_primary,  // 대표 당사자 여부
             representatives: [],
             party_order: idx + 1,
             manual_override: false,

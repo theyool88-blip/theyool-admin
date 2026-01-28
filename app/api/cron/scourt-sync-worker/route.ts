@@ -11,8 +11,10 @@ import { getScourtSyncSettings } from '@/lib/scourt/sync-settings'
 import { buildScourtDedupKey, enqueueScourtSyncJobs, type ScourtSyncType } from '@/lib/scourt/sync-queue'
 import { getWmonidManager } from '@/lib/scourt/wmonid-manager'
 
-let _supabase: ReturnType<typeof createClient> | null = null
-function getSupabase() {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSupabase(): any {
   if (!_supabase) {
     _supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

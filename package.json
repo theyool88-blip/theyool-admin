@@ -10,9 +10,9 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run",
-    "build:cloudflare": "npx @opennextjs/cloudflare",
+    "build:cloudflare": "npx @opennextjs/cloudflare build",
     "dev:cloudflare": "npx wrangler dev",
-    "deploy:cloudflare": "npx wrangler pages deploy .open-next"
+    "deploy:cloudflare": "npx @opennextjs/cloudflare deploy"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.975.0",

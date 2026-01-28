@@ -74,7 +74,8 @@ export async function GET(request: NextRequest) {
     }
 
     // 클라이언트별 필터링 (join 후 필터)
-    let filteredData = data || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let filteredData = (data || []) as any[];
     if (clientId) {
       filteredData = filteredData.filter(
         (item) => item.legal_case?.client?.id === clientId

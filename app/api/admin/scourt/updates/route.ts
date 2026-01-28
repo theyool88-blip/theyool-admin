@@ -126,10 +126,11 @@ export async function PATCH(request: NextRequest) {
 
     const { data, error } = await getSupabase()
       .from('scourt_case_updates')
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .update({
         [column]: true,
         [timestampColumn]: new Date().toISOString(),
-      })
+      } as any)
       .in('id', updateIds)
       .select();
 

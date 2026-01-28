@@ -33,11 +33,15 @@ export function useSidebarState(): UseSidebarStateReturn {
 
   // 마운트 후 localStorage에서 상태 로드 (hydration 이후)
   useEffect(() => {
-    setHasMounted(true)
+    void (async () => {
+      setHasMounted(true)
+    })()
 
     // 캐시가 있으면 캐시 사용 (페이지 전환 시)
     if (cachedCollapsed !== null) {
-      setIsCollapsed(cachedCollapsed)
+      void (async () => {
+        setIsCollapsed(cachedCollapsed)
+      })()
     } else {
       // 캐시가 없으면 localStorage에서 로드
       try {
@@ -45,7 +49,9 @@ export function useSidebarState(): UseSidebarStateReturn {
         if (savedCollapsed !== null) {
           const value = JSON.parse(savedCollapsed)
           cachedCollapsed = value
-          setIsCollapsed(value)
+          void (async () => {
+            setIsCollapsed(value)
+          })()
         }
       } catch (error) {
         console.error('[useSidebarState] Failed to load sidebar state:', error)
@@ -53,14 +59,18 @@ export function useSidebarState(): UseSidebarStateReturn {
     }
 
     if (cachedExpandedGroups !== null) {
-      setExpandedGroups(cachedExpandedGroups)
+      void (async () => {
+        setExpandedGroups(cachedExpandedGroups)
+      })()
     } else {
       try {
         const savedGroups = localStorage.getItem(SIDEBAR_GROUPS_KEY)
         if (savedGroups !== null) {
           const value = JSON.parse(savedGroups)
           cachedExpandedGroups = value
-          setExpandedGroups(value)
+          void (async () => {
+            setExpandedGroups(value)
+          })()
         }
       } catch (error) {
         console.error('[useSidebarState] Failed to load groups state:', error)

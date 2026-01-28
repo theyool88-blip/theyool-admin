@@ -86,7 +86,7 @@ export const GET = withTenant(async (request, { tenant }) => {
     }
 
     // 단일 쿼리로 모든 관련 케이스 조회 (최신순 정렬)
-    let casesMap = new Map<string, { id: string; case_name: string; created_at: string }>()
+    const casesMap = new Map<string, { id: string; case_name: string; created_at: string }>()
 
     if (allCaseIds.size > 0) {
       let casesQuery = supabase

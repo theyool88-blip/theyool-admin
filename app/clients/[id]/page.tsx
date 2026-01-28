@@ -56,20 +56,45 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
 
   const { data: caseClientsData } = await caseClientsQuery
 
+  type CaseClientRow = {
+    retainer_fee: number | null
+    legal_cases: {
+      id: string
+      contract_number: string | null
+      case_name: string
+      status: string
+      contract_date: string | null
+      case_type: string | null
+      created_at: string
+    }[]
+  }
+
+  type CaseInfo = {
+    id: string
+    contract_number: string | null
+    case_name: string
+    status: string
+    contract_date: string | null
+    case_type: string | null
+    retainer_fee: number | null
+    created_at: string
+  }
+
   // case_clients 데이터를 기존 형식으로 변환
   // NOTE: calculated_success_fee, total_received 컬럼이 legal_cases에 존재하지 않음
   const cases = (caseClientsData || [])
-    .map((cc: any) => ({
-      id: cc.legal_cases.id,
-      contract_number: cc.legal_cases.contract_number,
-      case_name: cc.legal_cases.case_name,
-      status: cc.legal_cases.status,
-      contract_date: cc.legal_cases.contract_date,
-      case_type: cc.legal_cases.case_type,
+    .filter((cc: CaseClientRow) => cc.legal_cases && cc.legal_cases.length > 0)
+    .map((cc: CaseClientRow): CaseInfo => ({
+      id: cc.legal_cases[0].id,
+      contract_number: cc.legal_cases[0].contract_number,
+      case_name: cc.legal_cases[0].case_name,
+      status: cc.legal_cases[0].status,
+      contract_date: cc.legal_cases[0].contract_date,
+      case_type: cc.legal_cases[0].case_type,
       retainer_fee: cc.retainer_fee,
-      created_at: cc.legal_cases.created_at
+      created_at: cc.legal_cases[0].created_at
     }))
-    .sort((a: any, b: any) =>
+    .sort((a: CaseInfo, b: CaseInfo) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     )
 

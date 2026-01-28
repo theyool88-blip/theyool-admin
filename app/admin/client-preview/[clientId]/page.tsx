@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import CaseDocuments from '@/components/client/CaseDocuments';
+import { getCourtAbbrev } from '@/lib/scourt/court-codes';
 
 interface Client {
   id: string;
@@ -463,7 +464,7 @@ export default function ClientPortalPreview() {
                 <div className="bg-[var(--bg-primary)] rounded-lg p-3">
                   <p className="text-xs text-[var(--text-muted)] mb-1">관할법원</p>
                   <p className="text-sm font-medium text-[var(--text-primary)]">
-                    {primaryCaseHearings[0]?.court_name || '-'}
+                    {getCourtAbbrev(primaryCaseHearings[0]?.court_name) || '-'}
                   </p>
                 </div>
               </div>
@@ -549,7 +550,7 @@ export default function ClientPortalPreview() {
                               D-{getDDay(hearing.hearing_date)}
                             </span>
                           </div>
-                          <p className="text-xs text-[var(--text-tertiary)]">{hearing.court_name || '장소 미정'}</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">{getCourtAbbrev(hearing.court_name) || '장소 미정'}</p>
                           {hearing.hearing_type && (
                             <span className="inline-block mt-1 text-xs text-[var(--sage-primary)] bg-[var(--sage-muted)] px-2 py-0.5 rounded">
                               {HEARING_TYPE_LABELS[hearing.hearing_type] || hearing.hearing_type}
@@ -800,7 +801,7 @@ export default function ClientPortalPreview() {
                 </div>
                 <div className="bg-[var(--bg-primary)] rounded-xl p-3">
                   <p className="text-xs text-[var(--text-muted)] mb-1">법원/장소</p>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{selectedHearing.court_name || '-'}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{getCourtAbbrev(selectedHearing.court_name) || '-'}</p>
                 </div>
                 {selectedHearing.judge_name && (
                   <div className="bg-[var(--bg-primary)] rounded-xl p-3">

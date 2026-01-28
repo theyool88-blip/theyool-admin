@@ -387,7 +387,7 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
 
   // Custom event prop getter for event styling
   const eventPropGetter = useCallback((event: BigCalendarEvent) => {
-    const isPostponed = event.status === 'adjourned'
+    const isPostponed = event.status === 'POSTPONED'
     const isLawyerMeeting = event.eventSubtype === 'HEARING_LAWYER_MEETING'
     const isNoAttendance = ['HEARING_JUDGMENT', 'HEARING_INVESTIGATION', 'HEARING_PARENTING'].includes(event.eventSubtype || '')
 

@@ -35,14 +35,14 @@ export default async function ClientEditPage({ params }: { params: Promise<{ id:
   // ClientEditForm에 전달할 profile 형식으로 변환
   const profile = {
     id: tenantContext.memberId,
-    tenant_id: tenantContext.tenantId,
+    name: tenantContext.memberDisplayName || tenantContext.tenantName || '',
+    email: '', // Not available in tenantContext
     role: tenantContext.memberRole,
-    display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
   }
 
   return (
     <AdminLayoutClient>
-      <ClientEditForm profile={profile as any} clientData={clientData} />
+      <ClientEditForm profile={profile} clientData={clientData} />
     </AdminLayoutClient>
   )
 }

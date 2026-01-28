@@ -280,7 +280,7 @@ export default function MemberPermissionModal({
               <div className="mb-4 p-3 bg-[var(--color-info-muted)] rounded-lg">
                 <p className="text-xs text-[var(--color-info)]">
                   <strong>개별 권한 오버라이드:</strong> 역할 기본 권한과 다른 설정을 이 멤버에게만 적용합니다.
-                  "역할 기본"을 선택하면 역할의 기본 권한을 따릅니다.
+                  &quot;역할 기본&quot;을 선택하면 역할의 기본 권한을 따릅니다.
                 </p>
               </div>
 

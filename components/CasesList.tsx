@@ -19,6 +19,7 @@ import CasePaymentsModal from './CasePaymentsModal'
 import DataTable, { Pagination, TableToolbar, Column } from './ui/DataTable'
 import { CaseStatusBadge } from './ui/StatusBadge'
 import { EmptySearchResults, EmptyCases } from './ui/EmptyState'
+import { getCourtAbbrev } from '@/lib/scourt/court-codes'
 
 interface Client {
   id: string
@@ -255,7 +256,7 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
       width: '90px',
       render: (item) => (
         <span className="text-caption truncate" title={item.court_name || ''}>
-          {shortenCourtName(item.court_name) || '-'}
+          {getCourtAbbrev(item.court_name) || '-'}
         </span>
       ),
     },
@@ -607,7 +608,7 @@ function CaseCard({ legalCase, formatDate, onClick, onPayment, onSchedule }: Cas
         {legalCase.court_name && (
           <div className="flex items-center justify-between text-caption">
             <span className="text-[var(--text-muted)]">법원</span>
-            <span>{shortenCourtName(legalCase.court_name)}</span>
+            <span>{getCourtAbbrev(legalCase.court_name)}</span>
           </div>
         )}
         {/* 계약일 */}
@@ -652,16 +653,6 @@ function CaseCard({ legalCase, formatDate, onClick, onPayment, onSchedule }: Cas
 }
 
 // Helper functions for new columns
-function shortenCourtName(name: string | null): string | null {
-  if (!name) return null
-  return name
-    .replace('지방법원', '지법')
-    .replace('고등법원', '고법')
-    .replace('대법원', '대법')
-    .replace('가정법원', '가법')
-    .replace('행정법원', '행법')
-}
-
 function CaseLevelBadge({ level }: { level: string }) {
   const colorMap: Record<string, string> = {
     '1심': 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',

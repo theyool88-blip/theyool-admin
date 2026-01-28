@@ -432,7 +432,7 @@ export default function InstagramManagement() {
                   </label>
                   <select
                     value={formData.media_type}
-                    onChange={(e) => setFormData({ ...formData, media_type: e.target.value as any })}
+                    onChange={(e) => setFormData({ ...formData, media_type: e.target.value as InstagramPost['media_type'] })}
                     className="form-input"
                   >
                     <option value="IMAGE">이미지</option>

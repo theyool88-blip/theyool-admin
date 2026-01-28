@@ -3,12 +3,28 @@
  * FAQ 목록 조회 및 생성
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withHomepage } from '@/lib/api/with-homepage';
 
+interface HomepageFaq {
+  id: string;
+  tenant_id: string;
+  notion_id?: string;
+  notion_last_edited_time?: string;
+  question: string;
+  answer: string;
+  slug?: string;
+  category?: string;
+  tags?: string[];
+  sort_order: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // 프론트엔드 필드 형식으로 변환
-function transformFaq(item: any) {
+function transformFaq(item: HomepageFaq) {
   return {
     ...item,
     published: item.status === 'published',

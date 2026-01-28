@@ -28,7 +28,6 @@ import {
   X,
   Moon,
   Sun,
-  Menu,
   LogOut,
   type LucideIcon,
 } from 'lucide-react'
@@ -100,73 +99,43 @@ interface AdminSidebarProps {
   onMobileClose?: () => void
 }
 
-export default function AdminSidebar({ isMobileOpen, onMobileClose }: AdminSidebarProps) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const supabase = createClient()
-  const { memberRole, hasHomepage, tenantLogo, tenantName, isLoading } = useTenant()
-  const { resolvedTheme, toggleTheme } = useTheme()
-  const [expandedItems, setExpandedItems] = useState<string[]>([])
+interface SidebarContentProps {
+  tenantLogo: string | null
+  tenantName: string | null
+  memberRole: string
+  hasHomepage: boolean
+  resolvedTheme: string | undefined
+  filteredMenuItems: MenuItem[]
+  filteredFinanceItems: MenuItem[]
+  canAccessSettings: boolean
+  expandedItems: string[]
+  handleMenuClick: () => void
+  toggleExpanded: (id: string) => void
+  toggleTheme: () => void
+  handleLogout: () => void
+  getRoleDisplayName: (role: string) => string
+  isActive: (href: string) => boolean
+  isGroupActive: (items: MenuItem[]) => boolean
+}
 
-  // 권한에 따라 메뉴 필터링
-  const filteredMenuItems = useMemo(() => {
-    return menuItems.filter(item => {
-      if (!item.module) return true
-      return canAccessModule(memberRole, item.module)
-    })
-  }, [memberRole])
-
-  const filteredFinanceItems = useMemo(() => {
-    return financeMenuItems.filter(item => {
-      if (!item.module) return true
-      return canAccessModule(memberRole, item.module)
-    })
-  }, [memberRole])
-
-  const canAccessSettings = useMemo(() => {
-    return canAccessModule(memberRole, 'settings')
-  }, [memberRole])
-
-  const toggleExpanded = (id: string) => {
-    setExpandedItems(prev =>
-      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
-    )
-  }
-
-  const isActive = (href: string) => {
-    // 대시보드 페이지는 정확히 일치할 때만 활성화
-    if (href === '/admin' || href === '/admin/homepage') {
-      return pathname === href
-    }
-    return pathname.startsWith(href)
-  }
-
-  const isGroupActive = (items: MenuItem[]) => {
-    return items.some(item => isActive(item.href))
-  }
-
-  const handleLogout = async () => {
-    invalidateTenantCache()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
-
-  const getRoleDisplayName = (role: string) => {
-    const names: Record<string, string> = {
-      owner: '소유자',
-      admin: '관리자',
-      lawyer: '변호사',
-      staff: '직원',
-    }
-    return names[role] || role
-  }
-
-  const handleMenuClick = () => {
-    if (onMobileClose) onMobileClose()
-  }
-
-  const SidebarContent = () => (
+const SidebarContent = ({
+  tenantLogo,
+  tenantName,
+  memberRole,
+  hasHomepage,
+  resolvedTheme,
+  filteredMenuItems,
+  filteredFinanceItems,
+  canAccessSettings,
+  expandedItems,
+  handleMenuClick,
+  toggleExpanded,
+  toggleTheme,
+  handleLogout,
+  getRoleDisplayName,
+  isActive,
+  isGroupActive,
+}: SidebarContentProps) => (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-4 py-5 border-b border-[var(--border-subtle)]">
@@ -403,6 +372,72 @@ export default function AdminSidebar({ isMobileOpen, onMobileClose }: AdminSideb
     </div>
   )
 
+export default function AdminSidebar({ isMobileOpen, onMobileClose }: AdminSidebarProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+  const { memberRole, hasHomepage, tenantLogo, tenantName, isLoading } = useTenant()
+  const { resolvedTheme, toggleTheme } = useTheme()
+  const [expandedItems, setExpandedItems] = useState<string[]>([])
+
+  // 권한에 따라 메뉴 필터링
+  const filteredMenuItems = useMemo(() => {
+    return menuItems.filter(item => {
+      if (!item.module) return true
+      return canAccessModule(memberRole, item.module)
+    })
+  }, [memberRole])
+
+  const filteredFinanceItems = useMemo(() => {
+    return financeMenuItems.filter(item => {
+      if (!item.module) return true
+      return canAccessModule(memberRole, item.module)
+    })
+  }, [memberRole])
+
+  const canAccessSettings = useMemo(() => {
+    return canAccessModule(memberRole, 'settings')
+  }, [memberRole])
+
+  const toggleExpanded = (id: string) => {
+    setExpandedItems(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    )
+  }
+
+  const isActive = (href: string) => {
+    // 대시보드 페이지는 정확히 일치할 때만 활성화
+    if (href === '/admin' || href === '/admin/homepage') {
+      return pathname === href
+    }
+    return pathname.startsWith(href)
+  }
+
+  const isGroupActive = (items: MenuItem[]) => {
+    return items.some(item => isActive(item.href))
+  }
+
+  const handleLogout = async () => {
+    invalidateTenantCache()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
+  const getRoleDisplayName = (role: string) => {
+    const names: Record<string, string> = {
+      owner: '소유자',
+      admin: '관리자',
+      lawyer: '변호사',
+      staff: '직원',
+    }
+    return names[role] || role
+  }
+
+  const handleMenuClick = () => {
+    if (onMobileClose) onMobileClose()
+  }
+
   if (isLoading) {
     return (
       <aside className="hidden md:block w-[240px] bg-[var(--bg-secondary)] border-r border-[var(--border-subtle)] h-screen">
@@ -430,7 +465,24 @@ export default function AdminSidebar({ isMobileOpen, onMobileClose }: AdminSideb
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex md:flex-col md:w-[240px] bg-[var(--bg-secondary)] border-r border-[var(--border-subtle)] h-screen sticky top-0">
-        <SidebarContent />
+        <SidebarContent
+          tenantLogo={tenantLogo}
+          tenantName={tenantName}
+          memberRole={memberRole}
+          hasHomepage={hasHomepage}
+          resolvedTheme={resolvedTheme}
+          filteredMenuItems={filteredMenuItems}
+          filteredFinanceItems={filteredFinanceItems}
+          canAccessSettings={canAccessSettings}
+          expandedItems={expandedItems}
+          handleMenuClick={handleMenuClick}
+          toggleExpanded={toggleExpanded}
+          toggleTheme={toggleTheme}
+          handleLogout={handleLogout}
+          getRoleDisplayName={getRoleDisplayName}
+          isActive={isActive}
+          isGroupActive={isGroupActive}
+        />
       </aside>
 
       {/* Mobile Sidebar */}
@@ -446,7 +498,24 @@ export default function AdminSidebar({ isMobileOpen, onMobileClose }: AdminSideb
         >
           <X className="w-5 h-5 text-[var(--text-secondary)]" />
         </button>
-        <SidebarContent />
+        <SidebarContent
+          tenantLogo={tenantLogo}
+          tenantName={tenantName}
+          memberRole={memberRole}
+          hasHomepage={hasHomepage}
+          resolvedTheme={resolvedTheme}
+          filteredMenuItems={filteredMenuItems}
+          filteredFinanceItems={filteredFinanceItems}
+          canAccessSettings={canAccessSettings}
+          expandedItems={expandedItems}
+          handleMenuClick={handleMenuClick}
+          toggleExpanded={toggleExpanded}
+          toggleTheme={toggleTheme}
+          handleLogout={handleLogout}
+          getRoleDisplayName={getRoleDisplayName}
+          isActive={isActive}
+          isGroupActive={isGroupActive}
+        />
       </aside>
     </>
   )

@@ -82,12 +82,12 @@ export async function GET() {
       }
 
       // 누락된 모듈에 대해 기본값 채우기
-      for (const module of ALL_MODULES) {
-        if (!rolePermMap[role][module]) {
+      for (const permissionModule of ALL_MODULES) {
+        if (!rolePermMap[role][permissionModule]) {
           const defaults = getDefaultRolePermissions(role);
-          const def = defaults.find((d) => d.module === module);
+          const def = defaults.find((d) => d.module === permissionModule);
           if (def) {
-            rolePermMap[role][module] = {
+            rolePermMap[role][permissionModule] = {
               canRead: def.canRead,
               canWrite: def.canWrite,
               canDelete: def.canDelete,

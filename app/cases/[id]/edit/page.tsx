@@ -83,14 +83,13 @@ export default async function CaseEditPage({ params }: { params: Promise<{ id: s
   // CaseEditForm에 전달할 profile 형식으로 변환
   const profile = {
     id: tenantContext.memberId,
-    tenant_id: tenantContext.tenantId,
+    name: tenantContext.memberDisplayName || tenantContext.tenantName,
     role: tenantContext.memberRole,
-    display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
   }
 
   return (
     <AdminLayoutClient>
-      <CaseEditForm profile={profile as any} caseData={caseData} allCases={allCases || []} relatedCases={relatedCases} />
+      <CaseEditForm profile={profile} caseData={caseData} allCases={allCases || []} relatedCases={relatedCases} />
     </AdminLayoutClient>
   )
 }

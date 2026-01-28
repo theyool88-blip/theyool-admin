@@ -3,6 +3,26 @@
  * 방문자 행동을 기반으로 전환 가능성 점수 계산
  */
 
+import { SupabaseClient } from '@supabase/supabase-js';
+
+interface VisitorSession {
+  id: string;
+  utm_source?: string;
+  utm_medium?: string;
+  referrer?: string;
+  device_type?: 'mobile' | 'tablet' | 'desktop';
+  started_at: string;
+}
+
+interface PageView {
+  id: string;
+  session_id: string;
+  page_path: string;
+  page_type?: string;
+  time_on_page?: number;
+  scroll_depth?: number;
+}
+
 export interface LeadScoreFactors {
   // 방문 관련
   visitCount: number;           // 방문 횟수
@@ -181,7 +201,7 @@ function generateRecommendations(
  * 방문자 세션에서 리드 스코어 팩터 추출
  */
 export async function extractLeadScoreFactors(
-  supabase: any,
+  supabase: SupabaseClient,
   tenantId: string,
   visitorId: string
 ): Promise<LeadScoreFactors> {
@@ -201,7 +221,7 @@ export async function extractLeadScoreFactors(
     .from('page_views')
     .select('*')
     .eq('tenant_id', tenantId)
-    .in('session_id', sessions?.map((s: any) => s.id) || []);
+    .in('session_id', sessions?.map((s: VisitorSession) => s.id) || []);
 
   const pageViewCount = pageViews?.length || 0;
 
@@ -211,7 +231,7 @@ export async function extractLeadScoreFactors(
   let timeCount = 0;
   let scrollCount = 0;
 
-  (pageViews || []).forEach((pv: any) => {
+  (pageViews || []).forEach((pv: PageView) => {
     if (pv.time_on_page) {
       totalTime += pv.time_on_page;
       timeCount++;
@@ -223,8 +243,8 @@ export async function extractLeadScoreFactors(
   });
 
   // 페이지 유형별 조회 여부
-  const pageTypes = new Set((pageViews || []).map((pv: any) => pv.page_type));
-  const pagePaths = (pageViews || []).map((pv: any) => pv.page_path);
+  const pageTypes = new Set((pageViews || []).map((pv: PageView) => pv.page_type));
+  const pagePaths = (pageViews || []).map((pv: PageView) => pv.page_path);
 
   return {
     visitCount,
@@ -233,11 +253,11 @@ export async function extractLeadScoreFactors(
     avgTimeOnPage: timeCount > 0 ? Math.round(totalTime / timeCount) : 0,
     avgScrollDepth: scrollCount > 0 ? Math.round(totalScroll / scrollCount) : 0,
 
-    viewedServicePages: pageTypes.has('service') || pagePaths.some((p: string) => p.includes('/service')),
-    viewedCaseStudies: pageTypes.has('case') || pagePaths.some((p: string) => p.includes('/case')),
-    viewedBlogPosts: (pageViews || []).filter((pv: any) => pv.page_type === 'blog').length,
-    viewedFAQ: pageTypes.has('faq') || pagePaths.some((p: string) => p.includes('/faq')),
-    viewedContactPage: pagePaths.some((p: string) => p.includes('/contact') || p.includes('/consultation')),
+    viewedServicePages: pageTypes.has('service') || pagePaths.some((p) => p?.includes('/service')),
+    viewedCaseStudies: pageTypes.has('case') || pagePaths.some((p) => p?.includes('/case')),
+    viewedBlogPosts: (pageViews || []).filter((pv: PageView) => pv.page_type === 'blog').length,
+    viewedFAQ: pageTypes.has('faq') || pagePaths.some((p) => p?.includes('/faq')),
+    viewedContactPage: pagePaths.some((p) => p?.includes('/contact') || p?.includes('/consultation')),
 
     utmSource: latestSession?.utm_source,
     utmMedium: latestSession?.utm_medium,

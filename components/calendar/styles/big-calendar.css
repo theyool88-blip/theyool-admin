@@ -275,6 +275,18 @@
   color: #A78BFA;
 }
 
+/* 기일 결과 (원고승, 원고패 등) - Teal */
+.event-label-result {
+  background: rgba(20, 184, 166, 0.15);
+  color: #0D9488;
+  font-weight: 600;
+}
+
+[data-theme="dark"] .event-label-result {
+  background: rgba(20, 184, 166, 0.25);
+  color: #5EEAD4;
+}
+
 /* 연기된 기일 - Light Gray */
 .event-label-postponed {
   background: rgba(100, 116, 139, 0.08);

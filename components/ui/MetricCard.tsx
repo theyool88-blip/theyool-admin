@@ -21,6 +21,28 @@ interface MetricCardProps {
   className?: string
 }
 
+const getTrendIcon = (direction: TrendDirection) => {
+  switch (direction) {
+    case 'up':
+      return TrendingUp
+    case 'down':
+      return TrendingDown
+    default:
+      return Minus
+  }
+}
+
+const getTrendClass = (direction: TrendDirection) => {
+  switch (direction) {
+    case 'up':
+      return 'positive'
+    case 'down':
+      return 'negative'
+    default:
+      return 'neutral'
+  }
+}
+
 export default function MetricCard({
   label,
   value,
@@ -31,30 +53,6 @@ export default function MetricCard({
   onClick,
   className = '',
 }: MetricCardProps) {
-  const getTrendIcon = (direction: TrendDirection) => {
-    switch (direction) {
-      case 'up':
-        return TrendingUp
-      case 'down':
-        return TrendingDown
-      default:
-        return Minus
-    }
-  }
-
-  const getTrendClass = (direction: TrendDirection) => {
-    switch (direction) {
-      case 'up':
-        return 'positive'
-      case 'down':
-        return 'negative'
-      default:
-        return 'neutral'
-    }
-  }
-
-  const TrendIcon = trend ? getTrendIcon(trend.direction) : null
-
   return (
     <div
       className={`metric-card ${onClick ? 'cursor-pointer' : ''} ${className}`}
@@ -78,7 +76,10 @@ export default function MetricCard({
 
       {trend && (
         <div className={`metric-card-trend ${getTrendClass(trend.direction)}`}>
-          {TrendIcon && <TrendIcon className="w-3 h-3" />}
+          {(() => {
+            const TrendIcon = getTrendIcon(trend.direction)
+            return <TrendIcon className="w-3 h-3" />
+          })()}
           <span>{typeof trend.value === 'number' ? `${trend.value}%` : trend.value}</span>
           {trend.label && <span className="ml-1 opacity-70">{trend.label}</span>}
         </div>

@@ -7,6 +7,18 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withSuperAdmin } from '@/lib/api/with-super-admin';
 
+interface TenantMember {
+  id: string;
+  role: string;
+  status: string;
+  created_at: string;
+  users: {
+    id: string;
+    full_name: string | null;
+    email: string;
+  }[] | null;
+}
+
 export const GET = withSuperAdmin(async (request, context) => {
   try {
     const supabase = createAdminClient();
@@ -82,7 +94,7 @@ export const GET = withSuperAdmin(async (request, context) => {
     ]);
 
     // 홈페이지 콘텐츠 통계 조회 (has_homepage인 경우에만)
-    let homepageStats = null;
+    let homepageStats: { blogs: number; faqs: number; cases: number; testimonials: number; instagram: number } | null = null;
     if (tenant.has_homepage) {
       const [
         { count: blogCount },
@@ -123,13 +135,16 @@ export const GET = withSuperAdmin(async (request, context) => {
     }
 
     // 멤버 데이터 포맷팅
-    const formattedMembers = (members || []).map((member: any) => ({
-      id: member.id,
-      name: member.users?.full_name || '알 수 없음',
-      email: member.users?.email || '',
-      role: member.role,
-      created_at: member.created_at,
-    }));
+    const formattedMembers = (members || []).map((member: TenantMember) => {
+      const user = member.users?.[0];
+      return {
+        id: member.id,
+        name: user?.full_name || '알 수 없음',
+        email: user?.email || '',
+        role: member.role,
+        created_at: member.created_at,
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -170,7 +185,7 @@ export const PATCH = withSuperAdmin(async (request, context) => {
 
     // 허용된 필드만 업데이트
     const allowedFields = ['name', 'email', 'phone', 'status', 'plan', 'has_homepage'];
-    const updateData: Record<string, any> = {};
+    const updateData: Record<string, string | boolean | Date> = {};
 
     for (const field of allowedFields) {
       if (body[field] !== undefined) {

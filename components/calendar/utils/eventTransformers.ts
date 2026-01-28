@@ -116,18 +116,6 @@ export function formatTimeString(date: Date): string {
   return `${hours}:${minutes}`
 }
 
-/**
- * Check if a hearing is postponed/cancelled
- * DB에 영문 enum 값으로 저장됨: adjourned, withdrawn
- */
-export function isPostponedHearing(result?: string): boolean {
-  if (!result) return false
-  // 영문 enum 값 (DB 저장값)
-  const englishKeywords = ['adjourned', 'withdrawn']
-  // 한글 키워드 (레거시 또는 수동 입력 대비)
-  const koreanKeywords = ['기일변경', '연기', '취하', '취소', '변경지정']
-  return englishKeywords.includes(result) || koreanKeywords.some(kw => result.includes(kw))
-}
 
 /**
  * Remove video device text from string
@@ -222,7 +210,7 @@ export function getScheduleTypeColor(
   eventSubtype?: string,
   status?: string
 ): string {
-  if (type === 'court_hearing' && status === 'adjourned') {
+  if (type === 'court_hearing' && status === 'POSTPONED') {
     return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-l-[var(--border-default)]'
   }
   if (type === 'court_hearing' && hearingType === 'HEARING_LAWYER_MEETING') {

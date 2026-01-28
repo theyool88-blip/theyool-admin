@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useLayoutEffect, useState, ReactNode } from 'react'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -46,27 +46,31 @@ export function ThemeProvider({
 
   // Initialize theme from storage on mount
   useEffect(() => {
-    const stored = getStoredTheme()
-    setThemeState(stored)
-    setMounted(true)
+    void (async () => {
+      const stored = getStoredTheme()
+      setThemeState(stored)
+      setMounted(true)
+    })()
   }, [])
 
   // Update resolved theme and apply to document
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!mounted) return
 
-    const resolved = theme === 'system' ? getSystemTheme() : theme
-    setResolvedTheme(resolved)
+    void (async () => {
+      const resolved = theme === 'system' ? getSystemTheme() : theme
+      setResolvedTheme(resolved)
 
-    // Apply theme to document
-    document.documentElement.setAttribute('data-theme', resolved)
+      // Apply theme to document
+      document.documentElement.setAttribute('data-theme', resolved)
 
-    // Also update the class for Tailwind dark mode if needed
-    if (resolved === 'dark') {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
+      // Also update the class for Tailwind dark mode if needed
+      if (resolved === 'dark') {
+        document.documentElement.classList.add('dark')
+      } else {
+        document.documentElement.classList.remove('dark')
+      }
+    })()
   }, [theme, mounted])
 
   // Listen for system theme changes

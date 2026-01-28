@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import CaseDocuments from '@/components/client/CaseDocuments';
+import { getCourtAbbrev } from '@/lib/scourt/court-codes';
 
 interface CaseDetail {
   id: string;
@@ -268,7 +269,7 @@ export default function CaseDetailPreview() {
                         <p className="font-semibold text-[var(--text-primary)]">{formatDate(hearing.hearing_date).weekday}요일 {hearing.hearing_time || ''}</p>
                         <span className="px-2 py-0.5 bg-[var(--sage-primary)]/20 text-[var(--sage-primary)] text-xs font-bold rounded-full">D-{getDDay(hearing.hearing_date)}</span>
                       </div>
-                      <p className="text-sm text-[var(--text-secondary)]">{hearing.court_name || '장소 미정'}</p>
+                      <p className="text-sm text-[var(--text-secondary)]">{getCourtAbbrev(hearing.court_name) || '장소 미정'}</p>
                       {hearing.hearing_type && (
                         <p className="text-xs text-[var(--sage-primary)] mt-1">{HEARING_TYPE_LABELS[hearing.hearing_type] || hearing.hearing_type}</p>
                       )}
@@ -294,7 +295,7 @@ export default function CaseDetailPreview() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-[var(--text-secondary)]">{formatDate(hearing.hearing_date).full}</p>
-                      <p className="text-sm text-[var(--text-tertiary)]">{hearing.court_name || '-'}</p>
+                      <p className="text-sm text-[var(--text-tertiary)]">{getCourtAbbrev(hearing.court_name) || '-'}</p>
                       <div className="flex items-center gap-2 mt-1">
                         {hearing.hearing_type && (
                           <span className="text-xs text-[var(--text-tertiary)]">{HEARING_TYPE_LABELS[hearing.hearing_type] || hearing.hearing_type}</span>
@@ -397,7 +398,7 @@ export default function CaseDetailPreview() {
                 </div>
                 <div>
                   <p className="text-xs text-[var(--text-muted)] mb-1">법원/장소</p>
-                  <p className="text-sm font-medium text-[var(--text-primary)]">{selectedHearing.court_name || '-'}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">{getCourtAbbrev(selectedHearing.court_name) || '-'}</p>
                 </div>
                 {selectedHearing.judge_name && (
                   <div>

@@ -76,20 +76,14 @@ const menuItems: MenuItem[] = [
   },
 ];
 
-export default function SuperAdminSidebar() {
-  const pathname = usePathname();
-  const [expandedItems, setExpandedItems] = useState<string[]>([
-    '/superadmin/subscriptions',
-    '/superadmin/monitoring',
-  ]);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+interface SidebarContentProps {
+  pathname: string;
+  expandedItems: string[];
+  toggleExpanded: (href: string) => void;
+  setMobileMenuOpen: (open: boolean) => void;
+}
 
-  const toggleExpanded = (href: string) => {
-    setExpandedItems((prev) =>
-      prev.includes(href) ? prev.filter((item) => item !== href) : [...prev, href]
-    );
-  };
-
+const SidebarContent = ({ pathname, expandedItems, toggleExpanded, setMobileMenuOpen }: SidebarContentProps) => {
   const isActive = (href: string, children?: { label: string; href: string }[]) => {
     if (children) {
       return children.some((child) => pathname === child.href);
@@ -99,7 +93,7 @@ export default function SuperAdminSidebar() {
 
   const isChildActive = (href: string) => pathname === href;
 
-  const SidebarContent = () => (
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-4 py-5 border-b border-[--sa-border-subtle]">
@@ -244,6 +238,21 @@ export default function SuperAdminSidebar() {
       </div>
     </div>
   );
+};
+
+export default function SuperAdminSidebar() {
+  const pathname = usePathname();
+  const [expandedItems, setExpandedItems] = useState<string[]>([
+    '/superadmin/subscriptions',
+    '/superadmin/monitoring',
+  ]);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const toggleExpanded = (href: string) => {
+    setExpandedItems((prev) =>
+      prev.includes(href) ? prev.filter((item) => item !== href) : [...prev, href]
+    );
+  };
 
   return (
     <>
@@ -269,7 +278,12 @@ export default function SuperAdminSidebar() {
 
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-[240px] bg-[--sa-bg-secondary] border-r border-[--sa-border-subtle] h-screen sticky top-0">
-        <SidebarContent />
+        <SidebarContent
+          pathname={pathname}
+          expandedItems={expandedItems}
+          toggleExpanded={toggleExpanded}
+          setMobileMenuOpen={setMobileMenuOpen}
+        />
       </aside>
 
       {/* Mobile Sidebar */}
@@ -278,7 +292,12 @@ export default function SuperAdminSidebar() {
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <SidebarContent />
+        <SidebarContent
+          pathname={pathname}
+          expandedItems={expandedItems}
+          toggleExpanded={toggleExpanded}
+          setMobileMenuOpen={setMobileMenuOpen}
+        />
       </aside>
     </>
   );

@@ -16,6 +16,7 @@ import {
 } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import { formatDaysUntil } from '@/types/court-hearing'
+import { shortenCourtLocation } from '@/components/calendar/utils/eventTransformers'
 import ScheduleListView from './ScheduleListView'
 import UnifiedScheduleModal, { type EditScheduleData } from './UnifiedScheduleModal'
 
@@ -391,47 +392,9 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
     return location.slice(0, 2)
   }
 
-  // 법원명을 축약형으로 변환 (장소 뒷부분은 유지)
-  // "수원가정법원 평택지원 제21호 법정" → "평택지원 제21호 법정"
-  // "수원고등법원 제804호 법정" → "수원고법 제804호 법정"
-  const shortenCourtLocation = (location?: string): string => {
-    if (!location) return ''
-
-    // 1. OO지원 패턴 (평택지원, 안산지원, 천안지원)
-    // "수원가정법원 평택지원 제21호 법정" → "평택지원 제21호 법정"
-    const jiwonMatch = location.match(/[가-힣]+법원\s+([가-힣]{2,4}지원)\s+(.+)/)
-    if (jiwonMatch) {
-      return `${jiwonMatch[1]} ${jiwonMatch[2]}`
-    }
-
-    // 2. 고등법원
-    // "수원고등법원 제804호 법정" → "수원고법 제804호 법정"
-    const goMatch = location.match(/([가-힣]{2,3})고등법원\s+(.+)/)
-    if (goMatch) {
-      return `${goMatch[1]}고법 ${goMatch[2]}`
-    }
-
-    // 3. 가정법원 본원
-    // "수원가정법원 본관 401호 법정" → "수원가정 본관 401호 법정"
-    const gaMatch = location.match(/([가-힣]{2,3})가정법원\s+(.+)/)
-    if (gaMatch) {
-      return `${gaMatch[1]}가정 ${gaMatch[2]}`
-    }
-
-    // 4. 지방법원 본원
-    // "수원지방법원 제101호 법정" → "수원지법 제101호 법정"
-    const jiMatch = location.match(/([가-힣]{2,3})지방법원\s+(.+)/)
-    if (jiMatch) {
-      return `${jiMatch[1]}지법 ${jiMatch[2]}`
-    }
-
-    // 못 찾으면 원본 반환
-    return location
-  }
-
   const getScheduleTypeColor = (type: ScheduleType, hearingType?: string, eventSubtype?: string, status?: string) => {
-    // 연기된 기일: 흐린 회색 (status === 'adjourned')
-    if (type === 'court_hearing' && status === 'adjourned') {
+    // 연기된 기일: 흐린 회색 (status === 'POSTPONED')
+    if (type === 'court_hearing' && status === 'POSTPONED') {
       return 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] border-l-[var(--border-default)]'
     }
 
@@ -1142,7 +1105,7 @@ export default function MonthlyCalendar({ profile: _profile }: { profile: Profil
                   >
                     <div className="flex flex-wrap items-center gap-1.5 mb-1.5">
                       <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-white/90 shadow-sm">
-                        {schedule.type === 'court_hearing' && schedule.status === 'adjourned'
+                        {schedule.type === 'court_hearing' && schedule.status === 'POSTPONED'
                           ? '기일연기'
                           : getScheduleTypeLabel(schedule.type, schedule.location)}
                       </span>

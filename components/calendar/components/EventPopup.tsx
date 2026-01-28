@@ -11,17 +11,6 @@ import {
   shortenCourtLocation,
 } from '../utils/eventTransformers'
 
-// 기일결과 한글 변환
-const RESULT_LABELS: Record<string, string> = {
-  continued: '속행',
-  settled: '종결',
-  judgment: '판결선고',
-  dismissed: '각하',
-  withdrawn: '취하',
-  adjourned: '연기',
-  other: '기타',
-}
-
 interface EventPopupProps {
   event: BigCalendarEvent | null
   position: { x: number; y: number } | null
@@ -76,12 +65,14 @@ function EventPopupComponent({
       top = viewportHeight - POPUP_HEIGHT - margin
     }
 
-    setPopupStyle({
-      position: 'fixed',
-      top,
-      left,
-      zIndex: 1000,
-    })
+    void (async () => {
+      setPopupStyle({
+        position: 'fixed',
+        top,
+        left,
+        zIndex: 1000,
+      })
+    })()
   }, [position])
 
   // ESC 키로 닫기
@@ -140,7 +131,7 @@ function EventPopupComponent({
     daysUntil,
   } = event
 
-  const isPostponed = status === 'adjourned'
+  const isPostponed = status === 'POSTPONED'
   const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
   const videoBadge = getVideoBadgeInfo(videoParticipantSide)

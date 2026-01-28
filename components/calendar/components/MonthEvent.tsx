@@ -9,17 +9,6 @@ import {
   extractClientName,
 } from '../utils/eventTransformers'
 
-// 기일결과 한글 변환
-const RESULT_LABELS: Record<string, string> = {
-  continued: '속행',
-  settled: '종결',
-  judgment: '판결선고',
-  dismissed: '각하',
-  withdrawn: '취하',
-  adjourned: '연기',
-  other: '기타',
-}
-
 interface MonthEventProps {
   event: BigCalendarEvent
   isSelected?: boolean
@@ -93,7 +82,7 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
     ourClientName,
   } = event
 
-  const isPostponed = status === 'adjourned'
+  const isPostponed = status === 'POSTPONED'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
   const videoBadge = getVideoBadgeInfo(videoParticipantSide)
 

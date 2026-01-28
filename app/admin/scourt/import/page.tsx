@@ -139,8 +139,10 @@ export default function ScourtImportPage() {
   // Start polling when batchId is set
   useEffect(() => {
     if (batchId && importing) {
-      // Initial fetch
-      pollBatchStatus(batchId)
+      // Initial fetch wrapped in async IIFE to avoid synchronous setState
+      void (async () => {
+        await pollBatchStatus(batchId)
+      })()
 
       // Poll every 3 seconds
       pollingRef.current = setInterval(() => {

@@ -3,12 +3,40 @@
  * 성공사례 목록 조회 및 생성
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withHomepage } from '@/lib/api/with-homepage';
 
+interface HomepageCase {
+  id: string;
+  tenant_id: string;
+  notion_id: string | null;
+  notion_last_edited_time: string | null;
+  title: string;
+  slug: string;
+  content: string | null;
+  summary: string | null;
+  cover_image: string | null;
+  category: string | null;
+  case_type: string | null;
+  tags: string[];
+  result: string | null;
+  result_amount: string | null;
+  result_details: string | null;
+  lawyer_id: string | null;
+  lawyer_name: string | null;
+  meta_title: string | null;
+  meta_description: string | null;
+  icon: string | null;
+  view_count: number;
+  status: 'draft' | 'published' | 'archived';
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // 프론트엔드 필드 형식으로 변환
-function transformCase(item: any) {
+function transformCase(item: HomepageCase) {
   return {
     ...item,
     badge: item.category,

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     tenantId: tenant.tenantId,
     tenantName: tenant.tenantName,
     isSuperAdmin: tenant.isSuperAdmin,
-    isImpersonating: (tenant as any).isImpersonating
+    isImpersonating: tenant.isImpersonating
   })
 
   try {

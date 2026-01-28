@@ -17,6 +17,14 @@ import {
   X,
 } from 'lucide-react';
 
+type PlanType = 'basic' | 'professional' | 'enterprise';
+
+// Generate years array outside component to avoid "Cannot create components during render"
+const generateYears = () => {
+  const currentYear = new Date().getFullYear();
+  return Array.from({ length: 5 }, (_, i) => currentYear - 1 + i);
+};
+
 interface SystemSettings {
   defaultPlan: 'basic' | 'professional' | 'enterprise';
   trialDays: number;
@@ -283,7 +291,7 @@ export default function SettingsPage() {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    } catch (err) {
+    } catch (_err) {
       setError('설정 저장에 실패했습니다.');
     } finally {
       setSaving(false);
@@ -298,7 +306,7 @@ export default function SettingsPage() {
     { id: 'security' as SettingSection, label: '보안 설정', icon: Shield },
   ];
 
-  const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 1 + i);
+  const years = generateYears();
 
   return (
     <div className="p-6 lg:p-8 max-w-[1200px] mx-auto">
@@ -372,7 +380,7 @@ export default function SettingsPage() {
                     <select
                       value={settings.defaultPlan}
                       onChange={(e) =>
-                        setSettings({ ...settings, defaultPlan: e.target.value as any })
+                        setSettings({ ...settings, defaultPlan: e.target.value as PlanType })
                       }
                       className="sa-input w-full"
                     >

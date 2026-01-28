@@ -3,12 +3,32 @@
  * 블로그 상세 조회, 수정, 삭제
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withHomepage } from '@/lib/api/with-homepage';
 
+interface BlogPostData {
+  id: string;
+  tenant_id: string;
+  title: string;
+  slug: string;
+  content: string;
+  excerpt?: string;
+  category?: string;
+  tags?: string[];
+  cover_image?: string;
+  author_name?: string;
+  status: string;
+  published_at?: string;
+  view_count?: number;
+  meta_title?: string;
+  meta_description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // 프론트엔드 필드 형식으로 변환
-function transformBlogPost(item: any) {
+function transformBlogPost(item: BlogPostData) {
   return {
     ...item,
     featured_image: item.cover_image,

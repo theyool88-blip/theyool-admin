@@ -3,12 +3,30 @@
  * 후기 상세 조회, 수정, 삭제
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withHomepage } from '@/lib/api/with-homepage';
 
+interface HomepageTestimonial {
+  id: string;
+  tenant_id: string;
+  client_display_name: string;
+  case_type: string;
+  testimonial_text: string;
+  rating: number;
+  verified: boolean;
+  consent_given: boolean;
+  status: 'pending' | 'approved' | 'rejected' | 'published';
+  published_at: string | null;
+  featured: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  homepage_testimonial_photos?: unknown[];
+}
+
 // 프론트엔드 필드 형식으로 변환
-function transformTestimonial(item: any) {
+function transformTestimonial(item: HomepageTestimonial) {
   const bgColors = [
     'from-slate-500 to-slate-700',
     'from-stone-400 to-stone-600',

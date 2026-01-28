@@ -86,7 +86,9 @@ export function useTenant(): TenantInfo {
   useEffect(() => {
     // 이미 캐시된 데이터가 있으면 fetch 하지 않음
     if (cachedTenantInfo) {
-      setTenantInfo(cachedTenantInfo)
+      void (async () => {
+        setTenantInfo(cachedTenantInfo)
+      })()
       return
     }
 

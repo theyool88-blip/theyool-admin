@@ -3,12 +3,30 @@
  * 후기 목록 조회 및 생성
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withHomepage } from '@/lib/api/with-homepage';
 
+interface HomepageTestimonial {
+  id: string;
+  tenant_id: string;
+  client_display_name: string;
+  case_type: string;
+  testimonial_text: string;
+  rating: number;
+  verified: boolean;
+  consent_given: boolean;
+  status: 'pending' | 'approved' | 'rejected' | 'published';
+  published_at: string | null;
+  featured: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  homepage_testimonial_photos?: unknown[];
+}
+
 // 프론트엔드 필드 형식으로 변환
-function transformTestimonial(item: any) {
+function transformTestimonial(item: HomepageTestimonial) {
   const bgColors = [
     'from-slate-500 to-slate-700',
     'from-stone-400 to-stone-600',
@@ -132,17 +150,6 @@ export const POST = withHomepage(async (request, { tenant }) => {
       .order('sort_order', { ascending: false })
       .limit(1)
       .single();
-
-    // 아바타 컬러 생성
-    const bgColors = [
-      'from-blue-400 to-blue-600',
-      'from-green-400 to-green-600',
-      'from-purple-400 to-purple-600',
-      'from-pink-400 to-pink-600',
-      'from-yellow-400 to-yellow-600',
-      'from-indigo-400 to-indigo-600',
-    ];
-    const avatarBgColor = body.avatar_bg_color || bgColors[Math.floor(Math.random() * bgColors.length)];
 
     const { data, error } = await supabase
       .from('homepage_testimonials')

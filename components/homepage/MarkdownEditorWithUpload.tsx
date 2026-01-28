@@ -6,10 +6,10 @@ import { Loader2, CheckCircle2 } from 'lucide-react';
 import '@uiw/react-md-editor/markdown-editor.css';
 import '@uiw/react-markdown-preview/markdown.css';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const MDEditor = dynamic(
   () => import('@uiw/react-md-editor').then((mod) => mod.default),
   { ssr: false }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ) as any;
 
 interface UploadResult {
@@ -50,7 +50,7 @@ export default function MarkdownEditorWithUpload({
     }, 3000);
   };
 
-  const uploadImage = async (file: File): Promise<UploadResult | null> => {
+  const uploadImage = useCallback(async (file: File): Promise<UploadResult | null> => {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folder', folder);
@@ -78,15 +78,15 @@ export default function MarkdownEditorWithUpload({
       alert('이미지 업로드 중 오류가 발생했습니다.');
       return null;
     }
-  };
+  }, [folder]);
 
-  const insertImage = (url: string, altText: string = '이미지') => {
+  const insertImage = useCallback((url: string, altText: string = '이미지') => {
     const imageMarkdown = `![${altText}](${url})`;
     const newValue = value ? `${value}\n\n${imageMarkdown}` : imageMarkdown;
     onChange(newValue);
-  };
+  }, [value, onChange]);
 
-  const handleFiles = async (files: FileList) => {
+  const handleFiles = useCallback(async (files: FileList) => {
     const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'));
 
     if (imageFiles.length === 0) {
@@ -112,7 +112,7 @@ export default function MarkdownEditorWithUpload({
     }
 
     setUploading(false);
-  };
+  }, [uploadImage, insertImage]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -135,7 +135,7 @@ export default function MarkdownEditorWithUpload({
     if (files.length > 0) {
       handleFiles(files);
     }
-  }, [value, folder]);
+  }, [handleFiles]);
 
   const handlePaste = useCallback((e: React.ClipboardEvent) => {
     const items = e.clipboardData.items;
@@ -155,7 +155,7 @@ export default function MarkdownEditorWithUpload({
             if (result) {
               insertImage(result.url, 'pasted-image');
 
-              // 최적화 정보 메시지 표시
+              // 최适化 정보 메시지 표시
               if (result.compressionRatio !== '0%') {
                 showUploadMessage(`이미지 최적화 완료: ${result.width}×${result.height}, ${result.compressionRatio} 압축`);
               } else {
@@ -167,7 +167,7 @@ export default function MarkdownEditorWithUpload({
         })();
       }
     }
-  }, [value, folder]);
+  }, [uploadImage, insertImage]);
 
   return (
     <div

@@ -33,7 +33,7 @@ function WeekDayEventComponent({ event, isSelected }: WeekDayEventProps) {
     daysUntil,
   } = event
 
-  const isPostponed = status === 'adjourned'
+  const isPostponed = status === 'POSTPONED'
   const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
   const videoBadge = getVideoBadgeInfo(videoParticipantSide)

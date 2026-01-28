@@ -121,14 +121,14 @@ export async function getEffectivePermissions(
   // 최종 권한 계산
   const effectivePermissions: ModulePermission[] = [];
 
-  for (const module of ALL_MODULES) {
-    const rolePerm = rolePermMap.get(module);
-    const memberOverride = memberOverrideMap.get(module);
+  for (const permissionModule of ALL_MODULES) {
+    const rolePerm = rolePermMap.get(permissionModule);
+    const memberOverride = memberOverrideMap.get(permissionModule);
 
     if (!rolePerm) {
       // 역할 권한이 없으면 모든 권한 없음
       effectivePermissions.push({
-        module,
+        module: permissionModule,
         canRead: false,
         canWrite: false,
         canDelete: false,
@@ -139,7 +139,7 @@ export async function getEffectivePermissions(
 
     // 오버라이드가 있으면 적용 (null이면 역할 기본값 사용)
     effectivePermissions.push({
-      module,
+      module: permissionModule,
       canRead: memberOverride?.canRead ?? rolePerm.canRead,
       canWrite: memberOverride?.canWrite ?? rolePerm.canWrite,
       canDelete: memberOverride?.canDelete ?? rolePerm.canDelete,

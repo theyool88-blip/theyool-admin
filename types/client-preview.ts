@@ -35,8 +35,8 @@ export interface CaseInfo {
 export interface UpcomingHearing {
   id: string;
   hearing_date: string;
-  hearing_time: string;
-  court_name: string;
+  hearing_time: string | null;
+  court_name: string | null;
   case_number: string;
   case_name: string;
 }

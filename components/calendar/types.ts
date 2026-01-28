@@ -47,7 +47,6 @@ export interface ApiEvent {
   case_id?: string | null
   description?: string | null
   status?: string | null
-  scourt_result_raw?: string | null
   attending_lawyer_id?: string | null
   attending_lawyer_name?: string | null
   video_participant_side?: string | null
@@ -75,7 +74,6 @@ export interface BigCalendarEvent {
   caseNumber?: string
   caseName?: string
   status?: string
-  scourtResultRaw?: string
   attendingLawyerId?: string
   attendingLawyerName?: string
   videoParticipantSide?: string
@@ -126,7 +124,6 @@ export interface UnifiedSchedule {
   case_id?: string
   notes?: string
   status?: string
-  scourtResultRaw?: string
   daysUntil?: number
   hearing_type?: string
   event_subtype?: string

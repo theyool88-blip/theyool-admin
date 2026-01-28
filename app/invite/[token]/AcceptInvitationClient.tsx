@@ -61,10 +61,6 @@ export default function AcceptInvitationClient({ token }: AcceptInvitationClient
   const [error, setError] = useState('');
   const [displayName, setDisplayName] = useState('');
 
-  useEffect(() => {
-    fetchInvitationInfo();
-  }, [token]);
-
   const fetchInvitationInfo = async () => {
     setState('loading');
     setError('');
@@ -106,6 +102,11 @@ export default function AcceptInvitationClient({ token }: AcceptInvitationClient
       setError('서버 오류가 발생했습니다.');
     }
   };
+
+  useEffect(() => {
+    fetchInvitationInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const handleAccept = async () => {
     setState('accepting');

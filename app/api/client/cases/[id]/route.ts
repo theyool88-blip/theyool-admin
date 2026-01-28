@@ -83,8 +83,7 @@ export async function GET(
         result,
         judge_name,
         report,
-        scourt_type_raw,
-        scourt_result_raw
+        scourt_type_raw
       `)
       .eq('case_id', caseId)
       .order('hearing_date', { ascending: false });

@@ -24,7 +24,7 @@ interface Hearing {
   id: string;
   hearing_date: string;
   hearing_time: string;
-  court_name: string;
+  court_name: string | null;
   hearing_type: string;
   hearing_result: string;
   judge_name: string;

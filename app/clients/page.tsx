@@ -51,15 +51,26 @@ export default async function ClientsPage() {
     created_at: string
   }
 
+  type CaseClientRow = {
+    client_id: string
+    retainer_fee: number | null
+    legal_cases: {
+      id: string
+      case_name: string
+      created_at: string
+    }[]
+  }
+
   // 의뢰인별로 사건 데이터 그룹핑
   const casesByClient = new Map<string, ClientCaseSummary[]>()
-  caseClientsData?.forEach((cc: any) => {
+  caseClientsData?.forEach((cc: CaseClientRow) => {
     const clientId = cc.client_id
-    const caseInfo = cc.legal_cases
-    if (clientId && caseInfo) {
+    const caseInfoArray = cc.legal_cases
+    if (clientId && caseInfoArray && caseInfoArray.length > 0) {
       if (!casesByClient.has(clientId)) {
         casesByClient.set(clientId, [])
       }
+      const caseInfo = caseInfoArray[0]
       casesByClient.get(clientId)?.push({
         id: caseInfo.id,
         case_name: caseInfo.case_name,
@@ -108,14 +119,14 @@ export default async function ClientsPage() {
   // ClientsList에 전달할 profile 형식으로 변환
   const profile = {
     id: tenantContext.memberId,
-    tenant_id: tenantContext.tenantId,
+    name: tenantContext.memberDisplayName || tenantContext.tenantName || '',
+    email: '', // Not available in tenantContext
     role: tenantContext.memberRole,
-    display_name: tenantContext.memberDisplayName || tenantContext.tenantName,
   }
 
   return (
     <AdminLayoutClient>
-      <ClientsList profile={profile as any} initialClients={clientsWithCalculations} />
+      <ClientsList profile={profile} initialClients={clientsWithCalculations} />
     </AdminLayoutClient>
   )
 }

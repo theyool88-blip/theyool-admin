@@ -946,6 +946,10 @@ CREATE TABLE IF NOT EXISTS legal_cases (
   -- 담당자
   assigned_to UUID REFERENCES tenant_members(id) ON DELETE SET NULL,
 
+  -- 주 의뢰인 정보 (denormalized for performance)
+  primary_client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
+  primary_client_name TEXT,
+
   -- 사건 상태
   status VARCHAR(20) DEFAULT 'active',            -- active, closed, suspended, dismissed
   case_level VARCHAR(10) DEFAULT '1심',           -- 1심, 2심(항소심), 3심(상고심)
@@ -1006,7 +1010,44 @@ COMMENT ON COLUMN legal_cases.main_case_id IS '주사건 ID (현재 최상위 �
 COMMENT ON COLUMN legal_cases.receivable_grade IS '미수금 관리 등급: normal, watch, collection';
 
 -- ============================================================================
--- 2. case_parties 테이블 (사건 당사자)
+-- 2. case_clients 테이블 (사건-의뢰인 M:N 관계)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS case_clients (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+  case_id UUID NOT NULL REFERENCES legal_cases(id) ON DELETE CASCADE,
+  client_id UUID NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+
+  -- 당사자 연결 (명시적)
+  linked_party_id UUID,  -- FK는 case_parties 테이블 생성 후 추가됨
+
+  -- 의뢰인 정보
+  is_primary_client BOOLEAN DEFAULT FALSE,
+  retainer_fee BIGINT,
+  success_fee_terms TEXT,
+
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+
+  UNIQUE(case_id, client_id)
+);
+
+-- 인덱스
+CREATE INDEX IF NOT EXISTS idx_case_clients_case ON case_clients(case_id);
+CREATE INDEX IF NOT EXISTS idx_case_clients_client ON case_clients(client_id);
+CREATE INDEX IF NOT EXISTS idx_case_clients_tenant ON case_clients(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_case_clients_linked_party ON case_clients(linked_party_id);
+
+-- 코멘트
+COMMENT ON TABLE case_clients IS '사건-의뢰인 M:N 관계 테이블 (당사자와 분리)';
+COMMENT ON COLUMN case_clients.linked_party_id IS 'case_parties 테이블의 당사자와 연결 (옵션)';
+COMMENT ON COLUMN case_clients.is_primary_client IS '주 의뢰인 여부';
+COMMENT ON COLUMN case_clients.retainer_fee IS '수임료 (원)';
+COMMENT ON COLUMN case_clients.success_fee_terms IS '성공보수 조건';
+
+-- ============================================================================
+-- 3. case_parties 테이블 (사건 당사자)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS case_parties (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1020,12 +1061,16 @@ CREATE TABLE IF NOT EXISTS case_parties (
   party_order INTEGER DEFAULT 1,                  -- 표시 순서
 
   -- 의뢰인 연결
-  client_id UUID REFERENCES clients(id) ON DELETE SET NULL,
   is_our_client BOOLEAN DEFAULT false,
 
-  -- 수임료 배분 (금액 기준)
-  fee_allocation_amount BIGINT,                   -- 배분 금액 (원)
-  fee_allocation_manual BOOLEAN DEFAULT false,    -- 수동 배분 여부
+  -- 수동 수정 플래그 및 SCOURT 원본 데이터
+  manual_override BOOLEAN DEFAULT FALSE,
+  scourt_label_raw TEXT,
+  scourt_name_raw TEXT,
+  is_primary BOOLEAN DEFAULT FALSE,
+
+  -- 대리인 정보 (JSONB)
+  representatives JSONB DEFAULT '[]'::JSONB,
 
   -- 판결 정보 (SCOURT 연동)
   adjdoc_rch_ymd VARCHAR(8),                      -- 판결도달일
@@ -1045,17 +1090,29 @@ CREATE TABLE IF NOT EXISTS case_parties (
 -- 인덱스
 CREATE INDEX IF NOT EXISTS idx_case_parties_tenant_id ON case_parties(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_case_parties_case_id ON case_parties(case_id);
-CREATE INDEX IF NOT EXISTS idx_case_parties_client_id ON case_parties(client_id);
 CREATE INDEX IF NOT EXISTS idx_case_parties_party_type ON case_parties(party_type);
 CREATE INDEX IF NOT EXISTS idx_case_parties_is_our_client ON case_parties(is_our_client);
+
+-- scourt 연동용 유니크 인덱스 (NULL 제외)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_case_parties_case_scourt_index
+  ON case_parties (case_id, scourt_party_index)
+  WHERE scourt_party_index IS NOT NULL;
 
 -- 코멘트
 COMMENT ON TABLE case_parties IS '사건별 당사자 정보 (원고/피고 등)';
 COMMENT ON COLUMN case_parties.party_type IS '당사자 유형: plaintiff, defendant, creditor, debtor, applicant, respondent';
-COMMENT ON COLUMN case_parties.fee_allocation_amount IS '당사자별 수임료 배분 금액';
+COMMENT ON COLUMN case_parties.manual_override IS '사용자가 수동으로 수정한 경우 TRUE (SCOURT 데이터로 덮어쓰지 않음)';
+COMMENT ON COLUMN case_parties.representatives IS '대리인 목록 (JSONB 배열): [{"name": "변호사명", "type": "attorney", "office": "법무법인명"}]';
+
+-- FK 추가 (case_clients.linked_party_id → case_parties)
+ALTER TABLE case_clients
+  DROP CONSTRAINT IF EXISTS fk_case_clients_linked_party;
+ALTER TABLE case_clients
+  ADD CONSTRAINT fk_case_clients_linked_party
+  FOREIGN KEY (linked_party_id) REFERENCES case_parties(id) ON DELETE SET NULL;
 
 -- ============================================================================
--- 3. case_representatives 테이블 (사건 대리인)
+-- 4. case_representatives 테이블 (사건 대리인)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS case_representatives (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1087,7 +1144,7 @@ CREATE INDEX IF NOT EXISTS idx_case_representatives_is_our_firm ON case_represen
 COMMENT ON TABLE case_representatives IS '사건별 대리인 정보 (소송대리인 등)';
 
 -- ============================================================================
--- 4. case_relations 테이블 (연관 사건)
+-- 5. case_relations 테이블 (연관 사건)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS case_relations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1117,7 +1174,7 @@ COMMENT ON TABLE case_relations IS '연관 사건 연결 (심급, 반소 등)';
 COMMENT ON COLUMN case_relations.relation_type IS '연관 유형: 항소, 상고, 반소, 관련사건 등';
 
 -- ============================================================================
--- 5. case_contracts 테이블 (계약서 파일)
+-- 6. case_contracts 테이블 (계약서 파일)
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS case_contracts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1144,11 +1201,17 @@ COMMENT ON TABLE case_contracts IS '계약서 파일 저장';
 COMMENT ON COLUMN case_contracts.file_path IS 'Supabase Storage 경로: {tenant_id}/{case_id}/{filename}';
 
 -- ============================================================================
--- 6. 트리거: updated_at 자동 업데이트
+-- 7. 트리거: updated_at 자동 업데이트
 -- ============================================================================
 DROP TRIGGER IF EXISTS update_legal_cases_updated_at ON legal_cases;
 CREATE TRIGGER update_legal_cases_updated_at
   BEFORE UPDATE ON legal_cases
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS update_case_clients_updated_at ON case_clients;
+CREATE TRIGGER update_case_clients_updated_at
+  BEFORE UPDATE ON case_clients
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
@@ -1165,11 +1228,17 @@ CREATE TRIGGER update_case_contracts_updated_at
   EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================================================
--- 7. 트리거: tenant_id 자동 설정
+-- 8. 트리거: tenant_id 자동 설정
 -- ============================================================================
 DROP TRIGGER IF EXISTS set_legal_cases_tenant_id ON legal_cases;
 CREATE TRIGGER set_legal_cases_tenant_id
   BEFORE INSERT ON legal_cases
+  FOR EACH ROW
+  EXECUTE FUNCTION set_tenant_id_on_insert();
+
+DROP TRIGGER IF EXISTS set_case_clients_tenant_id ON case_clients;
+CREATE TRIGGER set_case_clients_tenant_id
+  BEFORE INSERT ON case_clients
   FOR EACH ROW
   EXECUTE FUNCTION set_tenant_id_on_insert();
 
@@ -1198,9 +1267,10 @@ CREATE TRIGGER set_case_contracts_tenant_id
   EXECUTE FUNCTION set_tenant_id_on_insert();
 
 -- ============================================================================
--- 8. RLS 활성화 및 정책
+-- 9. RLS 활성화 및 정책
 -- ============================================================================
 ALTER TABLE legal_cases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE case_clients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_parties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_representatives ENABLE ROW LEVEL SECURITY;
 ALTER TABLE case_relations ENABLE ROW LEVEL SECURITY;
@@ -1208,6 +1278,12 @@ ALTER TABLE case_contracts ENABLE ROW LEVEL SECURITY;
 
 -- legal_cases: 테넌트 격리
 CREATE POLICY "tenant_isolation_legal_cases" ON legal_cases
+  FOR ALL TO authenticated
+  USING (is_super_admin() OR tenant_id = get_current_tenant_id())
+  WITH CHECK (is_super_admin() OR tenant_id = get_current_tenant_id());
+
+-- case_clients: 테넌트 격리
+CREATE POLICY "tenant_isolation_case_clients" ON case_clients
   FOR ALL TO authenticated
   USING (is_super_admin() OR tenant_id = get_current_tenant_id())
   WITH CHECK (is_super_admin() OR tenant_id = get_current_tenant_id());
@@ -3299,11 +3375,11 @@ SELECT
   lc.court_case_number,
   lc.status as case_status,
   lc.receivable_grade,
-  -- 수임료 합계 (case_parties에서 집계)
+  -- 수임료 합계 (case_clients에서 집계)
   COALESCE((
-    SELECT SUM(cp.fee_allocation_amount)
-    FROM case_parties cp
-    WHERE cp.case_id = lc.id AND cp.is_our_client = true
+    SELECT SUM(cc.retainer_fee)
+    FROM case_clients cc
+    WHERE cc.case_id = lc.id
   ), 0) as total_fee,
   -- 입금 합계
   COALESCE((
@@ -3313,9 +3389,9 @@ SELECT
   ), 0) as total_paid,
   -- 미수금 (수임료 - 입금)
   COALESCE((
-    SELECT SUM(cp.fee_allocation_amount)
-    FROM case_parties cp
-    WHERE cp.case_id = lc.id AND cp.is_our_client = true
+    SELECT SUM(cc.retainer_fee)
+    FROM case_clients cc
+    WHERE cc.case_id = lc.id
   ), 0) - COALESCE((
     SELECT SUM(p.amount)
     FROM payments p
@@ -3323,16 +3399,17 @@ SELECT
   ), 0) as receivable_amount,
   -- 의뢰인 정보
   (
-    SELECT cp.party_name
-    FROM case_parties cp
-    WHERE cp.case_id = lc.id AND cp.is_our_client = true
+    SELECT c.name
+    FROM case_clients cc
+    JOIN clients c ON cc.client_id = c.id
+    WHERE cc.case_id = lc.id AND cc.is_primary_client = true
     LIMIT 1
   ) as client_name,
   (
     SELECT c.phone
-    FROM case_parties cp
-    JOIN clients c ON cp.client_id = c.id
-    WHERE cp.case_id = lc.id AND cp.is_our_client = true
+    FROM case_clients cc
+    JOIN clients c ON cc.client_id = c.id
+    WHERE cc.case_id = lc.id AND cc.is_primary_client = true
     LIMIT 1
   ) as client_phone
 FROM legal_cases lc

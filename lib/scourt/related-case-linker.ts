@@ -195,7 +195,7 @@ export async function linkRelatedCases(
     supabase,
     legalCaseId,
     tenantId,
-    caseNumber,
+    caseNumber: _caseNumber,
     caseType,
     relatedCases,
     lowerCourt,

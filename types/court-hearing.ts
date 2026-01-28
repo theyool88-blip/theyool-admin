@@ -15,6 +15,9 @@ export const HEARING_TYPES = {
   HEARING_PARENTING: 'HEARING_PARENTING',
   HEARING_JUDGMENT: 'HEARING_JUDGMENT',
   HEARING_LAWYER_MEETING: 'HEARING_LAWYER_MEETING',
+  HEARING_SENTENCE: 'HEARING_SENTENCE',
+  HEARING_TRIAL: 'HEARING_TRIAL',
+  HEARING_EXAMINATION: 'HEARING_EXAMINATION',
 } as const;
 
 export type HearingType = keyof typeof HEARING_TYPES;
@@ -82,6 +85,9 @@ export const HEARING_TYPE_LABELS: Record<HearingType, string> = {
   HEARING_PARENTING: '상담·교육·프로그램 기일',
   HEARING_JUDGMENT: '선고기일',
   HEARING_LAWYER_MEETING: '변호사미팅',
+  HEARING_SENTENCE: '선고기일',
+  HEARING_TRIAL: '공판기일',
+  HEARING_EXAMINATION: '심문기일',
 };
 
 export const DEADLINE_TYPE_LABELS: Record<DeadlineType, string> = {
@@ -116,7 +122,7 @@ export const HEARING_RESULT_LABELS: Record<HearingResult, string> = {
   judgment: '판결선고',
   dismissed: '각하/기각',
   withdrawn: '취하',
-  adjourned: '휴정/연기',
+  adjourned: '휴정',
   other: '기타',
 };
 
@@ -195,6 +201,22 @@ export const HEARING_DETAIL_OPTIONS: Record<HearingType, string[]> = {
     '의뢰인 미팅',
     '사건 협의',
     '전략 회의',
+  ],
+  HEARING_SENTENCE: [
+    '선고',
+    '선고기일',
+    '판결선고',
+    '판결선고기일',
+  ],
+  HEARING_TRIAL: [
+    '공판',
+    '공판기일',
+    '공판준비기일',
+  ],
+  HEARING_EXAMINATION: [
+    '심문',
+    '심문기일',
+    '심문준비기일',
   ],
 };
 

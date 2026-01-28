@@ -98,11 +98,19 @@ const SCOURT_RESULT_MAP: Record<string, HearingResult> = {
   '연기': 'adjourned',
   '기일연기': 'adjourned',
   '휴정': 'adjourned',
+  '기일변경': 'adjourned',
+  '변경': 'adjourned',
   '취하': 'withdrawn',
   '각하': 'dismissed',
   '기각': 'dismissed',
   '판결선고': 'judgment',
   '선고': 'judgment',
+  '변론재개': 'continued',
+  '쌍방조사': 'other',
+  '조정불성립': 'dismissed',
+  '조정에갈음하는결정': 'judgment',
+  '불출석': 'other',
+  '출석': 'other',
 };
 
 // ============================================================
@@ -178,16 +186,17 @@ export function mapScourtResult(scourtResult: string | undefined): HearingResult
     return SCOURT_RESULT_MAP[scourtResult];
   }
 
-  // 부분 매칭 시도
+  // 부분 매칭 시도 (순서 중요: 더 구체적인 패턴이 먼저)
   const resultLC = scourtResult.toLowerCase();
-  if (resultLC.includes('속행')) return 'continued';
+  if (resultLC.includes('속행') || resultLC.includes('재개')) return 'continued';
+  if (resultLC.includes('불성립')) return 'dismissed';  // MUST be before '성립'
   if (resultLC.includes('종결') || resultLC.includes('성립') || resultLC.includes('화해')) return 'settled';
-  if (resultLC.includes('연기') || resultLC.includes('휴정')) return 'adjourned';
+  if (resultLC.includes('연기') || resultLC.includes('휴정') || resultLC.includes('변경')) return 'adjourned';
   if (resultLC.includes('취하')) return 'withdrawn';
   if (resultLC.includes('각하') || resultLC.includes('기각')) return 'dismissed';
   if (resultLC.includes('선고') || resultLC.includes('판결')) return 'judgment';
 
-  return null;
+  return 'other';  // Changed from null - any non-empty unmapped result gets 'other'
 }
 
 /**
@@ -288,13 +297,6 @@ function determineHearingStatus(hearing: HearingInfo): HearingStatus {
 // ============================================================
 // 화상 참여자 추출 (raw_data에서)
 // ============================================================
-
-interface AgentInfo {
-  agntNm?: string;       // 대리인명 (예: "법무법인 정향 (...) [화상장치]")
-  agntDvsNm?: string;    // 대리인구분명 (예: "피고 소송대리인")
-  btprNm?: string;       // 당사자명
-  btprDvsNm?: string;    // 당사자구분명
-}
 
 /**
  * SCOURT raw_data에서 화상 참여자 측 추출
@@ -398,18 +400,21 @@ export async function syncHearingsToCourtHearings(
       // 기존 기일 확인 (case_id + 해시로 검색)
       const { data: existing } = await supabase
         .from('court_hearings')
-        .select('id, result, status, scourt_type_raw')
+        .select('id, result, status, scourt_type_raw, scourt_raw_data')
         .eq('case_id', caseId)
         .eq('scourt_hearing_hash', hash)
         .single();
 
       if (existing) {
-        // 기존 기일이 있으면 결과/상태 및 SCOURT 원본 데이터 업데이트
-        // scourt_type_raw가 null인 경우 채워주기 (마이그레이션 전 데이터 대응)
+        // SCOURT 원본 결과 변경 감지
+        const existingRawResult = (existing.scourt_raw_data as Record<string, unknown>)?.result as string | undefined;
+        const rawResultChanged = hearing.result !== undefined && hearing.result !== (existingRawResult || '');
+
         const needsUpdate =
           (hearingResult && existing.result !== hearingResult) ||
           (hearingStatus !== existing.status) ||
-          (!existing.scourt_type_raw && hearing.type);
+          (!existing.scourt_type_raw && hearing.type) ||
+          rawResultChanged;
 
         if (needsUpdate) {
           const updateData: Record<string, unknown> = {};
@@ -419,14 +424,18 @@ export async function syncHearingsToCourtHearings(
           if (hearingStatus !== existing.status) {
             updateData.status = hearingStatus;
           }
-          // SCOURT 원본 데이터 업데이트
+          // SCOURT 원본 기일명이 없으면 채워주기 (마이그레이션 전 데이터 대응)
           if (!existing.scourt_type_raw && hearing.type) {
             updateData.scourt_type_raw = hearing.type;
+          }
+
+          // SCOURT 원본 데이터는 항상 최신으로 업데이트 (결과 변경 반영)
+          if (rawResultChanged || (!existing.scourt_type_raw && hearing.type)) {
             updateData.scourt_raw_data = {
               type: hearing.type,
               result: hearing.result,
               location: hearing.location,
-              sequence: extractHearingSequence(hearing.type),
+              sequence: extractHearingSequence(hearing.type || ''),
             };
           }
 
@@ -522,6 +531,9 @@ const HEARING_TYPE_DISPLAY: Record<HearingType, string> = {
   'HEARING_INTERIM': '심문기일',
   'HEARING_PARENTING': '양육상담',
   'HEARING_LAWYER_MEETING': '변호사 면담',
+  'HEARING_SENTENCE': '선고기일',
+  'HEARING_TRIAL': '공판기일',
+  'HEARING_EXAMINATION': '심문기일',
 };
 
 /**

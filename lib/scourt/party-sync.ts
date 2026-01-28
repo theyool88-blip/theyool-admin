@@ -17,6 +17,7 @@ import {
   mapScourtPartyType,
   normalizePartyNameForMatch,
   preservePrefix,
+  getPartySide,
 } from "@/types/case-party";
 import { updatePartyDeadline } from "./deadline-auto-register";
 
@@ -39,16 +40,6 @@ function isNonClientPartyLabel(label: string): boolean {
   return NON_CLIENT_PARTY_LABELS.some(l => label.includes(l));
 }
 
-// 원고측 party_type
-const PLAINTIFF_SIDE_TYPES: PartyType[] = ['plaintiff', 'creditor', 'applicant', 'actor'];
-// 피고측 party_type
-const DEFENDANT_SIDE_TYPES: PartyType[] = ['defendant', 'debtor', 'respondent', 'third_debtor', 'accused', 'juvenile'];
-
-function getPartySide(partyType: PartyType): 'plaintiff' | 'defendant' | null {
-  if (PLAINTIFF_SIDE_TYPES.includes(partyType)) return 'plaintiff';
-  if (DEFENDANT_SIDE_TYPES.includes(partyType)) return 'defendant';
-  return null;
-}
 
 export interface PartySyncParams {
   legalCaseId: string;

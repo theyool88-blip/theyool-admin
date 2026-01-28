@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useMemo, startTransition, useEffect } from 'react'
-import { Calendar, dateFnsLocalizer, Views, type Event as RBCEvent } from 'react-big-calendar'
+import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar'
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop'
 import { format, parse, startOfWeek, getDay, startOfMonth, endOfMonth, startOfWeek as startOfWeekFn, endOfWeek as endOfWeekFn } from 'date-fns'
 import { ko } from 'date-fns/locale'
@@ -9,13 +9,12 @@ import 'react-big-calendar/lib/css/react-big-calendar.css'
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css'
 
 import { useHolidays } from '@/hooks/useHolidays'
-import { formatDaysUntil } from '@/types/court-hearing'
 
 import type { Profile, BigCalendarEvent, UnifiedSchedule, Holiday } from './types'
 import { useCalendarEvents } from './hooks/useCalendarEvents'
 import { useCalendarNavigation } from './hooks/useCalendarNavigation'
 import { useEventActions } from './hooks/useEventActions'
-import { convertToUnifiedSchedule, getVideoBadgeInfo, shortenCourtLocation, getScheduleTypeLabel, getScheduleTypeColor } from './utils/eventTransformers'
+import { convertToUnifiedSchedule, getScheduleTypeLabel, isEventPostponed } from './utils/eventTransformers'
 import { CalendarToolbar } from './components/CalendarToolbar'
 import { MonthEvent } from './components/MonthEvent'
 import { WeekDayEvent } from './components/WeekDayEvent'
@@ -85,7 +84,6 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
     goToPrevious,
     goToNext,
     goToToday,
-    handleViewChange,
     openMonthPicker,
     closeMonthPicker,
     setPickerYear,
@@ -106,8 +104,6 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
     tenantMembers,
     refetch,
     updateEvent,
-    updateAttendingLawyer,
-    updatingLawyer,
   } = useCalendarEvents({
     currentDate,
     filterType,
@@ -128,9 +124,6 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<EditScheduleData | null>(null)
   const [prefilledDate, setPrefilledDate] = useState<string>('')
-
-  // Detail panel state
-  const [isDetailPanelCollapsed, setIsDetailPanelCollapsed] = useState(false)
 
   // Holidays
   const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate])
@@ -220,21 +213,6 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
   const handleNavigate = useCallback((date: Date) => {
     setCurrentDate(date)
   }, [setCurrentDate])
-
-  // Get schedules for selected day
-  const selectedDaySchedules = useMemo(() => {
-    if (!selectedDate) return []
-    const dateStr = format(selectedDate, 'yyyy-MM-dd')
-    return events
-      .filter(e => format(e.start, 'yyyy-MM-dd') === dateStr)
-      .map(convertToUnifiedSchedule)
-  }, [selectedDate, events])
-
-  // Get holiday for a day
-  const getHolidayForDay = useCallback((day: Date): string | null => {
-    const dateStr = format(day, 'yyyy-MM-dd')
-    return holidayMap.get(dateStr)?.holiday_name || null
-  }, [holidayMap])
 
   // Handle popup edit
   const handlePopupEdit = useCallback((event: BigCalendarEvent) => {
@@ -387,7 +365,9 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
 
   // Custom event prop getter for event styling
   const eventPropGetter = useCallback((event: BigCalendarEvent) => {
-    const isPostponed = event.status === 'POSTPONED'
+    // 연기 여부: status가 POSTPONED이거나 result가 adjourned이거나,
+    // scourt_result_raw가 '기일변경'으로 시작하거나 '연기', '휴정'인 경우
+    const isPostponed = isEventPostponed(event.status, event.result, event.scourtResultRaw)
     const isLawyerMeeting = event.eventSubtype === 'HEARING_LAWYER_MEETING'
     const isNoAttendance = ['HEARING_JUDGMENT', 'HEARING_INVESTIGATION', 'HEARING_PARENTING'].includes(event.eventSubtype || '')
 

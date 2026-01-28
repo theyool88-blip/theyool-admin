@@ -5,10 +5,11 @@ import { format } from 'date-fns'
 import { ko } from 'date-fns/locale'
 import type { BigCalendarEvent } from '../types'
 import { HEARING_TYPE_LABELS, NO_LAWYER_ATTENDANCE_TYPES } from '../types'
-import { formatDaysUntil } from '@/types/court-hearing'
+import { formatDaysUntil, HEARING_RESULT_LABELS } from '@/types/court-hearing'
 import {
   getVideoBadgeInfo,
   shortenCourtLocation,
+  isEventPostponed,
 } from '../utils/eventTransformers'
 
 interface EventPopupProps {
@@ -129,9 +130,13 @@ function EventPopupComponent({
     videoParticipantSide,
     ourClientName,
     daysUntil,
+    result,
+    scourtResultRaw,
   } = event
 
-  const isPostponed = status === 'POSTPONED'
+  // 연기 여부: status가 POSTPONED이거나 result가 adjourned이거나,
+  // scourt_result_raw가 '기일변경'으로 시작하거나 '연기', '휴정'인 경우
+  const isPostponed = isEventPostponed(status, result, scourtResultRaw)
   const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
   const videoBadge = getVideoBadgeInfo(videoParticipantSide)
@@ -240,6 +245,18 @@ function EventPopupComponent({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               <span className="text-[var(--text-primary)]">{attendingLawyerName}</span>
+            </div>
+          )}
+
+          {/* 기일 결과 */}
+          {eventType === 'COURT_HEARING' && (result || scourtResultRaw) && (
+            <div className="flex items-center gap-2 text-sm">
+              <svg className="w-4 h-4 text-[var(--text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-[var(--text-primary)]">
+                결과: {scourtResultRaw || HEARING_RESULT_LABELS[result as keyof typeof HEARING_RESULT_LABELS] || result}
+              </span>
             </div>
           )}
 

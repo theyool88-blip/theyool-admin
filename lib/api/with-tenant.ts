@@ -65,9 +65,9 @@ export function withTenant(handler: TenantHandler) {
         return errorResponse('Unauthorized: No tenant access', 401);
       }
 
-      // Next.js 16+: params는 항상 Promise
-      const rawParams = await segmentData.params;
-      const params = normalizeParams(rawParams);
+      // Next.js 16+: params는 항상 Promise (동적 세그먼트 없으면 undefined)
+      const rawParams = await segmentData?.params;
+      const params = normalizeParams(rawParams ?? {});
 
       return handler(request, { tenant, params });
     } catch (error) {
@@ -139,9 +139,9 @@ export function withSuperAdmin(handler: SuperAdminHandler) {
         return errorResponse('Forbidden: Super admin access required', 403);
       }
 
-      // Next.js 16+: params는 항상 Promise
-      const rawParams = await segmentData.params;
-      const params = normalizeParams(rawParams);
+      // Next.js 16+: params는 항상 Promise (동적 세그먼트 없으면 undefined)
+      const rawParams = await segmentData?.params;
+      const params = normalizeParams(rawParams ?? {});
 
       return handler(request, { params });
     } catch (error) {
@@ -168,9 +168,9 @@ export function withTenantOrSuperAdmin(handler: TenantHandler) {
         return errorResponse('Unauthorized: Not authenticated', 401);
       }
 
-      // Next.js 16+: params는 항상 Promise
-      const rawParams = await segmentData.params;
-      const params = normalizeParams(rawParams);
+      // Next.js 16+: params는 항상 Promise (동적 세그먼트 없으면 undefined)
+      const rawParams = await segmentData?.params;
+      const params = normalizeParams(rawParams ?? {});
 
       // 슈퍼 어드민인 경우 특정 테넌트 ID를 쿼리에서 가져올 수 있음
       if (tenant.isSuperAdmin && !tenant.tenantId) {
@@ -211,9 +211,9 @@ export function withOptionalTenant(
     try {
       const tenant = await getCurrentTenantContext();
 
-      // Next.js 16+: params는 항상 Promise
-      const rawParams = await segmentData.params;
-      const params = normalizeParams(rawParams);
+      // Next.js 16+: params는 항상 Promise (동적 세그먼트 없으면 undefined)
+      const rawParams = await segmentData?.params;
+      const params = normalizeParams(rawParams ?? {});
 
       return handler(request, { tenant, params });
     } catch (error) {

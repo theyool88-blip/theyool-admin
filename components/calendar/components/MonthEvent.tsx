@@ -7,7 +7,20 @@ import {
   getVideoBadgeInfo,
   getShortCourt,
   extractClientName,
+  getSpecialResultLabel,
+  isEventPostponed,
 } from '../utils/eventTransformers'
+
+// 기일 결과 라벨
+const RESULT_LABELS: Record<string, string> = {
+  continued: '속행',
+  settled: '종결',
+  judgment: '판결선고',
+  dismissed: '각하',
+  withdrawn: '취하',
+  adjourned: '연기',
+  other: '기타',
+}
 
 interface MonthEventProps {
   event: BigCalendarEvent
@@ -78,11 +91,22 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
     eventSubtype,
     location,
     status,
+    result,
+    scourtResultRaw,
     videoParticipantSide,
     ourClientName,
   } = event
 
-  const isPostponed = status === 'POSTPONED'
+  // 연기 여부: status가 POSTPONED이거나 result가 adjourned이거나,
+  // scourt_result_raw가 '기일변경'으로 시작하거나 '연기', '휴정'인 경우
+  const isPostponed = isEventPostponed(status, result, scourtResultRaw)
+  // 선고기일 여부
+  const isJudgment = eventSubtype === 'HEARING_JUDGMENT' || eventSubtype === 'HEARING_SENTENCE'
+  // 결과가 있는지 여부
+  const hasResult = result && RESULT_LABELS[result]
+
+  // 특별 표시할 기일 결과 (Sage Green 뱃지로 표시)
+  const specialResultLabel = getSpecialResultLabel(scourtResultRaw)
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
   const videoBadge = getVideoBadgeInfo(videoParticipantSide)
 
@@ -107,11 +131,13 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
     displayText = clientName
   } else if (allDay) {
     // 종일 이벤트: 라벨 제목 (시간 없음)
-    badgeLabel = displayLabel
+    // 결과가 있으면 결과로 뱃지 교체
+    badgeLabel = specialResultLabel || displayLabel
     displayText = clientName
   } else {
     // 시간 이벤트: 시간 법원 의뢰인 (라벨은 뱃지로 표시)
-    badgeLabel = displayLabel
+    // 결과가 있으면 결과로 뱃지 교체
+    badgeLabel = specialResultLabel || displayLabel
     const parts = [timeStr, shortCourt, clientName].filter(Boolean)
     displayText = parts.join(' ')
   }
@@ -146,6 +172,61 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
   // 연기/기일변경된 경우 회색 스타일 적용
   const labelBadgeClass = getLabelBadgeClass(eventType, eventSubtype, isPostponed, isNoAttendanceRequired)
 
+  // 결과 텍스트 (선고 결과 또는 연기)
+  const resultText = hasResult ? RESULT_LABELS[result!] : ''
+
+  // 연기된 경우: 취소선 효과만 적용
+  if (isPostponed) {
+    return (
+      <div
+        data-event-id={event.id}
+        className={`
+          flex items-center gap-1 px-0.5 py-0.5 rounded text-[12px] leading-normal truncate cursor-pointer transition-all
+          ${isSelected ? 'bg-[var(--sage-primary)] bg-opacity-20 ring-2 ring-[var(--sage-primary)] ring-opacity-50 scale-[1.02]' : 'hover:bg-[var(--bg-hover)]'}
+        `}
+      >
+        {badgeLabel && (
+          <span className={`text-[10px] px-1 py-0 rounded flex-shrink-0 font-medium ${labelBadgeClass}`}>
+            {badgeLabel}
+          </span>
+        )}
+        <span className="truncate text-[var(--text-muted)] line-through">
+          {displayText}
+        </span>
+      </div>
+    )
+  }
+
+  // 선고기일이고 결과가 있는 경우: 결과 표시
+  if (isJudgment && hasResult && !isPostponed) {
+    return (
+      <div
+        data-event-id={event.id}
+        className={`
+          flex flex-col gap-0 px-0.5 py-0.5 rounded text-[12px] leading-tight cursor-pointer transition-all
+          ${isSelected ? 'bg-[var(--sage-primary)] bg-opacity-20 ring-2 ring-[var(--sage-primary)] ring-opacity-50 scale-[1.02]' : 'hover:bg-[var(--bg-hover)]'}
+        `}
+      >
+        {/* 첫째 줄: 기본 정보 */}
+        <div className="flex items-center gap-1 truncate">
+          {badgeLabel && (
+            <span className={`text-[10px] px-1 py-0 rounded flex-shrink-0 font-medium ${labelBadgeClass}`}>
+              {badgeLabel}
+            </span>
+          )}
+          <span className="truncate text-[var(--text-secondary)]">
+            {displayText}
+          </span>
+        </div>
+        {/* 둘째 줄: 선고 결과 */}
+        <div className="text-[10px] text-[var(--sage-primary)] pl-1 font-medium">
+          → {resultText}
+        </div>
+      </div>
+    )
+  }
+
+  // 일반 이벤트
   return (
     <div
       data-event-id={event.id}
@@ -159,10 +240,10 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
           {badgeLabel}
         </span>
       )}
-      {videoBadge && !isPostponed && (
+      {videoBadge && (
         <span className="text-[8px] px-0.5 rounded event-badge-video flex-shrink-0">화</span>
       )}
-      <span className={`truncate ${isPostponed ? 'text-[var(--text-muted)] line-through' : 'text-[var(--text-secondary)]'}`}>
+      <span className="truncate text-[var(--text-secondary)]">
         {displayText}
       </span>
     </div>

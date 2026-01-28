@@ -47,6 +47,8 @@ export interface ApiEvent {
   case_id?: string | null
   description?: string | null
   status?: string | null
+  result?: string | null  // 기일 결과 (continued, settled, judgment, adjourned 등)
+  scourt_result_raw?: string | null  // SCOURT 원본 결과 텍스트 ("쌍방조사", "기일변경" 등)
   attending_lawyer_id?: string | null
   attending_lawyer_name?: string | null
   video_participant_side?: string | null
@@ -74,6 +76,8 @@ export interface BigCalendarEvent {
   caseNumber?: string
   caseName?: string
   status?: string
+  result?: string  // 기일 결과 (continued, settled, judgment, adjourned 등)
+  scourtResultRaw?: string  // SCOURT 원본 결과 텍스트
   attendingLawyerId?: string
   attendingLawyerName?: string
   videoParticipantSide?: string
@@ -101,6 +105,8 @@ export interface ScheduleXEvent {
   caseNumber?: string
   caseName?: string
   status?: string
+  result?: string  // 기일 결과 (continued, settled, judgment, adjourned 등)
+  scourtResultRaw?: string  // SCOURT 원본 결과 텍스트
   attendingLawyerId?: string
   attendingLawyerName?: string
   videoParticipantSide?: string
@@ -124,6 +130,8 @@ export interface UnifiedSchedule {
   case_id?: string
   notes?: string
   status?: string
+  result?: string  // 기일 결과 (continued, settled, judgment, adjourned 등)
+  scourt_result_raw?: string  // SCOURT 원본 결과 텍스트
   daysUntil?: number
   hearing_type?: string
   event_subtype?: string

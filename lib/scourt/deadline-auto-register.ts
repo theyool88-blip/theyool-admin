@@ -15,7 +15,8 @@ import { createCaseDeadline } from '@/lib/supabase/case-deadlines';
 import type { CaseUpdate, UpdateType } from './change-detector';
 import { getCaseTypeByCode, type CaseCategory } from './case-types';
 import type { DeadlineType, PartySide } from '@/types/court-hearing';
-import type { CaseParty, PartyType } from '@/types/case-party';
+import type { PartyType } from '@/types/case-party';
+import { PLAINTIFF_SIDE_TYPES, DEFENDANT_SIDE_TYPES } from '@/types/case-party';
 
 // ============================================================
 // 타입 정의
@@ -625,42 +626,39 @@ export function canAppeal(
 /**
  * PartyType에서 PartySide 결정
  *
- * party-sync.ts와 동일한 매핑 사용:
- * 원고측: plaintiff, creditor, applicant, actor
- * 피고측: defendant, debtor, respondent, third_debtor, accused, juvenile
+ * @/types/case-party의 중앙집중화된 상수 사용:
+ * - PLAINTIFF_SIDE_TYPES: plaintiff, creditor, applicant, actor, appellant, investigator
+ * - DEFENDANT_SIDE_TYPES: defendant, debtor, respondent, third_debtor, accused, juvenile, appellee, victim, crime_victim
  *
- * 참고: victim, crime_victim, investigator, assistant 등은
- * 상소권 있는 당사자가 아니므로 null 반환
+ * 주의: 상소권이 없는 당사자는 기한 생성에서 제외됨
+ * - victim, crime_victim: 형사사건 피해자 (상소권 없음)
+ * - investigator: 보호사건 조사관 (상소권 없음)
+ * - assistant, related: 중립 당사자 (상소권 없음)
  */
 export function getPartySideFromType(partyType: PartyType): PartySide {
-  // party-sync.ts의 PLAINTIFF_SIDE_TYPES와 일치
-  const plaintiffSideTypes: PartyType[] = [
-    'plaintiff',
-    'creditor',
-    'applicant',
-    'actor',
+  // 상소권이 없는 당사자 유형 - 기한 생성 제외
+  const noAppealRightsTypes: PartyType[] = [
+    'victim',        // 보호사건 피해자
+    'crime_victim',  // 형사사건 피해자
+    'investigator',  // 보호사건 조사관
+    'assistant',     // 보조인
+    'related',       // 관련자
   ];
 
-  // party-sync.ts의 DEFENDANT_SIDE_TYPES와 일치
-  const defendantSideTypes: PartyType[] = [
-    'defendant',
-    'debtor',
-    'respondent',
-    'third_debtor',
-    'accused',   // 형사 피고인 → 피고측
-    'juvenile',  // 소년 피의자 → 피고측
-  ];
+  if (noAppealRightsTypes.includes(partyType)) {
+    return null;
+  }
 
-  if (plaintiffSideTypes.includes(partyType)) {
+  // 중앙집중화된 상수 사용 (Set이므로 .has() 메서드 사용)
+  if (PLAINTIFF_SIDE_TYPES.has(partyType)) {
     return 'plaintiff_side';
   }
 
-  if (defendantSideTypes.includes(partyType)) {
+  if (DEFENDANT_SIDE_TYPES.has(partyType)) {
     return 'defendant_side';
   }
 
-  // victim, crime_victim, investigator, assistant, related 등
-  // → 상소권 당사자가 아님, null 반환
+  // 알 수 없는 유형 (미래에 추가될 수 있음)
   return null;
 }
 

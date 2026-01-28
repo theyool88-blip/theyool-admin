@@ -16,6 +16,8 @@ const CALENDAR_COLUMNS = [
   'case_name',
   'description',
   'status',
+  'result',  // 기일 결과 (continued, settled, judgment, adjourned 등)
+  'scourt_result_raw',  // SCOURT 원본 결과 텍스트 ("쌍방조사", "기일변경" 등)
   'attending_lawyer_id',
   'attending_lawyer_name',
   'video_participant_side',

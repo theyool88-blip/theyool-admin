@@ -8,6 +8,8 @@ import {
   getVideoBadgeInfo,
   getShortCourt,
   getShortTitle,
+  getSpecialResultLabel,
+  isEventPostponed,
 } from '../utils/eventTransformers'
 
 interface WeekDayEventProps {
@@ -29,14 +31,21 @@ function WeekDayEventComponent({ event, isSelected }: WeekDayEventProps) {
     location,
     caseNumber,
     status,
+    result,
+    scourtResultRaw,
     videoParticipantSide,
     daysUntil,
   } = event
 
-  const isPostponed = status === 'POSTPONED'
+  // 연기 여부: status가 POSTPONED이거나 result가 adjourned이거나,
+  // scourt_result_raw가 '기일변경'으로 시작하거나 '연기', '휴정'인 경우
+  const isPostponed = isEventPostponed(status, result, scourtResultRaw)
   const isLawyerMeeting = eventSubtype === 'HEARING_LAWYER_MEETING'
   const isNoAttendanceRequired = NO_LAWYER_ATTENDANCE_TYPES.includes(eventSubtype || '')
   const videoBadge = getVideoBadgeInfo(videoParticipantSide)
+
+  // 특별 표시할 기일 결과 (Sage Green 뱃지로 표시)
+  const specialResultLabel = getSpecialResultLabel(scourtResultRaw)
 
   // Get type label
   const subtypeLabel = eventSubtype ? HEARING_TYPE_LABELS[eventSubtype] || eventSubtype : ''
@@ -92,13 +101,13 @@ function WeekDayEventComponent({ event, isSelected }: WeekDayEventProps) {
             {timeStr}
           </span>
         )}
-        {eventType === 'COURT_HEARING' && subtypeLabel && (
+        {eventType === 'COURT_HEARING' && (specialResultLabel || subtypeLabel) && (
           <span className={`text-[9px] px-1 py-0.5 rounded ${
             isPostponed ? 'bg-[var(--bg-tertiary)] text-[var(--text-muted)]' :
             isLawyerMeeting ? 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300' :
             'bg-[var(--sage-muted)] text-[var(--sage-primary)]'
           }`}>
-            {isPostponed ? '연기' : subtypeLabel}
+            {isPostponed ? '연기' : (specialResultLabel || subtypeLabel)}
           </span>
         )}
         {videoBadge && !isPostponed && (

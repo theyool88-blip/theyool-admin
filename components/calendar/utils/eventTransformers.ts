@@ -1,11 +1,9 @@
 import type { ApiEvent, BigCalendarEvent, UnifiedSchedule } from '../types'
-import { EVENT_TYPE_CALENDAR_MAP } from '../types'
 
 /**
  * Convert API event to BigCalendar event format
  */
 export function convertToBigCalendarEvent(event: ApiEvent): BigCalendarEvent {
-  const eventType = EVENT_TYPE_CALENDAR_MAP[event.event_type] || 'meeting'
   const hasTime = event.event_time && event.event_time !== '00:00' && event.event_time !== '00:00:00'
 
   // Parse date
@@ -54,6 +52,8 @@ export function convertToBigCalendarEvent(event: ApiEvent): BigCalendarEvent {
     caseNumber: event.reference_id || undefined,
     caseName: event.case_name || undefined,
     status: event.status || undefined,
+    result: event.result || undefined,  // 기일 결과 (continued, settled, judgment, adjourned 등)
+    scourtResultRaw: event.scourt_result_raw || undefined,
     attendingLawyerId: event.attending_lawyer_id || undefined,
     attendingLawyerName: event.attending_lawyer_name || undefined,
     videoParticipantSide: event.video_participant_side || undefined,
@@ -87,6 +87,8 @@ export function convertToUnifiedSchedule(event: BigCalendarEvent): UnifiedSchedu
     case_id: event.caseId,
     notes: event.description,
     status: event.status,
+    result: event.result,  // 기일 결과 (continued, settled, judgment, adjourned 등)
+    scourt_result_raw: event.scourtResultRaw,
     daysUntil: event.daysUntil,
     hearing_type: event.eventSubtype,
     event_subtype: event.eventSubtype,
@@ -278,4 +280,43 @@ export function extractClientName(title: string): string {
 
   // 4. 기본값: 전체 제목 (너무 길면 자름)
   return title.length > 10 ? title.slice(0, 10) : title
+}
+
+/**
+ * Get special result label for display (Sage Green badge)
+ * @param scourtResultRaw - SCOURT 원본 결과 텍스트
+ * @returns 표시할 결과 라벨 또는 null
+ */
+export function getSpecialResultLabel(scourtResultRaw?: string): string | null {
+  if (!scourtResultRaw) return null
+  // 변론기일 결과
+  if (scourtResultRaw === '변론재개') return '변론재개'
+  if (scourtResultRaw.startsWith('속행')) return '속행'
+  if (scourtResultRaw === '변론종결') return '변론종결'
+  // 조정기일 결과
+  if (scourtResultRaw === '조정성립') return '조정성립'
+  if (scourtResultRaw === '조정불성립') return '조정불성립'
+  if (scourtResultRaw === '조정에갈음하는결정') return '조정갈음결정'
+  return null
+}
+
+/**
+ * Check if an event is postponed (연기 여부 확인)
+ * @param status - 이벤트 상태 (SCHEDULED, COMPLETED, POSTPONED, CANCELLED)
+ * @param result - 기일 결과 (continued, settled, judgment, adjourned 등)
+ * @param scourtResultRaw - SCOURT 원본 결과 텍스트
+ * @returns 연기 여부
+ */
+export function isEventPostponed(
+  status?: string,
+  result?: string,
+  scourtResultRaw?: string
+): boolean {
+  return status === 'POSTPONED' ||
+         result === 'adjourned' ||
+         !!(scourtResultRaw && (
+           scourtResultRaw.startsWith('기일변경') ||
+           scourtResultRaw === '연기' ||
+           scourtResultRaw === '휴정'
+         ))
 }

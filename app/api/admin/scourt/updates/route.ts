@@ -78,8 +78,9 @@ export async function GET(request: NextRequest) {
     // 클라이언트별 필터링 (join 후 필터)
     let filteredData = data || [];
     if (clientId) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       filteredData = filteredData.filter(
-        (item) => item.legal_case?.client?.id === clientId
+        (item: any) => item.legal_case?.client?.id === clientId
       );
     }
 

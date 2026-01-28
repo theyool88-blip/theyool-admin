@@ -6,6 +6,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
+// Next.js 16+ route handler context type
+type RouteSegmentData = {
+  params: Promise<Record<string, string | string[] | undefined>>;
+};
+
 export interface SuperAdminContext {
   userId: string;
   permissions: string[];
@@ -16,13 +21,26 @@ type SuperAdminHandler = (
   context: { superAdmin: SuperAdminContext; params?: Record<string, string> }
 ) => Promise<NextResponse>;
 
+// params를 Record<string, string>로 변환 (string[] → 첫번째 값)
+function normalizeParams(raw: Record<string, string | string[] | undefined>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'string') {
+      result[key] = value;
+    } else if (Array.isArray(value) && value.length > 0) {
+      result[key] = value[0];
+    }
+  }
+  return result;
+}
+
 /**
  * 슈퍼 어드민 전용 API 래퍼
  */
 export function withSuperAdmin(handler: SuperAdminHandler) {
   return async (
     request: NextRequest,
-    segmentData?: { params?: Promise<Record<string, string>> }
+    segmentData: RouteSegmentData
   ) => {
     try {
       // 현재 사용자 확인
@@ -50,8 +68,9 @@ export function withSuperAdmin(handler: SuperAdminHandler) {
         );
       }
 
-      // Next.js 16+: params가 Promise인 경우 await
-      const params = segmentData?.params ? await segmentData.params : undefined;
+      // Next.js 16+: params는 항상 Promise
+      const rawParams = await segmentData.params;
+      const params = normalizeParams(rawParams);
 
       return handler(request, {
         superAdmin: {

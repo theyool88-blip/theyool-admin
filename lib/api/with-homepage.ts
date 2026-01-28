@@ -8,6 +8,11 @@ import { getCurrentTenantContext } from '@/lib/auth/tenant-context';
 import { createClient } from '@/lib/supabase/server';
 import type { TenantContext } from '@/types/tenant';
 
+// Next.js 16+ route handler context type
+type RouteSegmentData = {
+  params: Promise<Record<string, string | string[] | undefined>>;
+};
+
 type HomepageHandler = (
   request: NextRequest,
   context: { tenant: TenantContext; params?: Record<string, string> }
@@ -17,6 +22,19 @@ function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
+// params를 Record<string, string>로 변환 (string[] → 첫번째 값)
+function normalizeParams(raw: Record<string, string | string[] | undefined>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'string') {
+      result[key] = value;
+    } else if (Array.isArray(value) && value.length > 0) {
+      result[key] = value[0];
+    }
+  }
+  return result;
+}
+
 /**
  * 홈페이지 기능 활성화 여부 검증 미들웨어
  * staff 이상 권한 + has_homepage=true 필요
@@ -24,7 +42,7 @@ function errorResponse(message: string, status: number) {
 export function withHomepage(handler: HomepageHandler) {
   return async (
     request: NextRequest,
-    segmentData?: { params?: Promise<Record<string, string>> }
+    segmentData: RouteSegmentData
   ) => {
     try {
       const tenant = await getCurrentTenantContext();
@@ -57,8 +75,9 @@ export function withHomepage(handler: HomepageHandler) {
         }
       }
 
-      // Next.js 16+: params가 Promise인 경우 await
-      const params = segmentData?.params ? await segmentData.params : undefined;
+      // Next.js 16+: params는 항상 Promise
+      const rawParams = await segmentData.params;
+      const params = normalizeParams(rawParams);
 
       return handler(request, { tenant, params });
     } catch (error) {

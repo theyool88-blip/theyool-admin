@@ -55,3 +55,6 @@ data/scourt-profiles/
 
 # test data files
 *.xlsx
+
+# MCP config with secrets
+.mcp.json

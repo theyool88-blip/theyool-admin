@@ -220,9 +220,10 @@ export async function GET(request: NextRequest) {
     }
 
     // 유효한 사건번호만 필터링
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const validCases: CaseToSync[] = cases
-      .filter((c) => c.court_case_number)
-      .map((c) => ({
+      .filter((c: any) => c.court_case_number)
+      .map((c: any) => ({
         id: c.id,
         court_case_number: c.court_case_number,
       }));

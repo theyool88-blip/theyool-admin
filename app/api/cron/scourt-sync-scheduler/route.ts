@@ -124,7 +124,8 @@ export async function GET(request: NextRequest) {
       throw new Error(`Candidate query failed: ${candidateError.message}`)
     }
 
-    const filtered = (candidates || []).filter((item) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filtered = (candidates || []).filter((item: any) => {
       if (settings.activeCaseRule.excludeFinalResult && isExpiredFinalResult(item)) {
         return false
       }
@@ -226,7 +227,8 @@ export async function GET(request: NextRequest) {
       if (wmonidError) {
         console.warn('WMONID renewal query failed:', wmonidError.message)
       } else if (wmonids && wmonids.length > 0) {
-        const wmonidJobs: ScourtSyncJobInput[] = wmonids.map((wmonid) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const wmonidJobs: ScourtSyncJobInput[] = wmonids.map((wmonid: any) => ({
           legalCaseId: null,
           tenantId: null,
           syncType: 'wmonid_renewal',

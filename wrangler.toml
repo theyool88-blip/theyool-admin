@@ -28,29 +28,9 @@ bucket_name = "luseed-files"
 binding = "HYPERDRIVE"
 id = "88b70aa08a7e4f7bbbf3f97e75c1f746"
 
-# Scheduled Tasks (Cron Triggers)
-# These run serverless functions on specified schedules
-
-# Daily reminders at midnight UTC
-# Sends notifications for upcoming hearings and deadlines
-[[triggers.crons]]
-schedule = "0 0 * * *"
-name = "daily-reminders"
-
-# Supreme Court sync scheduler - every 10 minutes
-# Checks for new cases that need to be synced from the Supreme Court system
-[[triggers.crons]]
-schedule = "*/10 * * * *"
-name = "scourt-sync-scheduler"
-
-# Supreme Court sync worker - every 2 minutes
-# Processes queued sync jobs to fetch case data
-[[triggers.crons]]
-schedule = "*/2 * * * *"
-name = "scourt-sync-worker"
-
-# Batch import worker - every minute
-# Processes queued batch import jobs for bulk case uploads
-[[triggers.crons]]
-schedule = "* * * * *"
-name = "batch-import-worker"
+# Note: Scheduled Tasks (Cron Triggers) are NOT supported in Cloudflare Pages
+# Use external cron services (e.g., cron-job.org, GitHub Actions) to call API routes:
+# - /api/cron/daily-reminders?secret=xxx (daily at midnight)
+# - /api/cron/scourt-sync-scheduler?secret=xxx (every 10 min)
+# - /api/cron/scourt-sync-worker?secret=xxx (every 2 min)
+# - /api/cron/batch-import-worker?secret=xxx (every minute)

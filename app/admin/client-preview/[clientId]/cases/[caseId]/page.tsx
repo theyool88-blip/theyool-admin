@@ -59,8 +59,8 @@ const HEARING_RESULT_LABELS: Record<string, string> = {
 
 export default function CaseDetailPreview() {
   const params = useParams();
-  const clientId = params.clientId as string;
-  const caseId = params.caseId as string;
+  const clientId = params?.clientId as string;
+  const caseId = params?.caseId as string;
 
   const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null);
   const [hearings, setHearings] = useState<Hearing[]>([]);

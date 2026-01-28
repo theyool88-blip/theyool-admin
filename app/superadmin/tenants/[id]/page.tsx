@@ -78,7 +78,7 @@ type TabType = 'info' | 'subscription' | 'members' | 'usage' | 'activity';
 export default function TenantDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const tenantId = params.id as string;
+  const tenantId = params?.id as string;
 
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
   const [stats, setStats] = useState<TenantStats | null>(null);

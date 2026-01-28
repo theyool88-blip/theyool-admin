@@ -68,7 +68,7 @@ const HEARING_RESULT_LABELS: Record<string, string> = {
 
 export default function ClientPortalPreview() {
   const params = useParams();
-  const clientId = params.clientId as string;
+  const clientId = params?.clientId as string;
 
   const [client, setClient] = useState<Client | null>(null);
   const [cases, setCases] = useState<Case[]>([]);

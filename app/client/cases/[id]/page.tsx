@@ -43,7 +43,7 @@ export default function CaseDetailPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const params = useParams();
-  const caseId = params.id as string;
+  const caseId = params?.id as string;
 
   const [caseDetail, setCaseDetail] = useState<CaseDetail | null>(null);
   const [hearings, setHearings] = useState<Hearing[]>([]);

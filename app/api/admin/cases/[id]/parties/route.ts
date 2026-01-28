@@ -3,29 +3,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isAuthenticated } from "@/lib/auth/auth";
 import type {
   CreateCasePartyRequest,
+  PartyType,
 } from "@/types/case-party";
-
-const PLAINTIFF_SIDE_TYPES = new Set([
-  "plaintiff",
-  "creditor",
-  "applicant",
-  "actor",
-]);
-const DEFENDANT_SIDE_TYPES = new Set([
-  "defendant",
-  "debtor",
-  "respondent",
-  "third_debtor",
-  "accused",
-  "juvenile",
-]);
-
-function getPartySide(partyType?: string | null): "plaintiff" | "defendant" | null {
-  if (!partyType) return null;
-  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return "plaintiff";
-  if (DEFENDANT_SIDE_TYPES.has(partyType)) return "defendant";
-  return null;
-}
+import { getPartySide, PLAINTIFF_SIDE_TYPES, DEFENDANT_SIDE_TYPES } from "@/types/case-party";
 
 const PARTY_UPDATE_FIELDS = [
   "party_name",
@@ -266,8 +246,9 @@ export async function PATCH(
       const primaryTargets = new Map<"plaintiff" | "defendant", string>();
       partyUpdates.forEach((update: { partyId?: string; party_type?: string; is_primary?: boolean }) => {
         if (!update.partyId || !update.is_primary) return;
-        const partyType = update.party_type || partyTypeById.get(update.partyId) || null;
-        const side = getPartySide(partyType);
+        const partyType = update.party_type || partyTypeById.get(update.partyId);
+        if (!partyType) return;
+        const side = getPartySide(partyType as PartyType);
         if (side) {
           primaryTargets.set(side, update.partyId);
         }

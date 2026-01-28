@@ -12,6 +12,9 @@ export type PartyType =
   | "applicant"     // 신청인
   | "respondent"    // 피신청인
   | "third_debtor"  // 제3채무자 (집행사건)
+  // 항소심 당사자
+  | "appellant"     // 항소인
+  | "appellee"      // 피항소인
   // 보호사건 당사자 (2026.01.07 추가)
   | "actor"         // 행위자
   | "victim"        // 피해자/피해아동
@@ -33,6 +36,9 @@ export const PARTY_TYPE_LABELS: Record<PartyType, string> = {
   applicant: "신청인",
   respondent: "피신청인",
   third_debtor: "제3채무자",
+  // 항소심 당사자
+  appellant: "항소인",
+  appellee: "피항소인",
   // 보호사건 당사자 (2026.01.07 추가)
   actor: "행위자",
   victim: "피해아동",
@@ -55,6 +61,9 @@ export const OPPOSITE_PARTY_TYPE: Record<PartyType, PartyType> = {
   applicant: "respondent",
   respondent: "applicant",
   third_debtor: "creditor",
+  // 항소심 당사자
+  appellant: "appellee",
+  appellee: "appellant",
   // 보호사건 당사자 (2026.01.07 추가)
   actor: "victim",
   victim: "actor",
@@ -67,6 +76,37 @@ export const OPPOSITE_PARTY_TYPE: Record<PartyType, PartyType> = {
   // 기타
   related: "related",
 };
+
+// ============================================================
+// Party Side Classification
+// ============================================================
+
+/** Plaintiff side party types */
+export const PLAINTIFF_SIDE_TYPES: ReadonlySet<PartyType> = new Set([
+  'plaintiff', 'creditor', 'applicant', 'actor', 'appellant', 'investigator'
+]);
+
+/** Defendant side party types */
+export const DEFENDANT_SIDE_TYPES: ReadonlySet<PartyType> = new Set([
+  'defendant', 'debtor', 'respondent', 'third_debtor', 'accused',
+  'juvenile', 'appellee', 'victim', 'crime_victim'
+]);
+
+/** Neutral types (no side) */
+export const NEUTRAL_PARTY_TYPES: ReadonlySet<PartyType> = new Set([
+  'related', 'assistant'
+]);
+
+/**
+ * Determines which side a party type belongs to
+ * @param partyType - The party type to check
+ * @returns 'plaintiff' | 'defendant' | null (null for neutral types)
+ */
+export function getPartySide(partyType: PartyType): 'plaintiff' | 'defendant' | null {
+  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return 'plaintiff';
+  if (DEFENDANT_SIDE_TYPES.has(partyType)) return 'defendant';
+  return null;
+}
 
 // 대리인 (JSONB 내부 구조)
 export interface PartyRepresentative {
@@ -250,10 +290,10 @@ export function mapScourtPartyType(btprDvsNm: string): PartyType {
     "신청인": "applicant",
     "피신청인": "respondent",
     // 항소/상고심
-    "항소인": "plaintiff",
-    "피항소인": "defendant",
-    "상고인": "plaintiff",
-    "피상고인": "defendant",
+    "항소인": "appellant",
+    "피항소인": "appellee",
+    "상고인": "appellant",
+    "피상고인": "appellee",
     "재항고인": "plaintiff",
     "항고인": "plaintiff",
     "상대방": "defendant",

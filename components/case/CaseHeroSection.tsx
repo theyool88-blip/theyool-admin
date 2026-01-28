@@ -11,12 +11,13 @@ import {
   normalizePartyNameForMatch,
   PARTY_TYPE_LABELS,
   preservePrefix,
+  PLAINTIFF_SIDE_TYPES,
+  DEFENDANT_SIDE_TYPES,
+  getPartySide,
 } from '@/types/case-party'
 import { getCourtAbbrev } from '@/lib/scourt/court-codes'
 
-// Party side classification
-const PLAINTIFF_SIDE_TYPES = new Set(['plaintiff', 'creditor', 'applicant', 'actor'])
-const DEFENDANT_SIDE_TYPES = new Set(['defendant', 'debtor', 'respondent', 'third_debtor', 'accused', 'juvenile'])
+// Party side classification (labels only - types imported from @/types/case-party)
 const PLAINTIFF_SIDE_LABELS = new Set([
   '원고', '채권자', '신청인', '항고인', '항소인', '상고인', '행위자', '청구인',
 ].map(label => normalizePartyLabel(label)))
@@ -269,9 +270,8 @@ export default function CaseHeroSection({
     const getCasePartySide = (party: CaseParty) => {
       const labelSide = getSideFromLabel(getCasePartyLabel(party))
       if (labelSide) return labelSide
-      if (PLAINTIFF_SIDE_TYPES.has(party.party_type)) return 'plaintiff'
-      if (DEFENDANT_SIDE_TYPES.has(party.party_type)) return 'defendant'
-      return null
+      // Use imported getPartySide function with type assertion
+      return getPartySide(party.party_type as import('@/types/case-party').PartyType)
     }
 
     const heroPartyLabels = new Set([

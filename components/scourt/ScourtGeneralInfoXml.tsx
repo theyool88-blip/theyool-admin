@@ -43,6 +43,8 @@ import {
   normalizePartyName as normalizePartyNameUtil,
   preservePrefix,
   ConfirmedParty,
+  getPartySide,
+  PartyType,
 } from "@/types/case-party";
 
 // ============================================================================
@@ -288,16 +290,6 @@ const PARTY_LIST_NAME_FIELDS = [
   "partyNm",
 ];
 
-// 라벨 별칭 (XML 당사자 리스트에서 매칭용)
-const PARTY_LABEL_ALIASES: Record<string, string[]> = {
-  항고인: ["원고"],
-  상대방: ["피고"],
-  피고인: ["피고"],
-  항소인: ["원고"],
-  피항소인: ["피고"],
-  상고인: ["원고"],
-  피상고인: ["피고"],
-};
 
 const PLAINTIFF_SIDE_LABELS = new Set([
   "원고",
@@ -334,28 +326,6 @@ function getSideFromLabel(label: string): "plaintiff" | "defendant" | null {
   return null;
 }
 
-// party_type 기반 측 결정 (라벨이 없거나 매칭 안될 때 사용)
-const PLAINTIFF_SIDE_TYPES = new Set([
-  "plaintiff",
-  "creditor",
-  "applicant",
-  "actor",
-]);
-const DEFENDANT_SIDE_TYPES = new Set([
-  "defendant",
-  "debtor",
-  "respondent",
-  "third_debtor",
-  "accused",
-  "juvenile",
-]);
-
-function getPartySideFromType(partyType?: string | null): "plaintiff" | "defendant" | null {
-  if (!partyType) return null;
-  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return "plaintiff";
-  if (DEFENDANT_SIDE_TYPES.has(partyType)) return "defendant";
-  return null;
-}
 
 const FALLBACK_CASE_NUMBER_PATTERN = /\d{4}\s*[가-힣]+\s*\d+/;
 const FALLBACK_NORMALIZED_CASE_NUMBER_PATTERN = /^\d{4}[가-힣]+\d+$/;
@@ -492,7 +462,7 @@ function resolveCasePartyName(
 
     // 3b: 라벨로 안되면 party_type 기반 판단
     if (!partySide && party.party_type) {
-      partySide = getPartySideFromType(party.party_type);
+      partySide = getPartySide(party.party_type as PartyType);
     }
 
     // 3c: is_primary 플래그가 있으면 이 당사자가 의뢰인 측임
@@ -547,7 +517,7 @@ function substitutePartyListNames(
     );
     let side = getSideFromLabel(partyLabel);
     if (!side && party.party_type) {
-      side = getPartySideFromType(party.party_type);
+      side = getPartySide(party.party_type as PartyType);
     }
     if (side) {
       partiesBySide.get(side)!.push(party);
@@ -988,7 +958,6 @@ export function ScourtGeneralInfoXml({
     basicInfoKey,
     overriddenBasicInfo,
     basicInfoData,
-    confirmedParties,
     caseParties,
     clientName,
     clientSide,

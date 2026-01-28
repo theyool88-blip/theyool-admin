@@ -30,6 +30,10 @@ import {
   normalizePartyNameForMatch,
   PARTY_TYPE_LABELS,
   preservePrefix,
+  getPartySide,
+  PLAINTIFF_SIDE_TYPES,
+  DEFENDANT_SIDE_TYPES,
+  type PartyType,
 } from "@/types/case-party";
 import { COURTS, getCourtAbbrev } from "@/lib/scourt/court-codes";
 import {
@@ -127,7 +131,9 @@ interface LegalCase {
   scourt_enc_cs_no?: string | null;
   scourt_wmonid?: string | null;
   scourt_case_name?: string | null;
+  /** @deprecated Use case_clients table instead. Will be removed in future version. */
   client_role?: "plaintiff" | "defendant" | null;
+  /** @deprecated Use case_parties table instead. Will be removed in future version. */
   opponent_name?: string | null;
   case_result?: string | null;
 }
@@ -208,20 +214,6 @@ interface UnifiedScheduleItem {
 // 탭 타입 정의
 type TabType = "notice" | "general" | "progress";
 
-const PLAINTIFF_SIDE_TYPES = new Set([
-  "plaintiff",
-  "creditor",
-  "applicant",
-  "actor",
-]);
-const DEFENDANT_SIDE_TYPES = new Set([
-  "defendant",
-  "debtor",
-  "respondent",
-  "third_debtor",
-  "accused",
-  "juvenile",
-]);
 const PLAINTIFF_SIDE_LABELS = new Set(
   [
     "원고",
@@ -252,13 +244,6 @@ const DEFENDANT_SIDE_LABELS = new Set(
     "피해자",
   ].map((label) => normalizePartyLabel(label)),
 );
-
-const getPartySideFromType = (partyType?: string | null) => {
-  if (!partyType) return null;
-  if (PLAINTIFF_SIDE_TYPES.has(partyType)) return "plaintiff";
-  if (DEFENDANT_SIDE_TYPES.has(partyType)) return "defendant";
-  return null;
-};
 
 export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   const [_unifiedSchedules, setUnifiedSchedules] = useState<
@@ -729,13 +714,13 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     Object.values(pendingPartyEdits).forEach((edit) => {
       if (!edit.isPrimary) return;
       const party = partyById.get(edit.partyId);
-      const side = getPartySideFromType(party?.party_type || null);
+      const side = party?.party_type ? getPartySide(party.party_type as PartyType) : null;
       if (side) pendingPrimaryBySide.set(side, edit.partyId);
     });
 
     return caseParties.map((party) => {
       const edit = pendingPartyEdits[party.id];
-      const side = getPartySideFromType(party.party_type);
+      const side = getPartySide(party.party_type as PartyType);
       const forcedPrimaryId = side ? pendingPrimaryBySide.get(side) : null;
       const nextPrimary = forcedPrimaryId
         ? party.id === forcedPrimaryId
@@ -1489,7 +1474,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
     const primaryBySide = new Map<string, (typeof parties)[number]>();
     parties.forEach((p) => {
-      const side = getPartySideFromType(p.party_type);
+      const side = getPartySide(p.party_type as PartyType);
       if (!side) return;
       if (p.is_primary && !primaryBySide.has(side)) {
         primaryBySide.set(side, p);
@@ -1503,7 +1488,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     if (linkedPartyId) {
       const linkedParty = parties.find((p) => p.id === linkedPartyId);
       if (linkedParty) {
-        clientSide = getPartySideFromType(linkedParty.party_type);
+        clientSide = getPartySide(linkedParty.party_type as PartyType);
       }
     }
 
@@ -1511,7 +1496,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     if (!clientSide) {
       const primaryClientParty = parties.find((p) => p.is_primary);
       clientSide = primaryClientParty
-        ? getPartySideFromType(primaryClientParty.party_type)
+        ? getPartySide(primaryClientParty.party_type as PartyType)
         : null;
     }
 
@@ -1523,7 +1508,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     const pickSideParty = (side: "plaintiff" | "defendant") => {
       return (
         primaryBySide.get(side) ||
-        parties.find((p) => getPartySideFromType(p.party_type) === side) ||
+        parties.find((p) => getPartySide(p.party_type as PartyType) === side) ||
         null
       );
     };
@@ -1626,7 +1611,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       // SCOURT 데이터 추가
       scourtProgress: scourtSnapshot?.progress || [],
       scourtDocuments: scourtDocuments,
-      clientPartyType: caseData.client_role || null,
+      clientPartyType: primaryParties.clientSide || null,
       // 의뢰인 역할 확인용
       clientRoleStatus:
         (caseData as { client_role_status?: "provisional" | "confirmed" })
@@ -1644,7 +1629,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   }, [
     caseData.id,
     caseData.court_name,
-    caseData.client_role,
+    primaryParties.clientSide,
     (caseData as { client_role_status?: string }).client_role_status,
     caseData.client?.name,
     caseData.case_relations,
@@ -2272,9 +2257,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     ) => {
       const labelSide = getSideFromLabel(getCasePartyLabel(party));
       if (labelSide) return labelSide;
-      if (PLAINTIFF_SIDE_TYPES.has(party.party_type)) return "plaintiff";
-      if (DEFENDANT_SIDE_TYPES.has(party.party_type)) return "defendant";
-      return null;
+      return getPartySide(party.party_type as PartyType);
     };
 
     const heroPartyLabels = new Set(

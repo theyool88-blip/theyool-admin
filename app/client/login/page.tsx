@@ -8,7 +8,7 @@ function LoginContent() {
   const { status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const error = searchParams.get('error');
+  const error = searchParams?.get('error');
 
   useEffect(() => {
     if (status === 'authenticated') {

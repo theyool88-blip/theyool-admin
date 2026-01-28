@@ -406,6 +406,7 @@ export default function AdminSidebar({ isMobileOpen, onMobileClose }: AdminSideb
   }
 
   const isActive = (href: string) => {
+    if (!pathname) return false
     // 대시보드 페이지는 정확히 일치할 때만 활성화
     if (href === '/admin' || href === '/admin/homepage') {
       return pathname === href

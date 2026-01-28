@@ -279,7 +279,7 @@ export default function SuperAdminSidebar() {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:block w-[240px] bg-[--sa-bg-secondary] border-r border-[--sa-border-subtle] h-screen sticky top-0">
         <SidebarContent
-          pathname={pathname}
+          pathname={pathname || ''}
           expandedItems={expandedItems}
           toggleExpanded={toggleExpanded}
           setMobileMenuOpen={setMobileMenuOpen}
@@ -293,7 +293,7 @@ export default function SuperAdminSidebar() {
         }`}
       >
         <SidebarContent
-          pathname={pathname}
+          pathname={pathname || ''}
           expandedItems={expandedItems}
           toggleExpanded={toggleExpanded}
           setMobileMenuOpen={setMobileMenuOpen}

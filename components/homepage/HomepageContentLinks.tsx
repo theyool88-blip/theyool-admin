@@ -91,7 +91,7 @@ export default function HomepageContentLinks() {
     <nav className="flex items-center gap-1 p-1 bg-sage-50/50 rounded-lg border border-sage-100 overflow-x-auto">
       {contentLinks.map((link) => {
         const Icon = link.icon;
-        const isActive = link.exact ? pathname === link.href : pathname.startsWith(link.href);
+        const isActive = pathname ? (link.exact ? pathname === link.href : pathname.startsWith(link.href)) : false;
         const stat = stats?.[link.key as keyof Stats];
 
         return (

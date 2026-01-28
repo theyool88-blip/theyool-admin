@@ -11,11 +11,20 @@ import { getScourtSyncSettings } from '@/lib/scourt/sync-settings'
 import { buildScourtDedupKey, enqueueScourtSyncJobs, type ScourtSyncType } from '@/lib/scourt/sync-queue'
 import { getWmonidManager } from '@/lib/scourt/wmonid-manager'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+let _supabase: ReturnType<typeof createClient> | null = null
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
-const CRON_SECRET = process.env.CRON_SECRET || 'scourt-batch-sync-secret'
+function getCronSecret() {
+  return process.env.CRON_SECRET || 'scourt-batch-sync-secret'
+}
 const DEFAULT_MAX_ATTEMPTS = 5
 
 function sleep(ms: number) {
@@ -85,7 +94,7 @@ async function updateJobStatus(
   status: string,
   fields: Record<string, unknown>
 ) {
-  await supabase
+  await getSupabase()
     .from('scourt_sync_jobs')
     .update({
       status,
@@ -95,7 +104,7 @@ async function updateJobStatus(
 }
 
 async function logSync(action: string, status: string, details: Record<string, unknown>) {
-  await supabase.from('scourt_sync_logs').insert({
+  await getSupabase().from('scourt_sync_logs').insert({
     action,
     status,
     cases_synced: status === 'success' ? 1 : 0,
@@ -109,7 +118,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const secret = searchParams.get('secret')
 
-  if (secret !== CRON_SECRET) {
+  if (secret !== getCronSecret()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -127,7 +136,7 @@ export async function GET(request: NextRequest) {
     }
 
     const workerId = crypto.randomUUID()
-    const { data: jobs, error } = await supabase.rpc('dequeue_scourt_sync_jobs', {
+    const { data: jobs, error } = await getSupabase().rpc('dequeue_scourt_sync_jobs', {
       p_limit: settings.workerBatchSize,
       p_worker_id: workerId,
     })
@@ -236,7 +245,7 @@ export async function GET(request: NextRequest) {
         return
       }
 
-      const { data: legalCase, error: caseError } = await supabase
+      const { data: legalCase, error: caseError } = await getSupabase()
         .from('legal_cases')
         .select(
           'id, tenant_id, court_case_number, court_name, scourt_enc_cs_no, scourt_wmonid, scourt_sync_enabled, scourt_sync_cooldown_until, scourt_last_general_sync_at'
@@ -389,7 +398,7 @@ export async function GET(request: NextRequest) {
           const nextGeneralAt = new Date(
             Date.now() + settings.generalBackoffHours * 60 * 60 * 1000
           )
-          await supabase
+          await getSupabase()
             .from('legal_cases')
             .update({ scourt_next_general_sync_at: nextGeneralAt.toISOString() })
             .eq('id', legalCase.id)

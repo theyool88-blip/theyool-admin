@@ -28,15 +28,23 @@ import { parseCaseNumber, stripCourtPrefix } from '@/lib/scourt/case-number-util
 import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/lib/scourt/related-case-linker'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
-import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync'
 import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+let _supabase: ReturnType<typeof createClient> | null = null
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
-const CRON_SECRET = process.env.CRON_SECRET || 'batch-import-secret'
+function getCronSecret() {
+  return process.env.CRON_SECRET || 'batch-import-secret'
+}
 
 // Utility functions
 function sleep(ms: number): Promise<void> {
@@ -91,7 +99,7 @@ async function runWithConcurrency<T>(
 
 // Get import options from batch summary
 async function getBatchOptions(batchId: string): Promise<Partial<ImportOptions>> {
-  const { data } = await supabase
+  const { data } = await getSupabase()
     .from('batch_import_summaries')
     .select('options')
     .eq('batch_id', batchId)
@@ -140,7 +148,7 @@ async function processJob(
     const normalizedCourtName = getCourtFullName(row.court_name, parsed.caseType)
 
     // 2. Check for duplicates
-    const { data: existingCase } = await supabase
+    const { data: existingCase } = await getSupabase()
       .from('legal_cases')
       .select('id, case_name')
       .eq('tenant_id', job.tenant_id)
@@ -230,7 +238,7 @@ async function processJob(
     })
 
     if (row.client_name) {
-      const { data: existingClient } = await supabase
+      const { data: existingClient } = await getSupabase()
         .from('clients')
         .select('id, name')
         .eq('tenant_id', job.tenant_id)
@@ -244,7 +252,7 @@ async function processJob(
         console.log('[BatchImport] 기존 의뢰인 매칭:', { clientId })
       } else if (options.createNewClients !== false) {
         console.log('[BatchImport] 신규 의뢰인 생성 시도:', { name: row.client_name })
-        const { data: newClient, error: clientError } = await supabase
+        const { data: newClient, error: clientError } = await getSupabase()
           .from('clients')
           .insert([{
             tenant_id: job.tenant_id,
@@ -290,7 +298,7 @@ async function processJob(
 
       for (let idx = 0; idx < lawyerNames.length; idx++) {
         const lawyerName = lawyerNames[idx]
-        const { data: member } = await supabase
+        const { data: member } = await getSupabase()
           .from('tenant_members')
           .select('id')
           .eq('tenant_id', job.tenant_id)
@@ -307,7 +315,7 @@ async function processJob(
     }
 
     if (row.assigned_staff) {
-      const { data: staffMember } = await supabase
+      const { data: staffMember } = await getSupabase()
         .from('tenant_members')
         .select('id')
         .eq('tenant_id', job.tenant_id)
@@ -322,12 +330,6 @@ async function processJob(
     }
 
     // 6. Create case
-    const resolvedClientRoleStatus = determineClientRoleStatus({
-      explicitClientRole: row.client_role,
-      clientName: row.client_name,
-      opponentName: row.opponent_name,
-    })
-
     const caseData: Record<string, unknown> = {
       tenant_id: job.tenant_id,
       case_name: row.case_name || cleanedCaseNumber,
@@ -350,7 +352,7 @@ async function processJob(
       caseData.scourt_sync_status = 'synced'
     }
 
-    const { data: newCase, error: caseError } = await supabase
+    const { data: newCase, error: caseError } = await getSupabase()
       .from('legal_cases')
       .insert([caseData])
       .select()
@@ -384,7 +386,7 @@ async function processJob(
         scourt_synced: false,
       }))
 
-      const { data, error: partyError } = await supabase
+      const { data, error: partyError } = await getSupabase()
         .from('case_parties')
         .upsert(payload, { onConflict: 'case_id,party_type,party_name' })
         .select('id, party_name')
@@ -401,7 +403,7 @@ async function processJob(
     if (clientId) {
       const clientParty = insertedParties?.find(p => p.party_name === row.client_name)
       parallelOps.push((async () => {
-        const { error } = await supabase
+        const { error } = await getSupabase()
           .from('case_clients')
           .upsert({
             tenant_id: job.tenant_id,
@@ -424,7 +426,7 @@ async function processJob(
         is_primary: a.isPrimary,
       }))
       parallelOps.push((async () => {
-        const { error } = await supabase.from('case_assignees').upsert(assigneePayload, { onConflict: 'case_id,member_id' })
+        const { error } = await getSupabase().from('case_assignees').upsert(assigneePayload, { onConflict: 'case_id,member_id' })
         if (error) warnings.push({ field: 'case_assignees', message: `담당자 연결 실패: ${error.message}` })
       })())
     }
@@ -467,7 +469,7 @@ async function processJob(
           relatedCases: relatedCasesData,
         }).then(async (snapshotId) => {
           if (snapshotId) {
-            await supabase.from('legal_cases').update({ scourt_last_snapshot_id: snapshotId }).eq('id', newCase.id)
+            await getSupabase().from('legal_cases').update({ scourt_last_snapshot_id: snapshotId }).eq('id', newCase.id)
           }
           return { type: 'snapshot' }
         }).catch(e => ({ type: 'snapshot', error: e.message }))
@@ -477,7 +479,7 @@ async function processJob(
       if (lowerCourtData.length > 0 || relatedCasesData.length > 0) {
         syncOps.push(
           linkRelatedCases({
-            supabase, legalCaseId: newCase.id, tenantId: job.tenant_id,
+            supabase: getSupabase(), legalCaseId: newCase.id, tenantId: job.tenant_id,
             caseNumber: cleanedCaseNumber, caseType: parsed.caseType,
             relatedCases: relatedCasesData, lowerCourt: lowerCourtData,
           }).then(() => ({ type: 'related_cases' })).catch(e => ({ type: 'related_cases', error: e.message }))
@@ -487,7 +489,7 @@ async function processJob(
       // Party sync
       if (generalData?.parties?.length || generalData?.representatives?.length) {
         syncOps.push(
-          syncPartiesFromScourtServer(supabase, {
+          syncPartiesFromScourtServer(getSupabase(), {
             legalCaseId: newCase.id, tenantId: job.tenant_id,
             parties: generalData.parties || [], representatives: generalData.representatives || []
           }).then(() => ({ type: 'party_sync' })).catch(e => ({ type: 'party_sync', error: e.message }))
@@ -538,7 +540,7 @@ async function processJob(
 
 // Check if a batch is complete and send notification
 async function checkBatchCompletion(batchId: string): Promise<void> {
-  const { data: summary } = await supabase
+  const { data: summary } = await getSupabase()
     .from('batch_import_summaries')
     .select('*')
     .eq('batch_id', batchId)
@@ -550,7 +552,7 @@ async function checkBatchCompletion(batchId: string): Promise<void> {
   await updateBatchSummaryCounts(batchId)
 
   // Re-fetch updated summary
-  const { data: updatedSummary } = await supabase
+  const { data: updatedSummary } = await getSupabase()
     .from('batch_import_summaries')
     .select('*')
     .eq('batch_id', batchId)
@@ -569,7 +571,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const secret = searchParams.get('secret')
 
-  if (secret !== CRON_SECRET) {
+  if (secret !== getCronSecret()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -580,7 +582,7 @@ export async function GET(request: NextRequest) {
     const workerId = crypto.randomUUID()
 
     // Dequeue jobs
-    const { data: jobs, error } = await supabase.rpc('dequeue_batch_import_jobs', {
+    const { data: jobs, error } = await getSupabase().rpc('dequeue_batch_import_jobs', {
       p_limit: settings.workerBatchSize,
       p_worker_id: workerId,
     })

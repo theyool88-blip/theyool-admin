@@ -4,19 +4,20 @@
  * POST /api/admin/tenant/api-keys - 새 API 키 발급
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/with-tenant';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
 const getServiceClient = () => {
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: { persistSession: false },
+    }
+  );
 };
 
 // GET - API 키 목록 조회

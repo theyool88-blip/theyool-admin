@@ -4,18 +4,19 @@
  * PUT /api/admin/tenant/homepage - 홈페이지 설정 저장
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/with-tenant';
 import { createClient } from '@supabase/supabase-js';
-import { TenantHomepageSettings, OfficeLocation } from '@/types/tenant';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { TenantHomepageSettings } from '@/types/tenant';
 
 const getServiceClient = () => {
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: { persistSession: false },
+    }
+  );
 };
 
 // 기본 홈페이지 설정

@@ -5,7 +5,7 @@
  * POST /api/admin/tenant/alerts/test - 테스트 알림 발송
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { withRole } from '@/lib/api/with-tenant';
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -15,13 +15,14 @@ import {
   sendEmailAlert,
 } from '@/lib/notifications/alert-service';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
 const getServiceClient = () => {
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: { persistSession: false },
+    }
+  );
 };
 
 // GET - 알림 설정 조회

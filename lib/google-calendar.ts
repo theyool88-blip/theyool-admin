@@ -13,13 +13,19 @@ const DRIVE_SCOPES = ['https://www.googleapis.com/auth/drive.readonly'];
 const SCOPES = CALENDAR_SCOPES;
 
 // =====================================================
-// OAuth2 Client (공용)
+// OAuth2 Client (공용) - Lazy initialization for Cloudflare Workers compatibility
 // =====================================================
-const oauth2Client = new google.auth.OAuth2(
-  process.env.GOOGLE_CALENDAR_CLIENT_ID,
-  process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
-  `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/callback/google`
-);
+let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null;
+function getOAuth2Client() {
+  if (!_oauth2Client) {
+    _oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CALENDAR_CLIENT_ID,
+      process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/callback/google`
+    );
+  }
+  return _oauth2Client;
+}
 
 // =====================================================
 // 기존 함수들 (하위 호환성)
@@ -27,7 +33,7 @@ const oauth2Client = new google.auth.OAuth2(
 
 /** @deprecated Use getTenantAuthUrl instead */
 export function getAuthUrl() {
-  return oauth2Client.generateAuthUrl({
+  return getOAuth2Client().generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent',
@@ -35,23 +41,23 @@ export function getAuthUrl() {
 }
 
 export async function getTokensFromCode(code: string) {
-  const { tokens } = await oauth2Client.getToken(code);
+  const { tokens } = await getOAuth2Client().getToken(code);
   return tokens;
 }
 
 export function setCredentials(tokens: { access_token?: string | null; refresh_token?: string | null }) {
-  oauth2Client.setCredentials(tokens);
+  getOAuth2Client().setCredentials(tokens);
 }
 
 export async function refreshAccessToken(refreshToken: string) {
-  oauth2Client.setCredentials({ refresh_token: refreshToken });
-  const { credentials } = await oauth2Client.refreshAccessToken();
+  getOAuth2Client().setCredentials({ refresh_token: refreshToken });
+  const { credentials } = await getOAuth2Client().refreshAccessToken();
   return credentials;
 }
 
 export async function getCalendarList(accessToken: string) {
-  oauth2Client.setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  getOAuth2Client().setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
 
   const response = await calendar.calendarList.list();
   return response.data.items || [];
@@ -66,8 +72,8 @@ export async function getCalendarEvents(
     maxResults?: number;
   }
 ) {
-  oauth2Client.setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  getOAuth2Client().setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
 
   const response = await calendar.events.list({
     calendarId,
@@ -81,7 +87,7 @@ export async function getCalendarEvents(
   return response.data.items || [];
 }
 
-export { oauth2Client };
+export { getOAuth2Client };
 
 // =====================================================
 // 테넌트별 OAuth 함수들 (신규)
@@ -118,7 +124,7 @@ export async function getTenantAuthUrl(
   // Scopes 선택
   const scopes = provider === 'google_calendar' ? CALENDAR_SCOPES : DRIVE_SCOPES;
 
-  return oauth2Client.generateAuthUrl({
+  return getOAuth2Client().generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
     prompt: 'consent',
@@ -447,8 +453,8 @@ export async function createCalendarEvent(
   calendarId: string,
   eventData: CalendarEventData
 ): Promise<{ id: string; htmlLink: string } | null> {
-  oauth2Client.setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  getOAuth2Client().setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
 
   try {
     const response = await calendar.events.insert({
@@ -492,8 +498,8 @@ export async function updateCalendarEvent(
   eventId: string,
   eventData: Partial<CalendarEventData>
 ): Promise<boolean> {
-  oauth2Client.setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  getOAuth2Client().setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
 
   try {
     const updateBody: Record<string, unknown> = {};
@@ -538,8 +544,8 @@ export async function deleteCalendarEvent(
   calendarId: string,
   eventId: string
 ): Promise<boolean> {
-  oauth2Client.setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  getOAuth2Client().setCredentials({ access_token: accessToken });
+  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
 
   try {
     await calendar.events.delete({

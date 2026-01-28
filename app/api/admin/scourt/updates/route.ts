@@ -9,9 +9,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 /**
  * 업데이트 목록 조회
@@ -27,7 +34,7 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     // 쿼리 빌드
-    let query = supabase
+    let query = getSupabase()
       .from('scourt_case_updates')
       .select(
         `
@@ -116,7 +123,7 @@ export async function PATCH(request: NextRequest) {
     const timestampColumn =
       readBy === 'admin' ? 'read_at_admin' : 'read_at_client';
 
-    const { data, error } = await supabase
+    const { data, error } = await getSupabase()
       .from('scourt_case_updates')
       .update({
         [column]: true,
@@ -160,7 +167,7 @@ export async function POST(request: NextRequest) {
       const since = new Date();
       since.setDate(since.getDate() - daysBack);
 
-      const query = supabase
+      const query = getSupabase()
         .from('scourt_case_updates')
         .select(
           `
@@ -244,7 +251,7 @@ export async function POST(request: NextRequest) {
       const column =
         readBy === 'admin' ? 'is_read_by_admin' : 'is_read_by_client';
 
-      let query = supabase
+      let query = getSupabase()
         .from('scourt_case_updates')
         .select('legal_case_id', { count: 'exact' })
         .eq(column, false);

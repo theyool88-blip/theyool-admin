@@ -13,12 +13,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 // 크론 시크릿 (환경변수에서 설정)
-const CRON_SECRET = process.env.CRON_SECRET || 'scourt-batch-sync-secret';
+function getCronSecret() {
+  return process.env.CRON_SECRET || 'scourt-batch-sync-secret';
+}
 
 // 동기화 설정
 const SYNC_CONFIG = {
@@ -162,7 +171,7 @@ export async function GET(request: NextRequest) {
   const secret = searchParams.get('secret');
   const useParallel = searchParams.get('parallel') === 'true';
 
-  if (secret !== CRON_SECRET) {
+  if (secret !== getCronSecret()) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -174,7 +183,7 @@ export async function GET(request: NextRequest) {
     const minSyncTime = new Date();
     minSyncTime.setHours(minSyncTime.getHours() - SYNC_CONFIG.minHoursSinceLastSync);
 
-    const { data: cases, error: casesError } = await supabase
+    const { data: cases, error: casesError } = await getSupabase()
       .from('legal_cases')
       .select(`
         id,
@@ -230,7 +239,7 @@ export async function GET(request: NextRequest) {
 
     // 5. 동기화 로그 저장
     try {
-      await supabase.from('scourt_sync_logs').insert({
+      await getSupabase().from('scourt_sync_logs').insert({
         action: 'batch_sync',
         status: failedCount === 0 ? 'success' : 'partial',
         cases_synced: successCount,

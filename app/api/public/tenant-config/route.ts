@@ -9,7 +9,7 @@
  * - 예약 가능 시간 등
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import {
   withPublicApi,
@@ -19,13 +19,14 @@ import {
 } from '@/lib/api/public-api';
 import { TenantPublicConfig, OfficeLocation } from '@/types/tenant';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
 const getServiceClient = () => {
-  return createClient(supabaseUrl, supabaseServiceKey, {
-    auth: { persistSession: false },
-  });
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      auth: { persistSession: false },
+    }
+  );
 };
 
 // OPTIONS (CORS preflight)

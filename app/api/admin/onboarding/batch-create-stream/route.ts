@@ -9,13 +9,11 @@
  */
 
 import { NextRequest } from 'next/server'
-import * as fs from 'fs'
 
-// 디버그 로그를 파일에 저장
+// 디버그 로그
 function debugLog(message: string, data?: unknown) {
   const logLine = `[${new Date().toISOString()}] ${message} ${data ? JSON.stringify(data) : ''}\n`
   console.log(logLine.trim())
-  fs.appendFileSync('/tmp/import-debug.log', logLine)
 }
 import { getCurrentTenantContext } from '@/lib/auth/tenant-context'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -28,7 +26,6 @@ import { parseCaseNumber, stripCourtPrefix } from '@/lib/scourt/case-number-util
 import { getCourtFullName } from '@/lib/scourt/court-codes'
 import { linkRelatedCases, type RelatedCaseData, type LowerCourtData } from '@/lib/scourt/related-case-linker'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
-import { determineClientRoleStatus } from '@/lib/case/client-role-utils'
 import { syncPartiesFromScourtServer } from '@/lib/scourt/party-sync'
 import { syncHearingsToCourtHearings } from '@/lib/scourt/hearing-sync'
 
@@ -447,13 +444,6 @@ export async function POST(request: NextRequest) {
             }
 
             // 4-3. 사건 생성 (대법원 연동 여부에 따라 다르게 처리)
-            // client_role_status 결정
-            const resolvedClientRoleStatus = determineClientRoleStatus({
-              explicitClientRole: row.client_role,
-              clientName: row.client_name,
-              opponentName: row.opponent_name
-            })
-
             // 정제된 사건번호, 정규화된 법원명 사용
             // 참고: client_id, client_role, client_role_status, opponent_name, retainer_fee, success_fee_agreement는
             //       legal_cases 테이블에서 제거됨 (case_clients, case_parties 테이블로 이동)

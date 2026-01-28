@@ -12,12 +12,21 @@ import { getCaseMigrator } from '@/lib/scourt/case-migrator';
 import { getScourtSyncSettings } from '@/lib/scourt/sync-settings';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+let _supabase: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
 
 // 크론 시크릿
-const CRON_SECRET = process.env.CRON_SECRET || 'scourt-batch-sync-secret';
+function getCronSecret() {
+  return process.env.CRON_SECRET || 'scourt-batch-sync-secret';
+}
 
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -26,7 +35,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const secret = searchParams.get('secret');
 
-  if (secret !== CRON_SECRET) {
+  if (secret !== getCronSecret()) {
     return NextResponse.json(
       { error: 'Unauthorized' },
       { status: 401 }
@@ -89,7 +98,7 @@ export async function GET(request: NextRequest) {
           renewedCount++;
 
           // 마이그레이션 결과 확인
-          const { data: migratedData } = await supabase
+          const { data: migratedData } = await getSupabase()
             .from('scourt_profile_cases')
             .select('id')
             .eq('wmonid', newWmonid.wmonid);
@@ -129,7 +138,7 @@ export async function GET(request: NextRequest) {
 
     // 4. 로그 저장
     try {
-      await supabase.from('scourt_sync_logs').insert({
+      await getSupabase().from('scourt_sync_logs').insert({
         action: 'wmonid_renewal',
         status: failedWmonids === 0 ? 'success' : 'partial',
         cases_synced: migratedCases,

@@ -13,11 +13,20 @@ import { createClient } from '@supabase/supabase-js'
 import { getScourtSyncSettings } from '@/lib/scourt/sync-settings'
 import { buildScourtDedupKey, enqueueScourtSyncJobs, type ScourtSyncJobInput } from '@/lib/scourt/sync-queue'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+let _supabase: ReturnType<typeof createClient> | null = null
+function getSupabase() {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+  }
+  return _supabase
+}
 
-const CRON_SECRET = process.env.CRON_SECRET || 'scourt-batch-sync-secret'
+function getCronSecret() {
+  return process.env.CRON_SECRET || 'scourt-batch-sync-secret'
+}
 
 function hashToOffset(value: string, range: number): number {
   const hash = crypto.createHash('sha256').update(value).digest('hex')
@@ -68,7 +77,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const secret = searchParams.get('secret')
 
-  if (secret !== CRON_SECRET) {
+  if (secret !== getCronSecret()) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -89,7 +98,7 @@ export async function GET(request: NextRequest) {
     const intervalMinutes = Math.max(1, Math.round(settings.progressIntervalHours * 60))
     const fetchLimit = Math.max(settings.schedulerBatchSize * 2, settings.schedulerBatchSize)
 
-    let query = supabase
+    let query = getSupabase()
       .from('legal_cases')
       .select(
         'id, tenant_id, court_case_number, status, scourt_enc_cs_no, scourt_wmonid, scourt_next_progress_sync_at, scourt_sync_cooldown_until, case_result, case_result_date'
@@ -183,7 +192,7 @@ export async function GET(request: NextRequest) {
 
     if (initialUpdates.length > 0) {
       for (const update of initialUpdates) {
-        await supabase
+        await getSupabase()
           .from('legal_cases')
           .update({ scourt_next_progress_sync_at: update.nextProgressAt })
           .eq('id', update.id)
@@ -192,7 +201,7 @@ export async function GET(request: NextRequest) {
 
     if (updates.length > 0) {
       for (const update of updates) {
-        await supabase
+        await getSupabase()
           .from('legal_cases')
           .update({ scourt_next_progress_sync_at: update.nextProgressAt })
           .eq('id', update.id)
@@ -206,7 +215,7 @@ export async function GET(request: NextRequest) {
       const renewalDate = new Date()
       renewalDate.setDate(renewalDate.getDate() + settings.wmonid.renewalBeforeDays)
 
-      const { data: wmonids, error: wmonidError } = await supabase
+      const { data: wmonids, error: wmonidError } = await getSupabase()
         .from('scourt_user_wmonid')
         .select('id, user_id, expires_at, status')
         .lte('expires_at', renewalDate.toISOString())
@@ -237,7 +246,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    await supabase.from('scourt_sync_logs').insert({
+    await getSupabase().from('scourt_sync_logs').insert({
       action: 'scheduler',
       status: 'success',
       cases_synced: jobInsertResult.inserted,

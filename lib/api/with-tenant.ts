@@ -33,7 +33,7 @@ function errorResponse(message: string, status: number) {
 export function withTenant(handler: TenantHandler) {
   return async (
     request: NextRequest,
-    segmentData?: { params?: Promise<Record<string, string>> }
+    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
   ) => {
     try {
       const tenant = await getCurrentTenantContext();
@@ -66,7 +66,7 @@ export function withRole(requiredRole: MemberRole) {
   return function (handler: TenantHandler) {
     return async (
       request: NextRequest,
-      segmentData?: { params?: Promise<Record<string, string>> }
+      segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
     ) => {
       try {
         const tenant = await getCurrentTenantContext();
@@ -110,7 +110,7 @@ export function withRole(requiredRole: MemberRole) {
 export function withSuperAdmin(handler: SuperAdminHandler) {
   return async (
     request: NextRequest,
-    segmentData?: { params?: Promise<Record<string, string>> }
+    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
   ) => {
     try {
       const isSuperAdminUser = await checkSuperAdmin();
@@ -138,7 +138,7 @@ export function withSuperAdmin(handler: SuperAdminHandler) {
 export function withTenantOrSuperAdmin(handler: TenantHandler) {
   return async (
     request: NextRequest,
-    segmentData?: { params?: Promise<Record<string, string>> }
+    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
   ) => {
     try {
       const tenant = await getCurrentTenantContext();
@@ -184,7 +184,7 @@ export function withOptionalTenant(
 ) {
   return async (
     request: NextRequest,
-    segmentData?: { params?: Promise<Record<string, string>> }
+    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
   ) => {
     try {
       const tenant = await getCurrentTenantContext();

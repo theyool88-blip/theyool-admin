@@ -1,0 +1,56 @@
+# Cloudflare Pages configuration for luseed
+# This file configures deployment settings, bindings, and scheduled tasks
+
+# Application name (must match Cloudflare Pages project name)
+name = "luseed"
+
+# Cloudflare Workers compatibility date
+# Controls which runtime features and behaviors are available
+compatibility_date = "2024-09-23"
+
+# Enable Node.js compatibility for standard Node APIs
+compatibility_flags = ["nodejs_compat"]
+
+# OpenNext build output directory for Next.js on Cloudflare
+# This is where the OpenNext adapter places the compiled application
+pages_build_output_dir = ".open-next"
+
+# R2 Bucket Binding
+# Provides access to Cloudflare R2 object storage for file uploads
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "luseed-files"
+
+# Hyperdrive Database Binding
+# Accelerates database connections via Cloudflare's connection pooling
+# Note: The actual Hyperdrive ID must be configured after creating the Hyperdrive config
+[[hyperdrive]]
+binding = "HYPERDRIVE"
+id = "88b70aa08a7e4f7bbbf3f97e75c1f746"
+
+# Scheduled Tasks (Cron Triggers)
+# These run serverless functions on specified schedules
+
+# Daily reminders at midnight UTC
+# Sends notifications for upcoming hearings and deadlines
+[[triggers.crons]]
+schedule = "0 0 * * *"
+name = "daily-reminders"
+
+# Supreme Court sync scheduler - every 10 minutes
+# Checks for new cases that need to be synced from the Supreme Court system
+[[triggers.crons]]
+schedule = "*/10 * * * *"
+name = "scourt-sync-scheduler"
+
+# Supreme Court sync worker - every 2 minutes
+# Processes queued sync jobs to fetch case data
+[[triggers.crons]]
+schedule = "*/2 * * * *"
+name = "scourt-sync-worker"
+
+# Batch import worker - every minute
+# Processes queued batch import jobs for bulk case uploads
+[[triggers.crons]]
+schedule = "* * * * *"
+name = "batch-import-worker"

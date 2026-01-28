@@ -47,6 +47,7 @@ export interface ApiEvent {
   case_id?: string | null
   description?: string | null
   status?: string | null
+  scourt_result_raw?: string | null
   attending_lawyer_id?: string | null
   attending_lawyer_name?: string | null
   video_participant_side?: string | null
@@ -74,6 +75,7 @@ export interface BigCalendarEvent {
   caseNumber?: string
   caseName?: string
   status?: string
+  scourtResultRaw?: string
   attendingLawyerId?: string
   attendingLawyerName?: string
   videoParticipantSide?: string
@@ -124,6 +126,7 @@ export interface UnifiedSchedule {
   case_id?: string
   notes?: string
   status?: string
+  scourtResultRaw?: string
   daysUntil?: number
   hearing_type?: string
   event_subtype?: string
@@ -164,13 +167,17 @@ export const EVENT_TYPE_LABELS: Record<string, string> = {
 }
 
 export const HEARING_TYPE_LABELS: Record<string, string> = {
-  HEARING_TRIAL: '변론',
+  HEARING_MAIN: '변론',           // DB primary enum
+  HEARING_INTERIM: '중간심문',     // DB enum
+  HEARING_TRIAL: '변론',          // legacy/alias
   HEARING_PREPARATION: '준비',
   HEARING_MEDIATION: '조정',
   HEARING_JUDGMENT: '선고',
   HEARING_LAWYER_MEETING: '미팅',
   HEARING_PARENTING: '양육',
   HEARING_INVESTIGATION: '조사',
+  HEARING_SENTENCE: '형사선고',    // DB enum
+  HEARING_EXAMINATION: '증인신문', // DB enum
   HEARING_OTHER: '기타',
 }
 

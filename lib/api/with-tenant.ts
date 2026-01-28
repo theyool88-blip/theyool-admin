@@ -8,6 +8,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getCurrentTenantContext, isSuperAdmin as checkSuperAdmin } from '@/lib/auth/tenant-context';
 import type { TenantContext, MemberRole } from '@/types/tenant';
 
+// Next.js 16+ route handler context type
+type RouteSegmentData = {
+  params: Promise<Record<string, string | string[] | undefined>>;
+};
+
 // API 핸들러 타입 (Next.js 16+ 호환)
 type TenantHandler = (
   request: NextRequest,
@@ -24,6 +29,19 @@ function errorResponse(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
 }
 
+// params를 Record<string, string>로 변환 (string[] → 첫번째 값)
+function normalizeParams(raw: Record<string, string | string[] | undefined>): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (typeof value === 'string') {
+      result[key] = value;
+    } else if (Array.isArray(value) && value.length > 0) {
+      result[key] = value[0];
+    }
+  }
+  return result;
+}
+
 /**
  * 테넌트 인증 래퍼
  * - 로그인 확인
@@ -33,7 +51,7 @@ function errorResponse(message: string, status: number) {
 export function withTenant(handler: TenantHandler) {
   return async (
     request: NextRequest,
-    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
+    segmentData: RouteSegmentData
   ) => {
     try {
       const tenant = await getCurrentTenantContext();
@@ -47,8 +65,9 @@ export function withTenant(handler: TenantHandler) {
         return errorResponse('Unauthorized: No tenant access', 401);
       }
 
-      // Next.js 16+: params가 Promise인 경우 await
-      const params = segmentData?.params ? await segmentData.params : undefined;
+      // Next.js 16+: params는 항상 Promise
+      const rawParams = await segmentData.params;
+      const params = normalizeParams(rawParams);
 
       return handler(request, { tenant, params });
     } catch (error) {
@@ -66,7 +85,7 @@ export function withRole(requiredRole: MemberRole) {
   return function (handler: TenantHandler) {
     return async (
       request: NextRequest,
-      segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
+      segmentData: RouteSegmentData
     ) => {
       try {
         const tenant = await getCurrentTenantContext();
@@ -92,8 +111,9 @@ export function withRole(requiredRole: MemberRole) {
           }
         }
 
-        // Next.js 16+: params가 Promise인 경우 await
-        const params = segmentData?.params ? await segmentData.params : undefined;
+        // Next.js 16+: params는 항상 Promise
+        const rawParams = await segmentData.params;
+        const params = normalizeParams(rawParams);
 
         return handler(request, { tenant, params });
       } catch (error) {
@@ -110,7 +130,7 @@ export function withRole(requiredRole: MemberRole) {
 export function withSuperAdmin(handler: SuperAdminHandler) {
   return async (
     request: NextRequest,
-    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
+    segmentData: RouteSegmentData
   ) => {
     try {
       const isSuperAdminUser = await checkSuperAdmin();
@@ -119,8 +139,9 @@ export function withSuperAdmin(handler: SuperAdminHandler) {
         return errorResponse('Forbidden: Super admin access required', 403);
       }
 
-      // Next.js 16+: params가 Promise인 경우 await
-      const params = segmentData?.params ? await segmentData.params : undefined;
+      // Next.js 16+: params는 항상 Promise
+      const rawParams = await segmentData.params;
+      const params = normalizeParams(rawParams);
 
       return handler(request, { params });
     } catch (error) {
@@ -138,7 +159,7 @@ export function withSuperAdmin(handler: SuperAdminHandler) {
 export function withTenantOrSuperAdmin(handler: TenantHandler) {
   return async (
     request: NextRequest,
-    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
+    segmentData: RouteSegmentData
   ) => {
     try {
       const tenant = await getCurrentTenantContext();
@@ -147,8 +168,9 @@ export function withTenantOrSuperAdmin(handler: TenantHandler) {
         return errorResponse('Unauthorized: Not authenticated', 401);
       }
 
-      // Next.js 16+: params가 Promise인 경우 await
-      const params = segmentData?.params ? await segmentData.params : undefined;
+      // Next.js 16+: params는 항상 Promise
+      const rawParams = await segmentData.params;
+      const params = normalizeParams(rawParams);
 
       // 슈퍼 어드민인 경우 특정 테넌트 ID를 쿼리에서 가져올 수 있음
       if (tenant.isSuperAdmin && !tenant.tenantId) {
@@ -184,13 +206,14 @@ export function withOptionalTenant(
 ) {
   return async (
     request: NextRequest,
-    segmentData: { params?: Promise<Record<string, string | string[] | undefined>> }
+    segmentData: RouteSegmentData
   ) => {
     try {
       const tenant = await getCurrentTenantContext();
 
-      // Next.js 16+: params가 Promise인 경우 await
-      const params = segmentData?.params ? await segmentData.params : undefined;
+      // Next.js 16+: params는 항상 Promise
+      const rawParams = await segmentData.params;
+      const params = normalizeParams(rawParams);
 
       return handler(request, { tenant, params });
     } catch (error) {

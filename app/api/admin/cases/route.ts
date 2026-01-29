@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { withTenant, withTenantId } from '@/lib/api/with-tenant'
-import { SCOURT_RELATION_MAP, determineRelationDirection } from '@/lib/scourt/case-relations'
+import { SCOURT_RELATION_MAP, determineRelationDirection, inferCaseLevelFromType } from '@/lib/scourt/case-relations'
 import { buildManualPartySeeds } from '@/lib/case/party-seeds'
 // determineClientRoleStatus removed - client_role now stored in case_parties
 import { getCourtFullName } from '@/lib/scourt/court-codes'
@@ -360,6 +360,11 @@ export const POST = withTenant(async (request, { tenant }) => {
         )
       : null
 
+    // 심급 추론: 사건번호에서 사건유형 코드로 심급 결정
+    const inferredCaseLevel = parsedCourtNumber?.valid && parsedCourtNumber.caseType
+      ? inferCaseLevelFromType(parsedCourtNumber.caseType)
+      : null
+
     // 중복 사건 검사 (사건번호가 있으면 중복 체크)
     if (cleanedCaseNumber) {
       let query = adminClient
@@ -411,6 +416,7 @@ export const POST = withTenant(async (request, { tenant }) => {
         court_case_number: cleanedCaseNumber,
         court_name: resolvedCourtName,
         judge_name: body.judge_name || null,
+        case_level: inferredCaseLevel,  // 심급 (사건번호에서 추론)
       }, tenant)])
       .select()
       .single()

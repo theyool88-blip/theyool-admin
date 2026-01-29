@@ -34,7 +34,6 @@ interface LegalCase {
   court_case_number: string | null
   court_name: string | null
   case_type: string | null
-  application_type: string | null
   judge_name: string | null
   notes: string | null
   onedrive_folder_url: string | null
@@ -207,7 +206,6 @@ export default function CaseEditForm({
     court_case_number: caseData.court_case_number || '',
     court_name: getCourtAbbrev(caseData.court_name || ''),
     case_type: caseData.case_type || '',
-    application_type: caseData.application_type || '',
     judge_name: caseData.judge_name || '',
     notes: caseData.notes || '',
     onedrive_folder_url: caseData.onedrive_folder_url || '',
@@ -302,21 +300,35 @@ export default function CaseEditForm({
 
     // 담당자 목록 불러오기
     fetch('/api/admin/tenant/members?role=lawyer,admin,owner')
-      .then(res => res.json())
+      .then(res => {
+        console.log('[CaseEditForm] tenant members response status:', res.status)
+        return res.json()
+      })
       .then(data => {
-        if (data.members) {
-          setLawyerMembers(data.members)
+        console.log('[CaseEditForm] tenant members data:', data)
+        // API 응답 구조: { success: true, data: { members: [...] } }
+        const members = data.data?.members || data.members || []
+        if (members.length > 0) {
+          console.log('[CaseEditForm] Setting lawyerMembers:', members.length, 'members')
+          setLawyerMembers(members)
+        } else {
+          console.warn('[CaseEditForm] No members found in response')
         }
       })
-      .catch(err => console.error('담당자 목록 조회 실패:', err))
+      .catch(err => console.error('[CaseEditForm] 담당자 목록 조회 실패:', err))
 
     // 담당변호사 목록 불러오기 (case_assignees)
     fetch(`/api/admin/cases/${caseData.id}/assignees`)
       .then(res => res.json())
       .then(data => {
         if (data.success && data.assignees) {
-          const assignees = data.assignees.map((a: { memberId: string; isPrimary: boolean }) => ({
+          const assignees = data.assignees.map((a: {
+            memberId: string;
+            assigneeRole?: 'lawyer' | 'staff';
+            isPrimary: boolean
+          }) => ({
             member_id: a.memberId,
+            assignee_role: a.assigneeRole,
             is_primary: a.isPrimary
           }))
           setFormData(prev => ({ ...prev, assignees }))
@@ -379,7 +391,7 @@ export default function CaseEditForm({
       if (result.success && result.caseInfo) {
         setFormData(prev => ({
           ...prev,
-          court_name: getCourtAbbrev(result.caseInfo.courtName || prev.court_name),
+          court_name: result.caseInfo.courtName ? getCourtAbbrev(result.caseInfo.courtName) : prev.court_name,
           client_role: result.caseInfo.clientRole || prev.client_role,
           scourt_enc_cs_no: result.caseInfo.encCsNo || prev.scourt_enc_cs_no,
         }))
@@ -772,6 +784,22 @@ export default function CaseEditForm({
                       </svg>
                     </div>
                   </div>
+                  {/* 선택된 의뢰인 정보 표시 */}
+                  {formData.client_id && allClients.find(c => c.id === formData.client_id) && (
+                    <div className="mt-2 p-3 bg-[var(--bg-tertiary)] rounded-lg text-sm flex items-center justify-between">
+                      <span className="text-[var(--text-secondary)]">
+                        {allClients.find(c => c.id === formData.client_id)?.phone || '연락처 미등록'}
+                      </span>
+                      <a
+                        href={`/admin/clients/${formData.client_id}/edit`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--sage-primary)] hover:underline text-xs"
+                      >
+                        의뢰인 정보 수정
+                      </a>
+                    </div>
+                  )}
                 </FormField>
 
                 <FormField label="의뢰인 역할">

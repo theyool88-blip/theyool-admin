@@ -63,7 +63,6 @@ export const PATCH = withTenant(async (
         court_case_number: body.court_case_number || null,
         court_name: resolvedCourtName,
         case_type: body.case_type || null,
-        application_type: body.application_type || null,
         judge_name: body.judge_name || null,
         notes: body.notes || null,
         onedrive_folder_url: body.onedrive_folder_url || null,

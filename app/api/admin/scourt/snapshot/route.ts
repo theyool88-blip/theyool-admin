@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { transformHearings, transformProgress } from '@/lib/scourt/field-transformer';
 import { getScourtApiClient } from '@/lib/scourt/api-client';
-import { scrapeProgress } from '@/lib/scourt/progress-scraper';
+// Note: scrapeProgress (puppeteer) removed for Cloudflare compatibility
 import { extractRawData } from '@/lib/scourt/dynamic-renderer';
 import { getCourtCodeByName, getCourtFullName } from '@/lib/scourt/court-codes';
 
@@ -123,16 +123,17 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/admin/scourt/snapshot
- * Puppeteer를 사용하여 진행내용 + 기본정보 새로고침
+ * API를 사용하여 진행내용 + 기본정보 새로고침
  *
  * 요청 body:
  * - caseId: 사건 ID
- * - useScraper: Puppeteer 스크래퍼 사용 여부 (기본: true)
+ *
+ * Note: Puppeteer 스크래퍼는 서버리스 환경(Cloudflare)에서 지원되지 않아 제거됨
  */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { caseId, useScraper = true } = body;
+    const { caseId } = body;
 
     if (!caseId) {
       return NextResponse.json(
@@ -166,101 +167,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`📍 스냅샷 새로고침 시작: ${legalCase.court_case_number} (${caseId})`);
 
-    // Puppeteer 스크래퍼 사용 (기본값)
-    if (useScraper) {
-      console.log('🌐 Puppeteer 스크래퍼로 데이터 추출 중...');
-
-      try {
-        const scrapeResult = await scrapeProgress(legalCase.court_case_number);
-
-        if (!scrapeResult.success) {
-          console.log(`⚠️ 스크래퍼 실패: ${scrapeResult.error}`);
-          // 스크래퍼 실패 시 API fallback
-        } else {
-          console.log(`✅ 스크래퍼 성공: 진행내용 ${scrapeResult.progress.length}건`);
-
-          // 기존 스냅샷 조회
-          const { data: existingSnapshot } = await supabase
-            .from('scourt_case_snapshots')
-            .select('id, basic_info')
-            .eq('legal_case_id', caseId)
-            .order('scraped_at', { ascending: false })
-            .limit(1)
-            .single();
-
-          // 진행내용 DB 형식 변환
-          const progressForDb = scrapeResult.progress.map(p => ({
-            prcdDt: p.date.replace(/\./g, ''),
-            prcdNm: p.content,
-            prcdRslt: p.result,
-          }));
-
-          // basicInfo 병합 (기존 + 새로 추출된 정보)
-          const existingBasicInfo = existingSnapshot?.basic_info || {};
-          const updatedBasicInfo = {
-            ...existingBasicInfo,
-            ...(scrapeResult.basicInfo || {}),
-          };
-
-          if (existingSnapshot) {
-            const { error: updateError } = await supabase
-              .from('scourt_case_snapshots')
-              .update({
-                progress: progressForDb,
-                basic_info: updatedBasicInfo,
-                scraped_at: new Date().toISOString(),
-              })
-              .eq('id', existingSnapshot.id);
-
-            if (updateError) {
-              console.error('스냅샷 업데이트 실패:', updateError);
-              return NextResponse.json(
-                { error: '스냅샷 업데이트 실패' },
-                { status: 500 }
-              );
-            }
-            console.log(`📸 스냅샷 업데이트 완료 (스크래퍼): ${existingSnapshot.id}`);
-          } else {
-            const { error: insertError } = await supabase
-              .from('scourt_case_snapshots')
-              .insert({
-                legal_case_id: caseId,
-                case_number: legalCase.court_case_number,
-                progress: progressForDb,
-                basic_info: updatedBasicInfo,
-                hearings: [],
-                documents: [],
-                lower_court: [],
-                related_cases: [],
-              });
-
-            if (insertError) {
-              console.error('스냅샷 생성 실패:', insertError);
-              return NextResponse.json(
-                { error: '스냅샷 생성 실패' },
-                { status: 500 }
-              );
-            }
-            console.log('📸 새 스냅샷 생성 완료 (스크래퍼)');
-          }
-
-          const transformedProgress = transformProgress(progressForDb);
-
-          return NextResponse.json({
-            success: true,
-            method: 'scraper',
-            progressCount: scrapeResult.progress.length,
-            progress: transformedProgress,
-            basicInfo: scrapeResult.basicInfo,
-          });
-        }
-      } catch (scrapeError) {
-        console.error('스크래퍼 에러:', scrapeError);
-        // API fallback 계속 진행
-      }
-    }
-
-    // API fallback (기존 로직)
+    // API를 통한 진행내용 조회
     if (!legalCase.scourt_enc_cs_no || !legalCase.scourt_wmonid) {
       return NextResponse.json(
         { error: 'SCOURT 연동 정보가 없습니다. 먼저 사건을 검색해주세요.' },

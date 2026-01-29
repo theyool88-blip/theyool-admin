@@ -28,6 +28,7 @@ import {
   extractTemplateIdFromResponse,
 } from '@/lib/scourt/xml-mapping';
 import { parseCaseNumber } from '@/lib/scourt/case-number-utils';
+import { inferCaseLevelFromType } from '@/lib/scourt/case-relations';
 import { isMaskedPartyName } from '@/types/case-party'
 
 type SyncType = 'progress' | 'general' | 'full'
@@ -981,7 +982,21 @@ export async function POST(request: NextRequest) {
     if (shouldUseGeneralData) {
       updateData.scourt_case_name = generalData?.csNm;
       updateData.court_name = generalData?.cortNm || null;  // 법원명 (SCOURT에서 가져온 값으로 업데이트)
-      updateData.case_level = shouldSetCaseLevel ? (generalData?.caseLevelDesc || null) : null;  // 심급 (1심, 항소심 등) - 신청/집행 사건은 제외
+
+      // 심급 결정: API 응답 우선, 없으면 사건번호에서 추론
+      let resolvedCaseLevel: string | null = null;
+      if (shouldSetCaseLevel) {
+        if (generalData?.caseLevelDesc) {
+          resolvedCaseLevel = generalData.caseLevelDesc;
+        } else {
+          // Fallback: 사건번호에서 심급 추론
+          const parsed = parseCaseNumber(caseNumber);
+          if (parsed.valid && parsed.caseType) {
+            resolvedCaseLevel = inferCaseLevelFromType(parsed.caseType);
+          }
+        }
+      }
+      updateData.case_level = resolvedCaseLevel;  // 심급 (1심, 항소심 등) - 신청/집행 사건은 제외
     }
     if (!shouldUseGeneralData && normalizedCourtName && normalizedCourtName !== legalCase.court_name) {
       updateData.court_name = normalizedCourtName;

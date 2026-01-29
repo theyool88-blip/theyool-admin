@@ -532,8 +532,10 @@ function substitutePartyListNames(
     // 1순위: scourt_party_index로 매칭
     let matchedParty = partiesByIndex.get(index);
 
-    // 2순위: scourt_party_index가 없으면 label 기반 측 매칭
-    if (!matchedParty && partiesByIndex.size === 0) {
+    // 2순위: scourt_party_index 매칭 실패 시 label 기반 측 매칭
+    // NOTE: 이전에는 partiesByIndex.size === 0 조건이 있어서 하나라도 index가 있으면 fallback 안됨
+    //       이제는 각 행에서 매칭 실패 시 항상 fallback 시도
+    if (!matchedParty) {
       const rowLabel = getPartyRowLabel(row);
       const rowSide = getSideFromLabel(normalizePartyLabel(rowLabel));
       if (rowSide) {
@@ -1218,16 +1220,51 @@ export function ScourtGeneralInfoXml({
 // ============================================================================
 
 /**
- * XML 당사자 행과 DB 당사자를 매칭 (scourt_party_index 기준)
+ * XML 당사자 행과 DB 당사자를 매칭
+ *
+ * 매칭 우선순위:
+ * 1. scourt_party_index 정확 매칭
+ * 2. 라벨 기반 측 매칭 (같은 측의 is_primary 우선)
  */
 function findMatchingParty(
-  _row: Record<string, unknown>,
+  row: Record<string, unknown>,
   rowIndex: number,
   caseParties?: CasePartyInfo[]
 ): CasePartyInfo | null {
   if (!caseParties || caseParties.length === 0) return null;
 
-  return caseParties.find(p => p.scourt_party_index === rowIndex) || null;
+  // 1순위: scourt_party_index 매칭
+  const indexMatch = caseParties.find(p => p.scourt_party_index === rowIndex);
+  if (indexMatch) return indexMatch;
+
+  // 2순위: 라벨 기반 측 매칭 + is_primary 우선순위
+  const rowLabel = getPartyRowLabel(row);
+  const normalizedLabel = normalizePartyLabel(rowLabel);
+  const rowSide = getSideFromLabel(normalizedLabel);
+
+  if (rowSide) {
+    // 같은 측의 당사자들 필터링
+    const sideParties = caseParties.filter(p => {
+      const partyLabel = normalizePartyLabel(
+        p.scourt_label_raw || p.party_type_label || ''
+      );
+      const partySide = getSideFromLabel(partyLabel) || getPartySide(p.party_type as PartyType);
+      return partySide === rowSide;
+    });
+
+    if (sideParties.length > 0) {
+      // is_primary 우선, 그 다음 첫 번째
+      const sorted = [...sideParties].sort((a, b) => {
+        if (a.is_primary && !b.is_primary) return -1;
+        if (!a.is_primary && b.is_primary) return 1;
+        return 0;
+      });
+      return sorted[0];
+    }
+  }
+
+  // 매칭 실패 시 null 반환 (잘못된 party_type 반환 방지)
+  return null;
 }
 
 // ============================================================================

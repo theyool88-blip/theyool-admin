@@ -39,6 +39,11 @@ export function AssigneeMultiSelect({
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
+  // 디버깅 로그
+  useEffect(() => {
+    console.log('[AssigneeMultiSelect] Render - members:', members.length, 'value:', value, 'assigneeRole:', assigneeRole)
+  }, [members, value, assigneeRole])
+
   // Default placeholder based on role
   const defaultPlaceholder = assigneeRole === 'staff' ? '담당직원 선택' : '담당변호사 선택'
   const displayPlaceholder = placeholder || defaultPlaceholder

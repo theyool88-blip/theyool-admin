@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import type { Expense } from '@/types/expense'
 import type { Payment } from '@/types/payment'
+import type { LegalCase } from '@/components/CasesList'
 
 /**
  * 지출 데이터를 Excel로 다운로드
@@ -156,6 +157,48 @@ export function exportFinancialReportToExcel(
   const summarySheet = XLSX.utils.json_to_sheet(summaryData)
   summarySheet['!cols'] = [{ wch: 20 }, { wch: 20 }]
   XLSX.utils.book_append_sheet(workbook, summarySheet, '요약')
+
+  XLSX.writeFile(workbook, filename)
+}
+
+/**
+ * 사건 목록을 Excel로 다운로드
+ */
+export function exportCasesToExcel(cases: LegalCase[], filename: string = 'cases.xlsx') {
+  const LAWYER_ROLES = ['lawyer', 'owner', 'admin']
+
+  const data = cases.map(c => ({
+    '상태': c.status,
+    '계약번호': c.contract_number || '-',
+    '계약일': c.contract_date || '-',
+    '법원': c.court_name || '-',
+    '사건번호': c.court_case_number || '-',
+    '심급': c.case_level || '-',
+    '사건명': c.case_name,
+    '의뢰인': c.parties?.ourClient || c.client?.name || '-',
+    '상대방': c.parties?.opponent || '-',
+    '다음기일': c.next_hearing ? `${c.next_hearing.date} (${c.next_hearing.type})` : '-',
+    '담당변호사': c.assignees?.filter(a => LAWYER_ROLES.includes(a.role))
+      .map(a => a.displayName).join(', ') || c.assigned_member?.display_name || '-',
+  }))
+
+  const worksheet = XLSX.utils.json_to_sheet(data)
+  const workbook = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(workbook, worksheet, '사건목록')
+
+  worksheet['!cols'] = [
+    { wch: 8 },   // 상태
+    { wch: 12 },  // 계약번호
+    { wch: 12 },  // 계약일
+    { wch: 15 },  // 법원
+    { wch: 18 },  // 사건번호
+    { wch: 10 },  // 심급
+    { wch: 30 },  // 사건명
+    { wch: 15 },  // 의뢰인
+    { wch: 15 },  // 상대방
+    { wch: 20 },  // 다음기일
+    { wch: 15 },  // 담당변호사
+  ]
 
   XLSX.writeFile(workbook, filename)
 }

@@ -1,0 +1,14 @@
+{
+  "active": false,
+  "mode": "ralplan",
+  "iteration": 2,
+  "max_iterations": 5,
+  "plan_path": ".omc/plans/party-masking-and-edit.md",
+  "current_phase": "complete",
+  "started_at": "2026-01-29T05:00:00Z",
+  "completed_at": "2026-01-29T05:30:00Z",
+  "critic_verdict": "OKAY",
+  "architect_verdict": "APPROVED",
+  "task_description": "당사자 마스킹 문제 재분석 및 일반탭 수정 기능 추가",
+  "execution_summary": "ScourtGeneralInfoXml.tsx 2개 수정: 1) substitutePartyListNames() 조건 버그 수정 (partiesByIndex.size === 0 제거), 2) findMatchingParty() fallback 매칭 로직 추가 (라벨 기반 측 매칭 + is_primary 우선)"
+}

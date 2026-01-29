@@ -14,7 +14,9 @@ import {
   Layers,
   CornerDownRight,
   Columns,
+  Download,
 } from 'lucide-react'
+import { exportCasesToExcel } from '@/lib/excel-export'
 import UnifiedScheduleModal from './UnifiedScheduleModal'
 import CasePaymentsModal from './CasePaymentsModal'
 import DataTable, { Pagination, TableToolbar, Column } from './ui/DataTable'
@@ -35,7 +37,7 @@ interface CaseAssignee {
   role: string
 }
 
-interface LegalCase {
+export interface LegalCase {
   id: string
   contract_number: string
   case_name: string
@@ -77,20 +79,22 @@ type ViewMode = 'table' | 'card'
 type SortDirection = 'asc' | 'desc' | null
 
 const COLUMN_DEFINITIONS = [
+  { id: 'status', label: '상태' },
+  { id: 'contract_number', label: '계약번호' },
   { id: 'contract_date', label: '계약일' },
-  { id: 'court_case_number', label: '사건번호' },
   { id: 'court_name', label: '법원' },
+  { id: 'court_case_number', label: '사건번호' },
   { id: 'case_level', label: '심급' },
   { id: 'case_name', label: '사건명' },
   { id: 'parties', label: '당사자' },
-  { id: 'assignee', label: '담당변호사' },
-  { id: 'status', label: '상태' },
   { id: 'next_hearing', label: '다음기일' },
+  { id: 'assignee', label: '담당변호사' },
+  { id: 'outstanding_amount', label: '미수금' },
 ]
 
 const DEFAULT_VISIBLE_COLUMNS = [
-  'contract_date', 'court_case_number', 'court_name',
-  'case_level', 'case_name', 'parties', 'assignee', 'status', 'next_hearing'
+  'status', 'contract_number', 'contract_date', 'court_name', 'court_case_number',
+  'case_level', 'case_name', 'parties', 'next_hearing', 'assignee', 'outstanding_amount'
 ]
 
 export default function CasesList({ initialCases }: { initialCases: LegalCase[] }) {
@@ -281,8 +285,26 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     setSelectedCaseForPayment(null)
   }
 
-  // Table columns definition
+  // Table columns definition (순서: 상태→계약번호→계약일→법원→사건번호→심급→사건명→당사자→다음기일→담당변호사→미수금)
   const columns: Column<LegalCase>[] = [
+    {
+      key: 'status',
+      header: '상태',
+      width: '80px',
+      align: 'center',
+      sortable: true,
+      render: (item) => <CaseStatusBadge status={item.status} />,
+    },
+    {
+      key: 'contract_number',
+      header: '계약번호',
+      width: '100px',
+      render: (item) => (
+        <span className="text-body font-mono text-sm">
+          {item.contract_number || '-'}
+        </span>
+      ),
+    },
     {
       key: 'contract_date',
       header: '계약일',
@@ -293,22 +315,22 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
       ),
     },
     {
-      key: 'court_case_number',
-      header: '사건번호',
-      width: '140px',
-      render: (item) => (
-        <span className="text-body font-mono text-sm">
-          {item.court_case_number || '-'}
-        </span>
-      ),
-    },
-    {
       key: 'court_name',
       header: '법원',
       width: '90px',
       render: (item) => (
         <span className="text-caption truncate" title={item.court_name || ''}>
           {getCourtAbbrev(item.court_name) || '-'}
+        </span>
+      ),
+    },
+    {
+      key: 'court_case_number',
+      header: '사건번호',
+      width: '140px',
+      render: (item) => (
+        <span className="text-body font-mono text-sm">
+          {item.court_case_number || '-'}
         </span>
       ),
     },
@@ -347,6 +369,23 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
       render: (item) => <PartiesCell parties={item.parties} clientName={item.client?.name} />,
     },
     {
+      key: 'next_hearing',
+      header: '다음기일',
+      width: '130px',
+      render: (item) => {
+        if (!item.next_hearing) return <span className="text-[var(--text-muted)]">-</span>
+        const date = new Date(item.next_hearing.date)
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return (
+          <div className="text-body text-sm">
+            <span>{month}/{day}</span>
+            <span className="text-[var(--text-muted)] ml-1">({item.next_hearing.type})</span>
+          </div>
+        )
+      },
+    },
+    {
       key: 'assignee',
       header: '담당변호사',
       width: '140px',
@@ -354,27 +393,13 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
       render: (item) => <AssigneeCell assignees={item.assignees} assignedMember={item.assigned_member} />,
     },
     {
-      key: 'status',
-      header: '상태',
-      width: '80px',
-      align: 'center',
-      sortable: true,
-      render: (item) => <CaseStatusBadge status={item.status} />,
-    },
-    {
-      key: 'next_hearing',
-      header: '다음기일',
+      key: 'outstanding_amount',
+      header: '미수금',
       width: '100px',
-      render: (item) => {
-        if (!item.next_hearing) return <span className="text-[var(--text-muted)]">-</span>
-        const date = new Date(item.next_hearing.date)
-        const month = String(date.getMonth() + 1).padStart(2, '0')
-        const day = String(date.getDate()).padStart(2, '0')
-        return (
-          <span className="text-body text-sm" title={item.next_hearing.type}>
-            {month}/{day}
-          </span>
-        )
+      align: 'right',
+      render: () => {
+        // TODO: 미수금 데이터는 서버에서 계산하여 전달 필요
+        return <span className="text-[var(--text-muted)]">-</span>
       },
     },
   ]
@@ -389,13 +414,26 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
           <h1 className="page-title">사건 목록</h1>
           <p className="page-subtitle">총 {processedCases.length}건</p>
         </div>
-        <button
-          onClick={() => router.push('/cases/new')}
-          className="btn btn-primary"
-        >
-          <Plus className="w-4 h-4" />
-          사건 추가
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              const filename = `cases-${new Date().toISOString().slice(0, 10)}.xlsx`
+              exportCasesToExcel(processedCases, filename)
+            }}
+            className="btn btn-secondary"
+            title="엑셀로 내보내기"
+          >
+            <Download className="w-4 h-4" />
+            내보내기
+          </button>
+          <button
+            onClick={() => router.push('/cases/new')}
+            className="btn btn-primary"
+          >
+            <Plus className="w-4 h-4" />
+            사건 추가
+          </button>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -657,32 +695,22 @@ function AssigneeCell({ assignees, assignedMember }: AssigneeCellProps) {
   const others = lawyers.filter(a => !a.isPrimary)
 
   if (lawyers.length > 0) {
+    // 모든 변호사 이름을 콤마로 연결 (주담당 우선)
+    const allNames = primary
+      ? [primary.displayName, ...others.map(a => a.displayName)]
+      : others.map(a => a.displayName)
+
     return (
-      <div className="flex items-center gap-1 flex-wrap justify-center">
-        {primary && (
-          <span
-            className="inline-flex items-center px-2 py-0.5 text-caption font-medium rounded bg-[var(--sage-muted)] text-[var(--sage-primary)]"
-            title={`주담당: ${primary.displayName}`}
-          >
-            {primary.displayName} ★
-          </span>
-        )}
-        {others.length > 0 && (
-          <span
-            className="inline-flex px-1.5 py-0.5 text-caption font-medium rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-help"
-            title={others.map(a => a.displayName).join(', ')}
-          >
-            +{others.length}
-          </span>
-        )}
-      </div>
+      <span className="text-body text-sm">
+        {allNames.join(', ')}
+      </span>
     )
   }
 
   // Legacy fallback
   if (assignedMember?.display_name) {
     return (
-      <span className="inline-flex px-2 py-0.5 text-caption font-medium rounded bg-[var(--color-info)]/10 text-[var(--color-info)]">
+      <span className="text-body text-sm">
         {assignedMember.display_name}
       </span>
     )

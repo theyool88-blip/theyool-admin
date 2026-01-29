@@ -309,8 +309,10 @@ export default function NewCaseForm({
     fetch('/api/admin/tenant/members?role=lawyer,admin,owner')
       .then(res => res.json())
       .then(data => {
-        if (data.members) {
-          setLawyerMembers(data.members)
+        // API 응답 구조: { success: true, data: { members: [...] } }
+        const members = data.data?.members || data.members || []
+        if (members.length > 0) {
+          setLawyerMembers(members)
         }
       })
       .catch(err => console.error('담당자 목록 조회 실패:', err))
@@ -654,13 +656,13 @@ export default function NewCaseForm({
         assignees: formData.assignees.length > 0 ? formData.assignees : undefined,
         status: formData.status,
         contract_date: formData.contract_date,
-        retainer_fee: formData.retainer_fee ? Number(formData.retainer_fee) : null,
+        retainer_fee: formData.retainer_fee ? Number(parseMoney(formData.retainer_fee)) || null : null,
         success_fee_agreement: formData.success_fee_agreement || null,
         notes: formData.notes,
         court_case_number: formData.court_case_number || null,
         court_name: formData.court_name || null,
         judge_name: formData.judge_name || null,
-        client_role: clientRoleOverride || formData.client_role || null,
+        client_role: clientRoleOverride || (formData.client_role || null),
         opponent_name: formData.opponent_name || null
       }
 
@@ -730,8 +732,12 @@ export default function NewCaseForm({
 
       // TODO: 업로드된 계약서 파일을 사건에 연결하는 로직 추가 필요
 
-      router.push(`/cases/${data.data.id}`)
-      router.refresh()
+      if (data?.data?.id) {
+        router.push(`/cases/${data.data.id}`)
+        router.refresh()
+      } else {
+        throw new Error('사건 ID를 받지 못했습니다')
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : '사건 등록에 실패했습니다'
       setError(message)

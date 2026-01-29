@@ -809,7 +809,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
       if (res.ok) {
         const responseData = await res.json();
-        // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신 (fetchCaseParties 대신)
+        // 낙관적 업데이트: 서버 응답으로 직접 상태 갱신
         if (responseData.data) {
           setCaseParties((prev) =>
             prev.map((p) =>
@@ -817,6 +817,8 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
             ),
           );
         }
+        // clients 정보 포함한 전체 데이터 재조회
+        await fetchCaseParties();
         setPendingPartyEdits((prev) => {
           const next = { ...prev };
           delete next[partyId];
@@ -838,6 +840,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     editPartyPrimaryInput,
     caseData.id,
     router,
+    fetchCaseParties,
   ]);
 
   const pendingPartyEditList = useMemo(

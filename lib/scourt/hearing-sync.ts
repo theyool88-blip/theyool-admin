@@ -408,7 +408,9 @@ export async function syncHearingsToCourtHearings(
       if (existing) {
         // SCOURT 원본 결과 변경 감지
         const existingRawResult = (existing.scourt_raw_data as Record<string, unknown>)?.result as string | undefined;
-        const rawResultChanged = hearing.result !== undefined && hearing.result !== (existingRawResult || '');
+        const normalizedNew = hearing.result?.trim() || '';
+        const normalizedOld = existingRawResult?.trim() || '';
+        const rawResultChanged = normalizedNew !== normalizedOld;
 
         const needsUpdate =
           (hearingResult && existing.result !== hearingResult) ||

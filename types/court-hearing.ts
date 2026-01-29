@@ -247,20 +247,48 @@ export interface CourtHearing {
   case_id: string; // 사건 ID (legal_cases 참조, 필수)
   case_number: string | null; // 사건번호 (예: "2024드단12345", 선택적)
   hearing_type: HearingType;
+  hearing_detail?: string | null; // 상세 유형 (선택)
   hearing_date: string; // 기일 일시 (ISO 8601 datetime)
-  location: string | null; // 법정 (예: "서울가정법원 301호")
-  judge_name: string | null; // 담당 판사 (deprecated - legal_cases.judge_name 사용 권장)
-  report: string | null; // 재판기일 보고서
-  result: HearingResult | null; // 변론기일 결과 (속행/종결/연기/추정)
-  notes: string | null;
+  court_name?: string | null; // 법원명
+  location: string | null; // 법정 위치 (예: "본관 402호")
+
+  // 출석 정보
+  lawyer_attendance_required?: boolean; // 변호사 출석 필요 여부 (기본값: true)
+  client_attendance_required?: boolean; // 의뢰인 출석 필요 여부 (기본값: false)
+  attending_lawyer_id?: string | null; // 출석 변호사 ID (tenant_members 참조)
+
+  // 화상기일 정보
+  video_participant_side?: string | null; // plaintiff_side, defendant_side, both, NULL
+
+  // 상태 및 결과
   status: HearingStatus;
+  result: HearingResult | null; // 변론기일 결과 (속행/종결/연기/추정)
+  result_notes?: string | null; // 기일 결과 메모
+
+  // SCOURT 연동
+  scourt_synced?: boolean; // SCOURT 동기화 여부 (기본값: false)
+  scourt_hearing_hash?: string | null; // 중복 확인용 해시
+  scourt_type_raw: string | null; // SCOURT 원본 기일명 (예: "제1회 변론기일")
+  scourt_raw_data?: Record<string, unknown> | null; // SCOURT 원본 데이터
+
+  // 알림
+  notice_received_date?: string | null; // 기일통지서 수령일 (ISO 8601 date)
+  notice_document_url?: string | null; // 기일통지서 문서 URL
+
+  // 메모
+  notes: string | null;
+
+  // Google Calendar 연동
+  google_event_id?: string | null; // Google 캘린더 이벤트 ID
+
+  // 메타데이터
   created_at: string;
   updated_at: string;
-  // SCOURT 원본 데이터 (나의사건검색 동일 표시용)
-  scourt_type_raw: string | null;    // SCOURT 원본 기일명 (예: "제1회 변론기일")
-  hearing_sequence: number | null;   // 기일 회차 (1, 2, 3...)
-  // 출석 변호사
-  attending_lawyer_id?: string | null; // 출석 변호사 ID (tenant_members 참조)
+
+  // DEPRECATED - 스키마에 존재하지 않는 필드들
+  // judge_name: string | null; // DEPRECATED - legal_cases.judge_name 사용
+  // report: string | null; // DEPRECATED - legal_cases.judge_report 사용
+  // hearing_sequence: number | null; // DEPRECATED - 스키마에 없음
 }
 
 /**
@@ -301,22 +329,49 @@ export interface CreateCourtHearingRequest {
   case_id: string; // 사건 ID (필수)
   case_number?: string; // 사건번호 (선택적)
   hearing_type: HearingType;
+  hearing_detail?: string; // 상세 유형
   hearing_date: string; // ISO 8601 datetime
-  location?: string;
-  judge_name?: string;
+  court_name?: string; // 법원명
+  location?: string; // 법정 위치
+  lawyer_attendance_required?: boolean;
+  client_attendance_required?: boolean;
+  attending_lawyer_id?: string | null; // 출석 변호사 ID
+  video_participant_side?: string | null;
+  result?: HearingResult | null;
+  result_notes?: string;
+  scourt_synced?: boolean;
+  scourt_hearing_hash?: string;
+  scourt_type_raw?: string;
+  scourt_raw_data?: Record<string, unknown>;
+  notice_received_date?: string;
+  notice_document_url?: string;
   notes?: string;
+  google_event_id?: string;
   status?: HearingStatus; // 기본값: SCHEDULED
 }
 
 export interface UpdateCourtHearingRequest {
   case_number?: string;
   hearing_type?: HearingType;
+  hearing_detail?: string;
   hearing_date?: string;
+  court_name?: string;
   location?: string;
-  judge_name?: string;
+  lawyer_attendance_required?: boolean;
+  client_attendance_required?: boolean;
+  attending_lawyer_id?: string | null;
+  video_participant_side?: string | null;
+  result?: HearingResult | null;
+  result_notes?: string;
+  scourt_synced?: boolean;
+  scourt_hearing_hash?: string;
+  scourt_type_raw?: string;
+  scourt_raw_data?: Record<string, unknown>;
+  notice_received_date?: string;
+  notice_document_url?: string;
   notes?: string;
+  google_event_id?: string;
   status?: HearingStatus;
-  attending_lawyer_id?: string | null; // 출석 변호사 ID
 }
 
 export interface CreateCaseDeadlineRequest {

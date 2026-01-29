@@ -48,7 +48,6 @@ export default function HearingDetailModal({
     hearing_date: '',
     hearing_time: '',
     location: '',
-    report: '',
     result: '' as HearingResult | '',
     notes: '',
     status: '' as HearingStatus | ''
@@ -67,7 +66,6 @@ export default function HearingDetailModal({
         hearing_date: dateStr,
         hearing_time: timeStr,
         location: hearing.location || '',
-        report: hearing.report || '',
         result: hearing.result || '',
         notes: hearing.notes || '',
         status: hearing.status
@@ -104,7 +102,6 @@ export default function HearingDetailModal({
           hearing_type: formData.hearing_type,
           hearing_date: hearing_datetime,
           location: formData.location || null,
-          report: formData.report || null,
           result: formData.result || null,
           notes: formData.notes || null,
           status: formData.status
@@ -250,14 +247,6 @@ export default function HearingDetailModal({
                 </div>
               )}
 
-              {hearing.report && (
-                <div>
-                  <label className="text-xs text-[var(--text-muted)]">재판기일 보고서</label>
-                  <div className="mt-1 p-4 bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] rounded-lg">
-                    <p className="text-sm text-[var(--text-primary)] whitespace-pre-wrap leading-relaxed">{hearing.report}</p>
-                  </div>
-                </div>
-              )}
 
               {hearing.result && (
                 <div>
@@ -414,17 +403,6 @@ export default function HearingDetailModal({
                 )}
               </div>
 
-              {/* 재판기일 보고서 */}
-              <div className="form-group">
-                <label className="form-label">재판기일 보고서</label>
-                <textarea
-                  value={formData.report}
-                  onChange={(e) => setFormData(prev => ({ ...prev, report: e.target.value }))}
-                  rows={5}
-                  placeholder="재판 진행 내용, 결과, 다음 절차 등을 기록하세요"
-                  className="form-input resize-none"
-                />
-              </div>
 
               {/* 변론기일 결과 */}
               <div className="form-group">

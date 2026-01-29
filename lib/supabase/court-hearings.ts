@@ -161,10 +161,24 @@ export async function createCourtHearing(
     case_id: request.case_id,
     case_number: request.case_number || null,
     hearing_type: request.hearing_type,
+    hearing_detail: request.hearing_detail || null,
     hearing_date: request.hearing_date,
+    court_name: request.court_name || null,
     location: request.location || null,
-    judge_name: request.judge_name || null,
+    lawyer_attendance_required: request.lawyer_attendance_required ?? true,
+    client_attendance_required: request.client_attendance_required ?? false,
+    attending_lawyer_id: request.attending_lawyer_id || null,
+    video_participant_side: request.video_participant_side || null,
+    result: request.result || null,
+    result_notes: request.result_notes || null,
+    scourt_synced: request.scourt_synced ?? false,
+    scourt_hearing_hash: request.scourt_hearing_hash || null,
+    scourt_type_raw: request.scourt_type_raw || null,
+    scourt_raw_data: request.scourt_raw_data || null,
+    notice_received_date: request.notice_received_date || null,
+    notice_document_url: request.notice_document_url || null,
     notes: request.notes || null,
+    google_event_id: request.google_event_id || null,
     status: request.status || 'SCHEDULED',
     tenant_id: tenantId || null,
   };
@@ -221,12 +235,25 @@ export async function updateCourtHearing(
 
   if (request.case_number !== undefined) updateData.case_number = request.case_number;
   if (request.hearing_type !== undefined) updateData.hearing_type = request.hearing_type;
+  if (request.hearing_detail !== undefined) updateData.hearing_detail = request.hearing_detail;
   if (request.hearing_date !== undefined) updateData.hearing_date = request.hearing_date;
+  if (request.court_name !== undefined) updateData.court_name = request.court_name;
   if (request.location !== undefined) updateData.location = request.location;
-  if (request.judge_name !== undefined) updateData.judge_name = request.judge_name;
+  if (request.lawyer_attendance_required !== undefined) updateData.lawyer_attendance_required = request.lawyer_attendance_required;
+  if (request.client_attendance_required !== undefined) updateData.client_attendance_required = request.client_attendance_required;
+  if (request.attending_lawyer_id !== undefined) updateData.attending_lawyer_id = request.attending_lawyer_id;
+  if (request.video_participant_side !== undefined) updateData.video_participant_side = request.video_participant_side;
+  if (request.result !== undefined) updateData.result = request.result;
+  if (request.result_notes !== undefined) updateData.result_notes = request.result_notes;
+  if (request.scourt_synced !== undefined) updateData.scourt_synced = request.scourt_synced;
+  if (request.scourt_hearing_hash !== undefined) updateData.scourt_hearing_hash = request.scourt_hearing_hash;
+  if (request.scourt_type_raw !== undefined) updateData.scourt_type_raw = request.scourt_type_raw;
+  if (request.scourt_raw_data !== undefined) updateData.scourt_raw_data = request.scourt_raw_data;
+  if (request.notice_received_date !== undefined) updateData.notice_received_date = request.notice_received_date;
+  if (request.notice_document_url !== undefined) updateData.notice_document_url = request.notice_document_url;
   if (request.notes !== undefined) updateData.notes = request.notes;
+  if (request.google_event_id !== undefined) updateData.google_event_id = request.google_event_id;
   if (request.status !== undefined) updateData.status = request.status;
-  if (request.attending_lawyer_id !== undefined) (updateData as Record<string, unknown>).attending_lawyer_id = request.attending_lawyer_id;
 
   const { data, error } = await supabase
     .from('court_hearings')

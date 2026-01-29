@@ -114,13 +114,6 @@ export function detectCaseNotices(params: NoticeDetectorParams): CaseNotice[] {
   )
   notices.push(...conflictNotices)
 
-  // 8. 미등록 관련사건/심급사건 알림
-  const unlinkedNotices = detectUnlinkedRelatedCases(
-    params.unlinkedRelatedCases || [],
-    params.unlinkedLowerCourt || []
-  )
-  notices.push(...unlinkedNotices)
-
   return notices
 }
 
@@ -584,7 +577,7 @@ function formatDateFromYYYYMMDD(yyyymmdd: string): string {
  * 미등록 관련사건/심급사건 알림 감지
  * linkedCaseId가 없는 관련사건/심급사건을 통합 알림으로 표시
  */
-function detectUnlinkedRelatedCases(
+function _detectUnlinkedRelatedCases(
   unlinkedRelatedCases: UnlinkedRelatedCase[],
   unlinkedLowerCourt: UnlinkedLowerCourt[]
 ): CaseNotice[] {

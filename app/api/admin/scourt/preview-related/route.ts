@@ -4,7 +4,7 @@
  * POST /api/admin/scourt/preview-related
  * - Fetches preview data for unlinked related cases from SCOURT
  * - Uses encCsNo (encrypted case number) from snapshot
- * - Returns general info and progress history for preview modal
+ * - Returns rawData for ScourtGeneralInfoXml and progress in same format as CaseDetail
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -19,21 +19,18 @@ interface PreviewRequest {
   sourceCaseId: string;      // The source case ID (to get WMONID)
 }
 
+interface ProgressItem {
+  date: string;
+  content: string;
+  result?: string | null;
+  progCttDvs?: string;  // 진행구분 코드: 0=법원, 1=기일, 2=명령, 3=제출, 4=송달
+}
+
 interface PreviewResponse {
   success: boolean;
-  generalInfo?: {
-    csNm: string;            // 사건명
-    cortNm: string;          // 법원명
-    prcdStsNm: string;       // 진행상태
-    rcptDt: string;          // 접수일
-    jdgNm: string;           // 재판부
-    parties: Array<{ label: string; name: string }>;
-  };
-  progress?: Array<{
-    date: string;
-    event: string;
-    result?: string;
-  }>;
+  rawData?: Record<string, unknown>;  // For ScourtGeneralInfoXml
+  caseType?: string;                   // SCOURT case type (ssgo101, ssgo102, etc.)
+  progress?: ProgressItem[];           // Same format as CaseDetail
   error?: string;
 }
 
@@ -151,69 +148,33 @@ export async function POST(request: NextRequest) {
       encCsNo,
     });
 
-    // Transform general info for preview
+    // Get raw data for ScourtGeneralInfoXml
     const generalData = generalResult.data;
-    const generalInfo = {
-      csNm: generalData.csNm || '',
-      cortNm: generalData.cortNm || effectiveCourtName,
-      prcdStsNm: generalData.prcdStsNm || '',
-      rcptDt: generalData.rcptDt || '',
-      jdgNm: generalData.jdgNm || '',
-      parties: [] as Array<{ label: string; name: string }>,
+    const rawData = generalData.raw || {};
+
+    // Determine case type from caseCategory
+    const caseCategory = generalData.caseCategory;
+    const caseTypeMap: Record<string, string> = {
+      family: 'ssgo102',
+      civil: 'ssgo101',
+      criminal: 'ssgo10g',
+      application: 'ssgo105',
+      execution: 'ssgo10a',
+      electronicOrder: 'ssgo10c',
+      insolvency: 'ssgo107',
+      appeal: 'ssgo108',
+      protection: 'ssgo10i',
+      contempt: 'ssgo106',
     };
+    const caseType = caseTypeMap[caseCategory || 'civil'] || 'ssgo101';
 
-    // Extract party information
-    const parties = generalData.parties || [];
-    const plaintiffLabel = generalData.titRprsPtnr || '원고';
-    const defendantLabel = generalData.titRprsRqstr || '피고';
-
-    // Group parties by type (using SCOURT property names)
-    const plaintiffs = parties.filter((p: { btprNm: string; btprDvsNm: string }) =>
-      ['원고', '신청인', '채권자', '항소인', '상고인'].some(label => p.btprDvsNm?.includes(label))
-    );
-    const defendants = parties.filter((p: { btprNm: string; btprDvsNm: string }) =>
-      ['피고', '피신청인', '채무자', '피항소인', '피상고인'].some(label => p.btprDvsNm?.includes(label))
-    );
-
-    // Add to generalInfo.parties
-    if (plaintiffs.length > 0) {
-      plaintiffs.forEach((p: { btprNm: string; btprDvsNm: string }) => {
-        if (p.btprNm) {
-          generalInfo.parties.push({
-            label: plaintiffLabel,
-            name: p.btprNm
-          });
-        }
-      });
-    } else if (generalData.aplNm) {
-      generalInfo.parties.push({
-        label: plaintiffLabel,
-        name: generalData.aplNm
-      });
-    }
-
-    if (defendants.length > 0) {
-      defendants.forEach((p: { btprNm: string; btprDvsNm: string }) => {
-        if (p.btprNm) {
-          generalInfo.parties.push({
-            label: defendantLabel,
-            name: p.btprNm
-          });
-        }
-      });
-    } else if (generalData.rspNm) {
-      generalInfo.parties.push({
-        label: defendantLabel,
-        name: generalData.rspNm
-      });
-    }
-
-    // Transform progress for preview
-    const progress = (progressResult.success && progressResult.progress)
+    // Transform progress to match CaseDetail format
+    const progress: ProgressItem[] = (progressResult.success && progressResult.progress)
       ? progressResult.progress.map((p) => ({
           date: p.prcdDt || '',
-          event: p.prcdNm || '',
-          result: p.prcdRslt || undefined,
+          content: p.prcdNm || '',
+          result: p.prcdRslt || null,
+          progCttDvs: p.progCttDvs,
         }))
       : [];
 
@@ -221,7 +182,8 @@ export async function POST(request: NextRequest) {
 
     const response: PreviewResponse = {
       success: true,
-      generalInfo,
+      rawData,
+      caseType,
       progress,
     };
 

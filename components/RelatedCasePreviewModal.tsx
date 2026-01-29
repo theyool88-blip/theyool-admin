@@ -1,7 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { getCourtAbbrev } from '@/lib/scourt/court-codes'
+import ScourtGeneralInfoXml from './scourt/ScourtGeneralInfoXml'
+import type { ScourtCaseType } from '@/lib/scourt/xml-mapping'
 
 interface RelatedCaseInfo {
   caseNo: string          // "2025가소6582"
@@ -10,24 +12,11 @@ interface RelatedCaseInfo {
   encCsNo?: string        // SCOURT 암호화된 사건번호
 }
 
-interface GeneralInfo {
-  caseName?: string
-  courtName?: string
-  status?: string
-  receiptDate?: string
-  judge?: string
-  division?: string
-  parties?: Array<{
-    name: string
-    type: string
-    role?: string
-  }>
-}
-
-interface ProgressEvent {
+interface ProgressItem {
   date: string
-  event: string
-  result?: string
+  content: string
+  result?: string | null
+  progCttDvs?: string  // 진행구분 코드: 0=법원, 1=기일, 2=명령, 3=제출, 4=송달
 }
 
 interface RelatedCasePreviewModalProps {
@@ -36,7 +25,45 @@ interface RelatedCasePreviewModalProps {
   relatedCaseInfo: RelatedCaseInfo
   sourceCaseId: string      // Source case ID for API call
   onLink: () => void        // Trigger linking
-  onDismiss: () => void     // Dismiss (연동안함)
+}
+
+// 진행 카테고리별 색상 (CaseDetail과 동일)
+const getProgressColor = (item: ProgressItem): string => {
+  const category = getProgressCategory(item)
+  switch (category) {
+    case 'hearing': return '#003399'    // 기일 - 파랑
+    case 'order': return '#336633'      // 명령 - 녹색
+    case 'submit': return '#660000'     // 제출 - 진빨강
+    case 'delivery': return '#CC6600'   // 송달 - 주황
+    case 'court': return '#000000'      // 법원 - 검정
+    default: return 'var(--text-primary)'
+  }
+}
+
+// 진행 카테고리 판단 (CaseDetail과 동일)
+const getProgressCategory = (item: ProgressItem): string => {
+  // SCOURT 진행구분 코드 기반
+  if (item.progCttDvs === '1') return 'hearing'   // 기일
+  if (item.progCttDvs === '2') return 'order'     // 명령
+  if (item.progCttDvs === '3') return 'submit'    // 제출
+  if (item.progCttDvs === '4') return 'delivery'  // 송달
+  if (item.progCttDvs === '0') return 'court'     // 법원
+  return 'court'
+}
+
+// 날짜 포맷 (YYYYMMDD -> YY.MM.DD)
+const formatProgressDate = (dateStr: string): string => {
+  if (!dateStr) return '-'
+  // YYYY-MM-DD 형식인 경우
+  if (dateStr.includes('-')) {
+    const [year, month, day] = dateStr.split('-')
+    return `${year.slice(2)}.${month}.${day}`
+  }
+  // YYYYMMDD 형식인 경우
+  if (dateStr.length === 8) {
+    return `${dateStr.slice(2, 4)}.${dateStr.slice(4, 6)}.${dateStr.slice(6, 8)}`
+  }
+  return dateStr
 }
 
 export default function RelatedCasePreviewModal({
@@ -45,13 +72,13 @@ export default function RelatedCasePreviewModal({
   relatedCaseInfo,
   sourceCaseId,
   onLink,
-  onDismiss
 }: RelatedCasePreviewModalProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'progress'>('general')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [generalInfo, setGeneralInfo] = useState<GeneralInfo | null>(null)
-  const [progress, setProgress] = useState<ProgressEvent[]>([])
+  const [rawData, setRawData] = useState<Record<string, unknown> | null>(null)
+  const [caseType, setCaseType] = useState<ScourtCaseType>('ssgo101')
+  const [progress, setProgress] = useState<ProgressItem[]>([])
 
   useEffect(() => {
     if (isOpen && relatedCaseInfo.encCsNo) {
@@ -76,7 +103,8 @@ export default function RelatedCasePreviewModal({
       })
       const data = await response.json()
       if (data.success) {
-        setGeneralInfo(data.generalInfo || {})
+        setRawData(data.rawData || null)
+        setCaseType((data.caseType as ScourtCaseType) || 'ssgo101')
         setProgress(data.progress || [])
       } else {
         setError(data.error || '데이터를 불러올 수 없습니다')
@@ -88,20 +116,37 @@ export default function RelatedCasePreviewModal({
     }
   }
 
+  // 진행 카테고리별 카운트
+  const progressCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: progress.length,
+      hearing: 0,
+      order: 0,
+      submit: 0,
+      delivery: 0,
+      court: 0,
+    }
+    progress.forEach(item => {
+      const cat = getProgressCategory(item)
+      if (counts[cat] !== undefined) counts[cat]++
+    })
+    return counts
+  }, [progress])
+
   if (!isOpen) return null
 
-  // 연관관계 타입에 따른 배지 색상 (RelatedCaseConfirmModal과 동일)
+  // 연관관계 타입에 따른 배지 색상
   const getRelationBadgeColor = (relationType: string) => {
     if (['항소심', '상고심', '하심사건'].includes(relationType)) {
-      return 'bg-[var(--color-info-muted)] text-[var(--color-info)]'  // 심급 관계
+      return 'bg-[var(--color-info-muted)] text-[var(--color-info)]'
     }
     if (['반소', '병합'].includes(relationType)) {
-      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'  // 관련 본안
+      return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
     }
     if (['본안사건', '신청사건'].includes(relationType)) {
-      return 'bg-[var(--color-success-muted)] text-[var(--color-success)]'  // 본안/보전 관계
+      return 'bg-[var(--color-success-muted)] text-[var(--color-success)]'
     }
-    return 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'  // 기타
+    return 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
   }
 
   return (
@@ -114,7 +159,7 @@ export default function RelatedCasePreviewModal({
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative w-full max-w-2xl transform rounded-xl bg-[var(--bg-secondary)] shadow-2xl transition-all">
+        <div className="relative w-full max-w-3xl transform rounded-xl bg-[var(--bg-secondary)] shadow-2xl transition-all">
           {/* Header */}
           <div className="border-b border-[var(--border-subtle)] px-6 py-4">
             <div className="flex items-start justify-between">
@@ -169,7 +214,7 @@ export default function RelatedCasePreviewModal({
           </div>
 
           {/* Content */}
-          <div className="px-6 py-5 min-h-[300px]">
+          <div className="px-6 py-5 min-h-[400px] max-h-[60vh] overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center h-64">
                 <div className="flex flex-col items-center gap-3">
@@ -193,97 +238,108 @@ export default function RelatedCasePreviewModal({
                 </div>
               </div>
             ) : activeTab === 'general' ? (
-              <div className="space-y-4">
-                {generalInfo?.caseName && (
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">사건명</label>
-                    <p className="text-sm text-[var(--text-primary)]">{generalInfo.caseName}</p>
-                  </div>
-                )}
-
-                {generalInfo?.courtName && (
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">법원명</label>
-                    <p className="text-sm text-[var(--text-primary)]">{generalInfo.courtName}</p>
-                  </div>
-                )}
-
-                {generalInfo?.status && (
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">진행상태</label>
-                    <p className="text-sm text-[var(--text-primary)]">{generalInfo.status}</p>
-                  </div>
-                )}
-
-                {generalInfo?.receiptDate && (
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">접수일</label>
-                    <p className="text-sm text-[var(--text-primary)]">{generalInfo.receiptDate}</p>
-                  </div>
-                )}
-
-                {(generalInfo?.judge || generalInfo?.division) && (
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-1">재판부</label>
-                    <p className="text-sm text-[var(--text-primary)]">
-                      {generalInfo.division && `${generalInfo.division}`}
-                      {generalInfo.division && generalInfo.judge && ' - '}
-                      {generalInfo.judge}
-                    </p>
-                  </div>
-                )}
-
-                {generalInfo?.parties && generalInfo.parties.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-muted)] mb-2">당사자 정보</label>
-                    <div className="space-y-2">
-                      {generalInfo.parties.map((party, index) => (
-                        <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-[var(--bg-tertiary)]">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[var(--bg-secondary)] text-[var(--text-secondary)]">
-                            {party.type}
-                          </span>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-[var(--text-primary)]">{party.name}</p>
-                            {party.role && (
-                              <p className="text-xs text-[var(--text-muted)] mt-0.5">{party.role}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {!generalInfo?.caseName && !generalInfo?.courtName && !generalInfo?.status && (
-                  <div className="text-center py-12">
-                    <p className="text-sm text-[var(--text-muted)]">표시할 정보가 없습니다</p>
-                  </div>
-                )}
-              </div>
+              // 일반 탭 - ScourtGeneralInfoXml 사용
+              rawData ? (
+                <ScourtGeneralInfoXml
+                  apiData={rawData as { dma_csBasCtt?: Record<string, unknown>; [key: string]: unknown }}
+                  caseType={caseType}
+                  caseNumber={relatedCaseInfo.caseNo}
+                  compact={true}
+                />
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-sm text-[var(--text-muted)]">일반내용 데이터가 없습니다</p>
+                </div>
+              )
             ) : (
-              <div className="space-y-3">
-                {progress.length > 0 ? (
-                  <div className="space-y-2">
-                    {progress.map((event, index) => (
-                      <div key={index} className="flex gap-3 p-3 rounded-lg bg-[var(--bg-tertiary)] hover:bg-[var(--bg-hover)] transition-colors">
-                        <div className="flex-shrink-0 w-20 text-xs text-[var(--text-muted)]">
-                          {event.date}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-[var(--text-primary)]">{event.event}</p>
-                          {event.result && (
-                            <p className="text-xs text-[var(--text-secondary)] mt-1">{event.result}</p>
-                          )}
-                        </div>
+              // 진행 탭 - CaseDetail과 동일한 형식
+              progress.length > 0 ? (
+                <>
+                  {/* 필터 탭 */}
+                  <div className="flex flex-wrap gap-2 mb-5">
+                    {[
+                      { key: 'all', label: '전체', color: undefined },
+                      { key: 'hearing', label: '기일', color: '#003399' },
+                      { key: 'order', label: '명령', color: '#336633' },
+                      { key: 'submit', label: '제출', color: '#660000' },
+                      { key: 'delivery', label: '송달', color: '#CC6600' },
+                      { key: 'court', label: '법원', color: '#000000' },
+                    ].map((tab) => {
+                      const count = progressCounts[tab.key] || 0
+                      if (tab.key !== 'all' && count === 0) return null
+
+                      return (
+                        <span
+                          key={tab.key}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                          style={tab.color ? { color: tab.color } : {}}
+                        >
+                          {tab.label}
+                          <span className="ml-1 text-[var(--text-muted)]">{count}</span>
+                        </span>
+                      )
+                    })}
+                  </div>
+
+                  {/* 진행내용 테이블 */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-[var(--border-default)]">
+                          <th className="px-4 py-2.5 text-left text-[var(--text-tertiary)] font-medium w-24">
+                            일자
+                          </th>
+                          <th className="px-4 py-2.5 text-left text-[var(--text-tertiary)] font-medium">
+                            내용
+                          </th>
+                          <th className="px-4 py-2.5 text-left text-[var(--text-tertiary)] font-medium w-24">
+                            결과
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {progress.slice(0, 20).map((item, idx) => {
+                          const textColor = getProgressColor(item)
+                          return (
+                            <tr
+                              key={idx}
+                              className="border-b border-[var(--border-subtle)] last:border-0"
+                            >
+                              <td
+                                className="px-4 py-3 font-medium whitespace-nowrap"
+                                style={{ color: textColor }}
+                              >
+                                {formatProgressDate(item.date)}
+                              </td>
+                              <td
+                                className="px-4 py-3 leading-relaxed"
+                                style={{ color: textColor }}
+                              >
+                                {item.content || '-'}
+                              </td>
+                              <td
+                                className="px-4 py-3"
+                                style={{ color: textColor }}
+                              >
+                                {item.result ? formatProgressDate(item.result) : '-'}
+                              </td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                    {progress.length > 20 && (
+                      <div className="py-3 text-center text-sm text-[var(--text-muted)]">
+                        + {progress.length - 20}건 더 있음
                       </div>
-                    ))}
+                    )}
                   </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-sm text-[var(--text-muted)]">진행 내역이 없습니다</p>
-                  </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-sm text-[var(--text-muted)]">진행 내역이 없습니다</p>
+                </div>
+              )
             )}
           </div>
 
@@ -292,17 +348,17 @@ export default function RelatedCasePreviewModal({
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={onDismiss}
+                onClick={onClose}
                 className="btn btn-secondary"
               >
-                연동안함
+                닫기
               </button>
               <button
                 type="button"
                 onClick={onLink}
                 className="btn btn-primary"
               >
-                연동
+                등록
               </button>
             </div>
           </div>

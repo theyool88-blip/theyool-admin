@@ -1676,57 +1676,37 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     setPreviewModalOpen(true);
   }, []);
 
-  // 관련사건 연동 핸들러
+  // 관련사건 연동 핸들러 (모달의 "등록" 버튼)
   const handleLinkRelatedCase = useCallback(async () => {
     if (!selectedRelatedCase) return;
-    // Close modal and refresh
-    setPreviewModalOpen(false);
-    const caseNoForKey = selectedRelatedCase.caseNo;
-    setSelectedRelatedCase(null);
-    // The actual linking will be done via existing RelatedCaseConfirmModal flow
-    // For now, just trigger a snapshot refresh
-    await fetchScourtSnapshot();
-    // Remove from dismissed set if it was there
-    const caseType =
-      selectedRelatedCase.relationType === "심급사건"
-        ? "lower_court"
-        : "related_case";
-    setDismissedRelatedCases((prev) => {
-      const newSet = new Set(prev);
-      newSet.delete(`${caseType}:${caseNoForKey}`);
-      return newSet;
-    });
-  }, [selectedRelatedCase, fetchScourtSnapshot]);
 
-  // 관련사건 연동안함 핸들러 (모달용)
-  const handleDismissRelatedCaseFromModal = useCallback(async () => {
-    if (!selectedRelatedCase) return;
-    const caseType =
-      selectedRelatedCase.relationType === "심급사건"
-        ? "lower_court"
-        : "related_case";
-    try {
-      const res = await fetch(`/api/admin/cases/${caseData.id}/related-cases`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          relatedCaseNo: selectedRelatedCase.caseNo,
-          relatedCaseType: caseType,
-        }),
+    // Actually perform the linking via handleLinkRelatedCaseWithParams
+    const success = await handleLinkRelatedCaseWithParams({
+      caseNo: selectedRelatedCase.caseNo,
+      courtName: selectedRelatedCase.courtName,
+      relationType: selectedRelatedCase.relationType,
+      encCsNo: selectedRelatedCase.encCsNo,
+    });
+
+    if (success) {
+      // Close modal and clear state
+      setPreviewModalOpen(false);
+      const caseNoForKey = selectedRelatedCase.caseNo;
+      setSelectedRelatedCase(null);
+
+      // Remove from dismissed set if it was there
+      const caseType =
+        selectedRelatedCase.relationType === "심급사건"
+          ? "lower_court"
+          : "related_case";
+      setDismissedRelatedCases((prev) => {
+        const newSet = new Set(prev);
+        newSet.delete(`${caseType}:${caseNoForKey}`);
+        return newSet;
       });
-      const data = await res.json();
-      if (data.success) {
-        setDismissedRelatedCases(
-          (prev) =>
-            new Set([...prev, `${caseType}:${selectedRelatedCase.caseNo}`]),
-        );
-      }
-    } catch (error) {
-      console.error("Failed to dismiss related case:", error);
     }
-    setPreviewModalOpen(false);
-    setSelectedRelatedCase(null);
-  }, [selectedRelatedCase, caseData.id]);
+    // If linking fails, modal stays open so user can retry or close manually
+  }, [selectedRelatedCase, handleLinkRelatedCaseWithParams]);
 
   // 알림 액션 핸들러 (역할 확정 등)
   const handleNoticeAction = async (
@@ -1804,31 +1784,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
     // 기일 충돌 등 다른 액션은 여기서 처리
     console.log("Notice action:", notice.id, actionType);
-  };
-
-  // 관련사건 연동안함 핸들러
-  const handleDismissRelatedCase = async (
-    caseNo: string,
-    caseType: "lower_court" | "related_case",
-  ) => {
-    try {
-      const res = await fetch(`/api/admin/cases/${caseData.id}/related-cases`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          relatedCaseNo: caseNo,
-          relatedCaseType: caseType,
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDismissedRelatedCases(
-          (prev) => new Set([...prev, `${caseType}:${caseNo}`]),
-        );
-      }
-    } catch (error) {
-      console.error("Failed to dismiss related case:", error);
-    }
   };
 
   // 삭제되지 않은 알림만 필터링
@@ -2995,9 +2950,20 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                   </button>
                                 ) : (
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[var(--text-primary)]">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedRelatedCase({
+                                          caseNo: item.caseNo || "",
+                                          courtName: item.courtName || item.court || "",
+                                          relationType: "하심사건",
+                                          encCsNo: item.encCsNo,
+                                        });
+                                        setPreviewModalOpen(true);
+                                      }}
+                                      className="text-[var(--sage-primary)] hover:underline font-medium"
+                                    >
                                       {item.caseNo || "-"}
-                                    </span>
+                                    </button>
                                     <button
                                       onClick={() =>
                                         handleLinkRelatedCaseWithParams({
@@ -3017,18 +2983,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                       {linkingCases.has(item.caseNo || "")
                                         ? "연동 중..."
                                         : "등록"}
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleDismissRelatedCase(
-                                          item.caseNo || "",
-                                          "lower_court",
-                                        )
-                                      }
-                                      disabled={isLinkingAll}
-                                      className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] rounded transition-colors disabled:opacity-50"
-                                    >
-                                      연동안함
                                     </button>
                                   </div>
                                 )}
@@ -3148,9 +3102,26 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                   </button>
                                 ) : (
                                   <div className="flex items-center gap-2">
-                                    <span className="text-[var(--text-primary)]">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedRelatedCase({
+                                          caseNo: item.caseNo || item.case_number || "",
+                                          courtName:
+                                            item.caseName ||
+                                            item.court_name ||
+                                            "",
+                                          relationType:
+                                            item.relation ||
+                                            item.relation_type ||
+                                            "관련사건",
+                                          encCsNo: item.encCsNo,
+                                        });
+                                        setPreviewModalOpen(true);
+                                      }}
+                                      className="text-[var(--sage-primary)] hover:underline font-medium"
+                                    >
                                       {item.caseNo || item.case_number || "-"}
-                                    </span>
+                                    </button>
                                     <button
                                       onClick={() =>
                                         handleLinkRelatedCaseWithParams({
@@ -3181,18 +3152,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                       )
                                         ? "연동 중..."
                                         : "등록"}
-                                    </button>
-                                    <button
-                                      onClick={() =>
-                                        handleDismissRelatedCase(
-                                          item.caseNo || item.case_number || "",
-                                          "related_case",
-                                        )
-                                      }
-                                      disabled={isLinkingAll}
-                                      className="text-xs px-2 py-0.5 bg-[var(--bg-tertiary)] text-[var(--text-tertiary)] hover:bg-[var(--bg-hover)] rounded transition-colors disabled:opacity-50"
-                                    >
-                                      연동안함
                                     </button>
                                   </div>
                                 )}
@@ -3651,7 +3610,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           relatedCaseInfo={selectedRelatedCase}
           sourceCaseId={caseData.id}
           onLink={handleLinkRelatedCase}
-          onDismiss={handleDismissRelatedCaseFromModal}
         />
       )}
 

@@ -19,11 +19,11 @@ compatibility_flags = ["nodejs_compat"]
 directory = ".open-next/assets"
 binding = "ASSETS"
 
-# R2 Bucket Binding
+# R2 Bucket Binding (disabled - enable after R2 setup on correct account)
 # Provides access to Cloudflare R2 object storage for file uploads
-[[r2_buckets]]
-binding = "R2_BUCKET"
-bucket_name = "luseed-files"
+# [[r2_buckets]]
+# binding = "R2_BUCKET"
+# bucket_name = "luseed-files"
 
 # Hyperdrive Database Binding (disabled - not currently used)
 # Uncomment when direct PostgreSQL connection is needed

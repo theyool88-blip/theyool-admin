@@ -5,54 +5,21 @@
  *
  * A bold, utilitarian file management interface inspired by
  * brutalist design principles with functional clarity.
- *
- * Design Philosophy:
- * - Stark black and white base with accent color for interactions
- * - Dense information display with clear hierarchy
- * - Minimal decoration, maximum function
- * - Sharp geometric shapes and borders
  */
 
-import { useState, useEffect } from 'react'
 import { AlertCircle, HardDrive, Loader2 } from 'lucide-react'
 import FileExplorer from '@/components/drive/FileExplorer'
-
-// Note: Metadata should be in layout.tsx for Server Components
-// Client components cannot export metadata
-
-interface TenantInfo {
-  id: string
-  name: string
-}
+import { useTenant } from '@/hooks/useTenant'
 
 export default function DrivePage() {
-  const [tenant, setTenant] = useState<TenantInfo | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const { tenantId, tenantName, isLoading, error } = useTenant()
 
-  useEffect(() => {
-    async function fetchTenant() {
-      try {
-        const response = await fetch('/api/tenant/current')
-        if (!response.ok) throw new Error('Failed to fetch tenant')
-        const data = await response.json()
-        setTenant(data)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchTenant()
-  }, [])
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-neutral-900" />
-          <p className="text-sm font-mono uppercase tracking-wider text-neutral-600">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--text-primary)]" />
+          <p className="text-sm font-mono uppercase tracking-wider text-[var(--text-secondary)]">
             Loading Drive
           </p>
         </div>
@@ -60,19 +27,19 @@ export default function DrivePage() {
     )
   }
 
-  if (error || !tenant) {
+  if (error || !tenantId) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-neutral-50">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
         <div className="max-w-md w-full mx-4">
-          <div className="bg-white border-4 border-red-600 p-8">
+          <div className="bg-[var(--bg-secondary)] border-2 border-[var(--color-danger)] rounded-lg p-8">
             <div className="flex items-start gap-4">
-              <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
+              <AlertCircle className="w-6 h-6 text-[var(--color-danger)] flex-shrink-0 mt-1" />
               <div>
-                <h1 className="text-xl font-bold uppercase tracking-tight mb-2">
-                  Error Loading Drive
+                <h1 className="text-xl font-bold mb-2 text-[var(--text-primary)]">
+                  드라이브 로드 오류
                 </h1>
-                <p className="text-sm text-neutral-700 font-mono">
-                  {error || 'Failed to load tenant information'}
+                <p className="text-sm text-[var(--text-secondary)]">
+                  {error || '테넌트 정보를 불러올 수 없습니다'}
                 </p>
               </div>
             </div>
@@ -83,20 +50,19 @@ export default function DrivePage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-neutral-50">
-      {/* Header - Stark and functional */}
-      <header className="bg-neutral-900 text-white border-b-4 border-neutral-800">
+    <div className="h-[calc(100vh-64px)] flex flex-col bg-[var(--bg-primary)]">
+      {/* Header */}
+      <header className="bg-[var(--bg-secondary)] border-b border-[var(--border-default)]">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <HardDrive className="w-6 h-6" />
-              <h1 className="text-2xl font-bold uppercase tracking-tight">
-                Drive
+            <div className="flex items-center gap-3">
+              <HardDrive className="w-5 h-5 text-[var(--sage-primary)]" />
+              <h1 className="text-lg font-semibold text-[var(--text-primary)]">
+                드라이브
               </h1>
             </div>
-            <div className="text-sm font-mono">
-              <span className="text-neutral-400">Tenant:</span>{' '}
-              <span className="text-white font-semibold">{tenant.name}</span>
+            <div className="text-sm text-[var(--text-secondary)]">
+              {tenantName}
             </div>
           </div>
         </div>
@@ -104,28 +70,8 @@ export default function DrivePage() {
 
       {/* Main content area */}
       <main className="flex-1 overflow-hidden">
-        <FileExplorer tenantId={tenant.id} />
+        <FileExplorer tenantId={tenantId} />
       </main>
-
-      <style jsx global>{`
-        /* Brutalist grid overlay effect on hover */
-        @keyframes gridPulse {
-          0%, 100% { opacity: 0.05; }
-          50% { opacity: 0.15; }
-        }
-
-        .drive-container:hover::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background-image:
-            linear-gradient(0deg, transparent 24%, rgba(0, 0, 0, .05) 25%, rgba(0, 0, 0, .05) 26%, transparent 27%, transparent 74%, rgba(0, 0, 0, .05) 75%, rgba(0, 0, 0, .05) 76%, transparent 77%, transparent),
-            linear-gradient(90deg, transparent 24%, rgba(0, 0, 0, .05) 25%, rgba(0, 0, 0, .05) 26%, transparent 27%, transparent 74%, rgba(0, 0, 0, .05) 75%, rgba(0, 0, 0, .05) 76%, transparent 77%, transparent);
-          background-size: 50px 50px;
-          pointer-events: none;
-          animation: gridPulse 3s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   )
 }

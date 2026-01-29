@@ -56,6 +56,9 @@ function isValidUUID(value: unknown): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const timings: Record<string, number> = {};
+  const startTotal = Date.now();
+
   try {
     const body = await request.json();
     const {
@@ -450,6 +453,7 @@ export async function POST(request: NextRequest) {
           }
         } else {
           // 저장된 encCsNo+WMONID로 직접 일반내용 조회 (캡챠 불필요!)
+          const t1 = Date.now();
           const generalResult = await apiClient.getCaseGeneralWithStoredEncCsNo(
             storedWmonid,
             storedEncCsNo,
@@ -460,6 +464,7 @@ export async function POST(request: NextRequest) {
               csSerial: csSerial,
             }
           );
+          timings['1_general_api'] = Date.now() - t1;
 
           if (generalResult.success && generalResult.data) {
             // CaseGeneralResult.data를 generalData로 사용
@@ -515,7 +520,9 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        const t2a = Date.now();
         const sessionOk = await apiClient.initSession(storedWmonid);
+        timings['2a_init_session'] = Date.now() - t2a;
         if (!sessionOk) {
           return NextResponse.json(
             { error: '세션 초기화 실패' },
@@ -524,6 +531,7 @@ export async function POST(request: NextRequest) {
         }
 
         try {
+          const t2b = Date.now();
           const progressResult = await apiClient.getCaseProgress({
             cortCd: cortCdNum,
             csYear,
@@ -531,6 +539,7 @@ export async function POST(request: NextRequest) {
             csSerial,
             encCsNo: storedEncCsNo,
           });
+          timings['2b_progress_api'] = Date.now() - t2b;
           if (progressResult.success) {
             progressData = progressResult.progress || [];
             progressFetched = true;
@@ -552,6 +561,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ 동기화 조회 완료: 일반내용=${generalData ? 'OK' : 'FAIL'}, 진행=${progressData.length}건`);
 
+    const tSnap1 = Date.now();
     const { data: existingSnapshot } = await supabase
       .from('scourt_case_snapshots')
       .select('id, raw_data, progress, basic_info, hearings, documents, lower_court, related_cases, case_type, content_hash')
@@ -559,6 +569,7 @@ export async function POST(request: NextRequest) {
       .order('scraped_at', { ascending: false })
       .limit(1)
       .single();
+    timings['6a_get_snapshot'] = Date.now() - tSnap1;
 
     const apiResponseForXml: Record<string, unknown> | null = (generalData?.raw as Record<string, unknown> | undefined) || null;
     const templateId = apiResponseForXml ? extractTemplateIdFromResponse(apiResponseForXml) : null;
@@ -566,15 +577,13 @@ export async function POST(request: NextRequest) {
     const caseTypeFromApi = apiResponseForXml ? detectCaseTypeFromApiResponse(apiResponseForXml) : null;
     const caseType = caseTypeFromTemplate || caseTypeFromApi || existingSnapshot?.case_type || detectCaseTypeFromCaseNumber(caseNumber);
 
-    if (apiResponseForXml) {
-      // XML 캐시 확보
-      // - 첫 연동: 모든 동적 추출 경로 캐시 (데이터 유무 무관)
-      // - 갱신: 데이터가 있는 항목 중 미캐시된 것만 다운로드 (이전 버전 호환)
+    // XML 캐시는 첫 연동 시에만 수행 (갱신 시에는 이미 캐시됨)
+    if (apiResponseForXml && isFirstLink) {
       try {
-        console.log(`📄 XML 캐시 확인 중 (사건유형: ${caseType}, 첫연동: ${isFirstLink})...`);
-        // 첫 연동: cacheAllOnFirstLink=true (모든 경로 캐시)
-        // 갱신: cacheAllOnFirstLink=false (데이터 있는 것만 캐시)
-        await ensureXmlCacheForCase(caseType, apiResponseForXml, isFirstLink);
+        console.log(`📄 XML 캐시 확보 중 (사건유형: ${caseType})...`);
+        const tXml = Date.now();
+        await ensureXmlCacheForCase(caseType, apiResponseForXml, true);
+        timings['6b_xml_cache'] = Date.now() - tXml;
         console.log(`✅ XML 캐시 확보 완료`);
       } catch (xmlError) {
         // XML 캐시 실패해도 동기화는 계속 진행
@@ -753,14 +762,14 @@ export async function POST(request: NextRequest) {
 
     if (shouldUseGeneralData) {
 
-      // 연관사건 정보 가공 (UI 필드명에 맞춤: caseNo, caseName, relation)
+      // 연관사건 정보 가공 (UI 필드명에 맞춤: caseNo, courtName, relation)
       // linkedCaseId: 시스템 내 사건이 있으면 해당 사건 ID
       relatedCasesData = await Promise.all(
         (generalData?.relatedCases || []).map(async (rc) => {
           const linkedCase = await findCaseByNumber(rc.userCsNo);
           return {
             caseNo: rc.userCsNo,
-            caseName: rc.reltCsCortNm,
+            courtName: rc.reltCsCortNm,
             relation: rc.reltCsDvsNm,
             encCsNo: rc.encCsNo || null,
             linkedCaseId: linkedCase?.id || null,
@@ -825,6 +834,29 @@ export async function POST(request: NextRequest) {
           representatives: representativesData,
         })
       : legalCase.scourt_general_hash;
+    const generalChanged = generalHash !== legalCase.scourt_general_hash;
+
+    // 변경 없으면 조기 반환 (갱신 시에만, 첫 연동은 제외)
+    if (!isFirstLink && !generalChanged && !progressChanged) {
+      console.log('⏭️ 일반내역/진행내역 변경 없음 - 전체 스킵');
+      timings['total'] = Date.now() - startTotal;
+      console.log('[SCOURT SYNC] ⏱️ Timings:', timings);
+
+      // scourt_last_sync만 업데이트
+      await supabase
+        .from('legal_cases')
+        .update({ scourt_last_sync: new Date().toISOString() })
+        .eq('id', legalCaseId);
+
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        message: '변경 없음',
+        caseNumber,
+        _timings: timings,
+      });
+    }
+
     const detectedUpdates = CaseChangeDetector.detectChanges(previousChangeSnapshot, currentChangeSnapshot);
     const snapshotData = {
       legal_case_id: legalCaseId,
@@ -844,7 +876,14 @@ export async function POST(request: NextRequest) {
     };
 
     let snapshotId: string;
-    if (existingSnapshot) {
+    const tSnap2 = Date.now();
+    const snapshotChanged = contentHash !== existingSnapshot?.content_hash;
+
+    if (existingSnapshot && !snapshotChanged) {
+      // 변경 없음 - 스냅샷 업데이트 스킵
+      console.log('⏭️ 스냅샷 변경 없음 - 업데이트 스킵');
+      snapshotId = existingSnapshot.id;
+    } else if (existingSnapshot) {
       // 기존 스냅샷 업데이트
       const { error: updateError } = await supabase
         .from('scourt_case_snapshots')
@@ -872,6 +911,7 @@ export async function POST(request: NextRequest) {
       }
       snapshotId = newSnapshot.id;
     }
+    timings['6c_save_snapshot'] = Date.now() - tSnap2;
 
     if (detectedUpdates.length > 0) {
       const updatesPayload = detectedUpdates.map((update) => ({
@@ -898,7 +938,8 @@ export async function POST(request: NextRequest) {
 
     // 7. 기일 동기화 (court_hearings 테이블)
     let hearingSyncResult = null;
-    if (shouldUseGeneralData && generalData?.hearings && generalData.hearings.length > 0) {
+    // 기일/당사자 동기화는 일반내역이 변경된 경우에만 실행 (성능 최적화)
+    if (generalChanged && shouldUseGeneralData && generalData?.hearings && generalData.hearings.length > 0) {
       const hearingsForSync = generalData.hearings.map((h) => ({
         date: h.trmDt || '',
         time: h.trmHm || '',
@@ -907,36 +948,44 @@ export async function POST(request: NextRequest) {
         result: h.rslt || '',
       }));
 
+      const t3 = Date.now();
       hearingSyncResult = await syncHearingsToCourtHearings(
         legalCaseId,
         caseNumber,
         hearingsForSync
       );
+      timings['3_hearing_sync'] = Date.now() - t3;
       console.log('📅 기일 동기화 결과:', hearingSyncResult);
+    } else if (!generalChanged) {
+      console.log('⏭️ 일반내역 변경 없음 - 기일 동기화 스킵');
     }
 
     // 7-1. 당사자/대리인 동기화 (case_parties, case_representatives 테이블)
     let partySyncResult = null;
-    if (shouldUseGeneralData && ((partiesData && partiesData.length > 0) || (representativesData && representativesData.length > 0))) {
+    if (generalChanged && shouldUseGeneralData && ((partiesData && partiesData.length > 0) || (representativesData && representativesData.length > 0))) {
+      const t4 = Date.now();
       partySyncResult = await syncPartiesFromScourtServer(supabase, {
         legalCaseId,
         tenantId,
         parties: partiesData as Parameters<typeof syncPartiesFromScourtServer>[1]['parties'],
         representatives: representativesData as Parameters<typeof syncPartiesFromScourtServer>[1]['representatives'],
       });
+      timings['4_party_sync'] = Date.now() - t4;
       console.log(`👥 당사자 동기화 결과: ${partySyncResult.partiesUpserted}명, 대리인: ${partySyncResult.representativesUpserted}명`);
+    } else if (!generalChanged) {
+      console.log('⏭️ 일반내역 변경 없음 - 당사자 동기화 스킵');
     }
 
     // 8. 심급내용(원심) 및 연관사건 자동 연결 (공통 모듈 사용)
-    // shouldUseGeneralData 여부와 관계없이 relatedCasesData/lowerCourtData를 사용
-    // (shouldUseGeneralData=false면 기존 스냅샷 데이터가 사용됨)
+    // 일반내역이 변경된 경우에만 실행 (성능 최적화)
     let linkResult: { unlinkedRelatedCases: typeof relatedCasesData; unlinkedLowerCourt: typeof lowerCourtData } | null = null;
-    if (lowerCourtData.length > 0 || relatedCasesData.length > 0) {
+    if (generalChanged && (lowerCourtData.length > 0 || relatedCasesData.length > 0)) {
       try {
         // 사건번호에서 caseType 추출
         const parsedCaseNumber = parseCaseNumber(caseNumber);
         const caseType = parsedCaseNumber.caseType || '';
 
+        const t5 = Date.now();
         linkResult = await linkRelatedCases({
           supabase,
           legalCaseId,
@@ -946,6 +995,7 @@ export async function POST(request: NextRequest) {
           relatedCases: relatedCasesData,
           lowerCourt: lowerCourtData,
         });
+        timings['5_related_cases'] = Date.now() - t5;
       } catch (linkError) {
         console.error('연관사건 연결 실패:', linkError);
         // 연관사건 연결 실패는 동기화 실패로 처리하지 않음
@@ -1043,6 +1093,10 @@ export async function POST(request: NextRequest) {
       lowerCourt: linkResult.unlinkedLowerCourt || [],
     } : { relatedCases: [], lowerCourt: [] };
 
+    // 타이밍 로그 출력
+    timings['total'] = Date.now() - startTotal;
+    console.log('[SCOURT SYNC] ⏱️ Timings:', timings);
+
     return NextResponse.json({
       success: true,
       caseNumber,
@@ -1059,6 +1113,7 @@ export async function POST(request: NextRequest) {
       syncType: effectiveSyncType,
       progressChanged,
       unlinkedCases,  // 미등록 관련사건/심급사건 정보
+      _timings: timings,  // 디버깅용 타이밍 정보
     });
 
   } catch (error) {

@@ -21,12 +21,11 @@ pages_build_output_dir = ".open-next"
 binding = "R2_BUCKET"
 bucket_name = "luseed-files"
 
-# Hyperdrive Database Binding
-# Accelerates database connections via Cloudflare's connection pooling
-# Note: The actual Hyperdrive ID must be configured after creating the Hyperdrive config
-[[hyperdrive]]
-binding = "HYPERDRIVE"
-id = "88b70aa08a7e4f7bbbf3f97e75c1f746"
+# Hyperdrive Database Binding (disabled - not currently used)
+# Uncomment when direct PostgreSQL connection is needed
+# [[hyperdrive]]
+# binding = "HYPERDRIVE"
+# id = "88b70aa08a7e4f7bbbf3f97e75c1f746"
 
 # Note: Scheduled Tasks (Cron Triggers) are NOT supported in Cloudflare Pages
 # Use external cron services (e.g., cron-job.org, GitHub Actions) to call API routes:

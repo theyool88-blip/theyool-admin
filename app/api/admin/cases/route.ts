@@ -207,11 +207,6 @@ export const POST = withTenant(async (request, { tenant }) => {
     }
 
     const adminClient = createAdminClient()
-    let sourceCase: {
-      case_level?: string | null
-      court_case_number?: string | null
-      main_case_id?: string | null
-    } | null = null
     let sourceClientRole: 'plaintiff' | 'defendant' | null = null  // case_clients + case_parties에서 조회
     let sourceOpponentName: string | null = null  // case_parties에서 조회
     let sourcePartyOverrides: Array<{
@@ -222,12 +217,6 @@ export const POST = withTenant(async (request, { tenant }) => {
       is_primary: boolean
       notes: string | null
     }> = []
-    let sourceClientInfo: {
-      client_id: string
-      retainer_fee: number | null
-      success_fee_terms: string | null
-      linked_party_id: string | null
-    } | null = null
 
     if (body.source_case_id) {
       // legal_cases에서 기본 정보 조회 (client_role, client_role_status 제거됨)
@@ -249,8 +238,6 @@ export const POST = withTenant(async (request, { tenant }) => {
         )
       }
 
-      sourceCase = sourceCaseData
-
       // case_clients에서 의뢰인 정보 조회
       const { data: sourceCaseClient } = await adminClient
         .from('case_clients')
@@ -260,8 +247,6 @@ export const POST = withTenant(async (request, { tenant }) => {
         .maybeSingle()
 
       if (sourceCaseClient) {
-        sourceClientInfo = sourceCaseClient
-
         // linked_party_id로 의뢰인 당사자의 party_type 조회
         if (sourceCaseClient.linked_party_id) {
           const { data: clientParty } = await adminClient

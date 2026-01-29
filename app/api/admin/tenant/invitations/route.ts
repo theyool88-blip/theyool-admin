@@ -3,7 +3,7 @@
  * 초대 목록 조회
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withRole } from '@/lib/api/with-tenant';
 

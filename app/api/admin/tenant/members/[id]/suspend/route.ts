@@ -3,7 +3,7 @@
  * 멤버 정지 및 정지 해제
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withRole } from '@/lib/api/with-tenant';
 

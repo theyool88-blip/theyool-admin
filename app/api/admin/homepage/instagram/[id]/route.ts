@@ -3,7 +3,7 @@
  * Instagram 포스트 상세 조회, 수정, 삭제
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { withHomepage } from '@/lib/api/with-homepage';
 

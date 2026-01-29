@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { withTenant } from '@/lib/api/with-tenant'
 import { confirmPaymentWithTenant } from '@/lib/supabase/payments-aggregation'
 

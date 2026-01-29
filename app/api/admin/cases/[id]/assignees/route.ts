@@ -305,7 +305,6 @@ export const PUT = withTenant(async (
     if (body.assignees.length > 0) {
       // Separate lawyers and staff
       const lawyers = body.assignees.filter(a => !a.assignee_role || a.assignee_role === 'lawyer')
-      const staff = body.assignees.filter(a => a.assignee_role === 'staff')
 
       // Ensure exactly one primary among lawyers
       const hasPrimaryLawyer = lawyers.some(a => a.is_primary)

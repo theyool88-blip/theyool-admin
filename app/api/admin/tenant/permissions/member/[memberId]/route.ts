@@ -15,7 +15,6 @@ import {
   clearMemberModuleOverride,
   getEffectivePermissions,
   ALL_MODULES,
-  type PermissionModule,
   type DataScope,
 } from '@/lib/auth/permission-service';
 import { MemberRole } from '@/types/tenant';

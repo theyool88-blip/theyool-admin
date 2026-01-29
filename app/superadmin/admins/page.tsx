@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import {
-  ShieldCheck,
   RefreshCw,
   AlertCircle,
   Search,

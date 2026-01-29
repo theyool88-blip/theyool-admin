@@ -3,7 +3,7 @@
  * 멤버 정보 수정 및 제거
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { withRole } from '@/lib/api/with-tenant';
 import type { MemberRole } from '@/types/tenant';

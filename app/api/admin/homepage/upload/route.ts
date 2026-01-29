@@ -135,7 +135,7 @@ export const POST = withHomepage(async (request: NextRequest, { tenant }) => {
     const filePath = `${tenant.tenantId}/${folder}/${fileName}`;
 
     // Supabase Storage에 업로드
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('homepage-images')
       .upload(filePath, optimized.buffer, {
         contentType: optimized.contentType,

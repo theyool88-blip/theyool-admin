@@ -506,7 +506,13 @@ export class StorageService {
       throw new Error(`Failed to move folder: ${updateError.message}`);
     }
 
-    // TODO: Update all descendant folders' paths recursively
+    // Update all descendant folders' paths recursively
+    const oldPath = folder.path;
+    await supabase.rpc('update_folder_paths_recursive', {
+      p_folder_id: folderId,
+      p_old_path: oldPath,
+      p_new_path: newPath,
+    });
 
     return updated as R2Folder;
   }
@@ -552,7 +558,13 @@ export class StorageService {
       throw new Error(`Failed to rename folder: ${updateError.message}`);
     }
 
-    // TODO: Update all descendant folders' paths recursively
+    // Update all descendant folders' paths recursively
+    const oldPath = folder.path;
+    await supabase.rpc('update_folder_paths_recursive', {
+      p_folder_id: folderId,
+      p_old_path: oldPath,
+      p_new_path: newPath,
+    });
 
     return updated as R2Folder;
   }
@@ -628,51 +640,37 @@ export class StorageService {
   }
 
   /**
-   * Update storage usage (internal use)
+   * Update storage usage atomically
    *
    * @param tenantId - Tenant ID
    * @param deltaBytes - Change in bytes (positive or negative)
    * @param deltaFiles - Change in file count (positive or negative)
+   * @returns Updated storage values for quota checking
    */
   static async updateUsage(
     tenantId: string,
     deltaBytes: number,
     deltaFiles: number
-  ): Promise<void> {
+  ): Promise<{ newUsedBytes: number; newFileCount: number; quotaBytes: number }> {
     const supabase = await createClient();
 
-    // Get current storage
-    const { data: storage } = await supabase
-      .from('tenant_storage')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .single();
-
-    if (!storage) {
-      // Create if doesn't exist
-      await supabase.from('tenant_storage').insert({
-        tenant_id: tenantId,
-        quota_bytes: 53687091200, // 50GB default
-        used_bytes: Math.max(0, deltaBytes),
-        file_count: Math.max(0, deltaFiles),
-      });
-      return;
-    }
-
-    // Update usage
-    const newUsedBytes = Math.max(0, storage.used_bytes + deltaBytes);
-    const newFileCount = Math.max(0, storage.file_count + deltaFiles);
-
-    const { error } = await supabase
-      .from('tenant_storage')
-      .update({
-        used_bytes: newUsedBytes,
-        file_count: newFileCount,
-      })
-      .eq('tenant_id', tenantId);
+    const { data, error } = await supabase.rpc('update_tenant_storage_atomic', {
+      p_tenant_id: tenantId,
+      p_delta_bytes: deltaBytes,
+      p_delta_files: deltaFiles,
+    });
 
     if (error) {
       throw new Error(`Failed to update storage usage: ${error.message}`);
     }
+
+    // RPC returns array with single row
+    const result = Array.isArray(data) ? data[0] : data;
+
+    return {
+      newUsedBytes: result.new_used_bytes,
+      newFileCount: result.new_file_count,
+      quotaBytes: result.quota_bytes,
+    };
   }
 }

@@ -19,6 +19,7 @@ export interface R2File {
   uploaded_by: string | null
   created_at: string
   updated_at: string
+  deleted_at: string | null  // Soft delete timestamp
 }
 
 export interface R2Folder {
@@ -33,6 +34,7 @@ export interface R2Folder {
   display_order: number
   created_at: string
   updated_at: string
+  deleted_at: string | null  // Soft delete timestamp
 }
 
 export interface TenantStorage {
@@ -117,6 +119,6 @@ export interface ClassificationResult {
 }
 
 // Insert types (for database operations)
-export type R2FileInsert = Omit<R2File, 'id' | 'created_at' | 'updated_at'>
-export type R2FolderInsert = Omit<R2Folder, 'id' | 'created_at' | 'updated_at'>
+export type R2FileInsert = Omit<R2File, 'id' | 'created_at' | 'updated_at' | 'deleted_at'>
+export type R2FolderInsert = Omit<R2Folder, 'id' | 'created_at' | 'updated_at' | 'deleted_at'>
 export type InboxRuleInsert = Omit<InboxRule, 'id' | 'created_at' | 'updated_at'>

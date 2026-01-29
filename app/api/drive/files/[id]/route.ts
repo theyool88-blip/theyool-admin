@@ -321,23 +321,17 @@ export const DELETE = withTenant(async (request: NextRequest, { tenant, params }
         );
       }
 
-      // Update tenant storage usage
+      // Update tenant storage usage atomically
       if (typedFile.file_size) {
-        const { data: storage } = await supabase
-          .from('tenant_storage')
-          .select('used_bytes, file_count')
-          .eq('tenant_id', typedFile.tenant_id)
-          .single();
+        const { error: storageError } = await supabase.rpc('update_tenant_storage_atomic', {
+          p_tenant_id: typedFile.tenant_id,
+          p_delta_bytes: -typedFile.file_size,  // NEGATIVE to decrement
+          p_delta_files: -1,                      // NEGATIVE to decrement
+        });
 
-        if (storage) {
-          await supabase
-            .from('tenant_storage')
-            .update({
-              used_bytes: Math.max(0, (storage.used_bytes || 0) - typedFile.file_size),
-              file_count: Math.max(0, (storage.file_count || 0) - 1),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('tenant_id', typedFile.tenant_id);
+        if (storageError) {
+          console.error('Failed to update storage after hard delete:', storageError);
+          // Non-fatal: file is deleted, storage count may drift
         }
       }
 
@@ -346,13 +340,27 @@ export const DELETE = withTenant(async (request: NextRequest, { tenant, params }
         message: 'File permanently deleted',
       });
     } else {
-      // Soft delete: Move to trash folder or mark as deleted
-      // For now, we'll implement hard delete only
-      // Soft delete logic can be added later with a "deleted_at" column
-      return NextResponse.json(
-        { success: false, error: 'Soft delete not implemented yet' },
-        { status: 501 }
-      );
+      // Soft delete: Set deleted_at timestamp
+      const { data: updatedFile, error: softDeleteError } = await supabase
+        .from('r2_files')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('id', fileId)
+        .select()
+        .single();
+
+      if (softDeleteError) {
+        console.error('File soft delete error:', softDeleteError);
+        return NextResponse.json(
+          { success: false, error: 'Failed to delete file' },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'File moved to trash',
+        file: updatedFile,
+      });
     }
   } catch (error) {
     console.error('File DELETE error:', error);

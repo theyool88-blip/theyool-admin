@@ -15,6 +15,7 @@
 
 import { useState, useEffect } from 'react'
 import { AlertCircle, HardDrive, Loader2 } from 'lucide-react'
+import FileExplorer from '@/components/drive/FileExplorer'
 
 // Note: Metadata should be in layout.tsx for Server Components
 // Client components cannot export metadata
@@ -103,37 +104,7 @@ export default function DrivePage() {
 
       {/* Main content area */}
       <main className="flex-1 overflow-hidden">
-        {/* Placeholder - FileExplorer component will be imported here */}
-        <div className="h-full flex items-center justify-center">
-          <div className="max-w-2xl w-full mx-4">
-            <div className="bg-white border-4 border-neutral-900 p-12">
-              <div className="text-center space-y-6">
-                <div className="inline-block p-6 bg-neutral-100">
-                  <HardDrive className="w-16 h-16 text-neutral-900" />
-                </div>
-                <div>
-                  <h2 className="text-3xl font-bold uppercase tracking-tight mb-3">
-                    File Explorer
-                  </h2>
-                  <p className="text-neutral-600 font-mono text-sm leading-relaxed">
-                    The FileExplorer component will be rendered here.
-                    <br />
-                    This page provides full-screen file management
-                    <br />
-                    with folder navigation, upload, and preview capabilities.
-                  </p>
-                </div>
-                <div className="pt-4">
-                  <div className="inline-block bg-neutral-900 text-white px-6 py-3">
-                    <code className="text-sm font-mono">
-                      {'<FileExplorer tenantId={tenant.id} />'}
-                    </code>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <FileExplorer tenantId={tenant.id} />
       </main>
 
       <style jsx global>{`

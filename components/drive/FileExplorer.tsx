@@ -22,6 +22,8 @@ import {
   RefreshCw,
 } from 'lucide-react'
 import type { R2File as R2FileType, R2Folder as R2FolderType } from '@/types/r2'
+import { useDriveFolder, useStorageUsage, invalidateDriveCache, invalidateStorageCache } from '@/hooks/useDrive'
+import FileUploader from '@/components/drive/FileUploader'
 
 // Use canonical types with local extensions
 type R2File = R2FileType
@@ -57,10 +59,16 @@ export default function FileExplorer({
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
 
-  // Mock data - Replace with SWR hooks
-  const { data: folders, isLoading: foldersLoading } = useFolders(tenantId, caseId, currentFolderId)
-  const { data: files, isLoading: filesLoading, mutate: refreshFiles } = useFiles(tenantId, caseId, currentFolderId)
-  const { data: breadcrumbs } = useBreadcrumbs(currentFolderId)
+  // Real SWR hooks for drive data
+  const {
+    folders,
+    files,
+    currentFolder: _currentFolder,
+    breadcrumbs,
+    isLoading: driveLoading,
+    mutate: refreshDrive
+  } = useDriveFolder(tenantId, currentFolderId, caseId)
+  const { storage: _storage } = useStorageUsage()
 
   // Filtered and sorted files
   const processedFiles = useMemo(() => {
@@ -135,6 +143,7 @@ export default function FileExplorer({
       setNewFolderName('')
       setShowNewFolder(false)
       // Refresh folder list
+      invalidateDriveCache(tenantId, currentFolderId, caseId)
     } catch (error) {
       console.error('Failed to create folder:', error)
     }
@@ -149,7 +158,7 @@ export default function FileExplorer({
     }
   }
 
-  const isLoading = foldersLoading || filesLoading
+  const isLoading = driveLoading
 
   return (
     <div className={`flex h-full ${embedded ? '' : 'page-container'}`}>
@@ -182,7 +191,7 @@ export default function FileExplorer({
               <Home className="w-4 h-4" />
               <span>홈</span>
             </button>
-            {breadcrumbs?.map((crumb) => (
+            {breadcrumbs?.map((crumb: R2Folder) => (
               <div key={crumb.id} className="flex items-center gap-2">
                 <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
                 <button
@@ -287,7 +296,7 @@ export default function FileExplorer({
 
             {/* Actions */}
             <button
-              onClick={() => refreshFiles()}
+              onClick={() => refreshDrive()}
               className="p-2 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
               title="새로고침"
             >
@@ -327,7 +336,7 @@ export default function FileExplorer({
                     폴더
                   </h3>
                   <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4' : 'space-y-2'}>
-                    {folders.map((folder) => (
+                    {folders.map((folder: R2Folder) => (
                       <FolderItem
                         key={folder.id}
                         folder={folder}
@@ -405,7 +414,7 @@ export default function FileExplorer({
         </div>
       )}
 
-      {/* Upload Modal Placeholder */}
+      {/* Upload Modal */}
       {showUploader && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-[var(--bg-secondary)] rounded-lg shadow-xl w-full max-w-2xl p-6">
@@ -418,9 +427,23 @@ export default function FileExplorer({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="text-center py-12 text-[var(--text-muted)]">
-              FileUploader component will be integrated here
-            </div>
+            <FileUploader
+              tenantId={tenantId}
+              folderId={currentFolderId ?? undefined}
+              caseId={caseId}
+              onUploadComplete={(files) => {
+                // Refresh the file list
+                refreshDrive()
+                invalidateStorageCache()
+                // Close modal if all uploads completed
+                if (files.length > 0) {
+                  setShowUploader(false)
+                }
+              }}
+              onUploadError={(error) => {
+                console.error('Upload error:', error)
+              }}
+            />
           </div>
         </div>
       )}
@@ -658,21 +681,3 @@ function formatDate(dateString: string): string {
   return `${year}.${month}.${day}`
 }
 
-// Mock data hooks (replace with real SWR implementations)
-function useFolders(_tenantId: string, _caseId?: string, _parentId?: string | null) {
-  // TODO: Replace with real SWR hook
-  // return useSWR(`/api/admin/drive/folders?tenantId=${tenantId}&caseId=${caseId}&parentId=${parentId}`)
-  return { data: [] as R2Folder[], isLoading: false }
-}
-
-function useFiles(_tenantId: string, _caseId?: string, _folderId?: string | null) {
-  // TODO: Replace with real SWR hook
-  // return useSWR(`/api/admin/drive/files?tenantId=${tenantId}&caseId=${caseId}&folderId=${folderId}`)
-  return { data: [] as R2File[], isLoading: false, mutate: () => {} }
-}
-
-function useBreadcrumbs(_folderId: string | null) {
-  // TODO: Replace with real SWR hook
-  // return useSWR(folderId ? `/api/admin/drive/folders/${folderId}/breadcrumbs` : null)
-  return { data: [] as R2Folder[] }
-}

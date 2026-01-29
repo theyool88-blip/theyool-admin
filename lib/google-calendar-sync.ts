@@ -1,4 +1,5 @@
-import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+import { calendar_v3, calendar } from '@googleapis/calendar';
 import { createAdminClient } from '@/lib/supabase/server';
 import {
   getCalendarEvents,
@@ -417,17 +418,17 @@ export async function registerTenantCalendarWatch(tenantId: string) {
     throw new Error('Failed to get access token');
   }
 
-  const oauth2Client = new google.auth.OAuth2();
+  const oauth2Client = new OAuth2Client();
   oauth2Client.setCredentials({ access_token: accessToken });
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const calendarClient = calendar({ version: 'v3', auth: oauth2Client });
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/google-calendar`;
   const channelId = `tenant-${tenantId.slice(0, 8)}-${Date.now()}`;
 
   const expiration = Date.now() + 7 * 24 * 60 * 60 * 1000;
 
-  const response = await calendar.events.watch({
+  const response = await calendarClient.events.watch({
     calendarId,
     requestBody: {
       id: channelId,
@@ -472,12 +473,12 @@ export async function stopTenantCalendarWatch(tenantId: string) {
     throw new Error('Failed to get access token');
   }
 
-  const oauth2Client = new google.auth.OAuth2();
+  const oauth2Client = new OAuth2Client();
   oauth2Client.setCredentials({ access_token: accessToken });
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const calendarClient = calendar({ version: 'v3', auth: oauth2Client });
 
-  await calendar.channels.stop({
+  await calendarClient.channels.stop({
     requestBody: {
       id: integration.webhook_channel_id,
       resourceId: integration.webhook_resource_id,
@@ -832,17 +833,17 @@ export async function registerCalendarWatch() {
     });
   }
 
-  const oauth2Client = new google.auth.OAuth2();
+  const oauth2Client = new OAuth2Client();
   oauth2Client.setCredentials({ access_token: accessToken });
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const calendarClient = calendar({ version: 'v3', auth: oauth2Client });
 
   const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/webhooks/google-calendar`;
   const channelId = `theyool-calendar-${Date.now()}`;
 
   const expiration = Date.now() + 7 * 24 * 60 * 60 * 1000;
 
-  const response = await calendar.events.watch({
+  const response = await calendarClient.events.watch({
     calendarId: LEGACY_CALENDAR_ID,
     requestBody: {
       id: channelId,
@@ -896,7 +897,7 @@ export async function stopCalendarWatch() {
 
   const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-  await calendar.channels.stop({
+  await calendarClient.channels.stop({
     requestBody: {
       id: watch.channelId,
       resourceId: watch.resourceId,

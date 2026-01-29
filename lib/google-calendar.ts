@@ -1,4 +1,5 @@
-import { google } from 'googleapis';
+import { OAuth2Client } from 'google-auth-library';
+import { calendar_v3, calendar } from '@googleapis/calendar';
 import { createAdminClient } from '@/lib/supabase/server';
 import type { IntegrationProvider, TenantIntegrationRecord, OAuthState } from '@/types/integration';
 
@@ -15,16 +16,23 @@ const SCOPES = CALENDAR_SCOPES;
 // =====================================================
 // OAuth2 Client (공용) - Lazy initialization for Cloudflare Workers compatibility
 // =====================================================
-let _oauth2Client: InstanceType<typeof google.auth.OAuth2> | null = null;
-function getOAuth2Client() {
+let _oauth2Client: OAuth2Client | null = null;
+function getOAuth2Client(): OAuth2Client {
   if (!_oauth2Client) {
-    _oauth2Client = new google.auth.OAuth2(
+    _oauth2Client = new OAuth2Client(
       process.env.GOOGLE_CALENDAR_CLIENT_ID,
       process.env.GOOGLE_CALENDAR_CLIENT_SECRET,
       `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/callback/google`
     );
   }
   return _oauth2Client;
+}
+
+// =====================================================
+// Calendar API 클라이언트
+// =====================================================
+function getCalendarClient(auth: OAuth2Client): calendar_v3.Calendar {
+  return calendar({ version: 'v3', auth });
 }
 
 // =====================================================
@@ -57,9 +65,9 @@ export async function refreshAccessToken(refreshToken: string) {
 
 export async function getCalendarList(accessToken: string) {
   getOAuth2Client().setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
+  const calendarClient = getCalendarClient(getOAuth2Client());
 
-  const response = await calendar.calendarList.list();
+  const response = await calendarClient.calendarList.list();
   return response.data.items || [];
 }
 
@@ -73,9 +81,9 @@ export async function getCalendarEvents(
   }
 ) {
   getOAuth2Client().setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
+  const calendarClient = getCalendarClient(getOAuth2Client());
 
-  const response = await calendar.events.list({
+  const response = await calendarClient.events.list({
     calendarId,
     timeMin: options?.timeMin || new Date().toISOString(),
     timeMax: options?.timeMax,
@@ -454,10 +462,10 @@ export async function createCalendarEvent(
   eventData: CalendarEventData
 ): Promise<{ id: string; htmlLink: string } | null> {
   getOAuth2Client().setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
+  const calendarClient = getCalendarClient(getOAuth2Client());
 
   try {
-    const response = await calendar.events.insert({
+    const response = await calendarClient.events.insert({
       calendarId,
       requestBody: {
         summary: eventData.summary,
@@ -499,7 +507,7 @@ export async function updateCalendarEvent(
   eventData: Partial<CalendarEventData>
 ): Promise<boolean> {
   getOAuth2Client().setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
+  const calendarClient = getCalendarClient(getOAuth2Client());
 
   try {
     const updateBody: Record<string, unknown> = {};
@@ -522,7 +530,7 @@ export async function updateCalendarEvent(
     if (eventData.colorId) updateBody.colorId = eventData.colorId;
     if (eventData.reminders) updateBody.reminders = eventData.reminders;
 
-    await calendar.events.patch({
+    await calendarClient.events.patch({
       calendarId,
       eventId,
       requestBody: updateBody,
@@ -545,10 +553,10 @@ export async function deleteCalendarEvent(
   eventId: string
 ): Promise<boolean> {
   getOAuth2Client().setCredentials({ access_token: accessToken });
-  const calendar = google.calendar({ version: 'v3', auth: getOAuth2Client() });
+  const calendarClient = getCalendarClient(getOAuth2Client());
 
   try {
-    await calendar.events.delete({
+    await calendarClient.events.delete({
       calendarId,
       eventId,
     });

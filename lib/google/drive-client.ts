@@ -4,7 +4,8 @@
  * 의뢰인 포털에서 파일 미리보기/다운로드에 사용
  */
 
-import { google, drive_v3 } from 'googleapis'
+import { GoogleAuth } from 'google-auth-library'
+import { drive_v3, drive } from '@googleapis/drive'
 
 let driveClient: drive_v3.Drive | null = null
 
@@ -32,7 +33,7 @@ function getServiceDriveClient(): drive_v3.Drive {
     throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY JSON 파싱 실패')
   }
 
-  const auth = new google.auth.GoogleAuth({
+  const auth = new GoogleAuth({
     credentials: {
       client_email: credentials.client_email,
       private_key: credentials.private_key,
@@ -40,7 +41,7 @@ function getServiceDriveClient(): drive_v3.Drive {
     scopes: ['https://www.googleapis.com/auth/drive.readonly'],
   })
 
-  driveClient = google.drive({ version: 'v3', auth })
+  driveClient = drive({ version: 'v3', auth })
   return driveClient
 }
 
@@ -55,9 +56,9 @@ export async function getFileMetadata(fileId: string): Promise<{
   webViewLink: string | null
   thumbnailLink: string | null
 }> {
-  const drive = getServiceDriveClient()
+  const driveApi = getServiceDriveClient()
 
-  const response = await drive.files.get({
+  const response = await driveApi.files.get({
     fileId,
     fields: 'id, name, mimeType, size, webViewLink, thumbnailLink',
   })
@@ -84,9 +85,9 @@ export async function getFileType(fileId: string): Promise<{
   type: 'pdf' | 'image' | 'unsupported'
   mimeType: string
 }> {
-  const drive = getServiceDriveClient()
+  const driveApi = getServiceDriveClient()
 
-  const response = await drive.files.get({
+  const response = await driveApi.files.get({
     fileId,
     fields: 'mimeType',
   })
@@ -114,10 +115,10 @@ export async function downloadFile(
   mimeType: string
   fileName: string
 }> {
-  const drive = getServiceDriveClient()
+  const driveApi = getServiceDriveClient()
 
   // 메타데이터 조회
-  const metaResponse = await drive.files.get({
+  const metaResponse = await driveApi.files.get({
     fileId,
     fields: 'name, mimeType',
   })
@@ -126,7 +127,7 @@ export async function downloadFile(
   const mimeType = metaResponse.data.mimeType || 'application/octet-stream'
 
   // 파일 다운로드
-  const response = await drive.files.get(
+  const response = await driveApi.files.get(
     {
       fileId,
       alt: 'media',
@@ -146,8 +147,8 @@ export async function downloadFile(
  */
 export async function fileExists(fileId: string): Promise<boolean> {
   try {
-    const drive = getServiceDriveClient()
-    await drive.files.get({
+    const driveApi = getServiceDriveClient()
+    await driveApi.files.get({
       fileId,
       fields: 'id',
     })

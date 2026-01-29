@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2026-01-30
 
 법무법인 더율 관리자 시스템 (luseed) 개발 가이드라인입니다.
 
@@ -17,7 +17,8 @@ docs/
 │   ├── CONSULTATION_SYSTEM.md # 상담 관리
 │   ├── COURT_HEARING_SYSTEM.md # 법원기일/데드라인
 │   ├── CALENDAR_SYSTEM.md     # 캘린더 시스템
-│   └── CLIENT_PORTAL.md       # 의뢰인 포털
+│   ├── CLIENT_PORTAL.md       # 의뢰인 포털
+│   └── DRIVE_STORAGE_SYSTEM.md # 드라이브/용량 관리
 │
 ├── guides/            # 개발 가이드
 │   ├── SETUP_GUIDE.md         # 초기 설정

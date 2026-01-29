@@ -11,17 +11,6 @@ import {
   isEventPostponed,
 } from '../utils/eventTransformers'
 
-// 기일 결과 라벨
-const RESULT_LABELS: Record<string, string> = {
-  continued: '속행',
-  settled: '종결',
-  judgment: '판결선고',
-  dismissed: '각하',
-  withdrawn: '취하',
-  adjourned: '연기',
-  other: '기타',
-}
-
 interface MonthEventProps {
   event: BigCalendarEvent
   isSelected?: boolean
@@ -100,10 +89,6 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
   // 연기 여부: status가 POSTPONED이거나 result가 adjourned이거나,
   // scourt_result_raw가 '기일변경'으로 시작하거나 '연기', '휴정'인 경우
   const isPostponed = isEventPostponed(status, result, scourtResultRaw)
-  // 선고기일 여부
-  const isJudgment = eventSubtype === 'HEARING_JUDGMENT' || eventSubtype === 'HEARING_SENTENCE'
-  // 결과가 있는지 여부
-  const hasResult = result && RESULT_LABELS[result]
 
   // 특별 표시할 기일 결과 (Sage Green 뱃지로 표시)
   const specialResultLabel = getSpecialResultLabel(scourtResultRaw)
@@ -172,9 +157,6 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
   // 연기/기일변경된 경우 회색 스타일 적용
   const labelBadgeClass = getLabelBadgeClass(eventType, eventSubtype, isPostponed, isNoAttendanceRequired)
 
-  // 결과 텍스트 (선고 결과 또는 연기)
-  const resultText = hasResult ? RESULT_LABELS[result!] : ''
-
   // 연기된 경우: 취소선 효과만 적용
   if (isPostponed) {
     return (
@@ -197,36 +179,7 @@ function MonthEventComponent({ event, isSelected }: MonthEventProps) {
     )
   }
 
-  // 선고기일이고 결과가 있는 경우: 결과 표시
-  if (isJudgment && hasResult && !isPostponed) {
-    return (
-      <div
-        data-event-id={event.id}
-        className={`
-          flex flex-col gap-0 px-0.5 py-0.5 rounded text-[12px] leading-tight cursor-pointer transition-all
-          ${isSelected ? 'bg-[var(--sage-primary)] bg-opacity-20 ring-2 ring-[var(--sage-primary)] ring-opacity-50 scale-[1.02]' : 'hover:bg-[var(--bg-hover)]'}
-        `}
-      >
-        {/* 첫째 줄: 기본 정보 */}
-        <div className="flex items-center gap-1 truncate">
-          {badgeLabel && (
-            <span className={`text-[10px] px-1 py-0 rounded flex-shrink-0 font-medium ${labelBadgeClass}`}>
-              {badgeLabel}
-            </span>
-          )}
-          <span className="truncate text-[var(--text-secondary)]">
-            {displayText}
-          </span>
-        </div>
-        {/* 둘째 줄: 선고 결과 */}
-        <div className="text-[10px] text-[var(--sage-primary)] pl-1 font-medium">
-          → {resultText}
-        </div>
-      </div>
-    )
-  }
-
-  // 일반 이벤트
+  // 일반 이벤트 (선고기일 포함 - 결과는 뱃지로 표시됨)
   return (
     <div
       data-event-id={event.id}

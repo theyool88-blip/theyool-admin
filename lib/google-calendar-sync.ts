@@ -892,10 +892,10 @@ export async function stopCalendarWatch() {
     throw new Error('Google Calendar not connected');
   }
 
-  const oauth2Client = new google.auth.OAuth2();
+  const oauth2Client = new OAuth2Client();
   oauth2Client.setCredentials({ access_token: tokens.access_token });
 
-  const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+  const calendarClient = calendar({ version: 'v3', auth: oauth2Client });
 
   await calendarClient.channels.stop({
     requestBody: {

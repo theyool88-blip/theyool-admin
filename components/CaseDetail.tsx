@@ -2107,15 +2107,15 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     role: "plaintiff" | "defendant",
     scourtName?: string,
   ) => {
-    // 1. client_role이 설정된 경우
-    const isClient = caseData.client_role === role;
+    // 1. primaryParties.clientSide로 의뢰인 측 확인
+    const isClient = primaryParties.clientSide === role;
     if (isClient && caseData.client?.name) {
       return { name: caseData.client.name, isClient: true };
     }
 
-    // 2. client_role이 없는 경우 - SCOURT 익명화 이름과 의뢰인 이름 매칭 시도
+    // 2. clientSide가 없는 경우 - SCOURT 익명화 이름과 의뢰인 이름 매칭 시도
     // 단, parties 배열에서 유일하게 매칭되는 경우에만 적용
-    if (!caseData.client_role && caseData.client?.name && scourtName) {
+    if (!primaryParties.clientSide && caseData.client?.name && scourtName) {
       const clientFirstChar = caseData.client.name.charAt(0);
       // "1. 이OO" 형식에서 이름 추출
       const cleanedScourtName = scourtName.replace(/^\d+\.\s*/, "").trim();
@@ -2210,10 +2210,15 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     const removeNumberPrefix = (name: string) => name.replace(/^\d+\.\s*/, "");
     const PARTY_NAME_SUFFIX_REGEX = /\s*외\s*\d+\s*(?:명)?\s*$/;
 
-    // clients 조인은 case_clients로 이동됨 - party_name만 사용
+    // 당사자 이름 해석: linked_party_id 연결된 의뢰인 이름 우선
     const resolveCasePartyName = (
       party: (typeof casePartiesForDisplay)[number],
     ) => {
+      // 1순위: linked_party_id로 연결된 의뢰인 이름 (case_clients에서 merge됨)
+      const clientName = party.clients?.name?.trim();
+      if (clientName && !isMaskedPartyName(clientName))
+        return removeNumberPrefix(clientName);
+      // 2순위: party_name (마스킹 안된 경우)
       const partyName = party.party_name?.trim();
       if (partyName && !isMaskedPartyName(partyName))
         return removeNumberPrefix(partyName);
@@ -2451,38 +2456,37 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
         const baseName = preferredParty?.party_name || "";
 
         let displayName = preferredParty?.party_name || "-";
-        if (
+        // 1순위: party.clients?.name (새 스키마 - linked_party_id 연결)
+        const resolvedName = preferredParty
+          ? resolveCasePartyName(preferredParty)
+          : null;
+        if (resolvedName) {
+          displayName = applyDisplayName(baseName, resolvedName);
+        } else if (
           isClientSide &&
           caseData.client?.name &&
           !isMaskedPartyName(caseData.client.name)
         ) {
+          // 2순위: caseData.client?.name (레거시 폴백)
           displayName = applyDisplayName(baseName, caseData.client.name);
-        } else {
-          const resolvedName = preferredParty
-            ? resolveCasePartyName(preferredParty)
-            : null;
-          if (resolvedName) {
-            displayName = applyDisplayName(baseName, resolvedName);
-          } else if (preferredParty?.party_name) {
-            displayName = removeNumberPrefix(preferredParty.party_name);
-          }
+        } else if (preferredParty?.party_name) {
+          displayName = removeNumberPrefix(preferredParty.party_name);
         }
 
         const uniqueNames = new Set<string>();
         parties.forEach((party) => {
           let nameForCount = party.party_name || "";
-          // is_our_client, client_id는 case_clients로 이동됨
-          // 의뢰인 이름이 필요한 경우 primary_client_name 또는 client.name 사용
-          if (
+          // 1순위: party.clients?.name (새 스키마)
+          const resolvedName = resolveCasePartyName(party);
+          if (resolvedName) {
+            nameForCount = resolvedName;
+          } else if (
             party.is_primary &&
             caseData.client?.name &&
             !isMaskedPartyName(caseData.client.name)
           ) {
+            // 2순위: caseData.client?.name (레거시 폴백)
             nameForCount = caseData.client.name;
-          }
-          const resolvedName = resolveCasePartyName(party);
-          if (resolvedName) {
-            nameForCount = resolvedName;
           }
           const normalized = normalizePartyNameForMatch(nameForCount);
           if (normalized) uniqueNames.add(normalized);
@@ -2581,7 +2585,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
           getBasicInfo("피고", "rspNm") ||
           "-",
       );
-      const isClient = caseData.client_role === "defendant";
+      const isClient = primaryParties.clientSide === "defendant";
       return (
         <div className="flex items-center gap-2">
           {isClient ? (

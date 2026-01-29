@@ -203,15 +203,20 @@ export default function CaseHeroSection({
       : { label: caseData.status, style: 'bg-[var(--bg-tertiary)] text-[var(--text-tertiary)]' }
   }
 
-  // Helper: Get party name with client check
+  // Helper: Get party name with client check (fallback when casePartiesForDisplay is empty)
   const getPartyName = (role: 'plaintiff' | 'defendant', scourtName?: string) => {
     const isClient = caseData.client_role === role
-    if (isClient && caseData.client?.name) {
-      return { name: caseData.client.name, isClient: true }
+    const clientName = caseData.client?.name
+    const hasUnmaskedClientName = clientName && !isMaskedPartyName(clientName)
+
+    // 의뢰인 측이고 마스킹되지 않은 이름이 있으면 사용
+    if (isClient && hasUnmaskedClientName) {
+      return { name: clientName, isClient: true }
     }
 
-    if (!caseData.client_role && caseData.client?.name && scourtName) {
-      const clientFirstChar = caseData.client.name.charAt(0)
+    // client_role이 없을 때: 첫 글자 매칭으로 의뢰인 판단
+    if (!caseData.client_role && hasUnmaskedClientName && scourtName) {
+      const clientFirstChar = clientName.charAt(0)
       const cleanedScourtName = scourtName.replace(/^\d+\.\s*/, '').trim()
       const scourtFirstChar = cleanedScourtName.charAt(0)
 
@@ -224,7 +229,7 @@ export default function CaseHeroSection({
       })
 
       if (matchingParties.length === 1 && clientFirstChar === scourtFirstChar && isMaskedPartyName(cleanedScourtName)) {
-        return { name: caseData.client.name, isClient: true }
+        return { name: clientName, isClient: true }
       }
     }
 
@@ -241,6 +246,10 @@ export default function CaseHeroSection({
     const PARTY_NAME_SUFFIX_REGEX = /\s*외\s*\d+\s*(?:명)?\s*$/
 
     const resolveCasePartyName = (party: CaseParty) => {
+      // 1순위: linked_party_id로 연결된 의뢰인 이름
+      const clientName = party.clients?.name?.trim()
+      if (clientName && !isMaskedPartyName(clientName)) return removeNumberPrefix(clientName)
+      // 2순위: party_name (마스킹 안된 경우)
       const partyName = party.party_name?.trim()
       if (partyName && !isMaskedPartyName(partyName)) return removeNumberPrefix(partyName)
       return null
@@ -416,26 +425,27 @@ export default function CaseHeroSection({
         const baseName = preferredParty?.party_name || ''
 
         let displayName = preferredParty?.party_name || '-'
-        if (isClientSide && caseData.client?.name && !isMaskedPartyName(caseData.client.name)) {
+        // 1순위: party.clients?.name (새 스키마 - linked_party_id 연결)
+        const resolvedName = preferredParty ? resolveCasePartyName(preferredParty) : null
+        if (resolvedName) {
+          displayName = applyDisplayName(baseName, resolvedName)
+        } else if (isClientSide && caseData.client?.name && !isMaskedPartyName(caseData.client.name)) {
+          // 2순위: caseData.client?.name (레거시 폴백)
           displayName = applyDisplayName(baseName, caseData.client.name)
-        } else {
-          const resolvedName = preferredParty ? resolveCasePartyName(preferredParty) : null
-          if (resolvedName) {
-            displayName = applyDisplayName(baseName, resolvedName)
-          } else if (preferredParty?.party_name) {
-            displayName = removeNumberPrefix(preferredParty.party_name)
-          }
+        } else if (preferredParty?.party_name) {
+          displayName = removeNumberPrefix(preferredParty.party_name)
         }
 
         const uniqueNames = new Set<string>()
         parties.forEach(party => {
           let nameForCount = party.party_name || ''
-          if (party.is_primary && caseData.client?.name && !isMaskedPartyName(caseData.client.name)) {
-            nameForCount = caseData.client.name
-          }
+          // 1순위: party.clients?.name (새 스키마)
           const resolvedName = resolveCasePartyName(party)
           if (resolvedName) {
             nameForCount = resolvedName
+          } else if (party.is_primary && caseData.client?.name && !isMaskedPartyName(caseData.client.name)) {
+            // 2순위: caseData.client?.name (레거시 폴백)
+            nameForCount = caseData.client.name
           }
           const normalized = normalizePartyNameForMatch(nameForCount)
           if (normalized) uniqueNames.add(normalized)

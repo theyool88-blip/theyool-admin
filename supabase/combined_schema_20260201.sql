@@ -1060,9 +1060,6 @@ CREATE TABLE IF NOT EXISTS case_parties (
   party_type_label VARCHAR(30),                   -- 원고, 피고, 채권자, 채무자, 신청인, 피신청인
   party_order INTEGER DEFAULT 1,                  -- 표시 순서
 
-  -- 의뢰인 연결
-  is_our_client BOOLEAN DEFAULT false,
-
   -- 수동 수정 플래그 및 SCOURT 원본 데이터
   manual_override BOOLEAN DEFAULT FALSE,
   scourt_label_raw TEXT,
@@ -1091,7 +1088,6 @@ CREATE TABLE IF NOT EXISTS case_parties (
 CREATE INDEX IF NOT EXISTS idx_case_parties_tenant_id ON case_parties(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_case_parties_case_id ON case_parties(case_id);
 CREATE INDEX IF NOT EXISTS idx_case_parties_party_type ON case_parties(party_type);
-CREATE INDEX IF NOT EXISTS idx_case_parties_is_our_client ON case_parties(is_our_client);
 
 -- scourt 연동용 유니크 인덱스 (NULL 제외)
 CREATE UNIQUE INDEX IF NOT EXISTS idx_case_parties_case_scourt_index
@@ -3182,6 +3178,8 @@ SELECT
   END::TEXT AS location,
   ch.notes::TEXT AS description,
   ch.status::TEXT AS status,
+  ch.result::TEXT AS result,  -- 기일 결과 (continued, settled, judgment, adjourned 등)
+  (ch.scourt_raw_data->>'result')::TEXT AS scourt_result_raw,  -- SCOURT 원본 결과 텍스트
   ch.case_id::TEXT AS case_id,
   lc.tenant_id::TEXT AS tenant_id,
   -- 출석변호사 정보
@@ -3190,11 +3188,15 @@ SELECT
   -- 화상기일 정보
   ch.video_participant_side::TEXT AS video_participant_side,
   -- 당사자 정보 (의뢰인)
-  (
-    SELECT party_name
-    FROM case_parties cp
-    WHERE cp.case_id = ch.case_id AND cp.is_our_client = true
-    LIMIT 1
+  COALESCE(
+    (SELECT cp.party_name FROM case_clients cc
+     JOIN case_parties cp ON cc.linked_party_id = cp.id
+     WHERE cc.case_id = ch.case_id
+     ORDER BY cc.is_primary_client DESC LIMIT 1),
+    (SELECT c.name FROM case_clients cc
+     JOIN clients c ON cc.client_id = c.id
+     WHERE cc.case_id = ch.case_id
+     ORDER BY cc.is_primary_client DESC LIMIT 1)
   )::TEXT AS our_client_name,
   -- 정렬 우선순위
   CASE
@@ -3239,6 +3241,8 @@ SELECT
   NULL::TEXT AS location,
   cd.notes::TEXT AS description,
   cd.status::TEXT AS status,
+  NULL::TEXT AS result,  -- DEADLINE은 result 없음
+  NULL::TEXT AS scourt_result_raw,  -- DEADLINE은 해당없음
   cd.case_id::TEXT AS case_id,
   lc.tenant_id::TEXT AS tenant_id,
   -- 담당변호사 (사건 담당자)
@@ -3249,7 +3253,14 @@ SELECT
   -- 당사자 정보 (데드라인에 연결된 당사자 또는 의뢰인)
   COALESCE(
     (SELECT cp.party_name FROM case_parties cp WHERE cp.id = cd.case_party_id),
-    (SELECT cp.party_name FROM case_parties cp WHERE cp.case_id = cd.case_id AND cp.is_our_client = true LIMIT 1)
+    (SELECT cp.party_name FROM case_clients cc
+     JOIN case_parties cp ON cc.linked_party_id = cp.id
+     WHERE cc.case_id = cd.case_id
+     ORDER BY cc.is_primary_client DESC LIMIT 1),
+    (SELECT c.name FROM case_clients cc
+     JOIN clients c ON cc.client_id = c.id
+     WHERE cc.case_id = cd.case_id
+     ORDER BY cc.is_primary_client DESC LIMIT 1)
   )::TEXT AS our_client_name,
   -- 정렬 우선순위
   1 AS sort_priority
@@ -3274,6 +3285,8 @@ SELECT
   NULL::TEXT AS location,
   c.message::TEXT AS description,
   c.status::TEXT AS status,
+  NULL::TEXT AS result,  -- CONSULTATION은 result 없음
+  NULL::TEXT AS scourt_result_raw,  -- CONSULTATION은 해당없음
   NULL::TEXT AS case_id,
   c.tenant_id::TEXT AS tenant_id,
   -- 담당자
@@ -3309,6 +3322,8 @@ SELECT
   gs.location::TEXT AS location,
   gs.description::TEXT AS description,
   gs.status::TEXT AS status,
+  NULL::TEXT AS result,  -- GENERAL_SCHEDULE은 result 없음
+  NULL::TEXT AS scourt_result_raw,  -- GENERAL_SCHEDULE은 해당없음
   NULL::TEXT AS case_id,
   gs.tenant_id::TEXT AS tenant_id,
   -- 담당자
@@ -3326,7 +3341,7 @@ SELECT
 FROM general_schedules gs
 LEFT JOIN tenant_members tm_assigned ON gs.assigned_to = tm_assigned.id;
 
-COMMENT ON VIEW unified_calendar IS '법원기일, 데드라인, 상담, 일반일정을 통합한 캘린더 뷰';
+COMMENT ON VIEW unified_calendar IS '법원기일, 데드라인, 상담, 일반일정을 통합한 캘린더 뷰 (scourt_result_raw 컬럼 포함)';
 
 -- ============================================================================
 -- 2. upcoming_hearings 뷰 (7일 이내 기일)

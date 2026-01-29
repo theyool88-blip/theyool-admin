@@ -78,7 +78,7 @@ const menuItems: MenuItem[] = [
     module: 'consultations',
   },
   {
-    href: '/drive',
+    href: '/admin/drive',
     label: '드라이브',
     icon: HardDrive,
     module: 'drive',

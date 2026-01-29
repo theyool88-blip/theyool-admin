@@ -180,9 +180,10 @@ interface ScourtSnapshot {
   }[];
   relatedCases: {
     caseNo: string;
-    caseName?: string;
+    courtName?: string;
     relation?: string;
     linkedCaseId?: string | null;
+    encCsNo?: string;
   }[];
   rawData?: Record<string, unknown>; // XML 렌더링용 원본 API 데이터
 }
@@ -1966,6 +1967,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       caseNo?: string;
       case_number?: string;
       caseName?: string;
+      courtName?: string;
       court_name?: string;
       relation?: string;
       relation_type?: string;
@@ -3023,7 +3025,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                 (item) => ({
                                   caseNo: item.caseNo || item.case_number || "",
                                   courtName:
-                                    item.caseName || item.court_name || "",
+                                    item.courtName || item.court_name || "",
                                   relationType:
                                     item.relation ||
                                     item.relation_type ||
@@ -3069,7 +3071,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                   "관련사건"}
                               </td>
                               <td className="px-5 py-3 text-sm text-[var(--text-secondary)]">
-                                {item.caseName || item.court_name || "-"}
+                                {item.courtName || item.court_name || "-"}
                               </td>
                               <td className="px-5 py-3 text-sm">
                                 {item.linkedCaseId ? (
@@ -3107,7 +3109,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                         setSelectedRelatedCase({
                                           caseNo: item.caseNo || item.case_number || "",
                                           courtName:
-                                            item.caseName ||
+                                            item.courtName ||
                                             item.court_name ||
                                             "",
                                           relationType:
@@ -3130,7 +3132,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
                                             item.case_number ||
                                             "",
                                           courtName:
-                                            item.caseName ||
+                                            item.courtName ||
                                             item.court_name ||
                                             "",
                                           relationType:

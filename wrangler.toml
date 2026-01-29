@@ -1,23 +1,17 @@
-# Cloudflare Workers configuration for luseed (OpenNext deployment)
-# This file configures deployment settings and bindings for Cloudflare Workers
+# Cloudflare Pages configuration for luseed (OpenNext deployment)
+# This file configures deployment settings and bindings for Cloudflare Pages
 
 # Application name
 name = "luseed"
 
-# OpenNext worker entry point
-main = ".open-next/worker.js"
+# Pages build output directory (required for Pages deployment)
+pages_build_output_dir = ".open-next"
 
-# Cloudflare Workers compatibility date
-# Must be 2025-04-01 or later for proper process.env support
+# Cloudflare compatibility date
 compatibility_date = "2025-12-01"
 
 # Enable Node.js compatibility for standard Node APIs
 compatibility_flags = ["nodejs_compat"]
-
-# Static assets configuration for OpenNext
-[assets]
-directory = ".open-next/assets"
-binding = "ASSETS"
 
 # R2 Bucket Binding (disabled - enable after R2 setup on correct account)
 # Provides access to Cloudflare R2 object storage for file uploads
@@ -25,13 +19,7 @@ binding = "ASSETS"
 # binding = "R2_BUCKET"
 # bucket_name = "luseed-files"
 
-# Hyperdrive Database Binding (disabled - not currently used)
-# Uncomment when direct PostgreSQL connection is needed
-# [[hyperdrive]]
-# binding = "HYPERDRIVE"
-# id = "88b70aa08a7e4f7bbbf3f97e75c1f746"
-
-# Note: Scheduled Tasks (Cron Triggers) are NOT supported in Cloudflare Workers
+# Note: Scheduled Tasks (Cron Triggers) are NOT supported in Cloudflare
 # Use external cron services (e.g., cron-job.org, GitHub Actions) to call API routes:
 # - /api/cron/daily-reminders?secret=xxx (daily at midnight)
 # - /api/cron/scourt-sync-scheduler?secret=xxx (every 10 min)

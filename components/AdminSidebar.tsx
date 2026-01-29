@@ -29,6 +29,7 @@ import {
   Moon,
   Sun,
   LogOut,
+  HardDrive,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -75,6 +76,12 @@ const menuItems: MenuItem[] = [
     label: '상담',
     icon: MessageSquare,
     module: 'consultations',
+  },
+  {
+    href: '/drive',
+    label: '드라이브',
+    icon: HardDrive,
+    module: 'drive',
   },
 ]
 

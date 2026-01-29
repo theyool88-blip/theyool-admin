@@ -17,6 +17,7 @@ export type PermissionModule =
   | 'expenses'      // 지출관리 (회계)
   | 'receivables'   // 미수금관리 (회계)
   | 'calendar'      // 캘린더
+  | 'drive'         // 드라이브 (파일관리)
   | 'settings'      // 설정
   | 'members'       // 멤버관리
   | 'dashboard';    // 대시보드
@@ -113,8 +114,8 @@ export function canManageSettingsWithContext(tenant: TenantContext): boolean {
 export function getAccessibleModules(role: MemberRole): PermissionModule[] {
   const allModules: PermissionModule[] = [
     'cases', 'clients', 'consultations', 'payments',
-    'expenses', 'receivables', 'calendar', 'settings',
-    'members', 'dashboard'
+    'expenses', 'receivables', 'calendar', 'drive',
+    'settings', 'members', 'dashboard'
   ];
 
   if (FULL_ACCESS_ROLES.includes(role)) {
@@ -135,8 +136,8 @@ export function getAccessibleModulesWithContext(tenant: TenantContext): Permissi
   if (tenant.isSuperAdmin) {
     return [
       'cases', 'clients', 'consultations', 'payments',
-      'expenses', 'receivables', 'calendar', 'settings',
-      'members', 'dashboard'
+      'expenses', 'receivables', 'calendar', 'drive',
+      'settings', 'members', 'dashboard'
     ];
   }
 
@@ -181,6 +182,7 @@ export const MODULE_DISPLAY_NAMES: Record<PermissionModule, string> = {
   expenses: '지출관리',
   receivables: '미수금관리',
   calendar: '캘린더',
+  drive: '드라이브',
   settings: '설정',
   members: '멤버관리',
   dashboard: '대시보드',
@@ -197,6 +199,7 @@ export const MODULE_DESCRIPTIONS: Record<PermissionModule, string> = {
   expenses: '법인 지출 관리',
   receivables: '미수금 현황 관리',
   calendar: '일정 및 기일 확인',
+  drive: '파일 업로드 및 관리',
   settings: '테넌트 설정 관리',
   members: '멤버 계정 관리',
   dashboard: '대시보드 조회',

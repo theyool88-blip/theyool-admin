@@ -384,6 +384,7 @@ async function processJob(
         party_type: seed.party_type,
         party_type_label: seed.party_type_label || null,
         party_order: index + 1,
+        is_primary: seed.is_primary,
         representatives: [],
         scourt_synced: false,
       }))

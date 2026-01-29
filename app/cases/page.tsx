@@ -18,6 +18,17 @@ interface CaseClient {
   is_primary_client: boolean
 }
 
+interface RawCaseAssignee {
+  id: string
+  member_id: string
+  is_primary: boolean
+  member: {
+    id: string
+    display_name: string
+    role: string
+  } | null
+}
+
 export default async function CasesPage() {
   // 테넌트 컨텍스트 조회 (impersonation 포함)
   const tenantContext = await getCurrentTenantContext()
@@ -34,7 +45,13 @@ export default async function CasesPage() {
       *,
       client:clients(id, name),
       case_parties(id, party_name, party_type, party_type_label, is_primary),
-      case_clients(client_id, linked_party_id, is_primary_client)
+      case_clients(client_id, linked_party_id, is_primary_client),
+      case_assignees(
+        id,
+        member_id,
+        is_primary,
+        member:tenant_members(id, display_name, role)
+      )
     `)
 
   // 슈퍼 어드민이 아니면 테넌트 필터 적용
@@ -44,10 +61,40 @@ export default async function CasesPage() {
 
   const { data: casesData } = await query.order('created_at', { ascending: false })
 
+  // Fetch next hearings for all cases
+  const caseIds = (casesData || []).map(c => c.id)
+  const { data: nextHearings } = caseIds.length > 0
+    ? await adminClient
+        .from('court_hearings')
+        .select('case_id, hearing_date, hearing_type')
+        .in('case_id', caseIds)
+        .gte('hearing_date', new Date().toISOString().split('T')[0])
+        .eq('status', 'SCHEDULED')
+        .order('hearing_date', { ascending: true })
+    : { data: [] }
+
+  // Create map of case_id -> next hearing
+  const nextHearingMap = new Map<string, { date: string; type: string }>()
+  for (const h of nextHearings || []) {
+    if (!nextHearingMap.has(h.case_id)) {
+      nextHearingMap.set(h.case_id, { date: h.hearing_date, type: h.hearing_type })
+    }
+  }
+
   // casesData 변환: parties 객체 추가
   const casesWithParties = (casesData || []).map((c) => {
     const parties = (c.case_parties || []) as CaseParty[]
     const clients = (c.case_clients || []) as CaseClient[]
+    const caseAssignees = (c.case_assignees || []) as RawCaseAssignee[]
+
+    // Transform assignees
+    const transformedAssignees = caseAssignees.map(ca => ({
+      id: ca.id,
+      memberId: ca.member_id,
+      isPrimary: ca.is_primary,
+      displayName: ca.member?.display_name || '',
+      role: ca.member?.role || ''
+    }))
 
     // 의뢰인: 캐시 필드 사용 (fallback: client JOIN)
     const clientData = c.client as { id: string; name: string } | null
@@ -77,8 +124,8 @@ export default async function CasesPage() {
       opponentLabel = opponentParty?.party_type_label || null
     }
 
-    // case_parties, case_clients는 제외하고 나머지 필드 유지
-    const { case_parties: _, case_clients: __, ...rest } = c
+    // case_parties, case_clients, case_assignees는 제외하고 나머지 필드 유지
+    const { case_parties: _, case_clients: __, case_assignees: ___, ...rest } = c
 
     return {
       ...rest,
@@ -87,7 +134,9 @@ export default async function CasesPage() {
         ourClientLabel: clientParty?.party_type_label || null,
         opponent,
         opponentLabel,
-      }
+      },
+      assignees: transformedAssignees,
+      next_hearing: nextHearingMap.get(c.id) || null
     }
   })
 

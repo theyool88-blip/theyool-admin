@@ -38,7 +38,9 @@ interface LegalCase {
   judge_name: string | null
   notes: string | null
   onedrive_folder_url: string | null
+  /** @deprecated Use case_clients table instead. Will be removed in future version. */
   client_role: 'plaintiff' | 'defendant' | null
+  /** @deprecated Use case_parties table instead. Will be removed in future version. */
   opponent_name: string | null
   scourt_enc_cs_no: string | null
   scourt_case_name: string | null

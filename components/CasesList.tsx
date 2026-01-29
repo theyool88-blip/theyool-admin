@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Search,
@@ -13,6 +13,7 @@ import {
   Cloud,
   Layers,
   CornerDownRight,
+  Columns,
 } from 'lucide-react'
 import UnifiedScheduleModal from './UnifiedScheduleModal'
 import CasePaymentsModal from './CasePaymentsModal'
@@ -65,11 +66,32 @@ interface LegalCase {
     opponent: string | null
     opponentLabel: string | null
   }
+  next_hearing?: {
+    date: string
+    type: string
+  } | null
   _isSubCase?: boolean
 }
 
 type ViewMode = 'table' | 'card'
 type SortDirection = 'asc' | 'desc' | null
+
+const COLUMN_DEFINITIONS = [
+  { id: 'contract_date', label: '계약일' },
+  { id: 'court_case_number', label: '사건번호' },
+  { id: 'court_name', label: '법원' },
+  { id: 'case_level', label: '심급' },
+  { id: 'case_name', label: '사건명' },
+  { id: 'parties', label: '당사자' },
+  { id: 'assignee', label: '담당변호사' },
+  { id: 'status', label: '상태' },
+  { id: 'next_hearing', label: '다음기일' },
+]
+
+const DEFAULT_VISIBLE_COLUMNS = [
+  'contract_date', 'court_case_number', 'court_name',
+  'case_level', 'case_name', 'parties', 'assignee', 'status', 'next_hearing'
+]
 
 export default function CasesList({ initialCases }: { initialCases: LegalCase[] }) {
   const cases = initialCases
@@ -86,13 +108,43 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
   const [sortColumn, setSortColumn] = useState<string>('contract_date')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [groupByMainCase, setGroupByMainCase] = useState(false)
+  const [lawyerFilter, setLawyerFilter] = useState<string>('all')
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('cases-visible-columns')
+      return saved ? JSON.parse(saved) : DEFAULT_VISIBLE_COLUMNS
+    }
+    return DEFAULT_VISIBLE_COLUMNS
+  })
+  const [showColumnSelector, setShowColumnSelector] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    localStorage.setItem('cases-visible-columns', JSON.stringify(visibleColumns))
+  }, [visibleColumns])
+
+  const allLawyers = useMemo(() => {
+    const LAWYER_ROLES = ['lawyer', 'owner', 'admin']
+    const lawyerMap = new Map<string, string>()
+    cases.forEach(c => {
+      c.assignees?.filter(a => LAWYER_ROLES.includes(a.role)).forEach(a => {
+        lawyerMap.set(a.memberId, a.displayName)
+      })
+    })
+    return Array.from(lawyerMap.entries()).map(([id, name]) => ({ id, name }))
+  }, [cases])
 
   const processedCases = useMemo(() => {
     let filtered = [...cases]
 
     if (statusFilter !== 'all') {
       filtered = filtered.filter(c => c.status === statusFilter)
+    }
+
+    if (lawyerFilter !== 'all') {
+      filtered = filtered.filter(c =>
+        c.assignees?.some(a => a.memberId === lawyerFilter)
+      )
     }
 
     if (searchTerm) {
@@ -190,7 +242,7 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     result.push(...orphanSubs)
 
     return result
-  }, [cases, searchTerm, statusFilter, groupByMainCase, sortColumn, sortDirection])
+  }, [cases, searchTerm, statusFilter, lawyerFilter, groupByMainCase, sortColumn, sortDirection])
 
   const indexOfLastCase = currentPage * casesPerPage
   const indexOfFirstCase = indexOfLastCase - casesPerPage
@@ -296,7 +348,7 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     },
     {
       key: 'assignee',
-      header: '담당자',
+      header: '담당변호사',
       width: '140px',
       align: 'center',
       render: (item) => <AssigneeCell assignees={item.assignees} assignedMember={item.assigned_member} />,
@@ -309,7 +361,25 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
       sortable: true,
       render: (item) => <CaseStatusBadge status={item.status} />,
     },
+    {
+      key: 'next_hearing',
+      header: '다음기일',
+      width: '100px',
+      render: (item) => {
+        if (!item.next_hearing) return <span className="text-[var(--text-muted)]">-</span>
+        const date = new Date(item.next_hearing.date)
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return (
+          <span className="text-body text-sm" title={item.next_hearing.type}>
+            {month}/{day}
+          </span>
+        )
+      },
+    },
   ]
+
+  const displayedColumns = columns.filter(c => visibleColumns.includes(c.key))
 
   return (
     <div className="page-container">
@@ -362,6 +432,24 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
           <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
         </div>
 
+        {/* Lawyer Filter */}
+        <div className="relative">
+          <select
+            value={lawyerFilter}
+            onChange={(e) => {
+              setLawyerFilter(e.target.value)
+              setCurrentPage(1)
+            }}
+            className="form-input pr-8 appearance-none"
+          >
+            <option value="all">전체 변호사</option>
+            {allLawyers.map(l => (
+              <option key={l.id} value={l.id}>{l.name}</option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
+        </div>
+
         {/* Group Toggle */}
         <button
           onClick={() => setGroupByMainCase(!groupByMainCase)}
@@ -400,6 +488,49 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
             <LayoutGrid className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Column Selector */}
+        <div className="relative">
+          <button
+            onClick={() => setShowColumnSelector(!showColumnSelector)}
+            className="p-1.5 rounded transition-colors text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
+            title="컬럼 설정"
+          >
+            <Columns className="w-4 h-4" />
+          </button>
+          {showColumnSelector && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setShowColumnSelector(false)}
+              />
+              <div className="absolute right-0 top-full mt-1 z-50 bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg shadow-lg py-2 min-w-[160px]">
+                {COLUMN_DEFINITIONS.map(col => (
+                  <label
+                    key={col.id}
+                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-[var(--bg-tertiary)] cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns.includes(col.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setVisibleColumns([...visibleColumns, col.id])
+                        } else {
+                          if (visibleColumns.length > 1) {
+                            setVisibleColumns(visibleColumns.filter(v => v !== col.id))
+                          }
+                        }
+                      }}
+                      className="form-checkbox"
+                    />
+                    <span className="text-caption">{col.label}</span>
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
       </TableToolbar>
 
       {/* Content */}
@@ -416,7 +547,7 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
         /* Table View */
         <DataTable
           data={currentCases}
-          columns={columns}
+          columns={displayedColumns}
           keyExtractor={(item) => item.id}
           onRowClick={(item) => router.push(`/cases/${item.id}`)}
           sortColumn={sortColumn}
@@ -520,10 +651,12 @@ interface AssigneeCellProps {
 }
 
 function AssigneeCell({ assignees, assignedMember }: AssigneeCellProps) {
-  const primary = assignees?.find(a => a.isPrimary)
-  const others = assignees?.filter(a => !a.isPrimary) || []
+  const LAWYER_ROLES = ['lawyer', 'owner', 'admin']
+  const lawyers = assignees?.filter(a => LAWYER_ROLES.includes(a.role)) || []
+  const primary = lawyers.find(a => a.isPrimary)
+  const others = lawyers.filter(a => !a.isPrimary)
 
-  if (assignees && assignees.length > 0) {
+  if (lawyers.length > 0) {
     return (
       <div className="flex items-center gap-1 flex-wrap justify-center">
         {primary && (
@@ -616,9 +749,9 @@ function CaseCard({ legalCase, formatDate, onClick, onPayment, onSchedule }: Cas
           <span className="text-[var(--text-muted)]">계약일</span>
           <span>{formatDate(legalCase.contract_date)}</span>
         </div>
-        {/* 담당자 */}
+        {/* 담당변호사 */}
         <div className="flex items-center justify-between text-caption">
-          <span className="text-[var(--text-muted)]">담당자</span>
+          <span className="text-[var(--text-muted)]">담당변호사</span>
           <span>{primary?.displayName || legalCase.assigned_member?.display_name || '-'}</span>
         </div>
       </div>

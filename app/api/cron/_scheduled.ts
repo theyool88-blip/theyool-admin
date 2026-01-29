@@ -71,7 +71,7 @@ async function executeCronJob(
 /**
  * Main scheduled event handler
  */
-export default {
+const scheduledHandler = {
   async scheduled(
     event: ScheduledEvent,
     env: Env,
@@ -101,3 +101,5 @@ export default {
     );
   },
 };
+
+export default scheduledHandler;

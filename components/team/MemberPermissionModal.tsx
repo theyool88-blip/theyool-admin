@@ -58,19 +58,13 @@ export default function MemberPermissionModal({
   isOpen,
   onClose,
   member,
-  currentRole,
+  currentRole: _currentRole,
 }: MemberPermissionModalProps) {
   const [effectivePermissions, setEffectivePermissions] = useState<EffectivePermission[]>([]);
   const [overrides, setOverrides] = useState<MemberOverride[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (isOpen && member) {
-      fetchMemberPermissions();
-    }
-  }, [isOpen, member]);
 
   const fetchMemberPermissions = async () => {
     setLoading(true);
@@ -94,6 +88,13 @@ export default function MemberPermissionModal({
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (isOpen && member) {
+      fetchMemberPermissions();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, member]);
 
   const handleOverrideChange = async (
     module: PermissionModule,

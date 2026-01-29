@@ -248,7 +248,7 @@ export async function dualDeleteFile(r2FileId: string): Promise<void> {
   const supabase = await createClient();
 
   // Step 1: Get R2 file to find linked classification
-  const { data: r2File, error: fetchError } = await supabase
+  const { data: _r2File, error: fetchError } = await supabase
     .from('r2_files')
     .select('*')
     .eq('id', r2FileId)

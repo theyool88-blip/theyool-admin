@@ -10,12 +10,9 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle,
-  Eye,
-  EyeOff,
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react';
-import { TenantApiKey } from '@/types/tenant';
 
 interface ApiKeyData {
   id: string;

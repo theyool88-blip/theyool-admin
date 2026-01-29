@@ -1,5 +1,5 @@
 import { OAuth2Client } from 'google-auth-library';
-import { calendar_v3, calendar } from '@googleapis/calendar';
+import { calendar } from '@googleapis/calendar';
 import { createAdminClient } from '@/lib/supabase/server';
 import {
   getCalendarEvents,

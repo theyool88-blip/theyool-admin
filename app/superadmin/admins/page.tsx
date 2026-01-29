@@ -29,8 +29,8 @@ export default function AdminsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedAdmin, setSelectedAdmin] = useState<SuperAdmin | null>(null);
+  const [_showAddModal, setShowAddModal] = useState(false);
+  const [_selectedAdmin, setSelectedAdmin] = useState<SuperAdmin | null>(null);
 
   const fetchAdmins = async () => {
     setLoading(true);

@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   FileText,
   Mail,
-  Send,
   TestTube,
 } from 'lucide-react';
 

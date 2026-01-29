@@ -20,10 +20,6 @@ interface Assignment {
   } | null
 }
 
-interface StaffWithAssignments {
-  staff: Member
-  assignments: Assignment[]
-}
 
 export default function StaffLawyerAssignments() {
   const [loading, setLoading] = useState(true)

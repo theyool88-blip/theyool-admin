@@ -114,7 +114,7 @@ export function AssigneeMultiSelect({
     onChange(newValue)
   }
 
-  const getMemberName = (memberId: string) => {
+  const _getMemberName = (memberId: string) => {
     const member = members.find(m => m.id === memberId)
     return member?.display_name || '이름 없음'
   }

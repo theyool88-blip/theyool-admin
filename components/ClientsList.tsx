@@ -10,7 +10,6 @@ import {
   LayoutList,
   Phone,
   Mail,
-  FileText,
   AlertCircle,
   ChevronDown,
 } from 'lucide-react'

@@ -14,7 +14,6 @@ import {
   MessageCircle,
   Eye,
   EyeOff,
-  Filter,
   Images,
 } from 'lucide-react';
 
@@ -269,6 +268,7 @@ export default function InstagramManagement() {
               {/* 썸네일 */}
               <div className="relative aspect-square bg-[var(--bg-tertiary)]">
                 {post.thumbnail_url || post.media_url ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
                   <img
                     src={post.thumbnail_url || post.media_url || ''}
                     alt="Instagram post"

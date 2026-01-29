@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo } from 'react'
 import {
   getPartyLabels as getPartyLabelsFromSchema,
   getCaseCategory,
@@ -11,8 +10,6 @@ import {
   normalizePartyNameForMatch,
   PARTY_TYPE_LABELS,
   preservePrefix,
-  PLAINTIFF_SIDE_TYPES,
-  DEFENDANT_SIDE_TYPES,
   getPartySide,
 } from '@/types/case-party'
 import { getCourtAbbrev } from '@/lib/scourt/court-codes'

@@ -29,7 +29,7 @@ export async function createPayment(
   try {
     const supabase = await createClient();
     const { data: userData } = await supabase.auth.getUser();
-    const confirmedBy = userData?.user?.email || userData?.user?.id || null;
+    const _confirmedBy = userData?.user?.email || userData?.user?.id || null;
 
     let caseNameFromCase: string | null = null;
     // NOTE: legal_cases.client_id 컬럼은 case_clients 테이블로 이동됨
@@ -247,7 +247,7 @@ export async function updatePayment(
   try {
     const supabase = await createClient();
     const { data: userData } = await supabase.auth.getUser();
-    const confirmedBy = userData?.user?.email || userData?.user?.id || null;
+    const _confirmedBy = userData?.user?.email || userData?.user?.id || null;
 
     let caseNameFromCase: string | null | undefined = undefined;
     // NOTE: legal_cases.client_id 컬럼은 case_clients 테이블로 이동됨

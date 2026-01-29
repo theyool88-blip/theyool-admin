@@ -153,7 +153,7 @@ interface ThemeToggleProps {
 }
 
 export function ThemeToggle({ showLabel = false, className = '' }: ThemeToggleProps) {
-  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme()
+  const { resolvedTheme, toggleTheme } = useTheme()
 
   return (
     <button

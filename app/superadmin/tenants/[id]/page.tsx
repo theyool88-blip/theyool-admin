@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Link from 'next/link';
 import {
   Building2,
   Users,
@@ -99,7 +98,7 @@ export default function TenantDetailPage() {
   const [impersonating, setImpersonating] = useState(false);
   const [togglingHomepage, setTogglingHomepage] = useState(false);
 
-  const fetchTenant = async () => {
+  const fetchTenant = useCallback(async () => {
     setLoading(true);
     setError('');
 
@@ -129,7 +128,7 @@ export default function TenantDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [tenantId]);
 
   const handleToggleHomepage = async () => {
     if (!tenant) return;
@@ -163,7 +162,7 @@ export default function TenantDetailPage() {
     if (tenantId) {
       fetchTenant();
     }
-  }, [tenantId]);
+  }, [tenantId, fetchTenant]);
 
   const handleSave = async () => {
     setSaving(true);

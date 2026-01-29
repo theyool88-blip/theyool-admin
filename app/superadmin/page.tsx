@@ -17,9 +17,6 @@ import {
   UserMinus,
   BarChart3,
   CheckCircle2,
-  XCircle,
-  Clock,
-  Activity,
 } from 'lucide-react';
 
 interface OverviewStats {

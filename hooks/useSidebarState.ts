@@ -29,7 +29,7 @@ export function useSidebarState(): UseSidebarStateReturn {
   // SSR과 클라이언트 첫 렌더에서 동일한 기본값 사용 (hydration 안전)
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [expandedGroups, setExpandedGroups] = useState<string[]>(['work', 'accounting'])
-  const [hasMounted, setHasMounted] = useState(false)
+  const [_hasMounted, setHasMounted] = useState(false)
 
   // 마운트 후 localStorage에서 상태 로드 (hydration 이후)
   useEffect(() => {

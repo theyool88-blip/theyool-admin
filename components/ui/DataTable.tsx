@@ -1,7 +1,7 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
-import { ChevronUp, ChevronDown, MoreHorizontal, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ReactNode } from 'react'
+import { ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 
 export type SortDirection = 'asc' | 'desc' | null
 

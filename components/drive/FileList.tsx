@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   File,
   FileText,
@@ -8,7 +8,6 @@ import {
   FileSpreadsheet,
   Folder,
   Download,
-  Trash2,
   MoreVertical,
   ChevronUp,
   ChevronDown,
@@ -117,10 +116,10 @@ export default function FileList({
 }: FileViewProps) {
   const tableRef = useRef<HTMLTableElement>(null);
 
-  const allItems = [
+  const allItems = useMemo(() => [
     ...folders.map((f) => ({ type: 'folder' as const, data: f, id: f.id })),
     ...files.map((f) => ({ type: 'file' as const, data: f, id: f.id })),
-  ];
+  ], [folders, files]);
 
   const isSelected = (id: string) => selectedIds.includes(id);
   const allSelected = allItems.length > 0 && allItems.every((item) => isSelected(item.id));
@@ -155,13 +154,15 @@ export default function FileList({
     }
   };
 
-  const handleItemDoubleClick = (item: (typeof allItems)[0]) => {
+  type ItemType = { type: 'folder'; data: R2Folder; id: string } | { type: 'file'; data: R2File; id: string };
+
+  const handleItemDoubleClick = useCallback((item: ItemType) => {
     if (item.type === 'folder') {
       onFolderOpen(item.id);
     } else {
       onFileOpen(item.data as R2File);
     }
-  };
+  }, [onFolderOpen, onFileOpen]);
 
   const handleCheckboxChange = (id: string, checked: boolean) => {
     if (checked) {
@@ -207,7 +208,7 @@ export default function FileList({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedIds, allItems, onSelect]);
+  }, [selectedIds, allItems, onSelect, handleItemDoubleClick]);
 
   return (
     <div className="overflow-x-auto border-3 border-slate-900 bg-white">
@@ -263,7 +264,7 @@ export default function FileList({
           </tr>
         </thead>
         <tbody>
-          {allItems.map((item, index) => {
+          {allItems.map((item) => {
             const selected = isSelected(item.id);
 
             if (item.type === 'folder') {

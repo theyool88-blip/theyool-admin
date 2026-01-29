@@ -148,32 +148,42 @@ export async function syncPartiesFromScourt(
         const existingReps = existingParty?.representatives || [];
         const mergedReps = mergeRepresentatives(existingReps, representativesJsonb);
 
-        const { error } = await supabase.from("case_parties").upsert(
-          {
-            tenant_id: tenantId,
-            case_id: legalCaseId,
-            party_name: resolvedName,
-            party_type: partyType,
-            party_type_label: scourtLabel,
-            party_order: i + 1,
-            scourt_synced: true,
-            scourt_party_index: i,
-            scourt_label_raw: scourtLabel,
-            scourt_name_raw: scourtName,
-            is_primary: isPrimary,
-            adjdoc_rch_ymd: party.adjdocRchYmd || null,
-            indvd_cfmtn_ymd: party.indvdCfmtnYmd || null,
-            // 대리인 JSONB (첫 번째 당사자에만 저장)
-            representatives: i === 0 ? mergedReps : (existingParty?.representatives || []),
-          },
-          {
-            onConflict: "case_id,scourt_party_index",
-            ignoreDuplicates: false,
-          }
-        );
+        const partyData = {
+          tenant_id: tenantId,
+          case_id: legalCaseId,
+          party_name: resolvedName,
+          party_type: partyType,
+          party_type_label: scourtLabel,
+          party_order: i + 1,
+          scourt_synced: true,
+          scourt_party_index: i,
+          scourt_label_raw: scourtLabel,
+          scourt_name_raw: scourtName,
+          is_primary: isPrimary,
+          adjdoc_rch_ymd: party.adjdocRchYmd || null,
+          indvd_cfmtn_ymd: party.indvdCfmtnYmd || null,
+          // 대리인 JSONB (첫 번째 당사자에만 저장)
+          representatives: i === 0 ? mergedReps : (existingParty?.representatives || []),
+        };
+
+        let error;
+        if (existingParty?.id) {
+          // 기존 당사자 UPDATE
+          const result = await supabase
+            .from("case_parties")
+            .update(partyData)
+            .eq("id", existingParty.id);
+          error = result.error;
+        } else {
+          // 새 당사자 INSERT
+          const result = await supabase
+            .from("case_parties")
+            .insert(partyData);
+          error = result.error;
+        }
 
         if (error) {
-          console.error(`당사자 upsert 오류 (${party.btprNm}):`, error.message);
+          console.error(`당사자 ${existingParty ? 'update' : 'insert'} 오류 (${party.btprNm}):`, error.message);
         } else {
           partiesUpserted++;
         }
@@ -360,42 +370,58 @@ export async function syncPartiesFromScourtServer(
         const existingReps = (existingParty as ExistingPartyRecord & { representatives?: PartyRepresentative[] })?.representatives || [];
         const mergedReps = i === 0 ? mergeRepresentatives(existingReps, representativesJsonb) : existingReps;
 
-        const { data: upsertedParty, error } = await supabase.from("case_parties").upsert(
-          {
-            tenant_id: tenantId,
-            case_id: legalCaseId,
-            party_name: resolvedName,
-            party_type: partyType,
-            party_type_label: scourtLabel,
-            party_order: i + 1,
-            scourt_synced: true,
-            scourt_party_index: i,
-            scourt_label_raw: scourtLabel,
-            scourt_name_raw: scourtName,
-            manual_override: manualOverride,
-            is_primary: isPrimary,
-            adjdoc_rch_ymd: newAdjdocRchYmd,
-            indvd_cfmtn_ymd: party.indvdCfmtnYmd || null,
-            // 대리인 JSONB
-            representatives: mergedReps,
-          },
-          {
-            onConflict: "case_id,scourt_party_index",
-            ignoreDuplicates: false,
-          }
-        )
-        .select('id')
-        .single();
+        const partyData = {
+          tenant_id: tenantId,
+          case_id: legalCaseId,
+          party_name: resolvedName,
+          party_type: partyType,
+          party_type_label: scourtLabel,
+          party_order: i + 1,
+          scourt_synced: true,
+          scourt_party_index: i,
+          scourt_label_raw: scourtLabel,
+          scourt_name_raw: scourtName,
+          manual_override: manualOverride,
+          is_primary: isPrimary,
+          adjdoc_rch_ymd: newAdjdocRchYmd,
+          indvd_cfmtn_ymd: party.indvdCfmtnYmd || null,
+          // 대리인 JSONB
+          representatives: mergedReps,
+        };
+
+        let resultPartyId: string | null = null;
+        let error;
+
+        if (existingParty?.id) {
+          // 기존 당사자 UPDATE
+          const result = await supabase
+            .from("case_parties")
+            .update(partyData)
+            .eq("id", existingParty.id)
+            .select('id')
+            .single();
+          error = result.error;
+          resultPartyId = existingParty.id;
+        } else {
+          // 새 당사자 INSERT
+          const result = await supabase
+            .from("case_parties")
+            .insert(partyData)
+            .select('id')
+            .single();
+          error = result.error;
+          resultPartyId = result.data?.id || null;
+        }
 
         if (error) {
-          console.error(`당사자 upsert 오류 (${party.btprNm}):`, error.message);
+          console.error(`당사자 ${existingParty ? 'update' : 'insert'} 오류 (${party.btprNm}):`, error.message);
         } else {
           partiesUpserted++;
 
           // 판결도달일이 변경되었으면 기한 업데이트 예약
-          if (adjdocRchYmdChanged && upsertedParty?.id) {
+          if (adjdocRchYmdChanged && resultPartyId) {
             adjdocRchYmdChanges.push({
-              partyId: upsertedParty.id,
+              partyId: resultPartyId,
               oldValue: oldAdjdocRchYmd,
               newValue: newAdjdocRchYmd,
             });

@@ -62,7 +62,7 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
     }
 
     // 4. Complete upload (updates ETag and storage usage)
-    const updatedFile = await StorageService.completeUpload(fileId, etag);
+    await StorageService.completeUpload(fileId, etag);
 
     // 5. Apply inbox classification rules
     const { data: rules, error: rulesError } = await supabase

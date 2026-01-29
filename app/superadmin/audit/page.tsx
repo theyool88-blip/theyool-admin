@@ -8,7 +8,6 @@ import {
   Search,
   Filter,
   Calendar,
-  User,
   Building2,
   Settings,
   CreditCard,
@@ -52,7 +51,7 @@ export default function AuditLogsPage() {
   const [search, setSearch] = useState('');
   const [actionFilter, setActionFilter] = useState('');
 
-  const fetchLogs = async (page = 1) => {
+  const fetchLogs = async (_page = 1) => {
     setLoading(true);
     setError('');
 

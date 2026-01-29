@@ -6,11 +6,9 @@ import {
   TrendingUp,
   Users,
   MessageSquare,
-  Calendar,
   Eye,
   AlertTriangle,
   RefreshCw,
-  ChevronDown,
   Activity,
   Key,
 } from 'lucide-react';
@@ -93,6 +91,7 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
     } else {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHomepage, period]);
 
   if (!hasHomepage) {
@@ -261,7 +260,7 @@ export default function HomepageMonitoring({ hasHomepage }: HomepageMonitoringPr
               일별 추이
             </h3>
             <div className="h-32 flex items-end gap-1">
-              {data.dailyStats.slice(-14).map((stat, idx) => {
+              {data.dailyStats.slice(-14).map((stat, _idx) => {
                 const maxVisitors = getMaxValue(data.dailyStats.slice(-14), 'visitors');
                 const maxConsultations = getMaxValue(data.dailyStats.slice(-14), 'consultations');
                 const visitorHeight = (stat.visitors / maxVisitors) * 100;

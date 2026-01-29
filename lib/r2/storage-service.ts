@@ -10,11 +10,9 @@ import {
   generateUploadUrl,
   generateDownloadUrl,
   deleteObject,
-  listObjects,
-  headObject,
 } from './r2-client';
 import { randomUUID } from 'crypto';
-import type { R2File, R2Folder, TenantStorage } from '@/types/r2';
+import type { R2File, R2Folder } from '@/types/r2';
 
 // ============================================================================
 // Types

@@ -8,7 +8,6 @@ import {
   FileSpreadsheet,
   Folder,
   Download,
-  Trash2,
   MoreVertical,
 } from 'lucide-react';
 import type { R2File, R2Folder } from '@/lib/r2/storage-service';

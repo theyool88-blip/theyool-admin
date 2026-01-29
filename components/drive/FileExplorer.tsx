@@ -3,7 +3,6 @@
 import { useState, useMemo } from 'react'
 import {
   Search,
-  Plus,
   Upload,
   LayoutGrid,
   LayoutList,
@@ -12,7 +11,7 @@ import {
   Folder,
   File,
   FileText,
-  Image,
+  Image as ImageIcon,
   FileSpreadsheet,
   Music,
   Video,
@@ -614,7 +613,7 @@ function getFileIcon(contentType: string) {
   const iconClass = "w-12 h-12 group-hover:scale-110 transition-transform"
 
   if (contentType.startsWith('image/')) {
-    return <Image className={`${iconClass} text-purple-500`} />
+    return <ImageIcon className={`${iconClass} text-purple-500`} />
   }
   if (contentType.startsWith('video/')) {
     return <Video className={`${iconClass} text-red-500`} />
@@ -660,19 +659,19 @@ function formatDate(dateString: string): string {
 }
 
 // Mock data hooks (replace with real SWR implementations)
-function useFolders(tenantId: string, caseId?: string, parentId?: string | null) {
+function useFolders(_tenantId: string, _caseId?: string, _parentId?: string | null) {
   // TODO: Replace with real SWR hook
   // return useSWR(`/api/admin/drive/folders?tenantId=${tenantId}&caseId=${caseId}&parentId=${parentId}`)
   return { data: [] as R2Folder[], isLoading: false }
 }
 
-function useFiles(tenantId: string, caseId?: string, folderId?: string | null) {
+function useFiles(_tenantId: string, _caseId?: string, _folderId?: string | null) {
   // TODO: Replace with real SWR hook
   // return useSWR(`/api/admin/drive/files?tenantId=${tenantId}&caseId=${caseId}&folderId=${folderId}`)
   return { data: [] as R2File[], isLoading: false, mutate: () => {} }
 }
 
-function useBreadcrumbs(folderId: string | null) {
+function useBreadcrumbs(_folderId: string | null) {
   // TODO: Replace with real SWR hook
   // return useSWR(folderId ? `/api/admin/drive/folders/${folderId}/breadcrumbs` : null)
   return { data: [] as R2Folder[] }

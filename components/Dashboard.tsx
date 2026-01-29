@@ -23,11 +23,11 @@ import WeeklyCalendar from './WeeklyCalendar'
 import QuickAddHearingModal from './QuickAddHearingModal'
 import HearingDetailModal from './HearingDetailModal'
 import UnifiedScheduleModal, { type EditScheduleData } from './UnifiedScheduleModal'
-import { formatDaysUntil, CourtHearing } from '@/types/court-hearing'
+import { CourtHearing } from '@/types/court-hearing'
 import MetricCard, { MetricCardGrid } from './ui/MetricCard'
 import { QuickActionsBar, ActionButton } from './ui/ActionCard'
 import StatusBadge, { UrgencyBadge } from './ui/StatusBadge'
-import ActivityFeed, { Activity, ActivityListCompact } from './ui/ActivityFeed'
+import { Activity, ActivityListCompact } from './ui/ActivityFeed'
 import EmptyState from './ui/EmptyState'
 
 interface Profile {
@@ -88,7 +88,6 @@ interface DashboardMetrics {
   expenseTrend: number
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function Dashboard({ profile, initialSchedules }: { profile: Profile, initialSchedules: Schedule[] }) {
   const router = useRouter()
   const supabase = createClient()
@@ -121,6 +120,7 @@ export default function Dashboard({ profile, initialSchedules }: { profile: Prof
     fetchUrgentItems()
     fetchMetrics()
     fetchRecentActivities()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchMetrics = async () => {

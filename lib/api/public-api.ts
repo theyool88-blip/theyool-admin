@@ -446,7 +446,7 @@ export function withPublicApi(
   } = {}
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
-    const { requireApiKey = false, requireCaptcha = false, rateLimit = 60 } = options;
+    const { requireApiKey = false, requireCaptcha: _requireCaptcha = false, rateLimit = 60 } = options;
 
     // IP 주소 추출
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] ||

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import type { MemberRole } from '@/types/tenant'
 
 interface TenantInfo {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, DragEvent, ChangeEvent } from 'react'
+import { useState, useRef, DragEvent, ChangeEvent } from 'react'
 import { Upload, X, Check, AlertCircle, FileIcon, Loader2 } from 'lucide-react'
 import type { R2File } from '@/types/r2'
 

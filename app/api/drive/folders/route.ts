@@ -202,6 +202,8 @@ export const POST = withTenant(async (request: NextRequest, { tenant }) => {
       parentFolder = data
       parentPath = data.path
       depth = (data.depth || 0) + 1
+      // Suppress unused variable warning
+      void parentFolder
     }
 
     // Generate folder path

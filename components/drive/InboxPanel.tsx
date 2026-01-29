@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
   FileText,
   CheckCircle2,
@@ -56,7 +56,41 @@ export default function InboxPanel({ tenantId, caseId, onFileClassified }: Inbox
   // Data Fetching
   // ============================================================================
 
-  const fetchInboxFiles = async () => {
+  const fetchClassification = useCallback(async (fileId: string) => {
+    try {
+      setFiles(prev =>
+        prev.map(f =>
+          f.id === fileId ? { ...f, isClassifying: true } : f
+        )
+      )
+
+      const response = await fetch('/api/inbox/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId, tenantId, caseId }),
+      })
+
+      if (!response.ok) throw new Error('Classification failed')
+
+      const suggestion: ClassificationSuggestion = await response.json()
+
+      setFiles(prev =>
+        prev.map(f =>
+          f.id === fileId
+            ? { ...f, suggestion, isClassifying: false }
+            : f
+        )
+      )
+    } catch (_err) {
+      setFiles(prev =>
+        prev.map(f =>
+          f.id === fileId ? { ...f, isClassifying: false } : f
+        )
+      )
+    }
+  }, [tenantId, caseId])
+
+  const fetchInboxFiles = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -82,45 +116,11 @@ export default function InboxPanel({ tenantId, caseId, onFileClassified }: Inbox
     } finally {
       setLoading(false)
     }
-  }
-
-  const fetchClassification = async (fileId: string) => {
-    try {
-      setFiles(prev =>
-        prev.map(f =>
-          f.id === fileId ? { ...f, isClassifying: true } : f
-        )
-      )
-
-      const response = await fetch('/api/inbox/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileId, tenantId, caseId }),
-      })
-
-      if (!response.ok) throw new Error('Classification failed')
-
-      const suggestion: ClassificationSuggestion = await response.json()
-
-      setFiles(prev =>
-        prev.map(f =>
-          f.id === fileId
-            ? { ...f, suggestion, isClassifying: false }
-            : f
-        )
-      )
-    } catch (err) {
-      setFiles(prev =>
-        prev.map(f =>
-          f.id === fileId ? { ...f, isClassifying: false } : f
-        )
-      )
-    }
-  }
+  }, [tenantId, caseId, fetchClassification])
 
   useEffect(() => {
     fetchInboxFiles()
-  }, [tenantId, caseId])
+  }, [fetchInboxFiles])
 
   // ============================================================================
   // Actions

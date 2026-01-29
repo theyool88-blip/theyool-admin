@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { withTenant, withRole } from '@/lib/api/with-tenant';
+import { withTenant } from '@/lib/api/with-tenant';
 import { generateDownloadUrl, deleteObject } from '@/lib/r2/r2-client';
 
 // Interface for r2_files table record

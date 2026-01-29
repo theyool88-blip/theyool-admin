@@ -13,7 +13,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  ArrowUpRight,
   Filter,
   ArrowUpDown,
   MoreHorizontal,

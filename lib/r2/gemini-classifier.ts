@@ -28,12 +28,6 @@ export interface GeminiClassificationResult {
   reasoning: string;
 }
 
-interface UsageRecord {
-  timestamp: Date;
-  tokens: number;
-  cost: number;
-}
-
 // Rate limiting state
 const requestTimestamps: number[] = [];
 

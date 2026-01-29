@@ -24,15 +24,12 @@ import type { CaseNotice } from "@/types/case-notice";
 import ScourtGeneralInfoXml from "./scourt/ScourtGeneralInfoXml";
 import {
   getPartyLabels as getPartyLabelsFromSchema,
-  getCaseCategory,
   isMaskedPartyName,
   normalizePartyLabel,
   normalizePartyNameForMatch,
   PARTY_TYPE_LABELS,
   preservePrefix,
   getPartySide,
-  PLAINTIFF_SIDE_TYPES,
-  DEFENDANT_SIDE_TYPES,
   type PartyType,
 } from "@/types/case-party";
 import { COURTS, getCourtAbbrev } from "@/lib/scourt/court-codes";
@@ -1633,7 +1630,6 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
     caseData.id,
     caseData.court_name,
     primaryParties.clientSide,
-    (caseData as { client_role_status?: string }).client_role_status,
     caseData.client?.name,
     caseData.case_relations,
     primaryParties.opponentParty,
@@ -1700,7 +1696,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
       newSet.delete(`${caseType}:${caseNoForKey}`);
       return newSet;
     });
-  }, [selectedRelatedCase]);
+  }, [selectedRelatedCase, fetchScourtSnapshot]);
 
   // 관련사건 연동안함 핸들러 (모달용)
   const handleDismissRelatedCaseFromModal = useCallback(async () => {
@@ -2156,7 +2152,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   };
 
   // 사건 상태 결정 (SCOURT 데이터 기반)
-  const getCaseStatusInfo = () => {
+  const _getCaseStatusInfo = () => {
     // 종국결과가 있으면 null 반환 (결과 배지가 별도로 표시되므로 "선고" 불필요)
     if (getBasicInfo("종국결과", "endRslt") || caseData.case_result) {
       return null;
@@ -2206,7 +2202,7 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
 
   // 당사자 정보 렌더링 (간소화)
   // 우선순위: case_parties (DB, SCOURT 라벨 반영) > 기존 fallback
-  const renderPartyInfo = () => {
+  const _renderPartyInfo = () => {
     const partyLabels = getPartyLabels();
 
     // 번호 접두사 제거 함수 (예: "1. 정OO" -> "정OO")

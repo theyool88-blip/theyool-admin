@@ -366,7 +366,7 @@ async function createSingleCase(
     const resolvedCourtName = normalizedCourtName || caseData.court_name
 
     // 6. 사건 생성 (client_role_status 결정)
-    const resolvedClientRoleStatus = determineClientRoleStatus({
+    const _resolvedClientRoleStatus = determineClientRoleStatus({
       explicitClientRole: caseData.client_role,
       clientName: row.client_name,
       opponentName: caseData.opponent_name

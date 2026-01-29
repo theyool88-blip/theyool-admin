@@ -298,7 +298,7 @@ export default function MemberManagement({
     }
   };
 
-  const formatDate = (dateString?: string) => {
+  const _formatDate = (dateString?: string) => {
     if (!dateString) return '-';
     const date = new Date(dateString);
     const yy = String(date.getFullYear()).slice(2);

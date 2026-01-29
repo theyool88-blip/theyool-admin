@@ -11,8 +11,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withTenant } from '@/lib/api/with-tenant';
 
 export const POST = withTenant(async (
-  request: NextRequest,
-  { tenant }
+  _request: NextRequest,
+  { tenant: _tenant }
 ) => {
   // Puppeteer 기능은 Cloudflare에서 지원되지 않음
   return NextResponse.json(

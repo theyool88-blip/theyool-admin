@@ -34,6 +34,8 @@ export default function DomainSettings({ hasHomepage }: DomainSettingsProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
+  // Suppress unused warning - validating state is set but not read in UI
+  void validating;
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 

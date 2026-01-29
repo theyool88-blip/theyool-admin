@@ -8,7 +8,6 @@ import {
   Trophy,
   MessageSquare,
   Instagram,
-  RefreshCw,
   AlertCircle,
   ExternalLink,
   Globe,

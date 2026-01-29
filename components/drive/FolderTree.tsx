@@ -68,11 +68,7 @@ export default function FolderTree({
   // Data Fetching
   // ============================================================================
 
-  useEffect(() => {
-    fetchFolders()
-  }, [tenantId, caseId])
-
-  const fetchFolders = async () => {
+  const fetchFolders = useCallback(async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams({ tenant_id: tenantId })
@@ -88,7 +84,11 @@ export default function FolderTree({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [tenantId, caseId])
+
+  useEffect(() => {
+    fetchFolders()
+  }, [fetchFolders])
 
   // ============================================================================
   // Tree Structure Building
@@ -261,7 +261,7 @@ export default function FolderTree({
     return <Folder className="w-5 h-5" strokeWidth={2.5} />
   }
 
-  const renderTreeNode = (node: TreeNode, index: number) => {
+  const renderTreeNode = (node: TreeNode, _index: number) => {
     const isExpanded = expandedNodes.has(node.id)
     const isSelected = currentFolderId === node.id
     const hasChildren = node.children && node.children.length > 0

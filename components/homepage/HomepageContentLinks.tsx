@@ -10,7 +10,6 @@ import {
   MessageSquare,
   Instagram,
   LayoutDashboard,
-  ChevronRight,
 } from 'lucide-react';
 
 interface ContentStats {

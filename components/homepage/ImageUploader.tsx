@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import { Upload, X, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
 
 interface UploadResult {
   url: string;
@@ -39,7 +39,7 @@ export default function ImageUploader({
   const [optimizationInfo, setOptimizationInfo] = useState<UploadResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = useCallback(async (file: File) => {
     setError(null);
     setOptimizationInfo(null);
     setUploading(true);
@@ -75,7 +75,7 @@ export default function ImageUploader({
     } finally {
       setUploading(false);
     }
-  };
+  }, [folder, onChange]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -103,7 +103,7 @@ export default function ImageUploader({
         setError('이미지 파일만 업로드할 수 있습니다.');
       }
     }
-  }, [folder]);
+  }, [uploadFile]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -137,6 +137,7 @@ export default function ImageUploader({
         <div className="space-y-2">
           <div className="relative group">
             <div className="relative aspect-video rounded-lg overflow-hidden bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={value}
                 alt="업로드된 이미지"

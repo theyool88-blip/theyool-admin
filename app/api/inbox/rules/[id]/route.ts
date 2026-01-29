@@ -44,7 +44,7 @@ const handler = async (
   request: NextRequest,
   context: { tenant: { tenantId: string }; params?: Record<string, string> }
 ) => {
-  const tenantId = context.tenant.tenantId;
+  const _tenantId = context.tenant.tenantId;
   const ruleId = context.params?.id;
 
   if (!ruleId) {
@@ -54,7 +54,7 @@ const handler = async (
     );
   }
 
-  const supabase = createAdminClient();
+  const _supabase = createAdminClient();
 
   // GET - Get single rule
   if (request.method === 'GET') {

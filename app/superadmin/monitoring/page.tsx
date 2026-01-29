@@ -15,9 +15,6 @@ import {
   AlertCircle,
   ArrowUpRight,
   Cpu,
-  HardDrive,
-  Wifi,
-  Zap,
 } from 'lucide-react';
 
 interface SystemHealth {
@@ -126,7 +123,6 @@ export default function MonitoringOverviewPage() {
   if (!health) return null;
 
   const allHealthy = Object.values(health).every(s => s.status === 'healthy');
-  const hasWarning = Object.values(health).some(s => s.status === 'warning');
   const hasError = Object.values(health).some(s => s.status === 'error');
 
   return (

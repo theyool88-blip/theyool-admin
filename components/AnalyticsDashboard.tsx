@@ -8,7 +8,6 @@ import {
   MessageSquare,
   Calendar,
   RefreshCw,
-  ChevronDown,
   Filter,
   BarChart3,
   PieChart,
@@ -132,6 +131,7 @@ export default function AnalyticsDashboard({ hasHomepage }: AnalyticsDashboardPr
     } else {
       setLoading(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasHomepage, activeTab, period]);
 
   if (!hasHomepage) {

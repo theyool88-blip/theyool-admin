@@ -58,7 +58,7 @@ const handler = async (
   context: { tenant: { tenantId: string } }
 ) => {
   const tenantId = context.tenant.tenantId;
-  const supabase = createAdminClient();
+  const _supabase = createAdminClient();
 
   // Get current user
   const { createClient } = await import('@/lib/supabase/server');
@@ -72,6 +72,8 @@ const handler = async (
       // Check if classification_rules table exists
       // For now, return empty array as the table doesn't exist yet
       // TODO: Create classification_rules table in migration
+      // Suppress unused variable warning
+      void _supabase;
 
       const response: RulesListResponse = {
         success: true,
@@ -97,6 +99,9 @@ const handler = async (
   // POST - Create rule
   if (request.method === 'POST') {
     try {
+      // Suppress unused variable warning
+      void _supabase;
+
       const body: CreateRuleRequest = await request.json();
       const { name, priority = 100, enabled = true, conditions, actions } = body;
 

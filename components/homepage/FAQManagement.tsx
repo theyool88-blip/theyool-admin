@@ -7,12 +7,10 @@ import {
   Trash2,
   X,
   Check,
-  ChevronDown,
   ChevronRight,
   Eye,
   EyeOff,
   HelpCircle,
-  Filter,
 } from 'lucide-react';
 
 interface FAQ {
@@ -69,7 +67,7 @@ export default function FAQManagement() {
     } finally {
       setLoading(false);
     }
-  }, [filter]);
+  }, [filter, expandedCategories.size]);
 
   useEffect(() => {
     loadFaqs();

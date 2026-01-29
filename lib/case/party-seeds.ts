@@ -26,7 +26,7 @@ export function buildManualPartySeeds({
   opponentName,
   clientRole,
   caseNumber,
-  clientId,
+  clientId: _clientId,
 }: ManualPartySeedInput): ManualPartySeed[] {
   const seeds: ManualPartySeed[] = []
   const trimmedClientName = clientName?.trim() || ''

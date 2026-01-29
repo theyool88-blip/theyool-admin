@@ -9,7 +9,6 @@ import {
   Clock,
   Database,
   RotateCw,
-  Scale,
   CheckCircle2,
   XCircle,
   Play,

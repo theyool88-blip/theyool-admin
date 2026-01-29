@@ -57,6 +57,7 @@ export default function RelatedCasePreviewModal({
     if (isOpen && relatedCaseInfo.encCsNo) {
       fetchPreviewData()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, relatedCaseInfo.encCsNo])
 
   const fetchPreviewData = async () => {
@@ -80,7 +81,7 @@ export default function RelatedCasePreviewModal({
       } else {
         setError(data.error || '데이터를 불러올 수 없습니다')
       }
-    } catch (err) {
+    } catch {
       setError('네트워크 오류가 발생했습니다')
     } finally {
       setLoading(false)

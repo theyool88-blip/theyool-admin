@@ -1,19 +1,17 @@
-# Cloudflare Pages configuration for luseed
-# This file configures deployment settings, bindings, and scheduled tasks
+# Cloudflare Workers configuration for luseed (OpenNext deployment)
+# This file configures deployment settings and bindings for Cloudflare Workers
 
-# Application name (must match Cloudflare Pages project name)
+# Application name
 name = "luseed"
 
 # Cloudflare Workers compatibility date
-# Controls which runtime features and behaviors are available
+# Must be 2025-04-01 or later for proper process.env support
 compatibility_date = "2025-12-01"
 
 # Enable Node.js compatibility for standard Node APIs
 compatibility_flags = ["nodejs_compat"]
 
-# OpenNext build output directory for Next.js on Cloudflare
-# This is where the OpenNext adapter places the compiled application
-pages_build_output_dir = ".open-next"
+# Note: pages_build_output_dir removed - OpenNext deploys to Workers, not Pages
 
 # R2 Bucket Binding
 # Provides access to Cloudflare R2 object storage for file uploads

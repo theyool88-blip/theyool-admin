@@ -39,6 +39,7 @@ import {
   type ScourtCaseType,
 } from "@/lib/scourt/xml-mapping";
 import { normalizeCaseNumber } from "@/lib/scourt/case-number-utils";
+import { useTheme } from "@/hooks/useTheme";
 
 /**
  * 당사자 유형 정렬 순서 (법적 표시 순서)
@@ -244,6 +245,7 @@ const DEFENDANT_SIDE_LABELS = new Set(
 );
 
 export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
+  const { resolvedTheme } = useTheme();
   const [_unifiedSchedules, setUnifiedSchedules] = useState<
     UnifiedScheduleItem[]
   >([]);
@@ -2034,21 +2036,24 @@ export default function CaseDetail({ caseData }: { caseData: LegalCase }) {
   // - Dark Red (#660000): 제출 (progCttDvs=3)
   // - Orange (#CC6600): 송달 (progCttDvs=4)
   // - Black (#000000): 법원/기타 (progCttDvs=0)
+  // 다크 모드에서는 밝은 색상 사용
   const getProgressColor = (item: ScourtProgressItem): string => {
     const category = getProgressCategory(item);
+    const isDark = resolvedTheme === "dark";
+
     switch (category) {
       case "delivery":
-        return "#CC6600"; // 송달
+        return isDark ? "#FF9933" : "#CC6600"; // 송달 (밝은 주황 / 어두운 주황)
       case "hearing":
-        return "#003399"; // 기일
+        return isDark ? "#6699FF" : "#003399"; // 기일 (밝은 파랑 / 어두운 파랑)
       case "order":
-        return "#336633"; // 명령
+        return isDark ? "#66CC66" : "#336633"; // 명령 (밝은 녹색 / 어두운 녹색)
       case "submit":
-        return "#660000"; // 제출
+        return isDark ? "#FF6666" : "#660000"; // 제출 (밝은 빨강 / 어두운 빨강)
       case "court":
-        return "#000000"; // 법원/기타
+        return isDark ? "var(--text-primary)" : "#000000"; // 법원/기타
       default:
-        return "#000000";
+        return isDark ? "var(--text-primary)" : "#000000";
     }
   };
 

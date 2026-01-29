@@ -4,6 +4,9 @@
 # Application name
 name = "luseed"
 
+# OpenNext worker entry point
+main = ".open-next/worker.js"
+
 # Cloudflare Workers compatibility date
 # Must be 2025-04-01 or later for proper process.env support
 compatibility_date = "2025-12-01"
@@ -11,7 +14,10 @@ compatibility_date = "2025-12-01"
 # Enable Node.js compatibility for standard Node APIs
 compatibility_flags = ["nodejs_compat"]
 
-# Note: pages_build_output_dir removed - OpenNext deploys to Workers, not Pages
+# Static assets configuration for OpenNext
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
 
 # R2 Bucket Binding
 # Provides access to Cloudflare R2 object storage for file uploads
@@ -25,7 +31,7 @@ bucket_name = "luseed-files"
 # binding = "HYPERDRIVE"
 # id = "88b70aa08a7e4f7bbbf3f97e75c1f746"
 
-# Note: Scheduled Tasks (Cron Triggers) are NOT supported in Cloudflare Pages
+# Note: Scheduled Tasks (Cron Triggers) are NOT supported in Cloudflare Workers
 # Use external cron services (e.g., cron-job.org, GitHub Actions) to call API routes:
 # - /api/cron/daily-reminders?secret=xxx (daily at midnight)
 # - /api/cron/scourt-sync-scheduler?secret=xxx (every 10 min)

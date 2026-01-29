@@ -41,20 +41,21 @@ export const POST = withTenant(async (request, { tenant }) => {
     const additionalBytes = additionalGB * 1024 * 1024 * 1024; // Convert GB to bytes
 
     // Get or create storage record
-    let storage: any;
-    let fetchError: any;
-    ({ data: storage, error: fetchError } = await supabase
+    let storageRecord;
+    const { data: existingStorage, error: fetchError } = await supabase
       .from('tenant_storage')
       .select('*')
       .eq('tenant_id', tenant.tenantId)
-      .single());
+      .single();
+
+    storageRecord = existingStorage;
 
     if (fetchError && fetchError.code !== 'PGRST116') {
       throw new Error(`Failed to fetch storage record: ${fetchError.message}`);
     }
 
     // Create if doesn't exist
-    if (!storage) {
+    if (!storageRecord) {
       const { data: created, error: createError } = await supabase
         .from('tenant_storage')
         .insert({
@@ -71,11 +72,11 @@ export const POST = withTenant(async (request, { tenant }) => {
         throw new Error(`Failed to create storage record: ${createError.message}`);
       }
 
-      storage = created;
+      storageRecord = created;
     }
 
     // Calculate new quota
-    const newExtraQuotaBytes = (storage.extra_quota_bytes || 0) + additionalBytes;
+    const newExtraQuotaBytes = (storageRecord.extra_quota_bytes || 0) + additionalBytes;
     const now = new Date();
 
     // Update storage with additional quota
@@ -83,7 +84,7 @@ export const POST = withTenant(async (request, { tenant }) => {
       .from('tenant_storage')
       .update({
         extra_quota_bytes: newExtraQuotaBytes,
-        extra_quota_started_at: storage.extra_quota_started_at || now.toISOString(),
+        extra_quota_started_at: storageRecord.extra_quota_started_at || now.toISOString(),
         // Set expiry to 1 year from now (for subscription model)
         extra_quota_expires_at: new Date(now.getFullYear() + 1, now.getMonth(), now.getDate()).toISOString(),
       })

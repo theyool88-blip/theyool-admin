@@ -571,7 +571,7 @@ export class StorageService {
     const supabase = await createClient();
 
     // Get or create storage record
-    let { data: storage, error } = await supabase
+    const { data: storageData, error } = await supabase
       .from('tenant_storage')
       .select('*')
       .eq('tenant_id', tenantId)
@@ -582,6 +582,7 @@ export class StorageService {
     }
 
     // Create if doesn't exist
+    let storage = storageData;
     if (!storage) {
       const { data: created, error: createError } = await supabase
         .from('tenant_storage')

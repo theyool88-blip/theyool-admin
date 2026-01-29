@@ -219,7 +219,7 @@ export default function StorageDashboard({ tenantId, compact = false }: StorageD
                 Storage {storage.percentUsed >= 95 ? 'Almost Full' : 'Running Low'}
               </h3>
               <p className="text-sm text-slate-700 mb-4">
-                You're using {storage.percentUsed.toFixed(1)}% of your storage quota.
+                You&apos;re using {storage.percentUsed.toFixed(1)}% of your storage quota.
                 {storage.percentUsed >= 95
                   ? ' Consider upgrading to avoid service disruption.'
                   : ' Upgrade now to add more space.'}

@@ -270,20 +270,24 @@ export async function classifyWithGemini(params: {
 
     return classification;
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    // Extract error properties with type guards
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStatus = (error as { status?: number })?.status;
+
     // Handle specific error types
-    if (error.message === 'Request timeout') {
+    if (errorMessage === 'Request timeout') {
       console.error('Gemini request timeout after 30s');
       return null;
     }
 
     // Handle API errors
-    if (error.status === 401) {
+    if (errorStatus === 401) {
       console.error('Invalid Gemini API key');
       return null;
     }
 
-    if (error.status === 429) {
+    if (errorStatus === 429) {
       // Rate limit from Google's side - try exponential backoff
       console.warn('Gemini API rate limit, attempting retry with backoff');
 
@@ -320,8 +324,8 @@ export async function classifyWithGemini(params: {
       }
     }
 
-    if (error.status === 500) {
-      console.error('Gemini server error:', error.message);
+    if (errorStatus === 500) {
+      console.error('Gemini server error:', errorMessage);
       return null;
     }
 

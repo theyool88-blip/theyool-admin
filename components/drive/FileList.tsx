@@ -94,6 +94,15 @@ function getMimeTypeDisplay(mimeType: string | null): string {
   return mimeType.split('/')[1]?.toUpperCase() || 'File';
 }
 
+const SortIcon = ({ column, sortBy, sortOrder }: { column: string; sortBy: string; sortOrder: 'asc' | 'desc' }) => {
+  if (sortBy !== column) return null;
+  return sortOrder === 'asc' ? (
+    <ChevronUp className="w-4 h-4 inline-block ml-1" />
+  ) : (
+    <ChevronDown className="w-4 h-4 inline-block ml-1" />
+  );
+};
+
 export default function FileList({
   files,
   folders,
@@ -200,15 +209,6 @@ export default function FileList({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedIds, allItems, onSelect]);
 
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return null;
-    return sortOrder === 'asc' ? (
-      <ChevronUp className="w-4 h-4 inline-block ml-1" />
-    ) : (
-      <ChevronDown className="w-4 h-4 inline-block ml-1" />
-    );
-  };
-
   return (
     <div className="overflow-x-auto border-3 border-slate-900 bg-white">
       <table ref={tableRef} className="w-full border-collapse">
@@ -230,7 +230,7 @@ export default function FileList({
               onClick={() => onSort('name')}
             >
               <span className="text-xs font-bold tracking-wider">
-                NAME <SortIcon column="name" />
+                NAME <SortIcon column="name" sortBy={sortBy} sortOrder={sortOrder} />
               </span>
             </th>
             <th
@@ -238,7 +238,7 @@ export default function FileList({
               onClick={() => onSort('type')}
             >
               <span className="text-xs font-bold tracking-wider">
-                FILE TYPE <SortIcon column="type" />
+                FILE TYPE <SortIcon column="type" sortBy={sortBy} sortOrder={sortOrder} />
               </span>
             </th>
             <th
@@ -246,7 +246,7 @@ export default function FileList({
               onClick={() => onSort('size')}
             >
               <span className="text-xs font-bold tracking-wider">
-                SIZE <SortIcon column="size" />
+                SIZE <SortIcon column="size" sortBy={sortBy} sortOrder={sortOrder} />
               </span>
             </th>
             <th
@@ -254,7 +254,7 @@ export default function FileList({
               onClick={() => onSort('modified')}
             >
               <span className="text-xs font-bold tracking-wider">
-                MODIFIED <SortIcon column="modified" />
+                MODIFIED <SortIcon column="modified" sortBy={sortBy} sortOrder={sortOrder} />
               </span>
             </th>
             <th className="w-24 p-3 text-center">

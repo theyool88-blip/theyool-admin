@@ -181,7 +181,7 @@ export async function dualReadFile(params: {
   caseId?: string;
   clientVisible?: boolean;
 }): Promise<{
-  files: any[];
+  files: Record<string, unknown>[];
   source: 'r2' | 'legacy';
 }> {
   const supabase = await createClient();

@@ -197,9 +197,18 @@ export async function headObject(
       contentType: response.ContentType || 'application/octet-stream',
       etag: response.ETag || '',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Return null if object not found (404)
-    if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      ('name' in error && error.name === 'NotFound' ||
+       '$metadata' in error &&
+       typeof error.$metadata === 'object' &&
+       error.$metadata !== null &&
+       'httpStatusCode' in error.$metadata &&
+       error.$metadata.httpStatusCode === 404)
+    ) {
       return null;
     }
 

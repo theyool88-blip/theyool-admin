@@ -284,6 +284,133 @@ interface UnifiedSchedule {
 
 ---
 
+## PartyVsDisplay 공통 컴포넌트 (2026-01-30 추가)
+
+### 개요
+
+"의뢰인 v 상대방" 형식의 표시를 전체 코드베이스에서 통일하기 위한 공통 컴포넌트입니다.
+
+### 사용 위치
+
+| 컴포넌트 | 파일 | 용도 |
+|----------|------|------|
+| EventPopup | `components/calendar/components/EventPopup.tsx` | 캘린더 이벤트 팝업 헤더 |
+| CasesList | `components/CasesList.tsx` | 사건 목록 테이블, 카드 뷰 |
+| UpcomingEventsWidget | `components/planning/UpcomingEventsWidget.tsx` | 대시보드 일정 위젯 |
+
+### 컴포넌트 Props
+
+```typescript
+interface PartyVsDisplayProps {
+  clientName?: string | null      // 의뢰인명 (필수)
+  opponentName?: string | null    // 상대방명 (선택)
+  size?: 'xs' | 'sm' | 'base'     // 글자 크기 (기본: 'base')
+  className?: string              // 추가 스타일 클래스
+  mutedOpponent?: boolean         // 상대방명 흐리게 표시 (기본: true)
+  truncate?: boolean              // 긴 텍스트 말줄임 (기본: true)
+}
+```
+
+### 표시 형식
+
+| 케이스 | 입력 | 출력 |
+|--------|------|------|
+| 둘 다 있음 | `김철수`, `이영희` | 김철수 v 이영희 |
+| 상대방 없음 | `김철수`, `null` | 김철수 |
+| 의뢰인 없음 | `null`, `이영희` | (아무것도 표시 안 함) |
+
+### 사용 예시
+
+```tsx
+import { PartyVsDisplay } from '@/components/ui/PartyVsDisplay'
+
+// 기본 사용
+<PartyVsDisplay
+  clientName={ourClientName}
+  opponentName={opponentName}
+/>
+
+// 작은 크기 + 커스텀 스타일
+<PartyVsDisplay
+  clientName={clientName}
+  opponentName={opponent}
+  size="sm"
+  className="font-medium"
+/>
+```
+
+### 유틸리티 함수
+
+`lib/utils/party-display.ts`에 관련 함수들이 정의되어 있습니다:
+
+```typescript
+// 문자열 형식으로 반환 (UI 컴포넌트 대신 문자열이 필요할 때)
+formatPartyVs(clientName, opponentName)
+// 예: "김철수 v 이영희"
+
+// 사건 제목 생성 (사건명 포함)
+generateCaseTitle(clientName, opponentName, caseLabel)
+// 예: "김철수v이영희(이혼)"
+```
+
+### 데이터 흐름
+
+```
+unified_calendar VIEW (our_client_name, opponent_name 컬럼)
+       ↓
+API: /api/admin/calendar (our_client_name, opponent_name 조회)
+       ↓
+Types: ApiEvent → BigCalendarEvent (eventTransformers.ts에서 매핑)
+       ↓
+UI: EventPopup, CasesList 등에서 PartyVsDisplay 사용
+```
+
+### 의뢰인명 폴백 체인 (unified_calendar VIEW)
+
+```sql
+COALESCE(
+  -- 1순위: case_clients → case_parties 연결된 당사자
+  (SELECT cp.party_name FROM case_clients cc
+   JOIN case_parties cp ON cc.linked_party_id = cp.id
+   WHERE cc.case_id = ch.case_id
+   ORDER BY cc.is_primary_client DESC LIMIT 1),
+
+  -- 2순위: case_clients → clients 테이블
+  (SELECT c.name FROM case_clients cc
+   JOIN clients c ON cc.client_id = c.id
+   WHERE cc.case_id = ch.case_id
+   ORDER BY cc.is_primary_client DESC LIMIT 1),
+
+  -- 3순위: legal_cases.primary_client_name (폴백)
+  lc.primary_client_name
+) AS our_client_name
+```
+
+### 상대방명 조회 로직
+
+```sql
+(SELECT cp.party_name FROM case_parties cp
+ WHERE cp.case_id = ch.case_id
+ AND cp.id NOT IN (
+   SELECT cc.linked_party_id FROM case_clients cc
+   WHERE cc.case_id = ch.case_id AND cc.linked_party_id IS NOT NULL
+ )
+ ORDER BY cp.party_order LIMIT 1
+) AS opponent_name
+```
+
+### 관련 파일
+
+| 파일 | 역할 |
+|------|------|
+| `components/ui/PartyVsDisplay.tsx` | 공통 UI 컴포넌트 |
+| `lib/utils/party-display.ts` | 유틸리티 함수 |
+| `components/calendar/types.ts` | 타입 정의 (opponentName 필드) |
+| `components/calendar/utils/eventTransformers.ts` | API → UI 데이터 변환 |
+| `supabase/migrations/20260131000000_add_opponent_name_to_unified_calendar.sql` | DB 뷰 마이그레이션 |
+
+---
+
 ## Google Calendar 동기화
 
 ### 기능

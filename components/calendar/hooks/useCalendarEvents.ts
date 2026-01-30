@@ -263,6 +263,36 @@ export function useCalendarEvents({
 
   // Update attending lawyer
   const updateAttendingLawyer = useCallback(async (hearingId: string, lawyerId: string | null) => {
+    // 1. Calculate lawyer name first
+    const lawyerName = lawyerId
+      ? tenantMembers.find(m => m.id === lawyerId)?.display_name
+      : undefined
+
+    // 2. OPTIMISTIC: Store previous state for rollback
+    const previousEvents = allEvents
+
+    // 3. OPTIMISTIC: Update UI immediately
+    setAllEvents(prev =>
+      prev.map(e =>
+        e.id === hearingId
+          ? { ...e, attendingLawyerId: lawyerId || undefined, attendingLawyerName: lawyerName }
+          : e
+      )
+    )
+
+    // 4. Update cache optimistically too
+    const cached = eventCache.get(cacheKey)
+    const previousCachedData = cached?.data
+
+    if (cached) {
+      cached.data = cached.data.map(e =>
+        e.id === hearingId
+          ? { ...e, attendingLawyerId: lawyerId || undefined, attendingLawyerName: lawyerName }
+          : e
+      )
+    }
+
+    // 5. SERVER: Make the actual API call
     setUpdatingLawyer(hearingId)
     try {
       const { createClient } = await import('@/lib/supabase/client')
@@ -272,35 +302,19 @@ export function useCalendarEvents({
         .update({ attending_lawyer_id: lawyerId })
         .eq('id', hearingId)
       if (error) throw error
-
-      const lawyerName = lawyerId
-        ? tenantMembers.find(m => m.id === lawyerId)?.display_name
-        : undefined
-
-      setAllEvents(prev =>
-        prev.map(e =>
-          e.id === hearingId
-            ? { ...e, attendingLawyerId: lawyerId || undefined, attendingLawyerName: lawyerName }
-            : e
-        )
-      )
-
-      // 캐시도 업데이트 (updateEvent와 일관성 유지)
-      const cached = eventCache.get(cacheKey)
-      if (cached) {
-        cached.data = cached.data.map(e =>
-          e.id === hearingId
-            ? { ...e, attendingLawyerId: lawyerId || undefined, attendingLawyerName: lawyerName }
-            : e
-        )
-      }
     } catch (error) {
+      // 6. ROLLBACK: Revert UI on error
+      setAllEvents(previousEvents)
+      if (cached && previousCachedData) {
+        cached.data = previousCachedData
+      }
       console.error('출석변호사 변경 실패:', error)
       alert('출석변호사 변경에 실패했습니다.')
+      throw error  // Re-throw so modal knows it failed
     } finally {
       setUpdatingLawyer(null)
     }
-  }, [tenantMembers, cacheKey])
+  }, [tenantMembers, cacheKey, allEvents])
 
   // Force refetch (cache invalidation)
   const refetch = useCallback(async () => {

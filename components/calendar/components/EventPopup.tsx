@@ -18,6 +18,7 @@ interface EventPopupProps {
   onClose: () => void
   onEdit: (event: BigCalendarEvent) => void
   onViewCase: (caseId: string) => void
+  onChangeAttendingLawyer?: (event: BigCalendarEvent) => void
 }
 
 const POPUP_WIDTH = 320
@@ -32,6 +33,7 @@ function EventPopupComponent({
   onClose,
   onEdit,
   onViewCase,
+  onChangeAttendingLawyer,
 }: EventPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
   const [popupStyle, setPopupStyle] = useState<React.CSSProperties>({})
@@ -132,7 +134,10 @@ function EventPopupComponent({
     daysUntil,
     result,
     scourtResultRaw,
+    scourtHearingHash,
   } = event
+
+  const isFromScourt = !!scourtHearingHash
 
   // 연기 여부: status가 POSTPONED이거나 result가 adjourned이거나,
   // scourt_result_raw가 '기일변경'으로 시작하거나 '연기', '휴정'인 경우
@@ -245,6 +250,20 @@ function EventPopupComponent({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               <span className="text-[var(--text-primary)]">{attendingLawyerName}</span>
+              {eventType === 'COURT_HEARING' && onChangeAttendingLawyer && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onChangeAttendingLawyer(event)
+                  }}
+                  className="p-1 text-[var(--text-muted)] hover:text-[var(--sage-primary)] hover:bg-[var(--bg-hover)] rounded transition-colors"
+                  title="출석변호사 변경"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              )}
             </div>
           )}
 
@@ -283,9 +302,14 @@ function EventPopupComponent({
         <div className="flex items-center gap-2 p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
           <button
             onClick={() => onEdit(event)}
-            className="flex-1 px-3 py-2 text-xs font-medium text-[var(--text-secondary)] bg-[var(--bg-secondary)] border border-[var(--border-default)] rounded-lg hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-colors"
+            disabled={isFromScourt}
+            className={`flex-1 px-3 py-2 text-xs font-medium border border-[var(--border-default)] rounded-lg transition-colors ${
+              isFromScourt
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] cursor-not-allowed'
+                : 'text-[var(--text-secondary)] bg-[var(--bg-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]'
+            }`}
           >
-            수정
+            {isFromScourt ? 'SCOURT 동기화' : '수정'}
           </button>
           {caseId && (
             <button

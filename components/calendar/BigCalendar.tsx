@@ -19,6 +19,7 @@ import { CalendarToolbar } from './components/CalendarToolbar'
 import { MonthEvent } from './components/MonthEvent'
 import { WeekDayEvent } from './components/WeekDayEvent'
 import { EventPopup } from './components/EventPopup'
+import { AttendingLawyerModal } from './components/AttendingLawyerModal'
 import ScheduleListView from '../ScheduleListView'
 import UnifiedScheduleModal, { type EditScheduleData } from '../UnifiedScheduleModal'
 
@@ -104,6 +105,8 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
     tenantMembers,
     refetch,
     updateEvent,
+    updateAttendingLawyer,
+    updatingLawyer,
   } = useCalendarEvents({
     currentDate,
     filterType,
@@ -124,6 +127,10 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [editingSchedule, setEditingSchedule] = useState<EditScheduleData | null>(null)
   const [prefilledDate, setPrefilledDate] = useState<string>('')
+
+  // Attending lawyer modal state
+  const [showAttendingLawyerModal, setShowAttendingLawyerModal] = useState(false)
+  const [attendingLawyerTargetEvent, setAttendingLawyerTargetEvent] = useState<BigCalendarEvent | null>(null)
 
   // Holidays
   const monthStart = useMemo(() => startOfMonth(currentDate), [currentDate])
@@ -231,6 +238,14 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
 
   // Close popup
   const handleClosePopup = useCallback(() => {
+    setPopupEvent(null)
+    setPopupPosition(null)
+  }, [])
+
+  // Handle change attending lawyer
+  const handleChangeAttendingLawyer = useCallback((event: BigCalendarEvent) => {
+    setAttendingLawyerTargetEvent(event)
+    setShowAttendingLawyerModal(true)
     setPopupEvent(null)
     setPopupPosition(null)
   }, [])
@@ -478,6 +493,10 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
                 location: unified.location || null,
                 description: unified.notes || null,
                 status: unified.status || 'SCHEDULED',
+                result: e.result || null,
+                scourt_result_raw: e.scourtResultRaw || null,
+                attending_lawyer_name: e.attendingLawyerName || null,
+                scourt_hearing_hash: e.scourtHearingHash || null,
                 sort_priority: unified.time ? 2 : 1
               }
             })}
@@ -554,7 +573,22 @@ export default function BigCalendar({ profile: _profile }: BigCalendarProps) {
         onClose={handleClosePopup}
         onEdit={handlePopupEdit}
         onViewCase={handlePopupViewCase}
+        onChangeAttendingLawyer={handleChangeAttendingLawyer}
       />
+
+      {/* Attending Lawyer Modal */}
+      {showAttendingLawyerModal && attendingLawyerTargetEvent && (
+        <AttendingLawyerModal
+          event={attendingLawyerTargetEvent}
+          tenantMembers={tenantMembers}
+          updateAttendingLawyer={updateAttendingLawyer}
+          updatingLawyer={updatingLawyer}
+          onClose={() => {
+            setShowAttendingLawyerModal(false)
+            setAttendingLawyerTargetEvent(null)
+          }}
+        />
+      )}
 
       {/* Schedule modal */}
       <UnifiedScheduleModal

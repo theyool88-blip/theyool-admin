@@ -7,7 +7,6 @@ import {
   Image,
   FileSpreadsheet,
   Folder,
-  Download,
   MoreVertical,
   ChevronUp,
   ChevronDown,
@@ -28,31 +27,31 @@ interface FileViewProps {
 }
 
 function getFileIcon(mimeType: string | null) {
-  if (!mimeType) return { Icon: File, color: 'text-slate-400' };
+  if (!mimeType) return { Icon: File, color: 'text-gray-400' };
 
   if (mimeType === 'application/pdf') {
-    return { Icon: FileText, color: 'text-danger-500' };
+    return { Icon: FileText, color: 'text-red-500' };
   }
   if (mimeType.startsWith('image/')) {
-    return { Icon: Image, color: 'text-info-500' };
+    return { Icon: Image, color: 'text-blue-500' };
   }
   if (
     mimeType === 'application/msword' ||
     mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   ) {
-    return { Icon: FileText, color: 'text-info-600' };
+    return { Icon: FileText, color: 'text-blue-600' };
   }
   if (
     mimeType === 'application/vnd.ms-excel' ||
     mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   ) {
-    return { Icon: FileSpreadsheet, color: 'text-success-500' };
+    return { Icon: FileSpreadsheet, color: 'text-green-600' };
   }
   if (mimeType === 'application/hwp') {
-    return { Icon: FileText, color: 'text-warning-500' };
+    return { Icon: FileText, color: 'text-orange-500' };
   }
 
-  return { Icon: File, color: 'text-slate-400' };
+  return { Icon: File, color: 'text-gray-400' };
 }
 
 function formatFileSize(bytes: number | null): string {
@@ -96,9 +95,9 @@ function getMimeTypeDisplay(mimeType: string | null): string {
 const SortIcon = ({ column, sortBy, sortOrder }: { column: string; sortBy: string; sortOrder: 'asc' | 'desc' }) => {
   if (sortBy !== column) return null;
   return sortOrder === 'asc' ? (
-    <ChevronUp className="w-4 h-4 inline-block ml-1" />
+    <ChevronUp className="w-3.5 h-3.5 inline-block ml-1 text-gray-600" />
   ) : (
-    <ChevronDown className="w-4 h-4 inline-block ml-1" />
+    <ChevronDown className="w-3.5 h-3.5 inline-block ml-1 text-gray-600" />
   );
 };
 
@@ -211,56 +210,63 @@ export default function FileList({
   }, [selectedIds, allItems, onSelect, handleItemDoubleClick]);
 
   return (
-    <div className="overflow-x-auto border-3 border-slate-900 bg-white">
+    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
       <table ref={tableRef} className="w-full border-collapse">
         <thead>
-          <tr className="bg-slate-900 text-white">
-            <th className="w-12 p-3 text-left border-r-2 border-slate-700">
+          <tr className="border-b border-gray-200 bg-gray-50">
+            <th className="w-12 py-3 px-4 text-left">
               <input
                 type="checkbox"
                 checked={allSelected}
                 onChange={handleSelectAll}
-                className="w-5 h-5 border-2 border-white rounded-none accent-sage-400 cursor-pointer"
+                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
               />
             </th>
-            <th className="w-12 p-3 text-left border-r-2 border-slate-700">
-              <span className="text-xs font-bold tracking-wider">TYPE</span>
-            </th>
             <th
-              className="p-3 text-left border-r-2 border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors"
+              className="py-3 px-4 text-left cursor-pointer hover:bg-gray-100 transition-colors select-none"
               onClick={() => onSort('name')}
             >
-              <span className="text-xs font-bold tracking-wider">
-                NAME <SortIcon column="name" sortBy={sortBy} sortOrder={sortOrder} />
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+                  Name
+                </span>
+                <SortIcon column="name" sortBy={sortBy} sortOrder={sortOrder} />
+              </div>
             </th>
             <th
-              className="p-3 text-left border-r-2 border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors"
-              onClick={() => onSort('type')}
-            >
-              <span className="text-xs font-bold tracking-wider">
-                FILE TYPE <SortIcon column="type" sortBy={sortBy} sortOrder={sortOrder} />
-              </span>
-            </th>
-            <th
-              className="p-3 text-left border-r-2 border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors"
-              onClick={() => onSort('size')}
-            >
-              <span className="text-xs font-bold tracking-wider">
-                SIZE <SortIcon column="size" sortBy={sortBy} sortOrder={sortOrder} />
-              </span>
-            </th>
-            <th
-              className="p-3 text-left border-r-2 border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors"
+              className="py-3 px-4 text-left cursor-pointer hover:bg-gray-100 transition-colors select-none"
               onClick={() => onSort('modified')}
             >
-              <span className="text-xs font-bold tracking-wider">
-                MODIFIED <SortIcon column="modified" sortBy={sortBy} sortOrder={sortOrder} />
-              </span>
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+                  Modified
+                </span>
+                <SortIcon column="modified" sortBy={sortBy} sortOrder={sortOrder} />
+              </div>
             </th>
-            <th className="w-24 p-3 text-center">
-              <span className="text-xs font-bold tracking-wider">ACTIONS</span>
+            <th
+              className="py-3 px-4 text-left cursor-pointer hover:bg-gray-100 transition-colors select-none"
+              onClick={() => onSort('size')}
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+                  Size
+                </span>
+                <SortIcon column="size" sortBy={sortBy} sortOrder={sortOrder} />
+              </div>
             </th>
+            <th
+              className="py-3 px-4 text-left cursor-pointer hover:bg-gray-100 transition-colors select-none"
+              onClick={() => onSort('type')}
+            >
+              <div className="flex items-center gap-1">
+                <span className="text-xs font-medium text-gray-700 uppercase tracking-wide">
+                  Type
+                </span>
+                <SortIcon column="type" sortBy={sortBy} sortOrder={sortOrder} />
+              </div>
+            </th>
+            <th className="w-16 py-3 px-4"></th>
           </tr>
         </thead>
         <tbody>
@@ -273,16 +279,16 @@ export default function FileList({
                 <tr
                   key={item.id}
                   className={`
-                    group border-b-2 border-slate-200
-                    transition-all duration-150
+                    group border-b border-gray-200
+                    transition-colors
                     cursor-pointer
-                    ${selected ? 'bg-sage-100 border-sage-400' : 'hover:bg-slate-50'}
+                    ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}
                   `}
                   onClick={(e) => handleItemClick(item.id, e)}
                   onDoubleClick={() => handleItemDoubleClick(item)}
                   onContextMenu={(e) => onContextMenu(e, folder)}
                 >
-                  <td className="p-3 border-r-2 border-slate-200">
+                  <td className="py-3 px-4">
                     <input
                       type="checkbox"
                       checked={selected}
@@ -290,34 +296,31 @@ export default function FileList({
                         e.stopPropagation();
                         handleCheckboxChange(item.id, e.target.checked);
                       }}
-                      className="w-5 h-5 border-2 border-slate-900 rounded-none accent-sage-600 cursor-pointer"
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                       onClick={(e) => e.stopPropagation()}
                     />
                   </td>
-                  <td className="p-3 border-r-2 border-slate-200">
-                    <Folder className="w-6 h-6 text-warning-600" strokeWidth={2.5} />
+                  <td className="py-3 px-4">
+                    <div className="flex items-center gap-3">
+                      <Folder className="w-5 h-5 text-amber-500 flex-shrink-0" strokeWidth={1.5} />
+                      <span className="text-sm text-gray-900 font-medium">{folder.name}</span>
+                    </div>
                   </td>
-                  <td className="p-3 border-r-2 border-slate-200">
-                    <span className="font-bold text-slate-900">{folder.name}</span>
-                  </td>
-                  <td className="p-3 border-r-2 border-slate-200">
-                    <span className="text-sm font-bold text-warning-700 bg-warning-100 px-2 py-1 border-2 border-warning-600">
-                      FOLDER
-                    </span>
-                  </td>
-                  <td className="p-3 border-r-2 border-slate-200 text-slate-500 text-sm">-</td>
-                  <td className="p-3 border-r-2 border-slate-200 text-slate-700 text-sm">
+                  <td className="py-3 px-4 text-sm text-gray-600">
                     {formatDate(folder.created_at)}
                   </td>
-                  <td className="p-3 text-center">
+                  <td className="py-3 px-4 text-sm text-gray-500">-</td>
+                  <td className="py-3 px-4 text-sm text-gray-600">Folder</td>
+                  <td className="py-3 px-4">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onContextMenu(e, folder);
                       }}
-                      className="p-1.5 border-2 border-slate-900 bg-white hover:bg-slate-900 hover:text-white transition-colors"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-gray-200 transition-all"
+                      aria-label="More actions"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <MoreVertical className="w-4 h-4 text-gray-600" />
                     </button>
                   </td>
                 </tr>
@@ -332,16 +335,16 @@ export default function FileList({
               <tr
                 key={item.id}
                 className={`
-                  group border-b-2 border-slate-200
-                  transition-all duration-150
+                  group border-b border-gray-200
+                  transition-colors
                   cursor-pointer
-                  ${selected ? 'bg-sage-100 border-sage-400' : 'hover:bg-slate-50'}
+                  ${selected ? 'bg-blue-50' : 'hover:bg-gray-50'}
                 `}
                 onClick={(e) => handleItemClick(item.id, e)}
                 onDoubleClick={() => handleItemDoubleClick(item)}
                 onContextMenu={(e) => onContextMenu(e, file)}
               >
-                <td className="p-3 border-r-2 border-slate-200">
+                <td className="py-3 px-4">
                   <input
                     type="checkbox"
                     checked={selected}
@@ -349,51 +352,38 @@ export default function FileList({
                       e.stopPropagation();
                       handleCheckboxChange(item.id, e.target.checked);
                     }}
-                    className="w-5 h-5 border-2 border-slate-900 rounded-none accent-sage-600 cursor-pointer"
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
                     onClick={(e) => e.stopPropagation()}
                   />
                 </td>
-                <td className="p-3 border-r-2 border-slate-200">
-                  <Icon className={`w-6 h-6 ${color}`} strokeWidth={2.5} />
+                <td className="py-3 px-4">
+                  <div className="flex items-center gap-3">
+                    <Icon className={`w-5 h-5 ${color} flex-shrink-0`} strokeWidth={1.5} />
+                    <span className="text-sm text-gray-900" title={file.display_name}>
+                      {file.display_name}
+                    </span>
+                  </div>
                 </td>
-                <td className="p-3 border-r-2 border-slate-200">
-                  <span className="font-bold text-slate-900" title={file.display_name}>
-                    {file.display_name}
-                  </span>
-                </td>
-                <td className="p-3 border-r-2 border-slate-200">
-                  <span className="text-sm font-bold text-slate-700 bg-slate-100 px-2 py-1 border-2 border-slate-300">
-                    {getMimeTypeDisplay(file.mime_type)}
-                  </span>
-                </td>
-                <td className="p-3 border-r-2 border-slate-200 text-slate-700 text-sm font-medium">
-                  {formatFileSize(file.file_size)}
-                </td>
-                <td className="p-3 border-r-2 border-slate-200 text-slate-700 text-sm">
+                <td className="py-3 px-4 text-sm text-gray-600">
                   {formatDate(file.created_at)}
                 </td>
-                <td className="p-3 text-center">
-                  <div className="flex gap-1 justify-center">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onFileOpen(file);
-                      }}
-                      className="p-1.5 border-2 border-info-500 bg-info-500 text-white hover:bg-info-600 hover:border-info-600 transition-colors"
-                      title="Download"
-                    >
-                      <Download className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onContextMenu(e, file);
-                      }}
-                      className="p-1.5 border-2 border-slate-900 bg-white hover:bg-slate-900 hover:text-white transition-colors"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </div>
+                <td className="py-3 px-4 text-sm text-gray-600">
+                  {formatFileSize(file.file_size)}
+                </td>
+                <td className="py-3 px-4 text-sm text-gray-600">
+                  {getMimeTypeDisplay(file.mime_type)}
+                </td>
+                <td className="py-3 px-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onContextMenu(e, file);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-gray-200 transition-all"
+                    aria-label="More actions"
+                  >
+                    <MoreVertical className="w-4 h-4 text-gray-600" />
+                  </button>
                 </td>
               </tr>
             );
@@ -402,14 +392,12 @@ export default function FileList({
       </table>
 
       {allItems.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-16 border-t-3 border-slate-900">
-          <div className="border-4 border-dashed border-slate-300 p-12 bg-slate-50">
-            <Folder className="w-16 h-16 text-slate-300 mx-auto mb-4" strokeWidth={2} />
-            <p className="text-lg font-bold text-slate-400 text-center">NO FILES YET</p>
-            <p className="text-sm text-slate-400 text-center mt-2">
-              Upload files or create folders to get started
-            </p>
-          </div>
+        <div className="flex flex-col items-center justify-center py-20">
+          <Folder className="w-16 h-16 text-gray-300 mb-4" strokeWidth={1.5} />
+          <p className="text-base text-gray-500 font-medium">This folder is empty</p>
+          <p className="text-sm text-gray-400 mt-1">
+            Upload files or create folders to get started
+          </p>
         </div>
       )}
     </div>

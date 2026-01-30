@@ -2,7 +2,7 @@
 
 **Last Updated**: 2026-01-30
 
-Luseed Drive는 법률 문서 관리를 위한 파일 스토리지 시스템입니다. Cloudflare R2를 백엔드로 사용하며, 테넌트별 용량 관리와 휴지통 기능을 제공합니다.
+Luseed Drive는 법률 문서 관리를 위한 파일 스토리지 시스템입니다. Cloudflare R2를 백엔드로 사용하며, 테넌트별 용량 관리를 제공합니다.
 
 ---
 
@@ -24,11 +24,7 @@ Luseed Drive는 법률 문서 관리를 위한 파일 스토리지 시스템입�
 │                        API Layer                                 │
 │  ┌───────────────┐ ┌───────────────┐ ┌───────────────────────┐  │
 │  │ /api/drive/   │ │ /api/drive/   │ │ /api/drive/files/[id] │  │
-│  │   folders     │ │   storage     │ │   /restore            │  │
-│  └───────────────┘ └───────────────┘ └───────────────────────┘  │
-│  ┌───────────────┐ ┌───────────────┐ ┌───────────────────────┐  │
-│  │ /api/drive/   │ │ /api/cron/    │ │ /api/drive/folders/   │  │
-│  │   trash       │ │ purge-deleted │ │   [id]/restore        │  │
+│  │   folders     │ │   storage     │ │   (CRUD)              │  │
 │  └───────────────┘ └───────────────┘ └───────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -52,9 +48,9 @@ Luseed Drive는 법률 문서 관리를 위한 파일 스토리지 시스템입�
 │                     Database Layer                               │
 │  ┌───────────────────┐  ┌───────────────────────────────────┐   │
 │  │  tenant_storage   │  │  r2_files / r2_folders            │   │
-│  │  - quota_bytes    │  │  - deleted_at (soft delete)       │   │
-│  │  - used_bytes     │  │  - path (folder hierarchy)        │   │
-│  │  - file_count     │  │  - tenant_id (RLS)                │   │
+│  │  - quota_bytes    │  │  - path (folder hierarchy)        │   │
+│  │  - used_bytes     │  │  - tenant_id (RLS)                │   │
+│  │  - file_count     │  │                                   │   │
 │  └───────────────────┘  └───────────────────────────────────┘   │
 │  ┌───────────────────┐  ┌───────────────────────────────────┐   │
 │  │  storage_alerts   │  │  RPC Functions                    │   │
@@ -133,34 +129,16 @@ await supabase.rpc('update_folder_paths_recursive', {
 })
 ```
 
-### 3. Soft Delete (Trash)
+### 3. Permanent Delete
 
 **Flow**:
-1. 파일/폴더 삭제 시 `deleted_at` 타임스탬프 설정
-2. 휴지통에서 30일 보관
-3. Cron job으로 30일 후 자동 영구 삭제
-
-**Database Schema**:
-```sql
--- r2_files, r2_folders
-deleted_at TIMESTAMPTZ DEFAULT NULL
-
--- RLS policies
-CREATE POLICY "Normal view excludes deleted"
-  ON r2_files FOR SELECT
-  USING (tenant_id = current_tenant() AND deleted_at IS NULL);
-
-CREATE POLICY "Trash view shows deleted"
-  ON r2_files FOR SELECT
-  USING (tenant_id = current_tenant() AND deleted_at IS NOT NULL);
-```
+1. 파일/폴더 삭제 요청
+2. R2 스토리지에서 즉시 삭제
+3. 데이터베이스 레코드 삭제
+4. 용량 카운터 차감
 
 **API Endpoints**:
-- `DELETE /api/drive/files/[id]` - Soft delete (sets deleted_at)
-- `DELETE /api/drive/files/[id]?hard=true` - Hard delete (permanent)
-- `GET /api/drive/trash` - List deleted items
-- `POST /api/drive/files/[id]/restore` - Restore from trash
-- `POST /api/drive/folders/[id]/restore` - Restore folder from trash
+- `DELETE /api/drive/files/[id]` - Permanently delete file
 
 ### 4. Quota Alerts
 
@@ -227,21 +205,12 @@ CREATE TRIGGER on_tenant_created
 6. Server → checkAndCreateQuotaAlert()
 ```
 
-### File Delete (Soft)
+### File Delete
 ```
 1. Client → DELETE /api/drive/files/[id]
-2. Server → UPDATE r2_files SET deleted_at = NOW()
-   (Storage NOT decremented yet - still counts toward quota)
-```
-
-### Trash Purge (Cron)
-```
-1. Cron → POST /api/cron/purge-deleted-files
-2. Server → SELECT files WHERE deleted_at < 30 days ago
-3. Server → Group by tenant_id, calculate total bytes/count
-4. Server → DELETE FROM r2_files
-5. Server → RPC update_tenant_storage_atomic (-bytes, -count) per tenant
-6. Server → DELETE from R2 storage
+2. Server → DELETE from R2 storage
+3. Server → DELETE FROM r2_files
+4. Server → RPC update_tenant_storage_atomic (-bytes, -1 file)
 ```
 
 ---
@@ -322,14 +291,30 @@ invalidateStorageCache()
 ### r2_files
 | Column | Type | Description |
 |--------|------|-------------|
-| ... | ... | (existing columns) |
-| deleted_at | TIMESTAMPTZ | Soft delete timestamp |
+| id | UUID | PK |
+| tenant_id | UUID | FK to tenants |
+| r2_key | TEXT | R2 object key |
+| original_name | TEXT | Original filename |
+| display_name | TEXT | Display name |
+| mime_type | TEXT | File MIME type |
+| file_size | BIGINT | File size in bytes |
+| folder_id | UUID | FK to r2_folders |
+| case_id | UUID | FK to cases (optional) |
+| created_at | TIMESTAMPTZ | |
+| updated_at | TIMESTAMPTZ | |
 
 ### r2_folders
 | Column | Type | Description |
 |--------|------|-------------|
-| ... | ... | (existing columns) |
-| deleted_at | TIMESTAMPTZ | Soft delete timestamp |
+| id | UUID | PK |
+| tenant_id | UUID | FK to tenants |
+| name | TEXT | Folder name |
+| path | TEXT | Full path |
+| parent_id | UUID | FK to self |
+| case_id | UUID | FK to cases (optional) |
+| depth | INT | Folder depth |
+| created_at | TIMESTAMPTZ | |
+| updated_at | TIMESTAMPTZ | |
 
 ---
 
@@ -337,9 +322,9 @@ invalidateStorageCache()
 
 | File | Description |
 |------|-------------|
+| `20260128800000_r2_storage_schema.sql` | Core schema for R2 storage |
 | `20260130_atomic_storage_usage.sql` | Atomic storage RPC function |
 | `20260130_update_folder_paths.sql` | Recursive path update RPC |
-| `20260130_soft_delete_schema.sql` | deleted_at columns + RLS |
 | `20260130_storage_alerts.sql` | Storage alerts table |
 | `20260130_auto_storage_init.sql` | Auto-init trigger |
 
@@ -352,29 +337,15 @@ invalidateStorageCache()
 - Configurable via `tenant_storage.quota_bytes`
 - Extra quota via `extra_quota_bytes`
 
-### Trash Retention
-- 30 days before permanent deletion
-- Configurable in `/api/cron/purge-deleted-files/route.ts`
-
-### Cron Schedule
-```
-# Vercel cron or external scheduler
-POST /api/cron/purge-deleted-files
-Authorization: Bearer ${CRON_SECRET}
-```
-
 ---
 
 ## Security
 
 ### RLS Policies
 - All tables use `tenant_id` for tenant isolation
-- `deleted_at IS NULL` filter for normal views
-- `deleted_at IS NOT NULL` filter for trash views
 
 ### API Authentication
 - All endpoints require authenticated session
-- Cron endpoint requires `CRON_SECRET` header
 
 ### File Access
 - R2 presigned URLs for secure direct upload/download

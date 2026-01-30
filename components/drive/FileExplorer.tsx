@@ -17,13 +17,15 @@ import {
   Video,
   Archive,
   X,
-  SortAsc,
-  SortDesc,
+  MoreVertical,
   RefreshCw,
 } from 'lucide-react'
 import type { R2File as R2FileType, R2Folder as R2FolderType } from '@/types/r2'
 import { useDriveFolder, useStorageUsage, invalidateDriveCache, invalidateStorageCache } from '@/hooks/useDrive'
 import FileUploader from '@/components/drive/FileUploader'
+import ContextMenu from '@/components/drive/ContextMenu'
+import RenameDialog from '@/components/drive/RenameDialog'
+import FilePreview from '@/components/drive/FilePreview'
 
 // Use canonical types with local extensions
 type R2File = R2FileType
@@ -58,6 +60,26 @@ export default function FileExplorer({
   const [showUploader, setShowUploader] = useState(false)
   const [showNewFolder, setShowNewFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+
+  // Context Menu
+  const [contextMenu, setContextMenu] = useState<{
+    x: number
+    y: number
+    type: 'file' | 'folder' | 'empty'
+    itemId?: string
+    itemName?: string
+  } | null>(null)
+
+  // Rename Dialog
+  const [renameDialog, setRenameDialog] = useState<{
+    isOpen: boolean
+    type: 'file' | 'folder'
+    id: string
+    name: string
+  } | null>(null)
+
+  // File Preview
+  const [previewFile, setPreviewFile] = useState<R2File | null>(null)
 
   // Real SWR hooks for drive data
   const {
@@ -158,17 +180,108 @@ export default function FileExplorer({
     }
   }
 
+  const handleContextMenu = (e: React.MouseEvent, item: R2File | R2Folder, type: 'file' | 'folder') => {
+    e.preventDefault()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      type,
+      itemId: item.id,
+      itemName: type === 'file' ? (item as R2File).display_name : (item as R2Folder).name
+    })
+  }
+
+  const handleEmptyContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setContextMenu({ x: e.clientX, y: e.clientY, type: 'empty' })
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      const isFile = files?.some(f => f.id === id)
+      const endpoint = isFile ? `/api/drive/files/${id}` : `/api/drive/folders/${id}`
+      const response = await fetch(endpoint, { method: 'DELETE' })
+      if (!response.ok) throw new Error('Failed to delete')
+      invalidateDriveCache(tenantId, currentFolderId, caseId)
+    } catch (error) {
+      console.error('Delete failed:', error)
+    }
+  }
+
+  const handleContextAction = async (action: string, itemId?: string) => {
+    setContextMenu(null)
+
+    switch (action) {
+      case 'preview':
+        const file = files?.find(f => f.id === itemId)
+        if (file) setPreviewFile(file)
+        break
+      case 'download':
+        if (itemId) window.open(`/api/drive/files/${itemId}/download`, '_blank')
+        break
+      case 'rename':
+        const item = files?.find(f => f.id === itemId) || folders?.find(f => f.id === itemId)
+        if (item) {
+          const isFile = 'display_name' in item
+          setRenameDialog({
+            isOpen: true,
+            type: isFile ? 'file' : 'folder',
+            id: item.id,
+            name: isFile ? item.display_name : item.name
+          })
+        }
+        break
+      case 'delete':
+        if (confirm('정말 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) {
+          await handleDelete(itemId!)
+        }
+        break
+      case 'newFolder':
+        setShowNewFolder(true)
+        break
+      case 'upload':
+        setShowUploader(true)
+        break
+      case 'open':
+        if (itemId) handleFolderClick(itemId)
+        break
+    }
+  }
+
+  const handleRename = async (newName: string) => {
+    if (!renameDialog) return
+    try {
+      const endpoint = renameDialog.type === 'file'
+        ? `/api/drive/files/${renameDialog.id}`
+        : `/api/drive/folders/${renameDialog.id}`
+      const body = renameDialog.type === 'file'
+        ? { display_name: newName }
+        : { name: newName }
+
+      const response = await fetch(endpoint, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!response.ok) throw new Error('Failed to rename')
+      setRenameDialog(null)
+      invalidateDriveCache(tenantId, currentFolderId, caseId)
+    } catch (error) {
+      console.error('Rename failed:', error)
+    }
+  }
+
   const isLoading = driveLoading
 
   return (
-    <div className={`flex h-full ${embedded ? '' : 'page-container'}`}>
+    <div className="flex h-full bg-white">
       {/* Left Sidebar - Folder Tree */}
       {!embedded && (
-        <div className="w-64 border-r border-[var(--border-default)] bg-[var(--bg-secondary)] flex flex-col">
-          <div className="p-4 border-b border-[var(--border-default)]">
-            <h2 className="text-body font-semibold text-[var(--text-primary)]">폴더</h2>
+        <div className="w-[280px] border-r border-gray-200 bg-gray-50 flex flex-col">
+          <div className="px-6 py-5 border-b border-gray-200">
+            <h2 className="text-sm font-normal text-gray-900">내 드라이브</h2>
           </div>
-          <div className="flex-1 overflow-y-auto p-2">
+          <div className="flex-1 overflow-y-auto px-3 py-4">
             <FolderTree
               folders={folders || []}
               currentFolderId={currentFolderId}
@@ -179,24 +292,24 @@ export default function FileExplorer({
       )}
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col bg-[var(--bg-primary)]">
-        {/* Toolbar */}
-        <div className="bg-[var(--bg-secondary)] border-b border-[var(--border-default)] p-4 space-y-4">
+      <div className="flex-1 flex flex-col bg-white">
+        {/* Header */}
+        <div className="border-b border-gray-200 bg-white">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-caption">
+          <div className="px-6 py-4 flex items-center gap-2 text-sm">
             <button
               onClick={() => setCurrentFolderId(null)}
-              className="flex items-center gap-1 text-[var(--text-secondary)] hover:text-[var(--sage-primary)] transition-colors"
+              className="flex items-center gap-1.5 text-gray-700 hover:text-gray-900 transition-colors"
             >
-              <Home className="w-4 h-4" />
+              <Home className="w-4 h-4" strokeWidth={1.5} />
               <span>홈</span>
             </button>
             {breadcrumbs?.map((crumb: R2Folder) => (
               <div key={crumb.id} className="flex items-center gap-2">
-                <ChevronRight className="w-3 h-3 text-[var(--text-muted)]" />
+                <ChevronRight className="w-4 h-4 text-gray-400" strokeWidth={1.5} />
                 <button
                   onClick={() => setCurrentFolderId(crumb.id)}
-                  className="text-[var(--text-secondary)] hover:text-[var(--sage-primary)] transition-colors"
+                  className="text-gray-700 hover:text-gray-900 transition-colors"
                 >
                   {crumb.name}
                 </button>
@@ -204,144 +317,96 @@ export default function FileExplorer({
             ))}
           </div>
 
-          {/* Actions Bar */}
-          <div className="flex items-center gap-3">
+          {/* Toolbar */}
+          <div className="px-6 py-3 flex items-center gap-4 border-t border-gray-200">
             {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+            <div className="relative flex-1 max-w-xl">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" strokeWidth={1.5} />
               <input
                 type="text"
-                placeholder="파일 검색..."
+                placeholder="드라이브 검색"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="form-input pl-9 w-full"
+                className="w-full pl-10 pr-10 py-2.5 text-sm bg-gray-50 border-0 rounded-full focus:bg-white focus:ring-1 focus:ring-blue-500 transition-all"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-4 h-4" strokeWidth={1.5} />
                 </button>
               )}
             </div>
 
-            {/* Sort */}
-            <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1">
-              <button
-                onClick={() => toggleSort('name')}
-                className={`px-3 py-1.5 rounded text-caption transition-colors ${
-                  sortBy === 'name'
-                    ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                이름
-              </button>
-              <button
-                onClick={() => toggleSort('date')}
-                className={`px-3 py-1.5 rounded text-caption transition-colors ${
-                  sortBy === 'date'
-                    ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                날짜
-              </button>
-              <button
-                onClick={() => toggleSort('size')}
-                className={`px-3 py-1.5 rounded text-caption transition-colors ${
-                  sortBy === 'size'
-                    ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                크기
-              </button>
-              <button
-                onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-                className="p-1.5 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]"
-              >
-                {sortOrder === 'asc' ? (
-                  <SortAsc className="w-4 h-4" />
-                ) : (
-                  <SortDesc className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-
             {/* View Toggle */}
-            <div className="flex items-center gap-1 bg-[var(--bg-tertiary)] rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded transition-colors ${
-                  viewMode === 'grid'
-                    ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-                }`}
-              >
-                <LayoutGrid className="w-4 h-4" />
-              </button>
+            <div className="flex items-center gap-1">
               <button
                 onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded transition-colors ${
+                className={`p-2 rounded-lg transition-colors ${
                   viewMode === 'list'
-                    ? 'bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm'
-                    : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-500 hover:bg-gray-100'
                 }`}
+                title="목록 보기"
               >
-                <LayoutList className="w-4 h-4" />
+                <LayoutList className="w-5 h-5" strokeWidth={1.5} />
+              </button>
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-lg transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-500 hover:bg-gray-100'
+                }`}
+                title="격자 보기"
+              >
+                <LayoutGrid className="w-5 h-5" strokeWidth={1.5} />
               </button>
             </div>
 
             {/* Actions */}
             <button
               onClick={() => refreshDrive()}
-              className="p-2 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
               title="새로고침"
             >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-
-            <button
-              onClick={() => setShowNewFolder(true)}
-              className="btn btn-ghost btn-sm"
-            >
-              <Folder className="w-4 h-4" />
-              새 폴더
+              <RefreshCw className="w-5 h-5" strokeWidth={1.5} />
             </button>
 
             <button
               onClick={() => setShowUploader(true)}
-              className="btn btn-primary btn-sm"
+              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
             >
-              <Upload className="w-4 h-4" />
+              <Upload className="w-4 h-4" strokeWidth={1.5} />
               업로드
             </button>
           </div>
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto" onContextMenu={handleEmptyContextMenu}>
           {isLoading ? (
             <div className="flex items-center justify-center h-64">
-              <RefreshCw className="w-6 h-6 animate-spin text-[var(--sage-primary)]" />
+              <RefreshCw className="w-6 h-6 animate-spin text-blue-600" strokeWidth={1.5} />
             </div>
           ) : (
-            <>
+            <div className="px-6 py-6">
               {/* Folders Section */}
               {folders && folders.length > 0 && (
                 <div className="mb-8">
-                  <h3 className="text-caption font-semibold text-[var(--text-secondary)] mb-3 uppercase tracking-wide">
+                  <h3 className="text-xs font-medium text-gray-500 mb-4 px-2">
                     폴더
                   </h3>
-                  <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4' : 'space-y-2'}>
+                  <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3' : 'space-y-1'}>
                     {folders.map((folder: R2Folder) => (
                       <FolderItem
                         key={folder.id}
                         folder={folder}
                         viewMode={viewMode}
                         onClick={() => handleFolderClick(folder.id)}
+                        onContextMenu={(e) => handleContextMenu(e, folder, 'folder')}
+                        onDoubleClick={() => handleFolderClick(folder.id)}
                       />
                     ))}
                   </div>
@@ -351,10 +416,10 @@ export default function FileExplorer({
               {/* Files Section */}
               {processedFiles.length > 0 ? (
                 <div>
-                  <h3 className="text-caption font-semibold text-[var(--text-secondary)] mb-3 uppercase tracking-wide">
+                  <h3 className="text-xs font-medium text-gray-500 mb-4 px-2">
                     파일 {searchQuery && `(${processedFiles.length})`}
                   </h3>
-                  <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4' : 'space-y-2'}>
+                  <div className={viewMode === 'grid' ? 'grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3' : 'space-y-1'}>
                     {processedFiles.map((file) => (
                       <FileItem
                         key={file.id}
@@ -362,6 +427,8 @@ export default function FileExplorer({
                         viewMode={viewMode}
                         selected={selectedFiles.includes(file.id)}
                         onClick={() => handleFileClick(file)}
+                        onContextMenu={(e) => handleContextMenu(e, file, 'file')}
+                        onDoubleClick={() => setPreviewFile(file)}
                       />
                     ))}
                   </div>
@@ -373,23 +440,23 @@ export default function FileExplorer({
                   onUpload={() => setShowUploader(true)}
                 />
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
 
       {/* New Folder Modal */}
       {showNewFolder && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-[var(--bg-secondary)] rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-body font-semibold mb-4">새 폴더 만들기</h3>
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h3 className="text-base font-normal text-gray-900 mb-4">새 폴더 만들기</h3>
             <input
               type="text"
               placeholder="폴더 이름"
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
-              className="form-input w-full mb-4"
+              className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent mb-6"
               autoFocus
             />
             <div className="flex gap-2 justify-end">
@@ -398,14 +465,14 @@ export default function FileExplorer({
                   setShowNewFolder(false)
                   setNewFolderName('')
                 }}
-                className="btn btn-ghost"
+                className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               >
                 취소
               </button>
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="btn btn-primary"
+                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 만들기
               </button>
@@ -416,15 +483,15 @@ export default function FileExplorer({
 
       {/* Upload Modal */}
       {showUploader && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-[var(--bg-secondary)] rounded-lg shadow-xl w-full max-w-2xl p-6">
+        <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-body font-semibold">파일 업로드</h3>
+              <h3 className="text-base font-normal text-gray-900">파일 업로드</h3>
               <button
                 onClick={() => setShowUploader(false)}
-                className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5" strokeWidth={1.5} />
               </button>
             </div>
             <FileUploader
@@ -447,6 +514,39 @@ export default function FileExplorer({
           </div>
         </div>
       )}
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          type={contextMenu.type}
+          itemId={contextMenu.itemId}
+          itemName={contextMenu.itemName}
+          onClose={() => setContextMenu(null)}
+          onAction={handleContextAction}
+        />
+      )}
+
+      {/* Rename Dialog */}
+      {renameDialog && (
+        <RenameDialog
+          isOpen={renameDialog.isOpen}
+          type={renameDialog.type}
+          currentName={renameDialog.name}
+          onClose={() => setRenameDialog(null)}
+          onRename={handleRename}
+        />
+      )}
+
+      {/* File Preview */}
+      {previewFile && (
+        <FilePreview
+          file={previewFile}
+          isOpen={!!previewFile}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
     </div>
   )
 }
@@ -462,21 +562,21 @@ function FolderTree({
   onFolderClick: (id: string) => void
 }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-0.5">
       {folders.map((folder) => (
         <button
           key={folder.id}
           onClick={() => onFolderClick(folder.id)}
-          className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-caption transition-colors ${
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
             currentFolderId === folder.id
-              ? 'bg-[var(--sage-muted)] text-[var(--sage-primary)] font-medium'
-              : 'text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)] hover:text-[var(--text-primary)]'
+              ? 'bg-blue-50 text-blue-600'
+              : 'text-gray-700 hover:bg-gray-100'
           }`}
         >
-          <Folder className="w-4 h-4 flex-shrink-0" />
-          <span className="truncate flex-1 text-left">{folder.name}</span>
+          <Folder className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
+          <span className="truncate flex-1 text-left font-normal">{folder.name}</span>
           {folder._count && (
-            <span className="text-xs text-[var(--text-muted)]">
+            <span className="text-xs text-gray-400">
               {folder._count.files + folder._count.subfolders}
             </span>
           )}
@@ -491,26 +591,39 @@ function FolderItem({
   folder,
   viewMode,
   onClick,
+  onContextMenu,
+  onDoubleClick,
 }: {
   folder: R2Folder
   viewMode: ViewMode
   onClick: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
+  onDoubleClick?: () => void
 }) {
   if (viewMode === 'grid') {
     return (
       <button
         onClick={onClick}
-        className="flex flex-col items-center gap-2 p-4 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] hover:border-[var(--sage-primary)] hover:shadow-md transition-all group"
+        onContextMenu={onContextMenu}
+        onDoubleClick={onDoubleClick}
+        className="group flex flex-col items-start gap-3 p-4 rounded-xl border border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm transition-all"
       >
-        <Folder className="w-12 h-12 text-[var(--sage-primary)] group-hover:scale-110 transition-transform" />
-        <span className="text-caption text-[var(--text-primary)] text-center truncate w-full">
-          {folder.name}
-        </span>
-        {folder._count && (
-          <span className="text-xs text-[var(--text-muted)]">
-            {folder._count.files + folder._count.subfolders} 항목
-          </span>
-        )}
+        <div className="w-full flex items-center justify-between">
+          <Folder className="w-6 h-6 text-gray-400" strokeWidth={1.5} />
+          <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-opacity">
+            <MoreVertical className="w-4 h-4 text-gray-500" strokeWidth={1.5} />
+          </button>
+        </div>
+        <div className="w-full">
+          <p className="text-sm text-gray-900 font-normal text-left truncate">
+            {folder.name}
+          </p>
+          {folder._count && (
+            <p className="text-xs text-gray-500 mt-1">
+              {folder._count.files + folder._count.subfolders} 항목
+            </p>
+          )}
+        </div>
       </button>
     )
   }
@@ -518,15 +631,20 @@ function FolderItem({
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-3 p-3 rounded-lg border border-[var(--border-default)] bg-[var(--bg-secondary)] hover:border-[var(--sage-primary)] transition-all"
+      onContextMenu={onContextMenu}
+      onDoubleClick={onDoubleClick}
+      className="group flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors w-full"
     >
-      <Folder className="w-5 h-5 text-[var(--sage-primary)] flex-shrink-0" />
-      <span className="text-body flex-1 text-left truncate">{folder.name}</span>
+      <Folder className="w-5 h-5 text-gray-400 flex-shrink-0" strokeWidth={1.5} />
+      <span className="text-sm text-gray-900 flex-1 text-left truncate font-normal">{folder.name}</span>
       {folder._count && (
-        <span className="text-caption text-[var(--text-muted)]">
+        <span className="text-xs text-gray-500">
           {folder._count.files + folder._count.subfolders} 항목
         </span>
       )}
+      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-opacity">
+        <MoreVertical className="w-4 h-4 text-gray-500" strokeWidth={1.5} />
+      </button>
     </button>
   )
 }
@@ -537,11 +655,15 @@ function FileItem({
   viewMode,
   selected,
   onClick,
+  onContextMenu,
+  onDoubleClick,
 }: {
   file: R2File
   viewMode: ViewMode
   selected: boolean
   onClick: () => void
+  onContextMenu?: (e: React.MouseEvent) => void
+  onDoubleClick?: () => void
 }) {
   const icon = getFileIcon(file.mime_type || '')
 
@@ -549,19 +671,28 @@ function FileItem({
     return (
       <button
         onClick={onClick}
-        className={`flex flex-col items-center gap-2 p-4 rounded-lg border transition-all group ${
+        onContextMenu={onContextMenu}
+        onDoubleClick={onDoubleClick}
+        className={`group flex flex-col items-start gap-3 p-4 rounded-xl border transition-all ${
           selected
-            ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)]'
-            : 'border-[var(--border-default)] bg-[var(--bg-secondary)] hover:border-[var(--sage-primary)] hover:shadow-md'
+            ? 'border-blue-500 bg-blue-50'
+            : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
         }`}
       >
-        {icon}
-        <span className="text-caption text-[var(--text-primary)] text-center truncate w-full">
-          {file.display_name}
-        </span>
-        <span className="text-xs text-[var(--text-muted)]">
-          {formatFileSize(file.file_size || 0)}
-        </span>
+        <div className="w-full flex items-center justify-between">
+          {icon}
+          <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-opacity">
+            <MoreVertical className="w-4 h-4 text-gray-500" strokeWidth={1.5} />
+          </button>
+        </div>
+        <div className="w-full">
+          <p className="text-sm text-gray-900 font-normal text-left truncate">
+            {file.display_name}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            {formatFileSize(file.file_size || 0)}
+          </p>
+        </div>
       </button>
     )
   }
@@ -569,20 +700,25 @@ function FileItem({
   return (
     <button
       onClick={onClick}
-      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+      onContextMenu={onContextMenu}
+      onDoubleClick={onDoubleClick}
+      className={`group flex items-center gap-4 px-4 py-3 rounded-lg transition-colors w-full ${
         selected
-          ? 'border-[var(--sage-primary)] bg-[var(--sage-muted)]'
-          : 'border-[var(--border-default)] bg-[var(--bg-secondary)] hover:border-[var(--sage-primary)]'
+          ? 'bg-blue-50'
+          : 'hover:bg-gray-50'
       }`}
     >
       {icon}
-      <span className="text-body flex-1 text-left truncate">{file.display_name}</span>
-      <span className="text-caption text-[var(--text-muted)]">
+      <span className="text-sm text-gray-900 flex-1 text-left truncate font-normal">{file.display_name}</span>
+      <span className="text-xs text-gray-500 w-20 text-right">
         {formatFileSize(file.file_size || 0)}
       </span>
-      <span className="text-caption text-[var(--text-muted)]">
+      <span className="text-xs text-gray-500 w-24 text-right">
         {formatDate(file.updated_at)}
       </span>
+      <button className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-100 rounded transition-opacity">
+        <MoreVertical className="w-4 h-4 text-gray-500" strokeWidth={1.5} />
+      </button>
     </button>
   )
 }
@@ -599,15 +735,18 @@ function EmptyState({
 }) {
   if (hasSearch) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <Search className="w-12 h-12 text-[var(--text-muted)] mb-4" />
-        <h3 className="text-body font-semibold text-[var(--text-primary)] mb-2">
+      <div className="flex flex-col items-center justify-center h-96 text-center">
+        <Search className="w-16 h-16 text-gray-300 mb-6" strokeWidth={1} />
+        <h3 className="text-base font-normal text-gray-900 mb-2">
           검색 결과 없음
         </h3>
-        <p className="text-caption text-[var(--text-secondary)] mb-4">
+        <p className="text-sm text-gray-500 mb-6">
           검색어를 변경하거나 필터를 조정해보세요
         </p>
-        <button onClick={onClearSearch} className="btn btn-ghost btn-sm">
+        <button
+          onClick={onClearSearch}
+          className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+        >
           검색 초기화
         </button>
       </div>
@@ -615,16 +754,19 @@ function EmptyState({
   }
 
   return (
-    <div className="flex flex-col items-center justify-center h-64 text-center">
-      <Folder className="w-12 h-12 text-[var(--text-muted)] mb-4" />
-      <h3 className="text-body font-semibold text-[var(--text-primary)] mb-2">
+    <div className="flex flex-col items-center justify-center h-96 text-center">
+      <Folder className="w-16 h-16 text-gray-300 mb-6" strokeWidth={1} />
+      <h3 className="text-base font-normal text-gray-900 mb-2">
         파일이 없습니다
       </h3>
-      <p className="text-caption text-[var(--text-secondary)] mb-4">
+      <p className="text-sm text-gray-500 mb-6">
         파일을 업로드하여 시작하세요
       </p>
-      <button onClick={onUpload} className="btn btn-primary btn-sm">
-        <Upload className="w-4 h-4" />
+      <button
+        onClick={onUpload}
+        className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+      >
+        <Upload className="w-4 h-4" strokeWidth={1.5} />
         파일 업로드
       </button>
     </div>
@@ -633,28 +775,29 @@ function EmptyState({
 
 // Utility Functions
 function getFileIcon(contentType: string) {
-  const iconClass = "w-12 h-12 group-hover:scale-110 transition-transform"
+  const iconClass = "w-6 h-6"
+  const strokeWidth = 1.5
 
   if (contentType.startsWith('image/')) {
-    return <ImageIcon className={`${iconClass} text-purple-500`} />
+    return <ImageIcon className={`${iconClass} text-purple-400`} strokeWidth={strokeWidth} />
   }
   if (contentType.startsWith('video/')) {
-    return <Video className={`${iconClass} text-red-500`} />
+    return <Video className={`${iconClass} text-red-400`} strokeWidth={strokeWidth} />
   }
   if (contentType.startsWith('audio/')) {
-    return <Music className={`${iconClass} text-pink-500`} />
+    return <Music className={`${iconClass} text-pink-400`} strokeWidth={strokeWidth} />
   }
   if (contentType.includes('pdf')) {
-    return <FileText className={`${iconClass} text-red-600`} />
+    return <FileText className={`${iconClass} text-red-500`} strokeWidth={strokeWidth} />
   }
   if (contentType.includes('sheet') || contentType.includes('excel')) {
-    return <FileSpreadsheet className={`${iconClass} text-green-600`} />
+    return <FileSpreadsheet className={`${iconClass} text-green-500`} strokeWidth={strokeWidth} />
   }
   if (contentType.includes('zip') || contentType.includes('compressed')) {
-    return <Archive className={`${iconClass} text-amber-600`} />
+    return <Archive className={`${iconClass} text-amber-500`} strokeWidth={strokeWidth} />
   }
 
-  return <File className={`${iconClass} text-[var(--text-muted)]`} />
+  return <File className={`${iconClass} text-gray-400`} strokeWidth={strokeWidth} />
 }
 
 function formatFileSize(bytes: number): string {

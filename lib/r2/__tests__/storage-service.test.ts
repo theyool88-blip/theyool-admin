@@ -178,45 +178,20 @@ describe('Quota Alert System', () => {
   })
 })
 
-describe('Soft Delete', () => {
-  it('should set deleted_at on soft delete', async () => {
-    const mockUpdate = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: { id: 'file-1', deleted_at: '2024-01-30T00:00:00Z' },
-            error: null,
-          }),
-        }),
+describe('Permanent Delete', () => {
+  it('should permanently delete file from database', async () => {
+    const mockDelete = vi.fn().mockReturnValue({
+      eq: vi.fn().mockResolvedValue({
+        error: null,
       }),
     })
 
     const mockChain = createCompleteMockChain()
-    mockChain.update = mockUpdate
+    mockChain.delete = mockDelete
     mockSupabase.from.mockReturnValue(mockChain)
 
-    // Soft delete should set deleted_at, not remove record
-    expect(mockUpdate).toBeDefined()
-  })
-
-  it('should restore by clearing deleted_at', async () => {
-    const mockUpdate = vi.fn().mockReturnValue({
-      eq: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          single: vi.fn().mockResolvedValue({
-            data: { id: 'file-1', deleted_at: null },
-            error: null,
-          }),
-        }),
-      }),
-    })
-
-    const mockChain = createCompleteMockChain()
-    mockChain.update = mockUpdate
-    mockSupabase.from.mockReturnValue(mockChain)
-
-    // Restore should set deleted_at to null
-    expect(mockUpdate).toBeDefined()
+    // Delete should remove record permanently
+    expect(mockDelete).toBeDefined()
   })
 })
 

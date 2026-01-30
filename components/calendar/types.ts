@@ -49,10 +49,12 @@ export interface ApiEvent {
   status?: string | null
   result?: string | null  // 기일 결과 (continued, settled, judgment, adjourned 등)
   scourt_result_raw?: string | null  // SCOURT 원본 결과 텍스트 ("쌍방조사", "기일변경" 등)
+  scourt_hearing_hash?: string | null
   attending_lawyer_id?: string | null
   attending_lawyer_name?: string | null
   video_participant_side?: string | null
   our_client_name?: string | null  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
+  opponent_name?: string | null  // 상대방명 (unified_calendar 뷰의 컬럼명)
   sort_priority?: number | null
 }
 
@@ -78,10 +80,12 @@ export interface BigCalendarEvent {
   status?: string
   result?: string  // 기일 결과 (continued, settled, judgment, adjourned 등)
   scourtResultRaw?: string  // SCOURT 원본 결과 텍스트
+  scourtHearingHash?: string
   attendingLawyerId?: string
   attendingLawyerName?: string
   videoParticipantSide?: string
   ourClientName?: string  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
+  opponentName?: string  // 상대방명 (unified_calendar 뷰의 컬럼명)
   sortPriority?: number
   daysUntil?: number
 }
@@ -107,10 +111,12 @@ export interface ScheduleXEvent {
   status?: string
   result?: string  // 기일 결과 (continued, settled, judgment, adjourned 등)
   scourtResultRaw?: string  // SCOURT 원본 결과 텍스트
+  scourtHearingHash?: string
   attendingLawyerId?: string
   attendingLawyerName?: string
   videoParticipantSide?: string
   ourClientName?: string  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
+  opponentName?: string  // 상대방명 (unified_calendar 뷰의 컬럼명)
   daysUntil?: number
 }
 
@@ -132,6 +138,7 @@ export interface UnifiedSchedule {
   status?: string
   result?: string  // 기일 결과 (continued, settled, judgment, adjourned 등)
   scourt_result_raw?: string  // SCOURT 원본 결과 텍스트
+  scourt_hearing_hash?: string
   daysUntil?: number
   hearing_type?: string
   event_subtype?: string
@@ -139,6 +146,7 @@ export interface UnifiedSchedule {
   attending_lawyer_name?: string
   video_participant_side?: string
   our_client_name?: string  // 의뢰인명 (unified_calendar 뷰의 컬럼명)
+  opponent_name?: string  // 상대방명 (unified_calendar 뷰의 컬럼명)
 }
 
 // ========================================

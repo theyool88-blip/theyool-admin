@@ -54,10 +54,12 @@ export function convertToBigCalendarEvent(event: ApiEvent): BigCalendarEvent {
     status: event.status || undefined,
     result: event.result || undefined,  // 기일 결과 (continued, settled, judgment, adjourned 등)
     scourtResultRaw: event.scourt_result_raw || undefined,
+    scourtHearingHash: event.scourt_hearing_hash || undefined,
     attendingLawyerId: event.attending_lawyer_id || undefined,
     attendingLawyerName: event.attending_lawyer_name || undefined,
     videoParticipantSide: event.video_participant_side || undefined,
     ourClientName: event.our_client_name || undefined,
+    opponentName: event.opponent_name || undefined,
     sortPriority: event.sort_priority || undefined,
     daysUntil,
   }
@@ -89,6 +91,7 @@ export function convertToUnifiedSchedule(event: BigCalendarEvent): UnifiedSchedu
     status: event.status,
     result: event.result,  // 기일 결과 (continued, settled, judgment, adjourned 등)
     scourt_result_raw: event.scourtResultRaw,
+    scourt_hearing_hash: event.scourtHearingHash,
     daysUntil: event.daysUntil,
     hearing_type: event.eventSubtype,
     event_subtype: event.eventSubtype,
@@ -96,6 +99,7 @@ export function convertToUnifiedSchedule(event: BigCalendarEvent): UnifiedSchedu
     attending_lawyer_name: event.attendingLawyerName,
     video_participant_side: event.videoParticipantSide,
     our_client_name: event.ourClientName,
+    opponent_name: event.opponentName,
   }
 }
 

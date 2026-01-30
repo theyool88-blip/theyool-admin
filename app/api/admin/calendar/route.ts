@@ -18,10 +18,12 @@ const CALENDAR_COLUMNS = [
   'status',
   'result',  // 기일 결과 (continued, settled, judgment, adjourned 등)
   'scourt_result_raw',  // SCOURT 원본 결과 텍스트 ("쌍방조사", "기일변경" 등)
+  'scourt_hearing_hash',
   'attending_lawyer_id',
   'attending_lawyer_name',
   'video_participant_side',
   'our_client_name',
+  'opponent_name',  // 상대방명
   'sort_priority',
 ].join(', ')
 

@@ -11,6 +11,7 @@ import {
   shortenCourtLocation,
   isEventPostponed,
 } from '../utils/eventTransformers'
+import { PartyVsDisplay } from '@/components/ui/PartyVsDisplay'
 
 interface EventPopupProps {
   event: BigCalendarEvent | null
@@ -131,6 +132,7 @@ function EventPopupComponent({
     attendingLawyerName,
     videoParticipantSide,
     ourClientName,
+    opponentName,
     daysUntil,
     result,
     scourtResultRaw,
@@ -194,10 +196,20 @@ function EventPopupComponent({
                 </span>
               )}
             </div>
-            {/* 부제목: 의뢰인명 또는 사건명 */}
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5 truncate">
-              {ourClientName || caseName || title}
-            </p>
+            {/* 부제목: 의뢰인 v 상대방 또는 사건명 */}
+            {ourClientName ? (
+              <PartyVsDisplay
+                clientName={ourClientName}
+                opponentName={opponentName}
+                size="base"
+                className="mt-0.5 block font-medium"
+                mutedOpponent={true}
+              />
+            ) : (
+              <p className="text-base text-[var(--text-primary)] mt-0.5 truncate font-medium">
+                {caseName || title}
+              </p>
+            )}
           </div>
           <button
             onClick={onClose}

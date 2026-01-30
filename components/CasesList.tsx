@@ -17,12 +17,16 @@ import {
   Download,
 } from 'lucide-react'
 import { exportCasesToExcel } from '@/lib/excel-export'
+import { HEARING_TYPE_LABELS, HearingType } from '@/types/court-hearing'
+import { normalizeCaseLevel } from '@/lib/constants/case-types'
+import { NO_LAWYER_ATTENDANCE_TYPES } from '@/components/calendar/types'
 import UnifiedScheduleModal from './UnifiedScheduleModal'
 import CasePaymentsModal from './CasePaymentsModal'
 import DataTable, { Pagination, TableToolbar, Column } from './ui/DataTable'
 import { CaseStatusBadge } from './ui/StatusBadge'
 import { EmptySearchResults, EmptyCases } from './ui/EmptyState'
 import { getCourtAbbrev } from '@/lib/scourt/court-codes'
+import { PartyVsDisplay } from '@/components/ui/PartyVsDisplay'
 
 interface Client {
   id: string
@@ -55,6 +59,7 @@ export interface LegalCase {
   court_case_number: string | null
   court_name: string | null
   case_level: string | null
+  case_result: string | null
   main_case_id: string | null
   onedrive_folder_url: string | null
   client?: Client
@@ -70,6 +75,7 @@ export interface LegalCase {
   }
   next_hearing?: {
     date: string
+    time: string
     type: string
   } | null
   _isSubCase?: boolean
@@ -371,16 +377,32 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     {
       key: 'next_hearing',
       header: '다음기일',
-      width: '130px',
+      width: '150px',
       render: (item) => {
+        // 종결된 사건은 결과 표시
+        if (item.status === '종결' && item.case_result) {
+          return (
+            <div className="text-body text-sm">
+              <span className="text-[var(--text-muted)]">종결:</span>
+              <span className="text-[var(--text-secondary)] ml-1">{item.case_result}</span>
+            </div>
+          )
+        }
         if (!item.next_hearing) return <span className="text-[var(--text-muted)]">-</span>
         const date = new Date(item.next_hearing.date)
         const month = String(date.getMonth() + 1).padStart(2, '0')
         const day = String(date.getDate()).padStart(2, '0')
+        const time = item.next_hearing.time !== '00:00' ? item.next_hearing.time : null
+        const hearingTypeLabel = HEARING_TYPE_LABELS[item.next_hearing.type as HearingType] || item.next_hearing.type
+        const isNoAttendance = NO_LAWYER_ATTENDANCE_TYPES.includes(item.next_hearing.type)
         return (
           <div className="text-body text-sm">
-            <span>{month}/{day}</span>
-            <span className="text-[var(--text-muted)] ml-1">({item.next_hearing.type})</span>
+            <span className={isNoAttendance ? 'text-[var(--text-muted)]' : 'text-[var(--sage-primary)]'}>
+              {hearingTypeLabel}
+            </span>
+            <span className="text-[var(--text-secondary)] ml-1">
+              {month}/{day}{time ? ` ${time}` : ''}
+            </span>
           </div>
         )
       },
@@ -388,7 +410,6 @@ export default function CasesList({ initialCases }: { initialCases: LegalCase[] 
     {
       key: 'assignee',
       header: '담당변호사',
-      width: '140px',
       align: 'center',
       render: (item) => <AssigneeCell assignees={item.assignees} assignedMember={item.assigned_member} />,
     },
@@ -692,17 +713,20 @@ function AssigneeCell({ assignees, assignedMember }: AssigneeCellProps) {
   const LAWYER_ROLES = ['lawyer', 'owner', 'admin']
   const lawyers = assignees?.filter(a => LAWYER_ROLES.includes(a.role)) || []
   const primary = lawyers.find(a => a.isPrimary)
-  const others = lawyers.filter(a => !a.isPrimary)
 
-  if (lawyers.length > 0) {
-    // 모든 변호사 이름을 콤마로 연결 (주담당 우선)
-    const allNames = primary
-      ? [primary.displayName, ...others.map(a => a.displayName)]
-      : others.map(a => a.displayName)
-
+  // 주 담당변호사만 표시 (없으면 첫 번째 변호사)
+  if (primary) {
     return (
       <span className="text-body text-sm">
-        {allNames.join(', ')}
+        {primary.displayName}
+      </span>
+    )
+  }
+
+  if (lawyers.length > 0) {
+    return (
+      <span className="text-body text-sm">
+        {lawyers[0].displayName}
       </span>
     )
   }
@@ -746,12 +770,12 @@ function CaseCard({ legalCase, formatDate, onClick, onPayment, onSchedule }: Cas
             <h3 className="text-body font-semibold truncate">{legalCase.case_name}</h3>
           </div>
           {/* 당사자 표시 */}
-          <p className="text-caption mt-0.5">
-            {legalCase.parties?.ourClient || legalCase.client?.name || '-'}
-            {legalCase.parties?.opponent && (
-              <span className="text-[var(--text-muted)]"> v {legalCase.parties.opponent}</span>
-            )}
-          </p>
+          <PartyVsDisplay
+            clientName={legalCase.parties?.ourClient || legalCase.client?.name}
+            opponentName={legalCase.parties?.opponent}
+            size="sm"
+            className="mt-0.5 block"
+          />
         </div>
         <CaseStatusBadge status={legalCase.status} />
       </div>
@@ -815,17 +839,9 @@ function CaseCard({ legalCase, formatDate, onClick, onPayment, onSchedule }: Cas
 
 // Helper functions for new columns
 function CaseLevelBadge({ level }: { level: string }) {
-  const colorMap: Record<string, string> = {
-    '1심': 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]',
-    '2심(항소심)': 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
-    '3심(상고심)': 'bg-[var(--color-error)]/10 text-[var(--color-error)]',
-  }
-  const shortLabel = level
-    .replace('2심(항소심)', '항소심')
-    .replace('3심(상고심)', '상고심')
   return (
-    <span className={`px-1.5 py-0.5 text-xs rounded ${colorMap[level] || ''}`}>
-      {shortLabel}
+    <span className="px-1.5 py-0.5 text-xs rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)]">
+      {normalizeCaseLevel(level)}
     </span>
   )
 }
@@ -838,14 +854,11 @@ function PartiesCell({ parties, clientName }: {
   if (!ourClient) return <span className="text-[var(--text-muted)]">-</span>
 
   return (
-    <div className="text-body text-sm truncate">
-      <span className="font-medium">{ourClient}</span>
-      {parties?.opponent && (
-        <>
-          <span className="text-[var(--text-muted)] mx-1">v</span>
-          <span>{parties.opponent}</span>
-        </>
-      )}
-    </div>
+    <PartyVsDisplay
+      clientName={ourClient}
+      opponentName={parties?.opponent}
+      size="sm"
+      truncate={true}
+    />
   )
 }

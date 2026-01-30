@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { HEARING_TYPE_LABELS, DEADLINE_TYPE_LABELS, type HearingType, type DeadlineType } from '@/types/court-hearing';
+import { PartyVsDisplay } from '@/components/ui/PartyVsDisplay';
 
 interface UpcomingEvent {
   id: string;
@@ -267,9 +268,11 @@ export default function UpcomingEventsWidget({ limit = 7 }: Props) {
                       {event.title}
                     </span>
                     {event.type === 'hearing' && (event.clientName || event.opponentName) && (
-                      <span className="text-sm text-[var(--text-primary)] truncate">
-                        {event.clientName || '의뢰인'} v {event.opponentName || '상대방'}
-                      </span>
+                      <PartyVsDisplay
+                        clientName={event.clientName}
+                        opponentName={event.opponentName}
+                        size="sm"
+                      />
                     )}
                     {event.type === 'deadline' && (
                       <span className="text-sm text-[var(--text-primary)] truncate">

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { COURTS, getCourtAbbrev } from '@/lib/scourt/court-codes'
 import { getCaseTypeAuto, isCriminalCase } from '@/lib/constants/case-types'
 import { AssigneeMultiSelect } from './ui/AssigneeMultiSelect'
+import { generateCaseTitle } from '@/lib/utils/party-display'
 
 interface Client {
   id: string
@@ -168,19 +169,14 @@ function formatPhoneNumber(value: string): string {
   }
 }
 
-// 사건명 자동 생성 (입력된 필드 기반)
-// - 상대방 있으면: 의뢰인v상대방(사건명)
-// - 상대방 없으면: 의뢰인(사건명)
-// - 사건명 우선, 없으면 사건번호 사용
+// 사건명 자동 생성 - 공통 함수 사용 (lib/utils/party-display.ts)
 function generateCaseName(
   clientName: string,
   opponentName: string,
   caseLabel: string,
   courtCaseNumber: string | null
 ): string {
-  const vs = opponentName ? `v${opponentName}` : ''
-  const suffix = caseLabel || courtCaseNumber || ''
-  return `${clientName}${vs}${suffix ? `(${suffix})` : ''}`
+  return generateCaseTitle(clientName, opponentName, caseLabel || courtCaseNumber)
 }
 
 // 파일 크기 포맷
